@@ -34,7 +34,7 @@ test('rock does not walk, stone does', () => {
 
 /* A little hill by hand on flat ground: a 3 by 3 block of rock at level 0 with a stone floor above it, and one slope on its west side. */
 function makeHill(api, x0, y0, withSlope){
-  for (let y = y0 - 2; y <= y0 + 4; y++) for (let x = x0 - 2; x <= x0 + 4; x++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; api.levels[api.ZOFF + 1][api.idx(x, y)] = null; }
+  for (let y = y0 - 2; y <= y0 + 4; y++) for (let x = x0 - 2; x <= x0 + 4; x++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; t.hill = null; api.levels[api.ZOFF + 1][api.idx(x, y)] = null; api.levels[api.ZOFF + 2][api.idx(x, y)] = null; }
   for (let y = y0; y < y0 + 3; y++) for (let x = x0; x < x0 + 3; x++){ api.tileAt(x, y).ground = 'rock'; api.placeTile(x, y, 1, 'stone'); }
   if (withSlope) api.tileAt(x0 - 1, y0 + 1).slope = true;
 }
@@ -89,4 +89,29 @@ test('fire on a hilltop burns and is seen from the hilltop, not from below', () 
   const before = top.fire; api.step();
   assert.ok(top.fire < before, 'the hilltop fire should burn down each tick');
   assert.equal(api.lightTile(x0 + 1, y0 + 1, 2), 'Nothing here but air.');
+});
+
+for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${seed}: the hills are sound`, () => {
+  const api = load(); api.startWorld(seed);
+  assert.ok(api.hills.length >= 6 && api.hills.length <= 10, `${api.hills.length} hills`);
+  const start = { sx: 5, sy: 3 };
+  const full = api.levels.length * api.world.length;
+  const slopes = []; for (const t of api.world) if (t.slope) slopes.push(t); for (const t of api.raised) if (t.slope) slopes.push(t);
+  const out = [];
+  for (const s of slopes){ api.steps(s.x, s.y, s.z, out); assert.ok(out.some((v, k) => k % 3 === 2 && v === s.z + 1), `slope at ${s.x},${s.y},${s.z} leads nowhere`); }
+  for (const h of api.hills){
+    const floors = api.raised.filter(t => t.hill === h && api.GROUND[t.ground].walk);
+    assert.ok(floors.length > 0, `hill at ${h.x},${h.y} has no floor`);
+    assert.ok(floors.some(t => t.z === h.storeys), `hill at ${h.x},${h.y} should reach level ${h.storeys}`);
+    for (const i of h.tiles){
+      const t = api.world[i];
+      assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
+      const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(279, Math.max(0, t.x + dx)), Math.min(119, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
+    }
+    const base = slopes.find(s => s.z === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const u = api.tileAt(s.x + dx, s.y + dy, 1); return u && u.hill === h; }));
+    assert.ok(base, `hill at ${h.x},${h.y} has no slope up from the ground`);
+    const region = api.reachable(base.x, base.y, 0, full);
+    for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `hill at ${h.x},${h.y}: floor ${t.x},${t.y},${t.z} cannot be reached`);
+  }
 });

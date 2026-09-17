@@ -71,6 +71,77 @@ function makeNoise(scale){
     return a + (b - a) * ty;
   };
 }
+/* ---------- uplift: hills ---------- */
+/* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
+   level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
+   level 1 with a floor at level 2. Each storey gets one or two slopes on its rim. The rest of the rim is cliff. */
+function uplift(){
+  const start = { sx: SW >> 1, sy: SH >> 1 };
+  const cands = shuffle(sectors.filter(s => (s.biome === 'rocky' || s.biome === 'forest') && !(s.sx === start.sx && s.sy === start.sy)));
+  const want = 6 + rint(5), jit = makeNoise(6);
+  for (const s of cands){
+    if (hills.length >= want) break;
+    for (let tries = 0; tries < 12; tries++){
+      const r = 3 + rint(12), ry = Math.max(3, Math.round(r * (0.6 + rng() * 0.4)));
+      const cx = s.sx * LW + r + rint(Math.max(1, LW - 2 * r)), cy = s.sy * LH + ry + rint(Math.max(1, LH - 2 * ry));
+      let foot = [];
+      for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - r; x <= cx + r; x++){
+        if (!inb(x, y)) continue;
+        const e = ((x - cx) / r) ** 2 + ((y - cy) / ry) ** 2 + (jit(x, y) - 0.5) * 0.5;
+        if (e <= 1) foot.push(idx(x, y));
+      }
+      if (!foot.includes(idx(cx, cy))) continue;
+      foot = component(foot, idx(cx, cy));
+      if (foot.length < 12 || !hillFits(foot, start)) continue;
+      const h = { x: cx, y: cy, r, storeys: r >= 8 ? 2 : 1, tiles: foot };
+      raiseHill(h); hills.push(h); break;
+    }
+  }
+}
+/* The tiles of `list` joined to `seed` by four-way steps within the list. */
+function component(list, seed){
+  const set = new Set(list), seen = new Set([seed]), q = [seed];
+  for (let head = 0; head < q.length; head++){ const i = q[head], x = i % W, y = (i - x) / W;
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (set.has(j) && !seen.has(j)){ seen.add(j); q.push(j); } } }
+  return [...seen];
+}
+/* A footprint fits if it stays off the map edge, out of the start sector, off other hills, and three tiles from any water or riverbank. */
+function hillFits(foot, start){
+  const set = new Set(foot);
+  for (const i of foot){
+    const x = i % W, y = (i - x) / W;
+    const sc = secOf(x, y); if (sc.sx === start.sx && sc.sy === start.sy) return false;
+    if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
+      const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const q = world[idx(nx, ny)];
+      if (q.ground === 'water' || q.ground === 'sand' || (q.hill && !set.has(idx(nx, ny)))) return false;
+    }
+  }
+  return true;
+}
+/* A tile is inside the shape eroded by d if every tile within d of it is in the set. */
+function erodedBy(i, set, d){ const x = i % W, y = (i - x) / W; for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.abs(dx) + Math.abs(dy) <= d && !set.has(idx(x + dx, y + dy))) return false; return true; }
+function raiseHill(h){
+  const set = new Set(h.tiles);
+  let inner = h.storeys === 2 ? h.tiles.filter(i => erodedBy(i, set, 2)) : [];
+  if (inner.length){ inner = component(inner, inner[0]); if (inner.length < 4){ inner = []; h.storeys = 1; } }
+  const innerSet = new Set(inner);
+  for (const i of h.tiles){ const t = world[i]; t.ground = 'rock'; t.feature = null; t.berries = 0; t.loose = null; t.hill = h; }
+  for (const i of h.tiles){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 1, innerSet.has(i) ? 'rock' : (rng() < 0.5 ? 'grass' : 'stone')); t.hill = h; }
+  for (const i of inner){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 2, rng() < 0.5 ? 'grass' : 'stone'); t.hill = h; }
+  cutSlopes(h, 0, i => !set.has(i), i => set.has(i) && !innerSet.has(i));
+  if (inner.length) cutSlopes(h, 1, i => set.has(i) && !innerSet.has(i), i => innerSet.has(i));
+}
+/* One or two slopes on level z at a rim: a walkable low tile beside a high tile whose floor is one level up. Slopes sit at least six tiles apart. */
+function cutSlopes(h, z, isLow, isHigh){
+  const rim = [];
+  for (const i of h.tiles){ const x = i % W, y = (i - x) / W; if (!isHigh(i)) continue;
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny);
+      if (isLow(j) && passable(nx, ny, z) && !tileAt(nx, ny, z).slope) rim.push([nx, ny]); } }
+  if (!rim.length) return;
+  const want = 1 + rint(2), picked = [];
+  for (let k = 0; k < 40 && picked.length < want; k++){ const [x, y] = rim[rint(rim.length)]; if (picked.every(([px, py]) => dist(px, py, x, y) >= 6)){ const t = tileAt(x, y, z); t.slope = true; t.feature = null; picked.push([x, y]); } }
+}
 function generate(){
   const bn = makeNoise(38), mn = makeNoise(52), en = makeNoise(9), fn = makeNoise(5), rn = makeNoise(40);
   sectors = [];
@@ -123,6 +194,7 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
+  uplift();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
