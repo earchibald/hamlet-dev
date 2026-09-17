@@ -2,7 +2,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const W = 280, H = 120;
 
 test('the surface is level 0 and the levels below are empty', () => {
   const api = load(); api.startWorld('r');
@@ -109,11 +108,27 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
       const t = api.world[i];
       assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
       const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(W - 1, Math.max(0, t.x + dx)), Math.min(H - 1, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(api.W - 1, Math.max(0, t.x + dx)), Math.min(api.H - 1, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
     }
     const base = slopes.find(s => s.z === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const u = api.tileAt(s.x + dx, s.y + dy, 1); return u && u.hill === h; }));
     assert.ok(base, `hill at ${h.x},${h.y} has no slope up from the ground`);
     const region = api.reachable(base.x, base.y, 0, full);
     for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `hill at ${h.x},${h.y}: floor ${t.x},${t.y},${t.z} cannot be reached`);
   }
+});
+
+test('a person walks up the slope, stands on the floor, and drops a stick there', () => {
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
+  makeHill(api, x0, y0, true);
+  const a = api.beings[0]; a.x = x0 - 2; a.y = y0 + 1; a.z = 0; a.asleep = false; a.homeless = false;
+  const path = api.bfs(a.x, a.y, 0, (x, y, z) => z === 1 && x === x0 + 1 && y === y0 + 1, 500, a);
+  assert.ok(path, 'no path up');
+  a.task = { type: 'wander', label: 'Climbing', path, arrive: () => 'done', started: api.tick, key: 'wander', fast: true };
+  for (let k = 0; k < path.length; k++) api.runTask(a);
+  assert.equal(a.z, 1, 'the person should be on the floor above');
+  assert.equal(api.tileAt(a.x, a.y, a.z).ground, 'stone');
+  a.carrying = { kind: 'stick', count: 1 }; api.dropCarried(a);
+  const it = api.items.find(i => i.kind === 'stick' && i.x === a.x && i.y === a.y);
+  assert.ok(it, 'no stick dropped'); assert.equal(it.z, 1, 'the stick should lie on the floor, not in the rock below');
+  assert.equal(api.itemAt(a.x, a.y, 1), it);
 });

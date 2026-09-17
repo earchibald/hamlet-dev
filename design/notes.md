@@ -146,14 +146,15 @@ The soak asserts, per seed:
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
+- The same seed tells the same story twice.
 
 `tests/terrain.js` checks the levels: the surface is level 0, a slope joins two floors and a cliff does not, rabbits never climb and deer do, a wolf a level up is not a threat, fire burns on a hilltop, and every hill on every seed is rock with reachable floors, off the water, and out of the start sector.
-- The same seed tells the same story twice.
 
 Known weak spots:
 - Snare catches are low, 1 to 5 per world in 70 days, since rabbits became a real population.
 - Wolves rarely catch deer.
 - Runs take about 15 seconds per seed. Profile before adding more per-tick work.
+- Some readers still see only the surface: plants grow on the surface, sector resource counts read the surface, lightning strikes surface tiles, and ash on a hill floor never returns to grass. Phase 2 of topography takes these up.
 
 ## 15. Next
 

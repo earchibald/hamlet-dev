@@ -55,8 +55,8 @@ function fingerprint(api, events){
   return {
     tick: api.tick, chronicleLines: events.length,
     chronicle: fnv(events.map(e => `${e.tick}|${e.kind}|${e.text}`).join('\n')),
-    beings: fnv(api.beings.map(b => `${b.id}|${b.species}|${b.alive ? 1 : 0}|${b.x},${b.y}|${b.camp ? b.camp.id : ''}`).join('\n')),
-    items: fnv(api.items.map(i => `${i.id}|${i.kind}|${i.x},${i.y}`).join('\n')),
+    beings: fnv(api.beings.map(b => `${b.id}|${b.species}|${b.alive ? 1 : 0}|${b.x},${b.y},${b.z}|${b.camp ? b.camp.id : ''}`).join('\n')),
+    items: fnv(api.items.map(i => `${i.id}|${i.kind}|${i.x},${i.y},${i.z}`).join('\n')),
   };
 }
 

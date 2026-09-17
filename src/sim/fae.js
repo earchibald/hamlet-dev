@@ -37,7 +37,7 @@ Object.assign(START, {
   },
   forage(a){
     const hasFood = t => t.feature === 'bush' && t.berries > 0; const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 800, a); if (!p) return false;
-    a.task = { type: 'eat', label: 'Picking berries in the dark', path: p, arrive(a){ const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail'; b.berries--; a.needs.glow = Math.min(100, a.needs.glow + 30); return 'done'; } };
+    a.task = { type: 'eat', label: 'Picking berries in the dark', path: p, arrive(a){ const b = nearFind(a.x, a.y, hasFood, NEAR, a.z); if (!b) return 'fail'; b.berries--; a.needs.glow = Math.min(100, a.needs.glow + 30); return 'done'; } };
     return true;
   },
   watch(a){

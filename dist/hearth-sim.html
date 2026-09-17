@@ -264,9 +264,9 @@ function log(text, who = [], kind = 'info'){
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
-function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false }; }
+function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null }; }
 /* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
-function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); levels[z + ZOFF][idx(x, y)] = t; if (z !== 0) raised.push(t); return t; }
+function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); const old = levels[z + ZOFF][idx(x, y)]; levels[z + ZOFF][idx(x, y)] = t; if (z !== 0){ if (old){ const k = raised.indexOf(old); if (k >= 0) raised[k] = t; else raised.push(t); } else raised.push(t); } return t; }
 function matOf(t){ return t.feature ? FEATURES[t.feature].mat : null; }
 function passable(x, y, z = 0){
   if (!hasTile(x, y, z)) return false;
@@ -678,7 +678,8 @@ function setSite(x, y){
 function nearbyBlaze(){
   if (fireCount <= 0 || !camp.site) return null;
   const [cx, cy] = camp.site; let best = null;
-  for (let i = 0; i < W * H; i++){ const t = world[i]; if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
+  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
+  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
   return best ? best.t : null;
 }
 
@@ -826,13 +827,13 @@ function dropCarried(a){
   if (!a.carrying) return;
   const c = a.carrying; a.carrying = null;
   if (c.kind === 'berries' || c.kind === 'cooked' || c.kind === 'ember' || c.kind === 'water' || c.kind === 'spear') return;
-  if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y); return; }
-  for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y);
+  if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y, a.z); return; }
+  for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y, a.z);
 }
 function die(a, cause){
   failTask(a); a.alive = false; a.asleep = false; a.status = 'Dead';
   if (a.species === 'human'){
-    corpses.push({ x: a.x, y: a.y, name: a.name });
+    corpses.push({ x: a.x, y: a.y, z: a.z, name: a.name });
     log(`${a.name} ${cause}.`, [a], 'death');
     for (const o of humans()){
       if (o.camp !== a.camp) continue;
@@ -840,13 +841,13 @@ function die(a, cause){
       if (op >= 25) addThought(o, 'grief' + a.id, `Grieves for ${a.name}`, -30, 3000);
       else addThought(o, 'loss' + a.id, `Sad about the death of ${a.name}`, -8, 1500);
     }
-  } else if (a.species === 'rabbit'){ addItem('carcass', a.x, a.y); }
+  } else if (a.species === 'rabbit'){ addItem('carcass', a.x, a.y, a.z); }
   else if (a.species === 'sprite'){
     const g = a.grove; if (g){ g.anger = Math.min(100, g.anger + 60); g.swarmUntil = tick + 4000; for (const c of camps) if (c.site && nearAt(a, ...c.site) <= 40){ c.fae.favor = Math.max(-100, c.fae.favor - 40); c.fae.blightUntil = tick + 5000; } }
     log(`A sprite dies. Its light goes out, and the grove will remember.`, humans().filter(h => near(h, a) <= 12), 'bad');
     for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'kin', 'One of us was killed by humans', -20, 4000);
   }
-  else if (a.species === 'deer'){ addItem('venison', a.x, a.y); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
+  else if (a.species === 'deer'){ addItem('venison', a.x, a.y, a.z); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
 }
 function chat(a, b){
   const compat = 1 - Math.abs(a.traits.sociability - b.traits.sociability) - 0.8 * Math.abs(a.traits.temper - b.traits.temper);
@@ -891,7 +892,7 @@ const START = {
     if (!p) p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), a.species === 'rabbit' ? 200 : 2500, a); if (!p) return false;
     a.task = { type: 'eat', label: a.species === 'rabbit' ? 'Looking for grass' : 'Going to eat berries', path: p, progress: 0,
       arrive(a, t){
-        const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail';
+        const b = nearFind(a.x, a.y, hasFood, NEAR, a.z); if (!b) return 'fail';
         if (a.species === 'rabbit'){ t.label = 'Nibbling grass'; if (++t.progress < 15) return 'continue'; a.needs.food = Math.min(100, a.needs.food + 45); if (b.feature === 'bush' && b.berries > 0) b.berries--; return 'done'; }
         b.berries--; a.needs.food = Math.min(100, a.needs.food + 25); addThought(a, 'ate', 'Ate berries off the bush', 2, 400);
         return a.needs.food < 60 && b.berries > 0 ? 'continue' : 'done';
@@ -1251,7 +1252,7 @@ Object.assign(START, {
   },
   forage(a){
     const hasFood = t => t.feature === 'bush' && t.berries > 0; const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 800, a); if (!p) return false;
-    a.task = { type: 'eat', label: 'Picking berries in the dark', path: p, arrive(a){ const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail'; b.berries--; a.needs.glow = Math.min(100, a.needs.glow + 30); return 'done'; } };
+    a.task = { type: 'eat', label: 'Picking berries in the dark', path: p, arrive(a){ const b = nearFind(a.x, a.y, hasFood, NEAR, a.z); if (!b) return 'fail'; b.berries--; a.needs.glow = Math.min(100, a.needs.glow + 30); return 'done'; } };
     return true;
   },
   watch(a){
@@ -1373,7 +1374,7 @@ function startGather(a, kind){
   const it = found; it.reservedBy = a.id;
   a.task = { type: 'gather', label: `Looking for ${ITEMS[kind].plural}`, path: p,
     arrive(a, t){
-      if (!items.includes(it) || it.x !== a.x || it.y !== a.y) return 'fail';
+      if (!items.includes(it) || it.x !== a.x || it.y !== a.y || it.z !== a.z) return 'fail';
       removeItem(it);
       if (a.carrying) a.carrying.count++; else a.carrying = { kind, count: 1 };
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
@@ -1396,7 +1397,7 @@ function startPickBerries(a){
     return true; }
   a.task = { type: 'gather', label: 'Going to pick berries', path: p, progress: 0,
     arrive(a, t){
-      const b = nearFind(a.x, a.y, hasFood);
+      const b = nearFind(a.x, a.y, hasFood, NEAR, a.z);
       if (!b){ return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail'; }
       t.label = 'Picking berries';
       if (++t.progress % 6 === 0){ b.berries--; if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'berries', count: 1 }; }
@@ -1758,7 +1759,7 @@ function startWorld(seed){
 /* ---------- god actions ---------- */
 function lightTile(x, y, z = 0){
   const t = hasTile(x, y, z) ? tileAt(x, y, z) : null;
-  if (!t) return 'Nothing here but air.';
+  if (!t) return z > 0 ? 'Nothing here but air.' : 'Solid earth. Nothing will burn in it.';
   if (t.struct && t.struct.type === 'firepit'){
     const p = t.struct; camp = camps.find(c => c.pit && c.pit[0] === x && c.pit[1] === y) || camp;
     if (p.lit) return 'The fire is already burning.';
@@ -1907,7 +1908,7 @@ function drawLoc(){
   for (const c of camps) if (lvl === 0 && c.site && !c.pit && secOf(...c.site).sx === cur.sx && secOf(...c.site).sy === cur.sy){
     const [x, y] = c.site; ctx.strokeStyle = P.select; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.strokeRect((x - ox) * T + 2, (y - oy) * T + 2, T - 4, T - 4); ctx.setLineDash([]);
   }
-  if (lvl === 0){ ctx.fillStyle = P.corpse; for (const c of corpses){ if (c.x >= ox && c.x < ox + LW && c.y >= oy && c.y < oy + LH) ctx.fillText('x', (c.x - ox) * T + T / 2, (c.y - oy) * T + T / 2 + 1); } }
+  { ctx.fillStyle = P.corpse; for (const c of corpses){ if (c.x >= ox && c.x < ox + LW && c.y >= oy && c.y < oy + LH && c.z === lvl) ctx.fillText('x', (c.x - ox) * T + T / 2, (c.y - oy) * T + T / 2 + 1); } }
   const dark = darkness(); if (dark > 0){ ctx.fillStyle = `rgba(${P.night},${dark})`; ctx.fillRect(0, 0, LW * T, LH * T); }
   if (isWinter()){ ctx.fillStyle = P.snow; ctx.globalAlpha = 0.22; ctx.fillRect(0, 0, LW * T, LH * T); ctx.globalAlpha = 1; }
   if (weather.storm){ ctx.strokeStyle = P.rain; ctx.globalAlpha = 0.35; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 90; k++){ const x = (hash(k, 3) % (LW * T)), y = ((hash(k, 7) + tick * 9) % (LH * T)); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 9); } ctx.stroke(); ctx.globalAlpha = 1; }

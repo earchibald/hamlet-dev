@@ -46,13 +46,13 @@ function dropCarried(a){
   if (!a.carrying) return;
   const c = a.carrying; a.carrying = null;
   if (c.kind === 'berries' || c.kind === 'cooked' || c.kind === 'ember' || c.kind === 'water' || c.kind === 'spear') return;
-  if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y); return; }
-  for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y);
+  if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y, a.z); return; }
+  for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y, a.z);
 }
 function die(a, cause){
   failTask(a); a.alive = false; a.asleep = false; a.status = 'Dead';
   if (a.species === 'human'){
-    corpses.push({ x: a.x, y: a.y, name: a.name });
+    corpses.push({ x: a.x, y: a.y, z: a.z, name: a.name });
     log(`${a.name} ${cause}.`, [a], 'death');
     for (const o of humans()){
       if (o.camp !== a.camp) continue;
@@ -60,13 +60,13 @@ function die(a, cause){
       if (op >= 25) addThought(o, 'grief' + a.id, `Grieves for ${a.name}`, -30, 3000);
       else addThought(o, 'loss' + a.id, `Sad about the death of ${a.name}`, -8, 1500);
     }
-  } else if (a.species === 'rabbit'){ addItem('carcass', a.x, a.y); }
+  } else if (a.species === 'rabbit'){ addItem('carcass', a.x, a.y, a.z); }
   else if (a.species === 'sprite'){
     const g = a.grove; if (g){ g.anger = Math.min(100, g.anger + 60); g.swarmUntil = tick + 4000; for (const c of camps) if (c.site && nearAt(a, ...c.site) <= 40){ c.fae.favor = Math.max(-100, c.fae.favor - 40); c.fae.blightUntil = tick + 5000; } }
     log(`A sprite dies. Its light goes out, and the grove will remember.`, humans().filter(h => near(h, a) <= 12), 'bad');
     for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'kin', 'One of us was killed by humans', -20, 4000);
   }
-  else if (a.species === 'deer'){ addItem('venison', a.x, a.y); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
+  else if (a.species === 'deer'){ addItem('venison', a.x, a.y, a.z); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
 }
 function chat(a, b){
   const compat = 1 - Math.abs(a.traits.sociability - b.traits.sociability) - 0.8 * Math.abs(a.traits.temper - b.traits.temper);
@@ -111,7 +111,7 @@ const START = {
     if (!p) p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), a.species === 'rabbit' ? 200 : 2500, a); if (!p) return false;
     a.task = { type: 'eat', label: a.species === 'rabbit' ? 'Looking for grass' : 'Going to eat berries', path: p, progress: 0,
       arrive(a, t){
-        const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail';
+        const b = nearFind(a.x, a.y, hasFood, NEAR, a.z); if (!b) return 'fail';
         if (a.species === 'rabbit'){ t.label = 'Nibbling grass'; if (++t.progress < 15) return 'continue'; a.needs.food = Math.min(100, a.needs.food + 45); if (b.feature === 'bush' && b.berries > 0) b.berries--; return 'done'; }
         b.berries--; a.needs.food = Math.min(100, a.needs.food + 25); addThought(a, 'ate', 'Ate berries off the bush', 2, 400);
         return a.needs.food < 60 && b.berries > 0 ? 'continue' : 'done';

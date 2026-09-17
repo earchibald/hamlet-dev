@@ -65,7 +65,7 @@ function startGather(a, kind){
   const it = found; it.reservedBy = a.id;
   a.task = { type: 'gather', label: `Looking for ${ITEMS[kind].plural}`, path: p,
     arrive(a, t){
-      if (!items.includes(it) || it.x !== a.x || it.y !== a.y) return 'fail';
+      if (!items.includes(it) || it.x !== a.x || it.y !== a.y || it.z !== a.z) return 'fail';
       removeItem(it);
       if (a.carrying) a.carrying.count++; else a.carrying = { kind, count: 1 };
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
@@ -88,7 +88,7 @@ function startPickBerries(a){
     return true; }
   a.task = { type: 'gather', label: 'Going to pick berries', path: p, progress: 0,
     arrive(a, t){
-      const b = nearFind(a.x, a.y, hasFood);
+      const b = nearFind(a.x, a.y, hasFood, NEAR, a.z);
       if (!b){ return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail'; }
       t.label = 'Picking berries';
       if (++t.progress % 6 === 0){ b.berries--; if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'berries', count: 1 }; }

@@ -66,7 +66,8 @@ function setSite(x, y){
 function nearbyBlaze(){
   if (fireCount <= 0 || !camp.site) return null;
   const [cx, cy] = camp.site; let best = null;
-  for (let i = 0; i < W * H; i++){ const t = world[i]; if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
+  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
+  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
   return best ? best.t : null;
 }
 
