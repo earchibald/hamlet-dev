@@ -5,6 +5,7 @@
   "description": "Hearth: a two-scale colony simulation. One person, one valley, a fire, and whatever the smoke brings.",
   "scripts": {
     "build": "node build.js",
+    "serve": "node serve.js",
     "test": "node tests/soak.js",
     "soak": "node tests/soak.js",
     "soak:quick": "SEEDS=r,x DAYS=10 node tests/soak.js",
