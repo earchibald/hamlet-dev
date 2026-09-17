@@ -7,7 +7,7 @@ function makeCamp(name){
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
-const campNear = (x, y, r) => camps.filter(c => c.site && dist(c.site[0], c.site[1], x, y) <= r).sort((p, q) => dist(p.site[0], p.site[1], x, y) - dist(q.site[0], q.site[1], x, y))[0] || null;
+const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r).sort((p, q) => nearAt(a, ...p.site) - nearAt(a, ...q.site))[0] || null;
 
 function stashAdd(kind, n){
   camp.stash[kind] = (camp.stash[kind] || 0) + n;
