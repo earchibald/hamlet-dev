@@ -11,7 +11,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runDays, countEvents, fingerprint, oddDeaths, campLine } = require('./lib/run');
+const { runDays, countEvents, fingerprint, oddDeaths, cutOff, campLine } = require('./lib/run');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -21,15 +21,15 @@ const GOLDEN = path.join(__dirname, 'soak-golden.json');
 const golden = fs.existsSync(GOLDEN) ? JSON.parse(fs.readFileSync(GOLDEN, 'utf8')) : {};
 let goldenDirty = false;
 
-/* Deaths that are not old age, found in the first soak of these seeds and not yet traced.
-   Each is a bug until proven otherwise. Trace with tests/trace-deaths.js <seed>. When one is
-   fixed, remove it here so the test guards it. */
-const KNOWN_DEATHS = { x: ['Esk starved to death.'], beta: ['Wren died of thirst.'] };
+/* Deaths that are not old age, seen in the soak and not yet traced, by seed. Each is a bug until
+   proven otherwise. Trace with tests/trace-deaths.js <seed>. Remove an entry when the bug is fixed. */
+const KNOWN_DEATHS = {};
 
 for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
     const t0 = Date.now();
-    const { api, events } = runDays(seed, DAYS);
+    const stranded = [];
+    const { api, events } = runDays(seed, DAYS, (api, i) => { if (api.tick % 1000 === 0) stranded.push(...cutOff(api)); });
     const counts = countEvents(api, events), fp = fingerprint(api, events);
     t.diagnostic(`${seed}: ${Date.now() - t0} ms, ${events.length} chronicle lines`);
     t.diagnostic(api.camps.map(c => campLine(api, c)).join(' | '));
@@ -44,6 +44,9 @@ for (const seed of SEEDS){
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
+    });
+    await t.test('nobody is cut off from their camp', () => {
+      assert.deepEqual(stranded, [], 'a person who cannot walk home is trapped, and a trap is a bug');
     });
     await t.test('every camp with a pit keeps a chronicle of a lit fire', () => {
       for (const c of api.camps) if (c.pit) assert.ok(c.everLit, `${c.name} built a pit that was never lit`);

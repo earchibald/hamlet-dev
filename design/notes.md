@@ -65,7 +65,7 @@ Young do half the work and are kept from hunting, guarding, felling, and foundin
 
 Births: spring or summer, a roof, six spare meals, two adults who like each other at 35 or more, and 16 days since either last had a child. The child blends both parents' traits. Rabbits breed when two adults are within 10 tiles in a warm season. Fawns come in spring. Foxes and wolves wander in from the world edges.
 
-Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed adjacent grass in spring and autumn at 1.2 percent per sample, and never next to another bush. Pines start as saplings, become trees after 12 days, and old pines fall in storms. Generation spreads bush ages over 60 days. A first draft gave them all similar ages and every bush died in the same week, which starved four camps.
+Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed adjacent grass in spring and autumn at 1.2 percent per sample, and never next to another bush. Pines start as saplings, become trees after 12 days, and old pines fall in storms. A sapling becomes a solid tree only if the open tiles beside it still touch each other around it once it is solid. Before this rule, saplings sealed one-tile gaps in dense forest. Two woodcutters were shut in pockets by the river and the world's edge, and one starved and one died of thirst, each two tiles from the tree that closed the way. The tile card says when a sapling is held back. Generation spreads bush ages over 60 days. A first draft gave them all similar ages and every bush died in the same week, which starved four camps.
 
 ## 8. Camps and goals
 
@@ -139,7 +139,8 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
 - Someone is alive at the end.
-- Nobody dies of anything but old age. Two known deaths are marked todo until traced: Esk starves in seed x, Wren dies of thirst in seed beta.
+- Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
+- Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
 - The same seed tells the same story twice.
 

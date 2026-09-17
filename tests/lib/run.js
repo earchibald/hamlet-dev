@@ -60,6 +60,18 @@ function fingerprint(api, events){
   };
 }
 
+/* Living humans who cannot walk to their camp's stash. Checked once a day by the soak:
+   one full-map search per camp. A person who is cut off starves or dies of thirst in a pocket. */
+function cutOff(api){
+  const out = [];
+  for (const c of api.camps){
+    if (!c.stashTile) continue;
+    const region = api.reachable(c.stashTile[0], c.stashTile[1], api.world.length);
+    for (const h of api.beings) if (h.alive && h.species === 'human' && h.camp === c && !region.has(api.idx(h.x, h.y))) out.push(`${h.name} at ${h.x},${h.y} on day ${api.dayOf()}, ${api.seasonOf()}, cut off from ${c.name}`);
+  }
+  return out;
+}
+
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, scriptGod, countEvents, fingerprint, deaths, oddDeaths, campLine, OLD_AGE };
+module.exports = { DAY, runDays, scriptGod, countEvents, fingerprint, deaths, oddDeaths, cutOff, campLine, OLD_AGE };

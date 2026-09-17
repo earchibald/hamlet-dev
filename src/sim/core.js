@@ -14,6 +14,8 @@ const SW = 10, SH = 6, LW = 28, LH = 20, W = SW * LW, H = SH * LH, DAY = 1000, T
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const RING = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 const NEAR = [[0,0], ...DIRS];
+/* The eight neighbours in order around the ring, so a walk along it stays on adjacent tiles. */
+const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 
 /* Data tables. Rules read properties. Rules do not check names. */
 const MATERIALS = {

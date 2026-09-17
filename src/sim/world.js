@@ -166,6 +166,17 @@ function generate(){
   }
 }
 
+/* A sapling becomes a solid tree only if it does not close a path. The open
+   tiles beside it must still touch each other around the ring once it is
+   solid. Two people starved in pockets sealed this way before this rule. */
+function saplingMayGrow(t){
+  const open = AROUND.map(([dx, dy]) => passable(t.x + dx, t.y + dy));
+  const sides = [0, 2, 4, 6].filter(i => open[i]);
+  if (sides.length < 2) return true;
+  const joined = new Set([sides[0]]);
+  for (const step of [1, -1]){ let i = sides[0]; for (let k = 0; k < 7; k++){ i = (i + step + 8) % 8; if (!open[i]) break; joined.add(i); } }
+  return sides.every(i => joined.has(i));
+}
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
   for (let k = 0; k < 60; k++){
@@ -177,7 +188,7 @@ function growPlants(){
       if (isWinter()){ if (t.berries > 0 && rng() < 0.15) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
       if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemGrid[idx(q.x, q.y)] && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
     }
-    else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12) t.feature = 'tree'; }
+    else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12 && saplingMayGrow(t)) t.feature = 'tree'; }
     else if (t.feature === 'tree'){
       if (weather.storm && (tick - (t.planted || 0)) / DAY > 100 && rng() < 0.03){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
       if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemGrid[idx(q.x, q.y)] && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }

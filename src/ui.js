@@ -164,6 +164,7 @@ function inspectTile(x, y){
   if (t.struct && t.struct.type === 'hut') rows.push(['Hut', 'sleeps three, out of the wind and rain.']);
   if (t.struct && t.struct.type === 'storehouse') rows.push(['Storehouse', 'the stash on stilts. Food keeps twice as long, and wolves cannot reach it.']);
   if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
+  if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);
   if (t.struct && t.struct.type === 'ward') rows.push(['Ward post', 'charred wood. Sprites will not come within nine tiles of the fire.']);
   if (t.feature === 'hollow'){ const g = groves.find(g => g.x === x && g.y === y); if (g) rows.push(['Grove', `${beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g).length} sprites live here. Anger ${g.anger}${g.swarmUntil > tick ? ', and they are out for revenge' : ''}.`]); }
