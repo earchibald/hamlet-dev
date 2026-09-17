@@ -41,7 +41,7 @@ Object.assign(START, {
     return true;
   },
   watch(a){
-    const c = camps.filter(c => c.pit && tileAt(...c.pit).struct.lit && dist(c.pit[0], c.pit[1], a.x, a.y) <= 90 && !(c.ward && a.traits.bravery < 0.9)).sort((p, q) => dist(p.pit[0], p.pit[1], a.x, a.y) - dist(q.pit[0], q.pit[1], a.x, a.y))[0]; if (!c) return false;
+    const c = camps.filter(c => c.pit && tileAt(...c.pit).struct.lit && nearAt(a, ...c.pit) <= 90 && !(c.ward && a.traits.bravery < 0.9)).sort((p, q) => nearAt(a, ...p.pit) - nearAt(a, ...q.pit))[0]; if (!c) return false;
     const r = c.ward ? 11 : 6; const p = legPath(a, c.pit[0], c.pit[1], r); if (!p) return false;
     a.task = { type: 'watch', label: 'Drawn to the firelight', path: p, progress: 0,
       arrive(a, t){ if (nearAt(a, ...c.pit) > r){ const q = legPath(a, c.pit[0], c.pit[1], r); if (!q) return 'fail'; t.path = q; return 'continue'; }
@@ -52,7 +52,7 @@ Object.assign(START, {
     return true;
   },
   collect(a){
-    const c = camps.find(c => c.stone && tileAt(...c.stone).struct.offering > 0 && dist(c.stone[0], c.stone[1], a.x, a.y) <= 50 && !c.ward); if (!c) return false;
+    const c = camps.find(c => c.stone && tileAt(...c.stone).struct.offering > 0 && nearAt(a, ...c.stone) <= 50 && !c.ward); if (!c) return false;
     const p = legPath(a, c.stone[0], c.stone[1], 1); if (!p) return false;
     a.task = { type: 'collect', label: 'Sniffing out a gift', path: p, arrive(a, t){ if (nearAt(a, ...c.stone) > 1){ const q = legPath(a, c.stone[0], c.stone[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
       const st = tileAt(...c.stone).struct; if (st.offering <= 0) return 'fail'; st.offering = 0; a.needs.glow = 100; a.needs.play = Math.min(100, a.needs.play + 30);
@@ -61,7 +61,7 @@ Object.assign(START, {
     return true;
   },
   prank(a){
-    const angry = camps.filter(c => c.pit && !c.ward && dist(c.pit[0], c.pit[1], a.x, a.y) <= 70 && (c.fae.favor < -20 || (a.grove && (a.grove.swarmUntil > tick || a.grove.anger > 30)) || Object.values(c.fae.grudges).some(g => g > 20)) && tick - c.fae.lastPrank > 300);
+    const angry = camps.filter(c => c.pit && !c.ward && nearAt(a, ...c.pit) <= 70 && (c.fae.favor < -20 || (a.grove && (a.grove.swarmUntil > tick || a.grove.anger > 30)) || Object.values(c.fae.grudges).some(g => g > 20)) && tick - c.fae.lastPrank > 300);
     const c = angry.sort((p, q) => p.fae.favor - q.fae.favor)[0]; if (!c) return false;
     const p = legPath(a, c.stashTile[0], c.stashTile[1], 1); if (!p) return false;
     a.task = { type: 'prank', label: 'Slipping into the camp with mischief in mind', path: p, fast: true,
