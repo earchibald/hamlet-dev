@@ -94,7 +94,8 @@ function uplift(){
       foot = component(foot, idx(cx, cy));
       if (foot.length < 12 || !hillFits(foot, start)) continue;
       const h = { x: cx, y: cy, r, storeys: r >= 8 ? 2 : 1, tiles: foot };
-      raiseHill(h); hills.push(h); break;
+      const shape = hillShape(h); if (!hillClimbable(shape)) continue;
+      raiseHill(h, shape); hills.push(h); break;
     }
   }
 }
@@ -120,12 +121,24 @@ function hillFits(foot, start){
   return true;
 }
 /* A tile is inside the shape eroded by d if every tile within d of it is in the set. */
-function erodedBy(i, set, d){ const x = i % W, y = (i - x) / W; for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.abs(dx) + Math.abs(dy) <= d && !set.has(idx(x + dx, y + dy))) return false; return true; }
-function raiseHill(h){
+function erodedBy(i, set, d){ const x = i % W, y = (i - x) / W; for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.abs(dx) + Math.abs(dy) <= d && (!inb(x + dx, y + dy) || !set.has(idx(x + dx, y + dy)))) return false; return true; }
+/* The shape of a hill before it is raised: the second-storey core and the ring of first-storey floor around it. */
+function hillShape(h){
   const set = new Set(h.tiles);
   let inner = h.storeys === 2 ? h.tiles.filter(i => erodedBy(i, set, 2)) : [];
   if (inner.length){ inner = component(inner, inner[0]); if (inner.length < 4){ inner = []; h.storeys = 1; } }
   const innerSet = new Set(inner);
+  return { set, inner, innerSet, ring: h.tiles.filter(i => !innerSet.has(i)) };
+}
+/* A hill can be climbed if its first-storey floor is one piece and some walkable tile beside it on the ground can hold a slope. */
+function hillClimbable(shape){
+  if (!shape.ring.length || component(shape.ring, shape.ring[0]).length !== shape.ring.length) return false;
+  for (const i of shape.ring){ const x = i % W, y = (i - x) / W;
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (inb(nx, ny) && !shape.set.has(idx(nx, ny)) && passable(nx, ny, 0) && !tileAt(nx, ny).slope) return true; } }
+  return false;
+}
+function raiseHill(h, shape){
+  const { set, inner, innerSet } = shape;
   for (const i of h.tiles){ const t = world[i]; t.ground = 'rock'; t.feature = null; t.berries = 0; t.loose = null; t.hill = h; }
   for (const i of h.tiles){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 1, innerSet.has(i) ? 'rock' : (rng() < 0.5 ? 'grass' : 'stone')); t.hill = h; }
   for (const i of inner){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 2, rng() < 0.5 ? 'grass' : 'stone'); t.hill = h; }

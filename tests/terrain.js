@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const W = 280, H = 120;
 
 test('the surface is level 0 and the levels below are empty', () => {
   const api = load(); api.startWorld('r');
@@ -35,12 +36,13 @@ test('rock does not walk, stone does', () => {
 /* A little hill by hand on flat ground: a 3 by 3 block of rock at level 0 with a stone floor above it, and one slope on its west side. */
 function makeHill(api, x0, y0, withSlope){
   for (let y = y0 - 2; y <= y0 + 4; y++) for (let x = x0 - 2; x <= x0 + 4; x++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; t.hill = null; api.levels[api.ZOFF + 1][api.idx(x, y)] = null; api.levels[api.ZOFF + 2][api.idx(x, y)] = null; }
+  for (let k = api.raised.length - 1; k >= 0; k--){ const t = api.raised[k]; if (t.x >= x0 - 2 && t.x <= x0 + 4 && t.y >= y0 - 2 && t.y <= y0 + 4) api.raised.splice(k, 1); }
   for (let y = y0; y < y0 + 3; y++) for (let x = x0; x < x0 + 3; x++){ api.tileAt(x, y).ground = 'rock'; api.placeTile(x, y, 1, 'stone'); }
   if (withSlope) api.tileAt(x0 - 1, y0 + 1).slope = true;
 }
 
 test('a slope joins the ground to the floor above, and a cliff does not', () => {
-  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, true);
   const out = [];
   api.steps(x0 - 1, y0 + 1, 0, out);
@@ -61,7 +63,7 @@ test('a slope joins the ground to the floor above, and a cliff does not', () => 
 });
 
 test('rabbits never climb, deer do', () => {
-  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, true);
   const goal = (x, y, z) => z === 1;
   assert.equal(api.bfs(x0 - 2, y0 + 1, 0, goal, 500, { species: 'rabbit' }), null);
@@ -69,7 +71,7 @@ test('rabbits never climb, deer do', () => {
 });
 
 test('a wolf on a hilltop is not near a person below it', () => {
-  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, false);
   const wolf = api.beings.find(b => b.species === 'wolf'); wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
   const person = api.beings[0]; person.x = x0 + 1; person.y = y0 + 3; person.z = 0;
@@ -79,7 +81,7 @@ test('a wolf on a hilltop is not near a person below it', () => {
 });
 
 test('fire on a hilltop burns and is seen from the hilltop, not from below', () => {
-  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, true);
   const top = api.tileAt(x0 + 1, y0 + 1, 1); top.ground = 'grass';
   assert.equal(api.lightTile(x0 + 1, y0 + 1, 1), 'The ground is burning. This fire is not contained.');
@@ -107,7 +109,7 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
       const t = api.world[i];
       assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
       const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(279, Math.max(0, t.x + dx)), Math.min(119, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(W - 1, Math.max(0, t.x + dx)), Math.min(H - 1, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
     }
     const base = slopes.find(s => s.z === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const u = api.tileAt(s.x + dx, s.y + dy, 1); return u && u.hill === h; }));
     assert.ok(base, `hill at ${h.x},${h.y} has no slope up from the ground`);
