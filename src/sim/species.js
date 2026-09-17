@@ -25,17 +25,17 @@ function drowsy(a){
 Object.assign(START, {
   hunt(a){
     const wantsDeer = a.species === 'wolf' && (isWinter() || a.needs.food < 30);
-    const prey = beings.filter(b => b.alive && (b.species === 'rabbit' || (wantsDeer && b.species === 'deer')) && dist(b.x, b.y, a.x, a.y) <= (a.species === 'wolf' ? 50 : 40))
-      .sort((p, q) => (dist(p.x, p.y, a.x, a.y) - (p.species === 'deer' ? 15 : 0)) - (dist(q.x, q.y, a.x, a.y) - (q.species === 'deer' ? 15 : 0)))[0];
+    const prey = beings.filter(b => b.alive && (b.species === 'rabbit' || (wantsDeer && b.species === 'deer')) && near(b, a) <= (a.species === 'wolf' ? 50 : 40))
+      .sort((p, q) => (near(p, a) - (p.species === 'deer' ? 15 : 0)) - (near(q, a) - (q.species === 'deer' ? 15 : 0)))[0];
     if (!prey) return false;
-    if (dist(a.x, a.y, prey.x, prey.y) > 9){
+    if (near(a, prey) > 9){
       const p = legPath(a, prey.x, prey.y, 8); if (!p) return false;
       a.task = { type: 'travel', label: 'Prowling toward the meadow', path: p, arrive: () => 'done' }; return true;
     }
     a.task = { type: 'hunt', label: `Stalking a ${prey.species}`, path: [], fast: true, progress: 0,
       arrive(a, t){
-        if (!prey.alive || ++t.progress > 140 + a.skills.hunt * 30){ if (prey.alive && dist(a.x, a.y, prey.x, prey.y) <= 4){ prey.xp.wary = (prey.xp.wary || 0) + 1; if (prey.xp.wary >= 2){ prey.xp.wary = 0; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); } addThought(prey, 'chased', 'Was nearly caught', -6, 800); } return 'fail'; }
-        if (dist(a.x, a.y, prey.x, prey.y) <= 1){
+        if (!prey.alive || ++t.progress > 140 + a.skills.hunt * 30){ if (prey.alive && near(a, prey) <= 4){ prey.xp.wary = (prey.xp.wary || 0) + 1; if (prey.xp.wary >= 2){ prey.xp.wary = 0; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); } addThought(prey, 'chased', 'Was nearly caught', -6, 800); } return 'fail'; }
+        if (near(a, prey) <= 1){
           if (prey.species === 'deer' && rng() > 0.45 + a.skills.hunt * 0.1){ addThought(prey, 'escaped', 'Broke free from a wolf', -8, 900); prey.hp -= 15; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); failTask(prey); START.flee(prey); return 'fail'; }
           prey.hp = 0; t.label = 'Eating'; a.needs.food = 100; addThought(a, 'fed', 'Made a kill', 8, 600); gainXp(a, 'hunt'); die(prey, `was caught by a ${SPECIES[a.species].label}`); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === prey.z && dist(x, y, prey.x, prey.y) <= 1, 400, a); if (!p) return 'fail';
@@ -49,7 +49,7 @@ Object.assign(START, {
     const [sx, sy] = c.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'raid', label: 'Slinking toward the dark camp', path: p, fast: true,
       arrive(a, t){
-        if (dist(a.x, a.y, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const prev = camp; camp = c;
         const k = c.stash.carcass > 0 ? 'carcass' : c.stash.cooked > 0 ? 'cooked' : c.stash.smoked > 0 ? 'smoked' : null;
         if (k){ stashTake(k); a.needs.food = 100; a.cooldown.raid = tick + 1200; if (tick - c.wolfLogged > 300){ c.wolfLogged = tick; log(`A wolf slips into the dark camp and takes the ${ITEMS[k].name} from the stash.`, campHumans(), 'bad'); } for (const h of campHumans()) addThought(h, 'wolf', 'A wolf came into camp in the night', -12, 1200); }
@@ -59,19 +59,19 @@ Object.assign(START, {
   },
   stalk(a){
     if (a.species !== 'wolf' || !isNight() || a.needs.food > 35) return false;
-    const lone = humans().filter(h => !humans().some(o => o !== h && dist(o.x, o.y, h.x, h.y) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && dist(h.x, h.y, ...h.camp.pit) <= 8) && dist(h.x, h.y, a.x, a.y) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
-    const h = lone.sort((p, q) => dist(p.x, p.y, a.x, a.y) - dist(q.x, q.y, a.x, a.y))[0]; if (!h) return false;
+    const lone = humans().filter(h => !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
+    const h = lone.sort((p, q) => near(p, a) - near(q, a))[0]; if (!h) return false;
     a.task = { type: 'stalk', label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0,
       arrive(a, t){
         if (!h.alive || ++t.progress > 160 || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-        if (dist(a.x, a.y, h.x, h.y) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, 2000); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + 2000; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); START.flee(h); return 'done'; }
+        if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, 2000); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + 2000; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); START.flee(h); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
       } };
     return true;
   },
   herd(a){
-    const kin = beings.filter(b => b.alive && b !== a && b.species === a.species && dist(b.x, b.y, a.x, a.y) <= 30).sort((p, q) => dist(p.x, p.y, a.x, a.y) - dist(q.x, q.y, a.x, a.y))[0];
-    if (!kin || dist(kin.x, kin.y, a.x, a.y) <= 4) return false;
+    const kin = beings.filter(b => b.alive && b !== a && b.species === a.species && near(b, a) <= 30).sort((p, q) => near(p, a) - near(q, a))[0];
+    if (!kin || near(kin, a) <= 4) return false;
     const p = bfs(a.x, a.y, a.z, (x, y, z) => z === kin.z && dist(x, y, kin.x, kin.y) <= 3, 600, a); if (!p) return false;
     a.task = { type: 'wander', label: 'Rejoining the herd', path: p, arrive: () => 'done' }; return true;
   },
@@ -87,21 +87,21 @@ function spawnWildlife(){
   /* Rabbits breed in the warm seasons. Kits are born beside two grown rabbits. */
   if (tick % 250 === 0 && !isWinter()){
     const rs = beings.filter(b => b.alive && b.species === 'rabbit'); const cap = seasonOf() === 'spring' ? 20 : 15;
-    if (rs.length < cap){ const p = rs.find(r => stage(r) === 'adult' && rs.some(o => o !== r && stage(o) === 'adult' && dist(o.x, o.y, r.x, r.y) <= 10));
+    if (rs.length < cap){ const p = rs.find(r => stage(r) === 'adult' && rs.some(o => o !== r && stage(o) === 'adult' && near(o, r) <= 10));
       if (p && rng() < 0.8){ const q = nearFind(p.x, p.y, q => passable(q.x, q.y) && !beings.some(b => b.alive && b.x === q.x && b.y === q.y), RING); if (q){ const k = makeBeing('rabbit', q.x, q.y, null, 0); k.born = tick; beings.push(k); } } }
   }
   /* Rabbits return to the meadows. */
   if (tick % 300 === 0 && beings.filter(b => b.alive && b.species === 'rabbit').length < (isWinter() ? 6 : 10)){
-    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'meadow' || s.biome === 'wetland') && passable(t.x, t.y) && nearFind(t.x, t.y, q => q.feature === 'bush', RING) && !humans().some(h => dist(h.x, h.y, t.x, t.y) < 8)){ beings.push(makeBeing('rabbit', t.x, t.y, null, 0)); break; } }
+    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'meadow' || s.biome === 'wetland') && passable(t.x, t.y) && nearFind(t.x, t.y, q => q.feature === 'bush', RING) && !humans().some(h => nearAt(h, t.x, t.y) < 8)){ beings.push(makeBeing('rabbit', t.x, t.y, null, 0)); break; } }
   }
   if (tick % 2000 === 1000 && seasonOf() === 'spring' && beings.filter(b => b.alive && b.species === 'deer').length < 9){
     const doe = beings.find(b => b.alive && b.species === 'deer'); if (doe){ const q = nearFind(doe.x, doe.y, q => passable(q.x, q.y) && !beings.some(b => b.alive && b.x === q.x && b.y === q.y), RING); if (q){ const f = makeBeing('deer', q.x, q.y, null, 0); f.born = tick; beings.push(f); log('A fawn is on its feet in the meadow.', []); } }
-    else for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (sectorOfTile(t).biome === 'meadow' && passable(t.x, t.y) && !humans().some(h => dist(h.x, h.y, t.x, t.y) < 20)){ beings.push(makeBeing('deer', t.x, t.y, null, 0)); beings.push(makeBeing('deer', t.x, t.y, null, 0)); break; } }
+    else for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (sectorOfTile(t).biome === 'meadow' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 20)){ beings.push(makeBeing('deer', t.x, t.y, null, 0)); beings.push(makeBeing('deer', t.x, t.y, null, 0)); break; } }
   }
   if (tick % 5000 === 2500 && beings.filter(b => b.alive && b.species === 'wolf').length < 2){
-    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const st = sectorOfTile(t); if (st.biome === 'forest' && passable(t.x, t.y) && !humans().some(h => dist(h.x, h.y, t.x, t.y) < 25)){ beings.push(makeBeing('wolf', t.x, t.y, null, 0)); break; } }
+    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const st = sectorOfTile(t); if (st.biome === 'forest' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 25)){ beings.push(makeBeing('wolf', t.x, t.y, null, 0)); break; } }
   }
   if (tick % 3000 === 0 && beings.filter(b => b.alive && b.species === 'fox').length < 2){
-    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'forest' || s.biome === 'rocky') && passable(t.x, t.y) && !humans().some(h => dist(h.x, h.y, t.x, t.y) < 15)){ beings.push(makeBeing('fox', t.x, t.y, null, 0)); break; } }
+    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'forest' || s.biome === 'rocky') && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 15)){ beings.push(makeBeing('fox', t.x, t.y, null, 0)); break; } }
   }
 }

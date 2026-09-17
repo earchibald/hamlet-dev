@@ -1,11 +1,11 @@
 /* ---------- the sprites of the groves ---------- */
-function spriteNear(){ if (!camp.pit) return null; return beings.filter(b => b.alive && b.species === 'sprite' && dist(b.x, b.y, ...camp.pit) <= 8).sort((p, q) => dist(p.x, p.y, ...camp.pit) - dist(q.x, q.y, ...camp.pit))[0] || null; }
+function spriteNear(){ if (!camp.pit) return null; return beings.filter(b => b.alive && b.species === 'sprite' && nearAt(b, ...camp.pit) <= 8).sort((p, q) => nearAt(p, ...camp.pit) - nearAt(q, ...camp.pit))[0] || null; }
 function startFightSprite(a, sp){
   a.carrying = { kind: 'spear', count: 1 };
   a.task = { type: 'guard', label: 'Going after the sprite with the spear', path: [], fast: true, progress: 0,
     arrive(a, t){
-      if (!sp.alive || ++t.progress > 90 || dist(sp.x, sp.y, a.x, a.y) > 14){ a.carrying = null; return 'done'; }
-      if (dist(a.x, a.y, sp.x, sp.y) <= 1){
+      if (!sp.alive || ++t.progress > 90 || near(sp, a) > 14){ a.carrying = null; return 'done'; }
+      if (near(a, sp) <= 1){
         const c = camp;
         if (rng() < 0.45 + a.skills.hunt * 0.1){ sp.hp -= 15; c.fae.favor = Math.max(-100, c.fae.favor - 10); if (sp.grove) sp.grove.anger = Math.min(100, sp.grove.anger + 15); c.fae.grudges[a.id] = (c.fae.grudges[a.id] || 0) + 30;
           if (sp.hp <= 0){ sp.lastHurt = `was killed by ${a.name}`; die(sp, 'was speared'); a.carrying = null; addThought(a, 'killedfae', 'Killed a sprite. Its light went out in my hands', -6, 2000); log(`${a.name} spears a sprite. It dies with a sound like a snapped string.`, campHumans(), 'bad'); return 'done'; }
@@ -27,10 +27,10 @@ Object.assign(START, {
   dance(a){
     const g = a.grove; if (!g) return false; const p = legPath(a, g.x, g.y, 2); if (!p) return false;
     a.task = { type: 'dance', label: drowsy(a) ? 'Sleeping in the hollow pine' : 'Dancing in the grove', path: p, progress: 0,
-      arrive(a, t){ if (dist(a.x, a.y, g.x, g.y) > 2){ const q = legPath(a, g.x, g.y, 2); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, g.x, g.y) > 2){ const q = legPath(a, g.x, g.y, 2); if (!q) return 'fail'; t.path = q; return 'continue'; }
         a.needs.glow = Math.min(100, a.needs.glow + 0.6); a.needs.rest = Math.min(100, a.needs.rest + 0.3);
-        if (!drowsy(a) && t.progress % 40 === 0) for (const h of humans()) if (h.camp && dist(h.x, h.y, a.x, a.y) <= 7){ camp = h.camp; if (!camp.fae.known){ camp.fae.known = true; log(`${h.name} stumbles on a ring of lights dancing around a hollow pine in the ${g.sector.name.toLowerCase()}. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw sprites dancing in the grove' : 'Saw lights in the grove that were not fireflies', h.traits.curiosity > 0.5 ? 5 : -4, 900); }
-        if (beings.some(o => o !== a && o.alive && o.species === 'sprite' && dist(o.x, o.y, a.x, a.y) <= 3)) a.needs.play = Math.min(100, a.needs.play + 0.5);
+        if (!drowsy(a) && t.progress % 40 === 0) for (const h of humans()) if (h.camp && near(h, a) <= 7){ camp = h.camp; if (!camp.fae.known){ camp.fae.known = true; log(`${h.name} stumbles on a ring of lights dancing around a hollow pine in the ${g.sector.name.toLowerCase()}. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw sprites dancing in the grove' : 'Saw lights in the grove that were not fireflies', h.traits.curiosity > 0.5 ? 5 : -4, 900); }
+        if (beings.some(o => o !== a && o.alive && o.species === 'sprite' && near(o, a) <= 3)) a.needs.play = Math.min(100, a.needs.play + 0.5);
         if (++t.progress % 200 === 0 && rng() < 0.35 && !items.some(i => i.kind === 'moss' && dist(i.x, i.y, g.x, g.y) <= 2)){ const q = nearFind(g.x, g.y, q => passable(q.x, q.y) && !itemAt(q.x, q.y), RING); if (q) addItem('moss', q.x, q.y); }
         return t.progress < 240 ? 'continue' : 'done'; } };
     return true;
@@ -44,9 +44,9 @@ Object.assign(START, {
     const c = camps.filter(c => c.pit && tileAt(...c.pit).struct.lit && dist(c.pit[0], c.pit[1], a.x, a.y) <= 90 && !(c.ward && a.traits.bravery < 0.9)).sort((p, q) => dist(p.pit[0], p.pit[1], a.x, a.y) - dist(q.pit[0], q.pit[1], a.x, a.y))[0]; if (!c) return false;
     const r = c.ward ? 11 : 6; const p = legPath(a, c.pit[0], c.pit[1], r); if (!p) return false;
     a.task = { type: 'watch', label: 'Drawn to the firelight', path: p, progress: 0,
-      arrive(a, t){ if (dist(a.x, a.y, ...c.pit) > r){ const q = legPath(a, c.pit[0], c.pit[1], r); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, ...c.pit) > r){ const q = legPath(a, c.pit[0], c.pit[1], r); if (!q) return 'fail'; t.path = q; return 'continue'; }
         t.label = 'Watching the fire from the dark'; a.needs.play = Math.min(100, a.needs.play + 0.4);
-        if (t.progress === 0){ camp = c; for (const h of campHumans()) if (dist(h.x, h.y, a.x, a.y) <= 7 && !h.asleep){ if (!c.fae.known){ c.fae.known = true; log(`${h.name} sees a light dancing at the edge of the firelight. It is not a firefly. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw a sprite dancing in the dark' : 'Something watched us from the dark', h.traits.curiosity > 0.5 ? 4 : -4, 700); } }
+        if (t.progress === 0){ camp = c; for (const h of campHumans()) if (near(h, a) <= 7 && !h.asleep){ if (!c.fae.known){ c.fae.known = true; log(`${h.name} sees a light dancing at the edge of the firelight. It is not a firefly. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw a sprite dancing in the dark' : 'Something watched us from the dark', h.traits.curiosity > 0.5 ? 4 : -4, 700); } }
         if (++t.progress === 120 && c.stone && c.fae.favor >= 20 && rng() < 0.5){ const st = tileAt(...c.stone).struct; if (!itemAt(c.stone[0], c.stone[1]) && st.offering === 0){ addItem('moss', c.stone[0], c.stone[1]); camp = c; log('A tuft of glowing moss lies on the offering stone in the morning.', campHumans(), 'good'); } }
         return t.progress < 160 && isNight() ? 'continue' : 'done'; } };
     return true;
@@ -54,7 +54,7 @@ Object.assign(START, {
   collect(a){
     const c = camps.find(c => c.stone && tileAt(...c.stone).struct.offering > 0 && dist(c.stone[0], c.stone[1], a.x, a.y) <= 50 && !c.ward); if (!c) return false;
     const p = legPath(a, c.stone[0], c.stone[1], 1); if (!p) return false;
-    a.task = { type: 'collect', label: 'Sniffing out a gift', path: p, arrive(a, t){ if (dist(a.x, a.y, ...c.stone) > 1){ const q = legPath(a, c.stone[0], c.stone[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+    a.task = { type: 'collect', label: 'Sniffing out a gift', path: p, arrive(a, t){ if (nearAt(a, ...c.stone) > 1){ const q = legPath(a, c.stone[0], c.stone[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
       const st = tileAt(...c.stone).struct; if (st.offering <= 0) return 'fail'; st.offering = 0; a.needs.glow = 100; a.needs.play = Math.min(100, a.needs.play + 30);
       c.fae.favor = Math.min(100, c.fae.favor + 10); for (const k in c.fae.grudges) c.fae.grudges[k] = Math.max(0, c.fae.grudges[k] - 10); if (a.grove) a.grove.anger = Math.max(0, a.grove.anger - 5);
       addThought(a, 'gift', 'Humans left berries for us', 8, 1500); camp = c; log('The berries on the offering stone are gone by morning.', campHumans(), 'good'); return 'done'; } };
@@ -65,7 +65,7 @@ Object.assign(START, {
     const c = angry.sort((p, q) => p.fae.favor - q.fae.favor)[0]; if (!c) return false;
     const p = legPath(a, c.stashTile[0], c.stashTile[1], 1); if (!p) return false;
     a.task = { type: 'prank', label: 'Slipping into the camp with mischief in mind', path: p, fast: true,
-      arrive(a, t){ if (dist(a.x, a.y, ...c.stashTile) > 1){ const q = legPath(a, c.stashTile[0], c.stashTile[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, ...c.stashTile) > 1){ const q = legPath(a, c.stashTile[0], c.stashTile[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         camp = c; c.fae.lastPrank = tick; a.needs.play = 100;
         if (!c.fae.known){ c.fae.known = true; log('Something small and angry has been in the camp in the night. The camp knows about the sprites now, and not in a good way.', campHumans(), 'major'); }
         const grudged = campHumans().filter(h => (c.fae.grudges[h.id] || 0) > 20), victim = grudged[rint(grudged.length)] || campHumans().filter(h => h.asleep)[0];

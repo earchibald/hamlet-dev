@@ -63,10 +63,10 @@ function die(a, cause){
   } else if (a.species === 'rabbit'){ addItem('carcass', a.x, a.y); }
   else if (a.species === 'sprite'){
     const g = a.grove; if (g){ g.anger = Math.min(100, g.anger + 60); g.swarmUntil = tick + 4000; for (const c of camps) if (c.site && dist(c.site[0], c.site[1], a.x, a.y) <= 40){ c.fae.favor = Math.max(-100, c.fae.favor - 40); c.fae.blightUntil = tick + 5000; } }
-    log(`A sprite dies. Its light goes out, and the grove will remember.`, humans().filter(h => dist(h.x, h.y, a.x, a.y) <= 12), 'bad');
+    log(`A sprite dies. Its light goes out, and the grove will remember.`, humans().filter(h => near(h, a) <= 12), 'bad');
     for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'kin', 'One of us was killed by humans', -20, 4000);
   }
-  else if (a.species === 'deer'){ addItem('venison', a.x, a.y); for (const o of beings) if (o.alive && o.species === 'deer' && dist(o.x, o.y, a.x, a.y) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
+  else if (a.species === 'deer'){ addItem('venison', a.x, a.y); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
 }
 function chat(a, b){
   const compat = 1 - Math.abs(a.traits.sociability - b.traits.sociability) - 0.8 * Math.abs(a.traits.temper - b.traits.temper);
@@ -87,7 +87,7 @@ const START = {
   drink(a){
     if (a.species === 'human' && !a.homeless && camp.stash.water > 0 && camp.stashTile){
       const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1);
-      if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (dist(a.x, a.y, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, 300); return 'done'; } }; return true; }
+      if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, 300); return 'done'; } }; return true; }
     }
     const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
     a.task = { type: 'drink', label: 'Going to drink', path: p, arrive(a){ a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
@@ -97,7 +97,7 @@ const START = {
     if (a.species === 'human' && !a.homeless && camp.stashTile && stashFood() > 0){
       const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1); if (p){
         a.task = { type: 'eat', label: 'Going to eat at camp', path: p, arrive(a, t){
-          if (dist(a.x, a.y, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+          if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
           if (camp.stash.cooked > 0){ stashTake('cooked'); a.needs.food = Math.min(100, a.needs.food + 55); addThought(a, 'ate', camp.bestCook > 1 ? 'Ate a meal cooked with real skill' : 'Ate a hot meal of rabbit', 7 + Math.min(4, camp.bestCook || 0), 700); }
           else if (camp.stash.smoked > 0){ stashTake('smoked'); a.needs.food = Math.min(100, a.needs.food + 45); addThought(a, 'ate', 'Chewed smoked meat by the fire', 4, 600); }
           else if (camp.stash.berries > 0){ stashTake('berries'); a.needs.food = Math.min(100, a.needs.food + 28); addThought(a, 'ate', 'Ate berries from the stash', 2, 400); }
@@ -119,8 +119,8 @@ const START = {
     return true;
   },
   sleep(a){
-    const place = a.species === 'human' && !a.homeless && sleepPlaces().filter(pl => beings.filter(b => b.alive && b.asleep && dist(b.x, b.y, ...pl) <= 1).length < 3).sort((p, q) => dist(a.x, a.y, ...p) - dist(a.x, a.y, ...q))[0];
-    if (place && dist(a.x, a.y, ...place) > 1){
+    const place = a.species === 'human' && !a.homeless && sleepPlaces().filter(pl => beings.filter(b => b.alive && b.asleep && nearAt(b, ...pl) <= 1).length < 3).sort((p, q) => nearAt(a, ...p) - nearAt(a, ...q))[0];
+    if (place && nearAt(a, ...place) > 1){
       const p = legPath(a, place[0], place[1], 1);
       if (p){ a.task = { type: 'sleep', label: 'Going to the lean-to', path: p, arrive(a){ a.asleep = true; a.task = null; return 'done'; } }; return true; }
     }
@@ -131,12 +131,12 @@ const START = {
     let target = null;
     const p = bfs(a.x, a.y, a.z, (x, y, z) => { target = others.find(o => o.z === z && dist(o.x, o.y, x, y) <= 1); return !!target; }, 1500, a); if (!p) return false;
     a.task = { type: 'socialize', label: `Going to talk to ${target.name}`, path: p, progress: 0,
-      arrive(a, t){ if (!target.alive || dist(target.x, target.y, a.x, a.y) > 2) return 'fail'; t.label = `Talking with ${target.name}`; if (++t.progress < 10) return 'continue'; chat(a, target); return 'done'; } };
+      arrive(a, t){ if (!target.alive || near(target, a) > 2) return 'fail'; t.label = `Talking with ${target.name}`; if (++t.progress < 10) return 'continue'; chat(a, target); return 'done'; } };
     return true;
   },
   shelter(a){
     if (!camp.shelter || a.homeless) return false; const [hx, hy] = camp.shelter; const p = legPath(a, hx, hy, 1); if (!p) return false;
-    a.task = { type: 'shelter', label: 'Waiting out the rain under the roof', path: p, progress: 0, arrive(a, t){ if (dist(a.x, a.y, hx, hy) > 1){ const q = legPath(a, hx, hy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } return ++t.progress < 60 && weather.storm ? 'continue' : 'done'; } };
+    a.task = { type: 'shelter', label: 'Waiting out the rain under the roof', path: p, progress: 0, arrive(a, t){ if (nearAt(a, hx, hy) > 1){ const q = legPath(a, hx, hy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } return ++t.progress < 60 && weather.storm ? 'continue' : 'done'; } };
     return true;
   },
   sit(a){
@@ -144,12 +144,12 @@ const START = {
     const [px, py] = camp.pit; const p = legPath(a, px, py, 1); if (!p) return false;
     a.task = { type: 'sit', label: 'Going to sit by the fire', path: p, progress: 0,
       arrive(a, t){
-        if (dist(a.x, a.y, px, py) > 1){ const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, px, py) > 1){ const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         t.label = 'Sitting by the fire'; a.needs.rest = Math.min(100, a.needs.rest + 0.05);
-        if (t.progress % 25 === 0){ const o = humans().find(o => o !== a && dist(o.x, o.y, a.x, a.y) <= 2 && o.task && o.task.type === 'sit'); if (o) chat(a, o); }
+        if (t.progress % 25 === 0){ const o = humans().find(o => o !== a && near(o, a) <= 2 && o.task && o.task.type === 'sit'); if (o) chat(a, o); }
         if (a.needs.warmth !== undefined) a.needs.warmth = Math.min(100, a.needs.warmth + 0.4);
         if (t.progress % 30 === 15){
-          const teacher = humans().find(o => o !== a && dist(o.x, o.y, a.x, a.y) <= 2 && o.task && o.task.type === 'sit' && Object.keys(o.skills).some(k => o.skills[k] > (a.skills[k] || 0) + 1));
+          const teacher = humans().find(o => o !== a && near(o, a) <= 2 && o.task && o.task.type === 'sit' && Object.keys(o.skills).some(k => o.skills[k] > (a.skills[k] || 0) + 1));
           if (teacher){ const sk = Object.keys(teacher.skills).filter(k => teacher.skills[k] > (a.skills[k] || 0) + 1).sort((p, q) => teacher.skills[q] - teacher.skills[p])[0]; a.xp[sk] = (a.xp[sk] || 0) + (stage(teacher) === 'old' ? 1.2 : 0.6) * (0.5 + a.traits.curiosity); addThought(a, 'taught', `Learned about ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name}`, 3, 600); if (a.xp[sk] >= (a.skills[sk] + 1) * 3){ a.xp[sk] = 0; a.skills[sk]++; log(`${a.name} learned ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name} by the fire.`, [a, teacher], 'good'); } }
         }
         return ++t.progress < 90 && pitLit() ? 'continue' : 'done';
@@ -184,17 +184,17 @@ function threatsFor(a){
   const timid = a.traits.bravery < 0.3 ? 2 : a.traits.bravery > 0.7 ? -1 : 0, wary = Math.min(3, a.skills.wary || 0);
   const f = nearestFire(a.x, a.y, 4); if (f >= 0) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (inb(a.x + dx, a.y + dy) && world[idx(a.x + dx, a.y + dy)].fire > 0) out.push([a.x + dx, a.y + dy]);
   const ember = b => b.carrying && b.carrying.kind === 'ember';
-  if (a.species === 'rabbit') for (const b of beings){ if (!b.alive || b === a) continue; const d = dist(b.x, b.y, a.x, a.y); if (((b.species === 'fox' || b.species === 'wolf') && d <= 6 + timid + wary) || (b.species === 'human' && d <= 2 + wary && !b.asleep)) out.push([b.x, b.y]); }
-  if (a.species === 'deer') for (const b of beings){ if (!b.alive || b === a) continue; const d = dist(b.x, b.y, a.x, a.y); if ((b.species === 'wolf' && d <= 8 + timid + wary) || (b.species === 'human' && d <= (b.carrying && b.carrying.kind === 'spear' ? 6 : 3) + timid + wary && !b.asleep)) out.push([b.x, b.y]); }
+  if (a.species === 'rabbit') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if (((b.species === 'fox' || b.species === 'wolf') && d <= 6 + timid + wary) || (b.species === 'human' && d <= 2 + wary && !b.asleep)) out.push([b.x, b.y]); }
+  if (a.species === 'deer') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if ((b.species === 'wolf' && d <= 8 + timid + wary) || (b.species === 'human' && d <= (b.carrying && b.carrying.kind === 'spear' ? 6 : 3) + timid + wary && !b.asleep)) out.push([b.x, b.y]); }
   if (a.species === 'fox' || a.species === 'wolf'){
     const r = a.species === 'fox' ? 3 : 1;
-    for (const b of beings){ if (b.alive && b.species === 'human' && dist(b.x, b.y, a.x, a.y) <= (ember(b) ? 7 : r)) out.push([b.x, b.y]); }
-    for (const c of camps) if (c.pit && ((tileAt(...c.pit).struct.lit && dist(a.x, a.y, ...c.pit) <= (a.species === 'fox' ? 6 : 8)) || (a.shyOf === c && (a.cooldown.raid || 0) > tick && dist(a.x, a.y, ...c.pit) <= 20))) out.push(c.pit);
+    for (const b of beings){ if (b.alive && b.species === 'human' && near(b, a) <= (ember(b) ? 7 : r)) out.push([b.x, b.y]); }
+    for (const c of camps) if (c.pit && ((tileAt(...c.pit).struct.lit && nearAt(a, ...c.pit) <= (a.species === 'fox' ? 6 : 8)) || (a.shyOf === c && (a.cooldown.raid || 0) > tick && nearAt(a, ...c.pit) <= 20))) out.push(c.pit);
   }
-  if (a.species === 'human') for (const b of beings){ if (b.alive && b.species === 'wolf' && dist(b.x, b.y, a.x, a.y) <= 3 && !ember(a)) out.push([b.x, b.y]); }
+  if (a.species === 'human') for (const b of beings){ if (b.alive && b.species === 'wolf' && near(b, a) <= 3 && !ember(a)) out.push([b.x, b.y]); }
   if (a.species === 'sprite'){
-    for (const b of beings){ if (b.alive && b.species === 'human' && (b.carrying && (b.carrying.kind === 'spear' || b.carrying.kind === 'ember')) && dist(b.x, b.y, a.x, a.y) <= 5 + timid) out.push([b.x, b.y]); }
-    for (const c of camps) if (c.ward && c.pit && dist(a.x, a.y, ...c.pit) <= 9) out.push(c.pit);
+    for (const b of beings){ if (b.alive && b.species === 'human' && (b.carrying && (b.carrying.kind === 'spear' || b.carrying.kind === 'ember')) && near(b, a) <= 5 + timid) out.push([b.x, b.y]); }
+    for (const c of camps) if (c.ward && c.pit && nearAt(a, ...c.pit) <= 9) out.push(c.pit);
   }
   return out;
 }
@@ -222,7 +222,7 @@ function chooseTask(a){
   } else if (a.species === 'deer'){
     opts = [{ type: 'flee', score: threatsFor(a).length ? 120 : 0 }, { type: 'eat', score: urg(n.food) * (drowsy(a) ? 0.6 : 1.2) }, { type: 'drink', score: urg(n.water) }, { type: 'herd', score: 22 + a.traits.sociability * 20 }, { type: 'rest', score: n.rest < 40 || weather.storm ? 50 : drowsy(a) ? 35 : 0 }, { type: 'wander', score: drowsy(a) ? 4 : 12 }];
   } else if (a.species === 'sprite'){
-    const home = a.grove ? dist(a.x, a.y, a.grove.x, a.grove.y) : 0, swarm = a.grove && a.grove.swarmUntil > tick, back = a.returnAt && tick > a.returnAt;
+    const home = a.grove ? nearAt(a, a.grove.x, a.grove.y) : 0, swarm = a.grove && a.grove.swarmUntil > tick, back = a.returnAt && tick > a.returnAt;
     if (back){ a.returnAt = 0; if (a.target){ a.target.fae.favor -= 15; for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === a.grove) addThought(o, 'raid', 'We go back together', 6, 1500); if (a.grove) a.grove.swarmUntil = Math.max(a.grove.swarmUntil, tick + 1500); } }
     opts = [{ type: 'flee', score: threatsFor(a).length ? 110 : 0 },
       { type: 'dance', score: drowsy(a) ? 90 : (n.glow < 40 ? 50 : 15) + (home > 25 ? 15 : 0) },
@@ -278,7 +278,7 @@ function updateBeing(a){
   for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
   if (a.species === 'human'){
     const season = seasonOf(), cold = season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
-    const byFire = camp && pitLit() && dist(a.x, a.y, ...camp.pit) <= 3, roofed = camp && sleepPlaces().some(pl => dist(a.x, a.y, ...pl) <= 1);
+    const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1);
     n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? 0.5 : 0), 0, 100);
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
@@ -290,15 +290,15 @@ function updateBeing(a){
   else if (a.hp < 100) a.hp = Math.min(100, a.hp + 0.01 * (0.6 + a.traits.hardiness * 0.8));
   /* The life clock. Past the usual span, each day is a gift. */
   if (ageDays(a) > LIFE[a.species].life && rng() < 0.0006 / (0.5 + a.traits.hardiness)){
-    const warm = a.species === 'human' && camp && pitLit() && dist(a.x, a.y, ...camp.pit) <= 4;
+    const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
     die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age'); return;
   }
   const here = tileAt(a.x, a.y);
   if (here.fire > 0){ a.hp -= 2.5; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, 800); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); START.flee(a); } }
   if (a.hp <= 0){ die(a, here.fire > 0 ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : n.warmth !== undefined && n.warmth < 20 ? 'froze in the cold' : (a.lastHurt || 'died')); return; }
-  if (a.species === 'human' && camp && pitLit() && dist(a.x, a.y, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, 200);
+  if (a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, 200);
   if (a.asleep){
-    if (n.rest >= 100 || (!night && n.rest >= 60)){ a.asleep = false; if (a.species === 'human'){ const roof = camp && sleepPlaces().some(pl => dist(a.x, a.y, ...pl) <= 1), warm = camp && pitLit() && dist(a.x, a.y, ...camp.pit) <= 4; addThought(a, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, 600); } }
+    if (n.rest >= 100 || (!night && n.rest >= 60)){ a.asleep = false; if (a.species === 'human'){ const roof = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1), warm = camp && pitLit() && nearAt(a, ...camp.pit) <= 4; addThought(a, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, 600); } }
     else { a.status = 'Sleeping'; return; }
   }
   const fast = a.task && a.task.fast;

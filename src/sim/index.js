@@ -20,7 +20,7 @@ function source(){
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
   startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND,
-  seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood,
+  seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, sectorOfTile, passable, nearestFire,
   near, nearAt, ZMIN, ZMAX, ZOFF, NZ,
   campHumans, humans, stashFood,

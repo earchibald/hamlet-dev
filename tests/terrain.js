@@ -67,3 +67,13 @@ test('rabbits never climb, deer do', () => {
   assert.equal(api.bfs(x0 - 2, y0 + 1, 0, goal, 500, { species: 'rabbit' }), null);
   assert.ok(api.bfs(x0 - 2, y0 + 1, 0, goal, 500, { species: 'deer' }));
 });
+
+test('a wolf on a hilltop is not near a person below it', () => {
+  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  makeHill(api, x0, y0, false);
+  const wolf = api.beings.find(b => b.species === 'wolf'); wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
+  const person = api.beings[0]; person.x = x0 + 1; person.y = y0 + 3; person.z = 0;
+  assert.equal(api.near(wolf, person), 8);
+  const threats = api.threatsFor(person);
+  assert.equal(threats.some(([x, y]) => x === wolf.x && y === wolf.y), false, 'a wolf one level up should not be a threat at three tiles');
+});
