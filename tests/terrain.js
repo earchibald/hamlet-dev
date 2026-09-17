@@ -7,7 +7,8 @@ test('the surface is level 0 and the levels below are empty', () => {
   const api = load(); api.startWorld('r');
   assert.equal(api.levels.length, 5);
   assert.equal(api.levels[api.ZOFF], api.world);
-  for (const z of [-2, -1]) assert.ok(api.levels[z + api.ZOFF].every(t => t === null), `level ${z} should hold nothing yet`);
+  /* Water cut a cave under any tall hill, so a level below the surface can hold cave tiles now; nothing else touches it. */
+  for (const z of [-2, -1]) assert.ok(api.levels[z + api.ZOFF].every(t => t === null || t.cave), `level ${z} should hold nothing but cave tiles yet`);
   const t = api.tileAt(10, 10);
   assert.equal(t.z, 0);
   assert.equal(api.tileAt(10, 10, 1), null);
@@ -100,15 +101,23 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
   const slopes = []; for (const t of api.world) if (t.slope) slopes.push(t); for (const t of api.raised) if (t.slope) slopes.push(t);
   const out = [];
   for (const s of slopes){ api.steps(s.x, s.y, s.z, out); assert.ok(out.some((v, k) => k % 3 === 2 && v === s.z + 1), `slope at ${s.x},${s.y},${s.z} leads nowhere`); }
+  /* A tall hill with a running spring shows one water tile right at its own mouth: expected, not a placement bug. */
+  const springs = api.caves.filter(c => c.kind === 'water' && c.story.some(s => s.includes('spring')));
   for (const h of api.hills){
     const floors = api.raised.filter(t => t.hill === h && api.GROUND[t.ground].walk);
     assert.ok(floors.length > 0, `hill at ${h.x},${h.y} has no floor`);
     assert.ok(floors.some(t => t.z === h.storeys), `hill at ${h.x},${h.y} should reach level ${h.storeys}`);
+    const spring = springs.find(c => c.hill === h);
     for (const i of h.tiles){
       const t = api.world[i];
       assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
       const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const q = api.tileAt(Math.min(api.W - 1, Math.max(0, t.x + dx)), Math.min(api.H - 1, Math.max(0, t.y + dy))); assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`); }
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
+        const qx = Math.min(api.W - 1, Math.max(0, t.x + dx)), qy = Math.min(api.H - 1, Math.max(0, t.y + dy));
+        const q = api.tileAt(qx, qy);
+        if (q.ground === 'water' && spring && Math.max(Math.abs(qx - spring.exit.x), Math.abs(qy - spring.exit.y)) <= 1) continue;
+        assert.notEqual(q.ground, 'water', `hill at ${h.x},${h.y} touches water`);
+      }
     }
     const base = slopes.find(s => s.z === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const u = api.tileAt(s.x + dx, s.y + dy, 1); return u && u.hill === h; }));
     assert.ok(base, `hill at ${h.x},${h.y} has no slope up from the ground`);
@@ -161,4 +170,27 @@ test('keepsPaths refuses a solid that would cut the last way through', () => {
   assert.equal(api.keepsPaths(api.tileAt(x0, y0)), false, 'the middle of a one-wide corridor');
   for (let x = x0 - 1; x <= x0 + 1; x++) api.tileAt(x, y0 - 1).feature = null;
   assert.equal(api.keepsPaths(api.tileAt(x0, y0)), true, 'with the north row open the sides join around it');
+});
+
+const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
+const stepList = (api, t) => { const out = []; api.steps(t.x, t.y, t.z, out); const r = []; for (let k = 0; k < out.length; k += 3) r.push([out[k], out[k + 1], out[k + 2]]); return r; };
+
+for (const seed of SEEDS) test(`seed ${seed}: water cut a cave under every tall hill`, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  const tall = api.hills.filter(h => h.storeys === 2);
+  const water = api.caves.filter(c => c.kind === 'water');
+  assert.equal(water.length, tall.length, `${tall.length} tall hills, ${water.length} water caves`);
+  for (const c of water){
+    assert.ok(c.mouth && c.mouth.slope && c.mouth.z === -1, 'the mouth is a slope on level -1');
+    assert.ok(c.exit && c.exit.z === 0 && c.exit.mouth === c && api.passable(c.exit.x, c.exit.y), 'the exit is a walkable surface tile that knows its cave');
+    assert.ok(stepList(api, c.mouth).some(([x, y, z]) => x === c.exit.x && y === c.exit.y && z === 0), 'the mouth leads up to the exit');
+    assert.ok(c.deep && c.deep.z === -2 && api.passable(c.deep.x, c.deep.y, -2), 'a deep chamber at level -2');
+    const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
+    assert.ok(floors.length >= 10, `a passage of ${floors.length} tiles is too short`);
+    const region = api.reachable(c.exit.x, c.exit.y, 0, full);
+    for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `cave under hill ${c.hill.x},${c.hill.y}: floor ${t.x},${t.y},${t.z} cannot be reached from the exit`);
+    for (const t of c.tiles) assert.ok(c.hill.tiles.includes(api.idx(t.x, t.y)), 'every cave tile lies under the hill');
+    assert.ok(c.story.some(s => s.includes('Water cut')), 'the story says water cut it');
+  }
 });

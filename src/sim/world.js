@@ -101,6 +101,48 @@ function rimExits(h, set){
     for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (passable(nx, ny) && !t.slope && !t.mouth) out.push([t, i]); } }
   return out;
 }
+/* ---------- pre-history ---------- */
+/* Every tall hill had a spring. Its stream cut a winding passage from under the hill out to a mouth at the foot, with
+   one or two chambers, and a drop to level -2 with a chamber at the bottom. One stream in three still runs. */
+function cutWaterCaves(){
+  for (const h of hills){
+    if (h.storeys < 2) continue;
+    const set = new Set(h.tiles);
+    const rim = rimExits(h, set); if (!rim.length) continue;
+    const [exit, under] = rim[rint(rim.length)];
+    const c = makeCave('water', h);
+    let x = under % W, y = (under - x) / W;
+    const mouth = carve(c, x, y, -1); mouth.slope = true; c.mouth = mouth; c.exit = exit; exit.mouth = c;
+    const len = 8 + rint(13);
+    for (let k = 0; k < len; k++){
+      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => set.has(idx(nx, ny)) && !(hasTile(nx, ny, -1) && tileAt(nx, ny, -1).cave) && dist(nx, ny, exit.x, exit.y) >= dist(x, y, exit.x, exit.y));
+      if (!opts.length) break;
+      [x, y] = opts[0]; carve(c, x, y, -1);
+      if (k === Math.floor(len / 2) && rng() < 0.5) chamber(c, x, y, -1, set);
+    }
+    chamber(c, x, y, -1, set);
+    /* The drop: a slope on level -2 under the last chamber, with a chamber around it. */
+    const drop = carve(c, x, y, -2); drop.slope = true;
+    const bottom = chamber(c, x, y, -2, set);
+    c.deep = bottom[rint(bottom.length)];
+    c.story.push('Water cut this passage when the river ran higher.');
+    if (rng() < 1 / 3){
+      const pond = RING.map(([dx, dy]) => [exit.x + dx, exit.y + dy]).filter(([px, py]) => inb(px, py) && !set.has(idx(px, py)) && passable(px, py) && !tileAt(px, py).slope && !tileAt(px, py).mouth && keepsPaths(tileAt(px, py)));
+      if (pond.length){ const [px, py] = pond[rint(pond.length)]; const t = tileAt(px, py); t.ground = 'water'; t.feature = null; t.berries = 0; t.loose = null; c.story.push('A spring still runs at its mouth.'); }
+    }
+  }
+}
+/* A room around a tile: its four sides first, so the room touches the tile, then the corners, each with four chances in five.
+   A corner is only cut beside one of its two sides already in this cave, so it is always four-connected to the room, never a
+   diagonal-only island. Returns the carved tiles. */
+function chamber(c, x, y, z, set){
+  const out = [];
+  for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (set.has(idx(nx, ny)) && (rng() < 0.8 || !out.length)){ const t = carve(c, nx, ny, z); if (t) out.push(t); } }
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]){ const nx = x + dx, ny = y + dy;
+    const sideA = hasTile(x + dx, y, z) && tileAt(x + dx, y, z).cave === c, sideB = hasTile(x, y + dy, z) && tileAt(x, y + dy, z).cave === c;
+    if (set.has(idx(nx, ny)) && (sideA || sideB) && rng() < 0.8){ const t = carve(c, nx, ny, z); if (t) out.push(t); } }
+  return out;
+}
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
    level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
@@ -237,7 +279,7 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  uplift();
+  uplift(); cutWaterCaves();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
