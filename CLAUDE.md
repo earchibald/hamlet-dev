@@ -10,6 +10,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `dist/hearth-sim.html`: the built single file. It is what gets published as the Claude artifact. Keep it working. Run `node build.js` after every change to `src/`.
 - `tests/soak.js`: six seeds for 70 days, with assertions and a golden record. Run it after every change to the core. If the numbers moved and the move is what you meant, bless them with `UPDATE_GOLDEN=1 node tests/soak.js`.
 - `tests/lib/run.js`: the shared runner. The script god, the event collector, the counters, and the fingerprint.
+- `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
 
 ## Rules of work
 - Write in plain English in the game's text. One idea per sentence.
@@ -22,6 +23,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
 - Load-time order matters only twice: `core.js` first, and `beings.js` before `species.js` and `fae.js`, which add actions to `START`.
 - `updateWorld()` in `main.js` calls the per-tick steps in a fixed order. The order fixes the random number stream. Do not reorder it.
+- Passability, search, and fire read levels. A tile has a z. Use `tileAt(x, y, z)`, `passable(x, y, z)`, and `near(a, b)` for beings. Do not index `world` for anything that can be off the surface.
 
 ## First task (done)
 `src/sim.js` was split into `src/sim/`, and `tests/soak.js` got assertions and a golden record. The six-seed fingerprint matched before and after, line for line.

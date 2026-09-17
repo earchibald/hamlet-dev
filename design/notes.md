@@ -15,12 +15,16 @@ The game is played by a god-player. The player does not tag tiles or give orders
 - The world is 10 by 6 sectors. Each sector is 28 by 20 tiles and has a biome and a name: open meadow, pine forest, stony ground, reedy marsh. A sector is a mix. Forests still have a few bushes and rocks.
 - The tile grid is continuous. Sectors are units of identity and viewing, not of simulation. A person walks out of one sector into the next.
 - A river winds across the world. Fords every 47 tiles keep the sides connected.
+- The world has five levels, −2 to +2. Level 0 is the surface. A level is an array like the surface, mostly empty: open air above, solid earth below. Six to ten hills stand on rocky and forest ground: rock at level 0 with a floor of stone or grass above it, and a second storey on the tall ones. A hill is only raised where it can be climbed: its first-storey floor is one piece, and some walkable tile beside it can hold a slope. Each storey has one or two slopes on its rim. Everything else is cliff.
+- Slopes are the only way between levels. From a slope you step to any of its four neighbours one level up, and from those you step back down onto it. Rabbits never climb. Deer climb hills. Everyone else goes anywhere.
+- Distance between beings adds six tiles per level apart. A wolf on a hilltop is not near a person at its foot.
+- Fire burns on every level and is half again as likely to run uphill over a slope.
 - Long walks use a full-map search once and follow the first 48 steps, then search again. A step-by-step heuristic was tried and walked into dead ends around lakes for weeks. Do not bring it back.
 - The path search marks visited tiles with a generation counter instead of clearing the visited array. This cut run time by a third.
 
 ## 3. Materials and tiles
 
-Materials are data: fuel and flammability. Ground, features, items, and structures read these. The fire rule reads flammability and fuel. It does not know what a tree or a pit is. A wood wall burns because wood has fuel. A stone wall does not.
+Materials are data: fuel and flammability. Ground, features, items, and structures read these. The fire rule reads flammability and fuel. It does not know what a tree or a pit is. A wood wall burns because wood has fuel. A stone wall does not. Two grounds are terrain: rock, which nothing walks through, and stone, a bare floor. Passability reads the ground table's walk flag.
 
 Tiles hold ground, a feature (tree, sapling, bush, boulder, reeds, hollow pine), loose items (sticks, rocks, logs, carcasses, moss), a structure (fire pit, snare, lean-to, hut, storehouse, drying rack, offering stone, ward post), fire, and an age for plants.
 
@@ -142,6 +146,8 @@ The soak asserts, per seed:
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
+
+`tests/terrain.js` checks the levels: the surface is level 0, a slope joins two floors and a cliff does not, rabbits never climb and deer do, a wolf a level up is not a threat, fire burns on a hilltop, and every hill on every seed is rock with reachable floors, off the water, and out of the start sector.
 - The same seed tells the same story twice.
 
 Known weak spots:
