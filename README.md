@@ -10,4 +10,6 @@ A two-scale colony simulation in one HTML file, on its way to being a project.
     node tests/trace-deaths.js x     # where, why, and what they were thinking
     open dist/hearth-sim.html
 
+The dev branch is published at https://earchibald.github.io/hamlet-dev/ on every push.
+
 See `design/notes.md` for the design and `CLAUDE.md` for how to work on it.
