@@ -2010,7 +2010,7 @@ function renderTip(){
   tip.style.left = Math.max(8, px) + 'px'; tip.style.top = py + 'px';
 }
 function hideTip(){ tipTarget = null; tipAnchor = null; tipPinned = false; renderTip(); }
-const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || (c.z === 0 && beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y)); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
+const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
   const same = tipPinned && tipTarget && (t.being ? tipTarget.being === t.being : tipTarget.tile && tipTarget.tile[0] === c.x && tipTarget.tile[1] === c.y && tipTarget.tile[2] === c.z);
