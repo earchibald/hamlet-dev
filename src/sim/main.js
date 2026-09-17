@@ -11,8 +11,9 @@ function startWorld(seed){
 }
 
 /* ---------- god actions ---------- */
-function lightTile(x, y){
-  const t = tileAt(x, y);
+function lightTile(x, y, z = 0){
+  const t = hasTile(x, y, z) ? tileAt(x, y, z) : null;
+  if (!t) return 'Nothing here but air.';
   if (t.struct && t.struct.type === 'firepit'){
     const p = t.struct; camp = camps.find(c => c.pit && c.pit[0] === x && c.pit[1] === y) || camp;
     if (p.lit) return 'The fire is already burning.';

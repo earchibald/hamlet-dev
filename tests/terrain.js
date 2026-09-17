@@ -77,3 +77,16 @@ test('a wolf on a hilltop is not near a person below it', () => {
   const threats = api.threatsFor(person);
   assert.equal(threats.some(([x, y]) => x === wolf.x && y === wolf.y), false, 'a wolf one level up should not be a threat at three tiles');
 });
+
+test('fire on a hilltop burns and is seen from the hilltop, not from below', () => {
+  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  makeHill(api, x0, y0, true);
+  const top = api.tileAt(x0 + 1, y0 + 1, 1); top.ground = 'grass';
+  assert.equal(api.lightTile(x0 + 1, y0 + 1, 1), 'The ground is burning. This fire is not contained.');
+  assert.ok(top.fire > 0);
+  assert.equal(api.nearestFire(x0 + 1, y0 + 2, 2, 1), 1);
+  assert.equal(api.nearestFire(x0 + 1, y0 + 4, 3, 0), -1, 'a fire one level up is not on this level');
+  const before = top.fire; api.step();
+  assert.ok(top.fire < before, 'the hilltop fire should burn down each tick');
+  assert.equal(api.lightTile(x0 + 1, y0 + 1, 2), 'Nothing here but air.');
+});

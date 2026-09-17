@@ -182,7 +182,7 @@ const START = {
 function threatsFor(a){
   const out = [];
   const timid = a.traits.bravery < 0.3 ? 2 : a.traits.bravery > 0.7 ? -1 : 0, wary = Math.min(3, a.skills.wary || 0);
-  const f = nearestFire(a.x, a.y, 4); if (f >= 0) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (inb(a.x + dx, a.y + dy) && world[idx(a.x + dx, a.y + dy)].fire > 0) out.push([a.x + dx, a.y + dy]);
+  const f = nearestFire(a.x, a.y, 4, a.z); if (f >= 0) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (hasTile(a.x + dx, a.y + dy, a.z) && tileAt(a.x + dx, a.y + dy, a.z).fire > 0) out.push([a.x + dx, a.y + dy]);
   const ember = b => b.carrying && b.carrying.kind === 'ember';
   if (a.species === 'rabbit') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if (((b.species === 'fox' || b.species === 'wolf') && d <= 6 + timid + wary) || (b.species === 'human' && d <= 2 + wary && !b.asleep)) out.push([b.x, b.y]); }
   if (a.species === 'deer') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if ((b.species === 'wolf' && d <= 8 + timid + wary) || (b.species === 'human' && d <= (b.carrying && b.carrying.kind === 'spear' ? 6 : 3) + timid + wary && !b.asleep)) out.push([b.x, b.y]); }
@@ -266,7 +266,7 @@ function runTask(a){
   if (a.task) a.status = a.task.label;
 }
 function checkSnare(r){
-  const t = tileAt(r.x, r.y);
+  const t = tileAt(r.x, r.y, r.z);
   if (t.struct && t.struct.type === 'snare' && t.struct.snare.armed && rng() < (t.struct.snare.chance || 0.7) + (t.struct.snare.camp.fae.favor >= 30 ? 0.1 : 0)){
     const s = t.struct.snare; s.armed = false; s.catch = 'carcass'; r.alive = false; r.status = 'Dead';
     log('A rabbit is caught in a snare.', [], 'good');
@@ -293,7 +293,7 @@ function updateBeing(a){
     const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
     die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age'); return;
   }
-  const here = tileAt(a.x, a.y);
+  const here = tileAt(a.x, a.y, a.z);
   if (here.fire > 0){ a.hp -= 2.5; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, 800); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); START.flee(a); } }
   if (a.hp <= 0){ die(a, here.fire > 0 ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : n.warmth !== undefined && n.warmth < 20 ? 'froze in the cold' : (a.lastHurt || 'died')); return; }
   if (a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, 200);
@@ -305,7 +305,7 @@ function updateBeing(a){
   if (!fast && (tick + a.id) % sp.stride) return;
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, 500); }
   if (a.species === 'human' && fireCount > 0 && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'ember' && a.task.type !== 'guard'))){
-    const d = nearestFire(a.x, a.y, 5);
+    const d = nearestFire(a.x, a.y, 5, a.z);
     if (d >= 0){ addThought(a, 'sawfire', 'Saw a wildfire close by', -Math.round(4 + 10 * (1 - a.traits.bravery)), 400); if (d <= 2){ failTask(a); START.flee(a); } }
   }
   if (a.species === 'human' && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'guard')) && threatsFor(a).some(([x, y]) => beings.some(b => b.alive && b.species === 'wolf' && b.x === x && b.y === y))){ addThought(a, 'sawwolf', 'A wolf came too close', -8, 600); failTask(a); START.flee(a); a.task && (a.task.label = 'Running from a wolf'); }

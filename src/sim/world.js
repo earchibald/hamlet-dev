@@ -34,12 +34,12 @@ function addItem(kind, x, y, z = 0){ const it = { id: nextId++, kind, x, y, z, r
 function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); rebuildItemGrid(); }
 const itemAt = (x, y, z = 0) => itemGrid[idx3(x, y, z)];
 
-function nearestFire(x, y, r){
+function nearestFire(x, y, r, z = 0){
   if (fireCount <= 0) return -1;
   let best = -1;
   for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++){
-    const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue;
-    const t = world[idx(nx, ny)]; if (t.fire <= 0) continue;
+    const nx = x + dx, ny = y + dy; if (!hasTile(nx, ny, z)) continue;
+    const t = levels[z + ZOFF][idx(nx, ny)]; if (t.fire <= 0) continue;
     const d = Math.abs(dx) + Math.abs(dy); if (d <= r && (best < 0 || d < best)) best = d;
   }
   return best;

@@ -7,20 +7,28 @@ function burnOut(t){
   if (!t.feature && t.ground === 'grass') t.ground = 'ash';
   if (t.struct && t.struct.type === 'snare'){ const sn = t.struct.snare, k = sn.camp.snares.indexOf(sn); if (k >= 0) sn.camp.snares.splice(k, 1); t.struct = null; }
   if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)){ const c = t.struct.camp, k = t.struct.type; if (c){ if (k === 'rack') c.rack = null; else if (k === 'leanto') c.shelter = null; else if (k === 'storehouse') c.storehouse = null; else c.huts = c.huts.filter(h => h[0] !== t.x || h[1] !== t.y); log(`The ${k === 'leanto' ? 'lean-to' : k === 'rack' ? 'drying rack' : k} burns down.`, [], 'bad'); } t.struct = null; }
-  const before = items.length; items = items.filter(i => i.x !== t.x || i.y !== t.y || MATERIALS[ITEMS[i.kind].mat].flam === 0); if (items.length !== before) rebuildItemGrid();
+  const before = items.length; items = items.filter(i => i.x !== t.x || i.y !== t.y || i.z !== t.z || MATERIALS[ITEMS[i.kind].mat].flam === 0); if (items.length !== before) rebuildItemGrid();
 }
 
-/* Fire spreads to neighbours and burns down. Rain slows it. */
+/* Fire spreads to neighbours and burns down. Rain slows it. Surface tiles first, then the tiles off the surface. */
 function spreadFire(){
   let count = 0;
-  for (let i = 0; i < W * H; i++){
-    const t = world[i]; if (t.fire <= 0) continue; count++;
-    t.fire--;
-    for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (!inb(nx, ny)) continue; const nb = world[idx(nx, ny)]; if (nb.fire > 0) continue; const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? 0.012 : 0.08)) ignite(nb); }
-    if (weather.storm) t.fire -= 2;
-    if (t.fire <= 0) burnOut(t);
-  }
+  for (const t of world) if (t.fire > 0){ count++; burnTile(t); }
+  for (const t of raised) if (t.fire > 0){ count++; burnTile(t); }
   fireCount = count;
+}
+/* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
+function burnTile(t){
+  t.fire--;
+  for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
+  if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
+  for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
+  if (weather.storm) t.fire -= 2;
+  if (t.fire <= 0) burnOut(t);
+}
+function spreadTo(nx, ny, nz, mult){
+  if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
+  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? 0.012 : 0.08) * mult) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
