@@ -112,14 +112,21 @@ function cutWaterCaves(){
     const [exit, under] = rim[rint(rim.length)];
     const c = makeCave('water', h);
     let x = under % W, y = (under - x) / W;
+    /* Hills stand four tiles apart, so no cave can meet another's tiles here and carve never returns null. */
     const mouth = carve(c, x, y, -1); mouth.slope = true; c.mouth = mouth; c.exit = exit; exit.mouth = c;
-    const len = 8 + rint(13);
+    const len = 8 + rint(13), spine = [[x, y]];
+    const free = (px, py) => shuffle(DIRS).map(([dx, dy]) => [px + dx, py + dy]).filter(([nx, ny]) => set.has(idx(nx, ny)) && !(hasTile(nx, ny, -1) && tileAt(nx, ny, -1).cave));
     for (let k = 0; k < len; k++){
-      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => set.has(idx(nx, ny)) && !(hasTile(nx, ny, -1) && tileAt(nx, ny, -1).cave) && dist(nx, ny, exit.x, exit.y) >= dist(x, y, exit.x, exit.y));
-      if (!opts.length) break;
-      [x, y] = opts[0]; carve(c, x, y, -1);
+      let opts = free(x, y).filter(([nx, ny]) => dist(nx, ny, exit.x, exit.y) >= dist(x, y, exit.x, exit.y));
+      if (!opts.length) opts = free(x, y);
+      if (!opts.length){ /* boxed in: go back along the spine to the last tile with room, and branch from there */
+        let j = spine.length - 1; while (j >= 0 && !free(spine[j][0], spine[j][1]).length) j--;
+        if (j < 0) break; [x, y] = spine[j]; opts = free(x, y);
+      }
+      [x, y] = opts[0]; carve(c, x, y, -1); spine.push([x, y]);
       if (k === Math.floor(len / 2) && rng() < 0.5) chamber(c, x, y, -1, set);
     }
+    c.length = spine.length - 1;
     chamber(c, x, y, -1, set);
     /* The drop: a slope on level -2 under the last chamber, with a chamber around it. */
     const drop = carve(c, x, y, -2); drop.slope = true;
