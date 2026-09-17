@@ -28,11 +28,11 @@ const pitLit = () => { const t = pitTile(); return !!(t && t.struct && t.struct.
 
 /* Score a camp site. The person explains the choice in the chronicle. */
 function chooseSite(a){
-  const s = secOf(a.x, a.y), region = reachable(a.x, a.y, 3000);
+  const s = secOf(a.x, a.y), region = reachable(a.x, a.y, a.z, 3000);
   let best = null;
   for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
     const t = tileAt(x, y);
-    if (!region.has(idx(x, y)) || t.feature) continue;
+    if (!region.has(idx3(x, y, 0)) || t.feature) continue;
     if (!RING.every(([dx, dy]) => passable(x + dx, y + dy) && !tileAt(x + dx, y + dy).feature)) continue;
     let sc = 0; const why = [];
     let water = 99, trees = 0, bushes = 0;
@@ -83,8 +83,8 @@ function openSpotNear(at, dmin, dmax){
 
 function startFoundCamp(leader){
   const here = secOf(...camp.site);
-  const region = reachable(camp.site[0], camp.site[1], W * H);
-  const cands = sectors.filter(s => s.biome === 'meadow' && camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= 3) && region.has(idx(...secCenter(s))));
+  const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
+  const cands = sectors.filter(s => s.biome === 'meadow' && camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= 3) && region.has(idx3(...secCenter(s), 0)));
   if (!cands.length) return false;
   const target = cands.sort((p, q) => dist(p.sx, p.sy, here.sx, here.sy) - dist(q.sx, q.sy, here.sx, here.sy))[0];
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
@@ -153,11 +153,11 @@ function updateCamps(){
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + 900 + rint(900);
       if (pitLit() && stashFood() >= 2 && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? 0.85 : 0.7)){
-        const region = reachable(camp.site[0], camp.site[1], W * H);
-        const edges = []; for (let x = 0; x < W; x++){ edges.push(idx(x, 0), idx(x, H - 1)); } for (let y = 0; y < H; y++){ edges.push(idx(0, y), idx(W - 1, y)); }
+        const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
+        const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
         const ok = edges.filter(i => region.has(i));
         if (ok.length){
-          const i = ok[rint(ok.length)], x = i % W, y = (i - x) / W;
+          const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
           const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
           log(`Someone saw the smoke. ${b.name} comes over the hills toward ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [b], 'major');
         }

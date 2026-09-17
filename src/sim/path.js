@@ -1,38 +1,45 @@
 /* ---------- path search ---------- */
-const bfsPrev = new Int32Array(W * H), bfsSeen = new Uint32Array(W * H); let bfsGen = 0;
-function bfs(sx, sy, goal, maxNodes = 2500){
-  if (goal(sx, sy)) return [];
-  const start = idx(sx, sy);
+/* Search runs over all levels. A tile's index is idx3(x, y, z). Neighbours come from steps(): the four beside,
+   up from a slope, down onto one. Visited tiles are marked with a generation counter, never cleared. */
+const bfsPrev = new Int32Array(NZ * W * H), bfsSeen = new Uint32Array(NZ * W * H); let bfsGen = 0; const bfsOut = [];
+const unpack = i => { const z = ((i / (W * H)) | 0) + ZMIN, r = i - (z - ZMIN) * W * H, x = r % W; return [x, (r - x) / W, z]; };
+function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
+  if (goal(sx, sy, sz)) return [];
+  const lo = who ? SPECIES[who.species].zmin : ZMIN, hi = who ? SPECIES[who.species].zmax : ZMAX;
+  const start = idx3(sx, sy, sz);
   const prev = bfsPrev, seen = bfsSeen, gen = ++bfsGen; prev[start] = start; seen[start] = gen;
   const q = [start]; let head = 0;
   while (head < q.length && head < maxNodes){
-    const c = q[head++]; const cx = c % W, cy = (c - cx) / W;
-    for (const [dx, dy] of DIRS){
-      const nx = cx + dx, ny = cy + dy;
-      if (!inb(nx, ny)) continue;
-      const ni = idx(nx, ny);
-      if (seen[ni] === gen || !passable(nx, ny)) continue;
+    const c = q[head++]; const cz = ((c / (W * H)) | 0) + ZMIN, cr = c - (cz - ZMIN) * W * H, cx = cr % W, cy = (cr - cx) / W;
+    const st = steps(cx, cy, cz, bfsOut);
+    for (let k = 0; k < st.length; k += 3){
+      const nx = st[k], ny = st[k + 1], nz = st[k + 2];
+      if (nz < lo || nz > hi) continue;
+      const ni = idx3(nx, ny, nz);
+      if (seen[ni] === gen) continue;
       seen[ni] = gen; prev[ni] = c;
-      if (goal(nx, ny)){ const path = []; let k = ni; while (k !== start){ path.push([k % W, (k - k % W) / W]); k = prev[k]; } return path.reverse(); }
+      if (goal(nx, ny, nz)){ const path = []; let j = ni; while (j !== start){ path.push(unpack(j)); j = prev[j]; } return path.reverse(); }
       q.push(ni);
     }
   }
   return null;
 }
-function reachable(sx, sy, cap = 4000){
-  const seen = new Set([idx(sx, sy)]); const q = [idx(sx, sy)];
+function reachable(sx, sy, sz, cap = 4000){
+  const s = idx3(sx, sy, sz); const seen = new Set([s]); const q = [s]; const out = [];
   for (let head = 0; head < q.length && head < cap; head++){
-    const c = q[head], cx = c % W, cy = (c - cx) / W;
-    for (const [dx, dy] of DIRS){ const nx = cx + dx, ny = cy + dy; if (!passable(nx, ny)) continue; const ni = idx(nx, ny); if (seen.has(ni)) continue; seen.add(ni); q.push(ni); }
+    const c = q[head]; const cz = ((c / (W * H)) | 0) + ZMIN, cr = c - (cz - ZMIN) * W * H, cx = cr % W, cy = (cr - cx) / W;
+    const st = steps(cx, cy, cz, out);
+    for (let k = 0; k < st.length; k += 3){ const ni = idx3(st[k], st[k + 1], st[k + 2]); if (seen.has(ni)) continue; seen.add(ni); q.push(ni); }
   }
   return seen;
 }
 /* One leg of a long walk. Far targets are approached in steps of about 16 tiles. */
-function legPath(a, tx, ty, within){
-  const d = dist(a.x, a.y, tx, ty); if (d <= within) return [];
-  let p = bfs(a.x, a.y, (x, y) => dist(x, y, tx, ty) <= within, 4000);
+function legPath(a, tx, ty, within, tz = 0){
+  if (nearAt(a, tx, ty, tz) <= within) return [];
+  const goal = (x, y, z) => z === tz && dist(x, y, tx, ty) <= within;
+  let p = bfs(a.x, a.y, a.z, goal, 4000, a);
   if (p) return p;
   /* Far away, or the straight way is blocked. Search the whole world once and walk the first stretch. */
-  p = bfs(a.x, a.y, (x, y) => dist(x, y, tx, ty) <= within, W * H);
+  p = bfs(a.x, a.y, a.z, goal, NZ * W * H, a);
   return p ? p.slice(0, 48) : null;
 }

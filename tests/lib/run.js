@@ -66,8 +66,8 @@ function cutOff(api){
   const out = [];
   for (const c of api.camps){
     if (!c.stashTile) continue;
-    const region = api.reachable(c.stashTile[0], c.stashTile[1], api.world.length);
-    for (const h of api.beings) if (h.alive && h.species === 'human' && h.camp === c && !region.has(api.idx(h.x, h.y))) out.push(`${h.name} at ${h.x},${h.y} on day ${api.dayOf()}, ${api.seasonOf()}, cut off from ${c.name}`);
+    const region = api.reachable(c.stashTile[0], c.stashTile[1], 0, api.levels.length * api.world.length);
+    for (const h of api.beings) if (h.alive && h.species === 'human' && h.camp === c && !region.has(api.idx3(h.x, h.y, h.z))) out.push(`${h.name} at ${h.x},${h.y},${h.z} on day ${api.dayOf()}, ${api.seasonOf()}, cut off from ${c.name}`);
   }
   return out;
 }

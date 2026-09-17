@@ -1,6 +1,6 @@
 /* ---------- human work tasks ---------- */
 function startFetchEmber(a){
-  const p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, t => t.fire > 0, DIRS), 3500); if (!p) return false;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
   a.task = { type: 'ember', label: 'Running to the blaze for an ember', path: p, fast: true,
     arrive(a, t){
       if (!a.carrying){
@@ -52,7 +52,7 @@ function startGather(a, kind){
   if (!camp.stashTile) return false;
   if (a.carrying && a.carrying.kind !== kind) return startDeliver(a);
   let found = null;
-  const p = bfs(a.x, a.y, (x, y) => { const it = itemAt(x, y); if (it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500);
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => { const it = itemAt(x, y, z); if (it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500, a);
   if (!p){
     if (a.carrying) return startDeliver(a);
     const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
@@ -71,7 +71,7 @@ function startGather(a, kind){
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
       if (a.carrying.count < Math.min(6, 3 + Math.floor(a.skills.gather / 2))){
         let nxt = null;
-        const q = bfs(a.x, a.y, (x, y) => { const j = itemAt(x, y); if (j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300);
+        const q = bfs(a.x, a.y, a.z, (x, y, z) => { const j = itemAt(x, y, z); if (j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300, a);
         if (q && nxt) return chain(a, t, startGather(a, kind)) || chain(a, t, startDeliver(a)) || 'done';
       }
       return chain(a, t, startDeliver(a)) || 'done';
@@ -82,7 +82,7 @@ function startGather(a, kind){
 function startPickBerries(a){
   if (a.carrying && a.carrying.kind !== 'berries') return startDeliver(a);
   const hasFood = t => t.feature === 'bush' && t.berries > 0;
-  const p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, hasFood), 2500);
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
   if (!p){ if (a.carrying) return startDeliver(a); const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false; const [cx, cy] = secCenter(s); const q = legPath(a, cx, cy, 6); if (!q) return false;
     a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, arrive(a, t){ if (dist(a.x, a.y, cx, cy) > 6){ const r = legPath(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
     return true; }
@@ -131,7 +131,7 @@ function startHuntDeer(a, d){
           const it = items.find(i => i.kind === 'venison' && i.x === d.x && i.y === d.y); if (it){ removeItem(it); a.carrying = { kind: 'venison', count: 1 }; return chain(a, t, startDeliver(a)) || 'done'; } return 'done'; }
         d.skills.wary = Math.min(3, (d.skills.wary || 0) + 1); addThought(d, 'escaped', 'A hunter missed', -6, 900); failTask(d); START.flee(d); t.progress += 40;
       }
-      const p = bfs(a.x, a.y, (x, y) => dist(x, y, d.x, d.y) <= 2, 700); if (!p) return 'fail'; t.path = p.slice(0, 4); t.fast = dist(a.x, a.y, d.x, d.y) <= 8; return 'continue';
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => z === d.z && dist(x, y, d.x, d.y) <= 2, 700, a); if (!p) return 'fail'; t.path = p.slice(0, 4); t.fast = dist(a.x, a.y, d.x, d.y) <= 8; return 'continue';
     },
     cleanup(){ if (a.carrying && a.carrying.kind === 'spear') a.carrying = null; } };
   return true;
@@ -144,7 +144,7 @@ function startDriveOff(a, w){
       if (!a.carrying){ if (dist(a.x, a.y, px, py) > 1) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + 500 }; t.label = 'Running at the wolf with fire'; }
       if (!w.alive || dist(w.x, w.y, ...camp.pit) > 22 || ++t.progress > 200){ a.carrying = null; if (w.alive && dist(w.x, w.y, ...camp.pit) > 22){ if (tick - camp.guardLogged > 800){ camp.guardLogged = tick; log(`${a.name} chases the wolf off into the dark with a burning branch.`, campHumans(), 'good'); } addThought(a, 'brave', 'Drove off a wolf', 8, 1200); drift(a, 'bravery', 0.03); for (const h of campHumans()) if (h !== a) addThought(h, 'guarded', `${a.name} drove off a wolf`, 4, 800); } return 'done'; }
       if (dist(a.x, a.y, w.x, w.y) <= 2){ addThought(w, 'burned', 'A human came at me with fire', -20, 1500); w.cooldown.raid = tick + 2500; w.cooldown.wander = tick + 600; w.shyOf = camp; failTask(w); START.flee(w); }
-      const q = bfs(a.x, a.y, (x, y) => dist(x, y, w.x, w.y) <= 2, 500); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
+      const q = bfs(a.x, a.y, a.z, (x, y, z) => z === w.z && dist(x, y, w.x, w.y) <= 2, 500, a); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
     },
     cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
   return true;
@@ -153,7 +153,7 @@ function startDriveOff(a, w){
 function startCutTree(a){
   const [cx, cy] = camp.site; let tree = null;
   const shy = camp.fae.known && camp.fae.favor < 30 ? new Set(groves.map(g => g.sector)) : null;
-  const p = bfs(a.x, a.y, (x, y) => { for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (inb(nx, ny)){ const t = tileAt(nx, ny); if (t.feature === 'tree' && t.fire <= 0 && dist(nx, ny, cx, cy) >= 4 && !t.claimed && !(shy && shy.has(sectorOfTile(t)))){ tree = t; return true; } } } return false; }, 2500);
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => { for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (hasTile(nx, ny, z)){ const t = tileAt(nx, ny, z); if (t.feature === 'tree' && t.fire <= 0 && dist(nx, ny, cx, cy) >= 4 && !t.claimed && !(shy && shy.has(sectorOfTile(t)))){ tree = t; return true; } } } return false; }, 2500, a);
   if (!p) return false;
   tree.claimed = a.id;
   a.task = { type: 'work', label: 'Walking to a tree with the axe', path: p, progress: 0,
@@ -171,7 +171,7 @@ function startCutTree(a){
 }
 function startFillWater(a){
   if (a.carrying && a.carrying.kind !== 'water') return startDeliver(a);
-  const p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, t => t.ground === 'water'), 3000); if (!p) return false;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
   a.task = { type: 'gather', label: 'Going to fill the waterskin', path: p, progress: 0,
     arrive(a, t){ t.label = 'Filling the waterskin'; if (++t.progress < 12) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startDeliver(a)) || 'done'; } };
   return true;

@@ -7,7 +7,7 @@ function makeBeing(species, x, y, name, hue){
   const needs = {}; for (const k in sp.decay) needs[k] = 55 + rint(40);
   const L = LIFE[species];
   const b = {
-    id: nextId++, species, name: name || `${sp.label[0].toUpperCase()}${sp.label.slice(1)} ${nextId}`, hue, x, y, hp: 100, alive: true,
+    id: nextId++, species, name: name || `${sp.label[0].toUpperCase()}${sp.label.slice(1)} ${nextId}`, hue, x, y, z: 0, hp: 100, alive: true,
     born: tick - Math.round((L.adult + rng() * (L.old - L.adult)) * DAY), parents: null, lastChild: -99999,
     needs, traits: { bravery: r(), sociability: r(), diligence: r(), temper: r(), curiosity: r(), patience: r(), hardiness: r() },
     skills: { gather: 0, build: 0, cook: 0, trap: 0, craft: 0, woodcut: 0, hunt: 0, wary: 0 }, xp: {},
@@ -89,7 +89,7 @@ const START = {
       const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1);
       if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (dist(a.x, a.y, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, 300); return 'done'; } }; return true; }
     }
-    const p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, t => t.ground === 'water'), 3000); if (!p) return false;
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
     a.task = { type: 'drink', label: 'Going to drink', path: p, arrive(a){ a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
     return true;
   },
@@ -107,8 +107,8 @@ const START = {
     }
     let hasFood = a.species === 'rabbit' ? (t => t.ground === 'grass' && !t.feature || t.feature === 'bush' || t.feature === 'reeds') : (t => t.feature === 'bush' && t.berries > 0);
     let p = null;
-    if (a.species === 'rabbit'){ const bushy = t => t.feature === 'bush' && t.berries > 0; p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, bushy), 400); if (p) hasFood = bushy; }
-    if (!p) p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, hasFood), a.species === 'rabbit' ? 200 : 2500); if (!p) return false;
+    if (a.species === 'rabbit'){ const bushy = t => t.feature === 'bush' && t.berries > 0; p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, bushy, NEAR, z), 400, a); if (p) hasFood = bushy; }
+    if (!p) p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), a.species === 'rabbit' ? 200 : 2500, a); if (!p) return false;
     a.task = { type: 'eat', label: a.species === 'rabbit' ? 'Looking for grass' : 'Going to eat berries', path: p, progress: 0,
       arrive(a, t){
         const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail';
@@ -129,7 +129,7 @@ const START = {
     const others = humans().filter(o => o !== a && !o.asleep && o.camp === a.camp);
     if (!others.length) return false;
     let target = null;
-    const p = bfs(a.x, a.y, (x, y) => { target = others.find(o => dist(o.x, o.y, x, y) <= 1); return !!target; }, 1500); if (!p) return false;
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => { target = others.find(o => o.z === z && dist(o.x, o.y, x, y) <= 1); return !!target; }, 1500, a); if (!p) return false;
     a.task = { type: 'socialize', label: `Going to talk to ${target.name}`, path: p, progress: 0,
       arrive(a, t){ if (!target.alive || dist(target.x, target.y, a.x, a.y) > 2) return 'fail'; t.label = `Talking with ${target.name}`; if (++t.progress < 10) return 'continue'; chat(a, target); return 'done'; } };
     return true;
@@ -158,8 +158,8 @@ const START = {
   },
   wander(a){
     for (let k = 0; k < 6; k++){
-      const tx = a.x + rint(11) - 5, ty = a.y + rint(11) - 5; if (!passable(tx, ty)) continue;
-      const p = bfs(a.x, a.y, (x, y) => x === tx && y === ty, 250);
+      const tx = a.x + rint(11) - 5, ty = a.y + rint(11) - 5; if (!passable(tx, ty, a.z)) continue;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => x === tx && y === ty && z === a.z, 250, a);
       if (p){ a.task = { type: 'wander', label: a.species === 'human' ? 'Wandering' : 'Roaming', path: p, arrive: () => 'done' }; return true; }
     }
     a.task = { type: 'wander', label: 'Standing still', path: [], wait: 20, arrive: () => 'done' }; return true;
@@ -169,12 +169,12 @@ const START = {
     const threats = threatsFor(a); if (!threats.length) return false;
     let best = null;
     for (let k = 0; k < 14; k++){
-      const tx = a.x + rint(13) - 6, ty = a.y + rint(13) - 6; if (!passable(tx, ty)) continue;
+      const tx = a.x + rint(13) - 6, ty = a.y + rint(13) - 6; if (!passable(tx, ty, a.z)) continue;
       const md = Math.min(...threats.map(([x, y]) => dist(tx, ty, x, y)));
       if (!best || md > best.md) best = { tx, ty, md };
     }
     if (!best) return false;
-    const p = bfs(a.x, a.y, (x, y) => x === best.tx && y === best.ty, 250); if (!p) return false;
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => x === best.tx && y === best.ty && z === a.z, 250, a); if (!p) return false;
     a.task = { type: 'flee', label: a.species === 'human' ? 'Running from the fire' : 'Bolting', path: p, fast: true, arrive: () => 'done' }; return true;
   },
 };
@@ -254,9 +254,9 @@ function runTask(a){
   const t = a.task; a.status = t.label;
   if (t.wait > 0){ t.wait--; return; }
   if (t.path.length){
-    const [nx, ny] = t.path[0];
-    if (!passable(nx, ny)){ a.cooldown[t.key] = tick + 40; failTask(a); return; }
-    a.x = nx; a.y = ny; t.path.shift();
+    const [nx, ny, nz] = t.path[0];
+    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + 40; failTask(a); return; }
+    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
     if (a.species === 'rabbit') checkSnare(a);
     return;
   }

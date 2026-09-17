@@ -31,3 +31,39 @@ test('rock does not walk, stone does', () => {
   assert.equal(api.passable(20, 20, 1), false);
   assert.equal(api.raised.includes(t), true);
 });
+
+/* A little hill by hand on flat ground: a 3 by 3 block of rock at level 0 with a stone floor above it, and one slope on its west side. */
+function makeHill(api, x0, y0, withSlope){
+  for (let y = y0 - 2; y <= y0 + 4; y++) for (let x = x0 - 2; x <= x0 + 4; x++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; api.levels[api.ZOFF + 1][api.idx(x, y)] = null; }
+  for (let y = y0; y < y0 + 3; y++) for (let x = x0; x < x0 + 3; x++){ api.tileAt(x, y).ground = 'rock'; api.placeTile(x, y, 1, 'stone'); }
+  if (withSlope) api.tileAt(x0 - 1, y0 + 1).slope = true;
+}
+
+test('a slope joins the ground to the floor above, and a cliff does not', () => {
+  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  makeHill(api, x0, y0, true);
+  const out = [];
+  api.steps(x0 - 1, y0 + 1, 0, out);
+  assert.ok(out.join(',').includes(`${x0},${y0 + 1},1`), 'the slope should offer a step up');
+  api.steps(x0, y0 + 1, 1, out);
+  assert.ok(out.join(',').includes(`${x0 - 1},${y0 + 1},0`), 'the floor above the slope should offer a step down');
+  const walker = { x: x0 - 2, y: y0 + 1, z: 0, species: 'human' };
+  const up = api.bfs(walker.x, walker.y, 0, (x, y, z) => z === 1 && x === x0 + 1 && y === y0 + 1, 500, walker);
+  assert.ok(up, 'no path up the slope');
+  assert.deepEqual(up[0], [x0 - 1, y0 + 1, 0]);
+  assert.deepEqual(up[1], [x0, y0 + 1, 1]);
+  const leg = api.legPath(walker, x0 + 1, y0 + 1, 0, 1);
+  assert.ok(leg && leg.length === up.length, 'legPath should climb too');
+  api.tileAt(x0 - 1, y0 + 1).slope = false;
+  assert.equal(api.bfs(walker.x, walker.y, 0, (x, y, z) => z === 1, 500, walker), null, 'a cliff should block');
+  const region = api.reachable(walker.x, walker.y, 0, 200);
+  assert.equal(region.has(api.idx3(x0, y0 + 1, 1)), false);
+});
+
+test('rabbits never climb, deer do', () => {
+  const api = load(); api.startWorld('r'); const x0 = 100, y0 = 50;
+  makeHill(api, x0, y0, true);
+  const goal = (x, y, z) => z === 1;
+  assert.equal(api.bfs(x0 - 2, y0 + 1, 0, goal, 500, { species: 'rabbit' }), null);
+  assert.ok(api.bfs(x0 - 2, y0 + 1, 0, goal, 500, { species: 'deer' }));
+});

@@ -207,4 +207,12 @@ function growPlants(){
 function rotCarcasses(){
   if (tick % 50 === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison') || tick - i.born < (i.kind === 'venison' ? 1500 : 900) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
-function steps(){ return []; }
+/* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */
+function steps(x, y, z, out){
+  out.length = 0;
+  for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (passable(nx, ny, z)) out.push(nx, ny, z); }
+  const t = levels[z + ZOFF][idx(x, y)];
+  if (t && t.slope) for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (passable(nx, ny, z + 1)) out.push(nx, ny, z + 1); }
+  for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (passable(nx, ny, z - 1) && levels[z - 1 + ZOFF][idx(nx, ny)].slope) out.push(nx, ny, z - 1); }
+  return out;
+}

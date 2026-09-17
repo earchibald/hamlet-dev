@@ -16,7 +16,7 @@ function startFightSprite(a, sp){
         }
         addThought(sp, 'dodged', 'A human swung a spear at me', -8, 1500); failTask(sp); START.flee(sp); a.carrying = null; return 'done';
       }
-      const q = bfs(a.x, a.y, (x, y) => dist(x, y, sp.x, sp.y) <= 1, 400); if (!q) return 'fail'; t.path = q.slice(0, 3); return 'continue';
+      const q = bfs(a.x, a.y, a.z, (x, y, z) => z === sp.z && dist(x, y, sp.x, sp.y) <= 1, 400, a); if (!q) return 'fail'; t.path = q.slice(0, 3); return 'continue';
     },
     cleanup(){ if (a.carrying && a.carrying.kind === 'spear') a.carrying = null; } };
   return true;
@@ -36,7 +36,7 @@ Object.assign(START, {
     return true;
   },
   forage(a){
-    const hasFood = t => t.feature === 'bush' && t.berries > 0; const p = bfs(a.x, a.y, (x, y) => !!nearFind(x, y, hasFood), 800); if (!p) return false;
+    const hasFood = t => t.feature === 'bush' && t.berries > 0; const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 800, a); if (!p) return false;
     a.task = { type: 'eat', label: 'Picking berries in the dark', path: p, arrive(a){ const b = nearFind(a.x, a.y, hasFood); if (!b) return 'fail'; b.berries--; a.needs.glow = Math.min(100, a.needs.glow + 30); return 'done'; } };
     return true;
   },
