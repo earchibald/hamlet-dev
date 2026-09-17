@@ -147,6 +147,11 @@ test('a cave is carved as stone floor and remembers its record', () => {
   assert.equal(u, s); assert.equal(u.ground, 'stone'); assert.equal(u.feature, null); assert.equal(u.cave, c);
   assert.equal(api.passable(150, 66, -1), true);
   assert.ok(api.ITEMS.firestones && api.ITEMS.bones);
+  const other = api.makeCave('den', null);
+  assert.equal(api.carve(other, 150, 66, -1), null, 'another cave cannot take an owned tile');
+  assert.equal(t.cave, c); assert.equal(other.tiles.length, 0);
+  const sl = api.tileAt(152, 66); sl.ground = 'rock'; sl.slope = true;
+  assert.equal(api.carve(c, 152, 66, 0).slope, false, 'cutting the rock clears a slope');
 });
 
 test('keepsPaths refuses a solid that would cut the last way through', () => {
