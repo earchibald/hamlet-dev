@@ -132,3 +132,28 @@ test('a person walks up the slope, stands on the floor, and drops a stick there'
   assert.ok(it, 'no stick dropped'); assert.equal(it.z, 1, 'the stick should lie on the floor, not in the rock below');
   assert.equal(api.itemAt(a.x, a.y, 1), it);
 });
+
+test('a cave is carved as stone floor and remembers its record', () => {
+  const api = load(); api.startWorld('r');
+  assert.ok(Array.isArray(api.caves));
+  const before = api.caves.length;
+  const c = api.makeCave('water', null);
+  assert.equal(api.caves.length, before + 1);
+  const t = api.carve(c, 150, 66, -1);
+  assert.equal(t.ground, 'stone'); assert.equal(t.z, -1); assert.equal(t.cave, c); assert.ok(c.tiles.includes(t));
+  assert.equal(api.carve(c, 150, 66, -1), t, 'carving twice returns the same tile');
+  const s = api.tileAt(151, 66); s.ground = 'rock'; s.feature = 'tree';
+  const u = api.carve(c, 151, 66, 0);
+  assert.equal(u, s); assert.equal(u.ground, 'stone'); assert.equal(u.feature, null); assert.equal(u.cave, c);
+  assert.equal(api.passable(150, 66, -1), true);
+  assert.ok(api.ITEMS.firestones && api.ITEMS.bones);
+});
+
+test('keepsPaths refuses a solid that would cut the last way through', () => {
+  const api = load(); api.startWorld('r'); const x0 = 150, y0 = 74;
+  for (let y = y0 - 2; y <= y0 + 2; y++) for (let x = x0 - 2; x <= x0 + 2; x++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; }
+  for (const dy of [-1, 1]) for (let x = x0 - 1; x <= x0 + 1; x++) api.tileAt(x, y0 + dy).feature = 'boulder';
+  assert.equal(api.keepsPaths(api.tileAt(x0, y0)), false, 'the middle of a one-wide corridor');
+  for (let x = x0 - 1; x <= x0 + 1; x++) api.tileAt(x, y0 - 1).feature = null;
+  assert.equal(api.keepsPaths(api.tileAt(x0, y0)), true, 'with the north row open the sides join around it');
+});

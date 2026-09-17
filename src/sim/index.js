@@ -19,15 +19,15 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
-  startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND,
+  startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   runTask, dropCarried,
-  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, sectorOfTile, passable, nearestFire, itemAt,
+  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, sectorOfTile, passable, nearestFire, itemAt,
   near, nearAt, ZMIN, ZMAX, ZOFF, NZ, W, H,
   campHumans, humans, stashFood,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
-  get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; },
+  get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
   get tick(){ return tick; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },

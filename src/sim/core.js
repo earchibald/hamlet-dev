@@ -57,6 +57,8 @@ const ITEMS = {
   venison: { name: 'deer carcass',   plural: 'deer carcasses', mat: 'flesh', fuel: 0 },
   spear:   { name: 'spear',          plural: 'spears',    mat: 'wood',  fuel: 0 },
   moss:    { name: 'tuft of glowing moss', plural: 'glowing moss', mat: 'plant', fuel: 0 },
+  firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0 },
+  bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0 },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
@@ -85,7 +87,7 @@ const secCenter = s => [s.sx * LW + (LW >> 1), s.sy * LH + (LH >> 1)];
 function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = rint(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 /* World state */
-let world, levels, raised, hills, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];

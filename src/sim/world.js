@@ -2,7 +2,7 @@
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
-function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null }; }
+function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null }; }
 /* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
 function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); const old = levels[z + ZOFF][idx(x, y)]; levels[z + ZOFF][idx(x, y)] = t; if (z !== 0){ if (old){ const k = raised.indexOf(old); if (k >= 0) raised[k] = t; else raised.push(t); } else raised.push(t); } return t; }
 function matOf(t){ return t.feature ? FEATURES[t.feature].mat : null; }
@@ -70,6 +70,34 @@ function makeNoise(scale){
     const a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * tx, b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * tx;
     return a + (b - a) * ty;
   };
+}
+/* ---------- caves ---------- */
+/* A cave is a record. kind: water, den, or hollow. tiles: every carved tile, on any level. mouth: the slope on the
+   lower level you climb out by, or the pocket tile beside the outside for a den at level 0. exit: the surface tile
+   you step out onto; it points back through t.mouth. deep: the find spot. blocked: a rock tile in the passage. */
+function makeCave(kind, hill){ const c = { id: nextId++, kind, hill, owner: null, tiles: [], mouth: null, exit: null, deep: null, blocked: null, story: [] }; caves.push(c); return c; }
+/* Turn a tile into cave floor for cave c. Below the surface the tile is made; on the surface the rock is cut. */
+function carve(c, x, y, z){
+  let t = hasTile(x, y, z) ? tileAt(x, y, z) : null;
+  if (t && t.cave === c) return t;
+  if (!t) t = placeTile(x, y, z, 'stone'); else { t.ground = 'stone'; t.feature = null; t.berries = 0; t.loose = null; }
+  t.cave = c; c.tiles.push(t); return t;
+}
+/* Making this tile solid keeps every path if its open sides still touch each other around the ring. */
+function keepsPaths(t){
+  const open = AROUND.map(([dx, dy]) => passable(t.x + dx, t.y + dy, t.z));
+  const sides = [0, 2, 4, 6].filter(i => open[i]);
+  if (sides.length < 2) return true;
+  const joined = new Set([sides[0]]);
+  for (const step of [1, -1]){ let i = sides[0]; for (let k = 0; k < 7; k++){ i = (i + step + 8) % 8; if (!open[i]) break; joined.add(i); } }
+  return sides.every(i => joined.has(i));
+}
+/* Walkable surface tiles just outside a hill, each with the footprint tile it touches. Mouths and slopes are skipped. */
+function rimExits(h, set){
+  const out = [];
+  for (const i of h.tiles){ const x = i % W, y = (i - x) / W;
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (passable(nx, ny) && !t.slope && !t.mouth) out.push([t, i]); } }
+  return out;
 }
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
@@ -166,7 +194,7 @@ function generate(){
     sectors.push({ sx, sy, biome, name: BIOMES[biome].name });
   }
   const riverY = x => H * 0.5 + (rn(x, 7) - 0.5) * H * 0.7;
-  levels = []; for (let z = ZMIN; z <= ZMAX; z++) levels.push(new Array(W * H).fill(null)); world = levels[ZOFF]; raised = []; hills = [];
+  levels = []; for (let z = ZMIN; z <= ZMAX; z++) levels.push(new Array(W * H).fill(null)); world = levels[ZOFF]; raised = []; hills = []; caves = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const s = sectors[secIdx(Math.floor(x / LW), Math.floor(y / LH))];
     const e = en(x, y), f = fn(x, y), dr = Math.abs(y - riverY(x));
@@ -259,14 +287,7 @@ function generate(){
 /* A sapling becomes a solid tree only if it does not close a path. The open
    tiles beside it must still touch each other around the ring once it is
    solid. Two people starved in pockets sealed this way before this rule. */
-function saplingMayGrow(t){
-  const open = AROUND.map(([dx, dy]) => passable(t.x + dx, t.y + dy));
-  const sides = [0, 2, 4, 6].filter(i => open[i]);
-  if (sides.length < 2) return true;
-  const joined = new Set([sides[0]]);
-  for (const step of [1, -1]){ let i = sides[0]; for (let k = 0; k < 7; k++){ i = (i + step + 8) % 8; if (!open[i]) break; joined.add(i); } }
-  return sides.every(i => joined.has(i));
-}
+function saplingMayGrow(t){ return keepsPaths(t); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
   for (let k = 0; k < 60; k++){
