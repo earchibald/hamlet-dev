@@ -188,10 +188,32 @@ for (const seed of SEEDS) test(`seed ${seed}: water cut a cave under every tall 
     assert.ok(c.deep && c.deep.z === -2 && api.passable(c.deep.x, c.deep.y, -2), 'a deep chamber at level -2');
     const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
     assert.ok(floors.length >= 10, `a passage of ${floors.length} tiles is too short`);
-    assert.ok(c.length >= 8 && c.length <= 20, `a passage of ${c.length} steps`);
+    assert.ok(c.steps >= 8 && c.steps <= 20, `a passage of ${c.steps} steps`);
     const region = api.reachable(c.exit.x, c.exit.y, 0, full);
-    for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `cave under hill ${c.hill.x},${c.hill.y}: floor ${t.x},${t.y},${t.z} cannot be reached from the exit`);
+    if (!c.blocked) for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `cave under hill ${c.hill.x},${c.hill.y}: floor ${t.x},${t.y},${t.z} cannot be reached from the exit`);
     for (const t of c.tiles) assert.ok(c.hill.tiles.includes(api.idx(t.x, t.y)), 'every cave tile lies under the hill');
     assert.ok(c.story.some(s => s.includes('Water cut')), 'the story says water cut it');
+  }
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: rock fell at the hill feet and blocked some passages`, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  let feet = 0;
+  for (const h of api.hills){ const set = new Set(h.tiles);
+    let n = 0; for (const i of h.tiles){ const x = i % api.W, y = (i - x) / api.W; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const t = api.tileAt(Math.min(api.W - 1, Math.max(0, x + dx)), Math.min(api.H - 1, Math.max(0, y + dy))); if (!set.has(api.idx(t.x, t.y)) && t.feature === 'boulder') n++; } }
+    if (n) feet++;
+  }
+  assert.ok(feet >= api.hills.length / 2, `only ${feet} of ${api.hills.length} hills have boulders at the foot`);
+  for (const c of api.caves.filter(c => c.kind === 'water')){
+    const region = api.reachable(c.exit.x, c.exit.y, 0, full);
+    if (c.blocked){
+      assert.equal(c.blocked.ground, 'rock'); assert.ok(c.tiles.includes(c.blocked)); assert.notEqual(c.blocked, c.mouth);
+      assert.ok(region.has(api.idx3(c.mouth.x, c.mouth.y, -1)), 'the mouth is still reachable');
+      assert.equal(region.has(api.idx3(c.deep.x, c.deep.y, -2)), false, 'the deep chamber is sealed off');
+      assert.ok(c.story.some(s => s.includes('Fallen rock')));
+    } else {
+      assert.ok(region.has(api.idx3(c.deep.x, c.deep.y, -2)), 'an open cave reaches its deep chamber');
+    }
   }
 });

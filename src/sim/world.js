@@ -74,8 +74,9 @@ function makeNoise(scale){
 /* ---------- caves ---------- */
 /* A cave is a record. kind: water, den, or hollow. tiles: every carved tile, on any level. mouth: the slope on the
    lower level you climb out by, or the pocket tile beside the outside for a den at level 0. exit: the surface tile
-   you step out onto; it points back through t.mouth. deep: the find spot. blocked: a rock tile in the passage. */
-function makeCave(kind, hill){ const c = { id: nextId++, kind, hill, owner: null, tiles: [], mouth: null, exit: null, deep: null, blocked: null, story: [] }; caves.push(c); return c; }
+   you step out onto; it points back through t.mouth. deep: the find spot. blocked: a rock tile in the passage.
+   steps: how many walk tiles the water cut. */
+function makeCave(kind, hill){ const c = { id: nextId++, kind, hill, owner: null, tiles: [], mouth: null, exit: null, deep: null, blocked: null, steps: 0, story: [] }; caves.push(c); return c; }
 /* Turn a tile into cave floor for cave c. Below the surface the tile is made; on the surface the rock is cut.
    A tile another cave owns is left alone: the caller gets null and must go round it. */
 function carve(c, x, y, z){
@@ -126,7 +127,8 @@ function cutWaterCaves(){
       [x, y] = opts[0]; carve(c, x, y, -1); spine.push([x, y]);
       if (k === Math.floor(len / 2) && rng() < 0.5) chamber(c, x, y, -1, set);
     }
-    c.length = spine.length - 1;
+    c.steps = spine.length - 1;
+    const far = spine.reduce((p, q) => dist(q[0], q[1], exit.x, exit.y) > dist(p[0], p[1], exit.x, exit.y) ? q : p, spine[0]); [x, y] = far;
     chamber(c, x, y, -1, set);
     /* The drop: a slope on level -2 under the last chamber, with a chamber around it. */
     const drop = carve(c, x, y, -2); drop.slope = true;
@@ -149,6 +151,21 @@ function chamber(c, x, y, z, set){
     const sideA = hasTile(x + dx, y, z) && tileAt(x + dx, y, z).cave === c, sideB = hasTile(x, y + dy, z) && tileAt(x, y + dy, z).cave === c;
     if (set.has(idx(nx, ny)) && (sideA || sideB) && rng() < 0.8){ const t = carve(c, nx, ny, z); if (t) out.push(t); } }
   return out;
+}
+/* Rock fell from the hills. Boulders lie at the feet where they cut no path, and one water passage in four is blocked. */
+function rockfall(){
+  for (const h of hills){
+    const set = new Set(h.tiles);
+    const rim = shuffle(rimExits(h, set)); let want = 2 + rint(3);
+    for (const [t] of rim){ if (!want) break; if (t.feature || t.struct || t.mouth) continue; if (!keepsPaths(t)) continue; t.feature = 'boulder'; t.loose = null; want--; }
+  }
+  for (const c of caves){
+    if (c.kind !== 'water' || rng() >= 0.25) continue;
+    const passage = c.tiles.filter(t => t.z === -1 && t !== c.mouth && !t.slope && !keepsPaths(t));
+    if (passage.length < 4) continue;
+    const t = passage[1 + rint(passage.length - 3)];
+    t.ground = 'rock'; c.blocked = t; c.story.push('Fallen rock blocks the way.');
+  }
 }
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
@@ -286,7 +303,7 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  uplift(); cutWaterCaves();
+  uplift(); cutWaterCaves(); rockfall();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
