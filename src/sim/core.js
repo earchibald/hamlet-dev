@@ -16,6 +16,8 @@ const RING = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 const NEAR = [[0,0], ...DIRS];
 /* The eight neighbours in order around the ring, so a walk along it stays on adjacent tiles. */
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+/* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
+const ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
 
 /* Data tables. Rules read properties. Rules do not check names. */
 const MATERIALS = {
@@ -25,11 +27,13 @@ const MATERIALS = {
   flesh: { name: 'flesh',        fuel: 0,  flam: 0 },
 };
 const GROUND = {
-  grass: { name: 'grass',     fuel: 6, flam: 0.6 },
-  soil:  { name: 'bare soil', fuel: 0, flam: 0 },
-  sand:  { name: 'sand',      fuel: 0, flam: 0 },
-  ash:   { name: 'ash',       fuel: 0, flam: 0 },
-  water: { name: 'water',     fuel: 0, flam: 0 },
+  grass: { name: 'grass',       fuel: 6, flam: 0.6, walk: true },
+  soil:  { name: 'bare soil',   fuel: 0, flam: 0,   walk: true },
+  sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true },
+  ash:   { name: 'ash',         fuel: 0, flam: 0,   walk: true },
+  water: { name: 'water',       fuel: 0, flam: 0,   walk: false },
+  rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false },
+  stone: { name: 'stone floor', fuel: 0, flam: 0,   walk: true },
 };
 const FEATURES = {
   tree:    { name: 'pine tree',  solid: true,  mat: 'wood',  fuel: 40 },
@@ -71,13 +75,17 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const idx = (x, y) => y * W + x;
 const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
 const dist = (ax, ay, bx, by) => Math.abs(ax - bx) + Math.abs(ay - by);
+const idx3 = (x, y, z) => (z + ZOFF) * W * H + y * W + x;
+/* Distance between two beings, or a being and a spot. A level apart counts as six tiles, through the rock. */
+const near = (a, b) => dist(a.x, a.y, b.x, b.y) + 6 * Math.abs(a.z - b.z);
+const nearAt = (a, x, y, z = 0) => dist(a.x, a.y, x, y) + 6 * Math.abs(a.z - z);
 const secOf = (x, y) => ({ sx: Math.floor(x / LW), sy: Math.floor(y / LH) });
 const secIdx = (sx, sy) => sy * SW + sx;
 const secCenter = s => [s.sx * LW + (LW >> 1), s.sy * LH + (LH >> 1)];
 function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = rint(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 /* World state */
-let world, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+let world, levels, raised, hills, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];

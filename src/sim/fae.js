@@ -31,7 +31,7 @@ Object.assign(START, {
         a.needs.glow = Math.min(100, a.needs.glow + 0.6); a.needs.rest = Math.min(100, a.needs.rest + 0.3);
         if (!drowsy(a) && t.progress % 40 === 0) for (const h of humans()) if (h.camp && dist(h.x, h.y, a.x, a.y) <= 7){ camp = h.camp; if (!camp.fae.known){ camp.fae.known = true; log(`${h.name} stumbles on a ring of lights dancing around a hollow pine in the ${g.sector.name.toLowerCase()}. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw sprites dancing in the grove' : 'Saw lights in the grove that were not fireflies', h.traits.curiosity > 0.5 ? 5 : -4, 900); }
         if (beings.some(o => o !== a && o.alive && o.species === 'sprite' && dist(o.x, o.y, a.x, a.y) <= 3)) a.needs.play = Math.min(100, a.needs.play + 0.5);
-        if (++t.progress % 200 === 0 && rng() < 0.35 && !items.some(i => i.kind === 'moss' && dist(i.x, i.y, g.x, g.y) <= 2)){ const q = nearFind(g.x, g.y, q => passable(q.x, q.y) && !itemGrid[idx(q.x, q.y)], RING); if (q) addItem('moss', q.x, q.y); }
+        if (++t.progress % 200 === 0 && rng() < 0.35 && !items.some(i => i.kind === 'moss' && dist(i.x, i.y, g.x, g.y) <= 2)){ const q = nearFind(g.x, g.y, q => passable(q.x, q.y) && !itemAt(q.x, q.y), RING); if (q) addItem('moss', q.x, q.y); }
         return t.progress < 240 ? 'continue' : 'done'; } };
     return true;
   },
@@ -47,7 +47,7 @@ Object.assign(START, {
       arrive(a, t){ if (dist(a.x, a.y, ...c.pit) > r){ const q = legPath(a, c.pit[0], c.pit[1], r); if (!q) return 'fail'; t.path = q; return 'continue'; }
         t.label = 'Watching the fire from the dark'; a.needs.play = Math.min(100, a.needs.play + 0.4);
         if (t.progress === 0){ camp = c; for (const h of campHumans()) if (dist(h.x, h.y, a.x, a.y) <= 7 && !h.asleep){ if (!c.fae.known){ c.fae.known = true; log(`${h.name} sees a light dancing at the edge of the firelight. It is not a firefly. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw a sprite dancing in the dark' : 'Something watched us from the dark', h.traits.curiosity > 0.5 ? 4 : -4, 700); } }
-        if (++t.progress === 120 && c.stone && c.fae.favor >= 20 && rng() < 0.5){ const st = tileAt(...c.stone).struct; if (!itemGrid[idx(c.stone[0], c.stone[1])] && st.offering === 0){ addItem('moss', c.stone[0], c.stone[1]); camp = c; log('A tuft of glowing moss lies on the offering stone in the morning.', campHumans(), 'good'); } }
+        if (++t.progress === 120 && c.stone && c.fae.favor >= 20 && rng() < 0.5){ const st = tileAt(...c.stone).struct; if (!itemAt(c.stone[0], c.stone[1]) && st.offering === 0){ addItem('moss', c.stone[0], c.stone[1]); camp = c; log('A tuft of glowing moss lies on the offering stone in the morning.', campHumans(), 'good'); } }
         return t.progress < 160 && isNight() ? 'continue' : 'done'; } };
     return true;
   },

@@ -1,33 +1,38 @@
 /* ---------- tiles, loose items, resource counts, generation, plants ---------- */
-const tileAt = (x, y) => world[idx(x, y)];
+const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
+const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
+function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false }; }
+/* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
+function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); levels[z + ZOFF][idx(x, y)] = t; if (z !== 0) raised.push(t); return t; }
 function matOf(t){ return t.feature ? FEATURES[t.feature].mat : null; }
-function passable(x, y){
-  if (!inb(x, y)) return false;
-  const t = world[idx(x, y)];
-  return t.ground !== 'water' && !(t.feature && FEATURES[t.feature].solid) && t.fire <= 0 && !(t.struct && t.struct.type === 'firepit');
+function passable(x, y, z = 0){
+  if (!hasTile(x, y, z)) return false;
+  const t = levels[z + ZOFF][idx(x, y)];
+  return GROUND[t.ground].walk && !(t.feature && FEATURES[t.feature].solid) && t.fire <= 0 && !(t.struct && t.struct.type === 'firepit');
 }
-function nearFind(x, y, pred, offs = NEAR){
-  for (const [dx, dy] of offs){ const nx = x + dx, ny = y + dy; if (inb(nx, ny) && pred(world[idx(nx, ny)])) return world[idx(nx, ny)]; }
+function nearFind(x, y, pred, offs = NEAR, z = 0){
+  for (const [dx, dy] of offs){ const nx = x + dx, ny = y + dy; if (hasTile(nx, ny, z)){ const t = levels[z + ZOFF][idx(nx, ny)]; if (pred(t)) return t; } }
   return null;
 }
 function tileFlam(t){
   let f = t.feature ? MATERIALS[matOf(t)].flam : GROUND[t.ground].flam;
   if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)) f = Math.max(f, 0.3);
-  const it = itemGrid[idx(t.x, t.y)]; if (it) f = Math.max(f, MATERIALS[ITEMS[it.kind].mat].flam);
+  const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, MATERIALS[ITEMS[it.kind].mat].flam);
   return f;
 }
 function tileFuel(t){
   let f = t.feature ? FEATURES[t.feature].fuel : GROUND[t.ground].fuel;
   if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)) f = Math.max(f, 60);
-  const it = itemGrid[idx(t.x, t.y)]; if (it) f = Math.max(f, ITEMS[it.kind].fuel);
+  const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, ITEMS[it.kind].fuel);
   return f;
 }
 
 /* ---------- loose items ---------- */
-function rebuildItemGrid(){ itemGrid = new Array(W * H).fill(null); for (const it of items){ const i = idx(it.x, it.y); if (!itemGrid[i]) itemGrid[i] = it; } }
-function addItem(kind, x, y){ const it = { id: nextId++, kind, x, y, reservedBy: null, born: tick }; items.push(it); if (!itemGrid[idx(x, y)]) itemGrid[idx(x, y)] = it; return it; }
+function rebuildItemGrid(){ itemGrid = new Array(NZ * W * H).fill(null); for (const it of items){ const i = idx3(it.x, it.y, it.z); if (!itemGrid[i]) itemGrid[i] = it; } }
+function addItem(kind, x, y, z = 0){ const it = { id: nextId++, kind, x, y, z, reservedBy: null, born: tick }; items.push(it); const i = idx3(x, y, z); if (!itemGrid[i]) itemGrid[i] = it; return it; }
 function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); rebuildItemGrid(); }
+const itemAt = (x, y, z = 0) => itemGrid[idx3(x, y, z)];
 
 function nearestFire(x, y, r){
   if (fireCount <= 0) return -1;
@@ -47,7 +52,7 @@ function sectorCount(s, key, pred){
   for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (pred(world[idx(x, y)], x, y)) n++;
   resCache.set(ck, { t: tick, n }); return n;
 }
-const looseCount = kind => (s) => sectorCount(s, 'item-' + kind, (t, x, y) => { const it = itemGrid[idx(x, y)]; return it && it.kind === kind && !it.reservedBy; });
+const looseCount = kind => (s) => sectorCount(s, 'item-' + kind, (t, x, y) => { const it = itemAt(x, y); return it && it.kind === kind && !it.reservedBy; });
 function nearestSectorWith(a, counter){
   const me = secOf(a.x, a.y);
   const list = sectors.filter(s => !(s.sx === me.sx && s.sy === me.sy)).sort((p, q) => dist(p.sx, p.sy, me.sx, me.sy) - dist(q.sx, q.sy, me.sx, me.sy));
@@ -77,11 +82,11 @@ function generate(){
     sectors.push({ sx, sy, biome, name: BIOMES[biome].name });
   }
   const riverY = x => H * 0.5 + (rn(x, 7) - 0.5) * H * 0.7;
-  world = new Array(W * H);
+  levels = []; for (let z = ZMIN; z <= ZMAX; z++) levels.push(new Array(W * H).fill(null)); world = levels[ZOFF]; raised = []; hills = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const s = sectors[secIdx(Math.floor(x / LW), Math.floor(y / LH))];
     const e = en(x, y), f = fn(x, y), dr = Math.abs(y - riverY(x));
-    const t = { x, y, ground: 'grass', feature: null, berries: 0, fire: 0, struct: null };
+    const t = makeTile(x, y, 0, 'grass');
     let loose = null;
     const ford = (x + 23) % 47 < 3;
     if (dr <= 1.3) t.ground = ford ? 'sand' : 'water';
@@ -118,7 +123,7 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  items = []; itemGrid = new Array(W * H).fill(null);
+  items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
   const s0 = sectors[secIdx(SW >> 1, SH >> 1)];
@@ -186,15 +191,15 @@ function growPlants(){
       if (age > 60 && rng() < 0.01){ t.feature = null; t.berries = 0; t.ground = t.ground === 'grass' ? 'soil' : t.ground; continue; }
       const g = { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }[seasonOf()] * (age < 3 ? 0 : age > 48 ? 0.5 : 1);
       if (isWinter()){ if (t.berries > 0 && rng() < 0.15) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
-      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemGrid[idx(q.x, q.y)] && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
+      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
     }
     else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12 && saplingMayGrow(t)) t.feature = 'tree'; }
     else if (t.feature === 'tree'){
       if (weather.storm && (tick - (t.planted || 0)) / DAY > 100 && rng() < 0.03){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
-      if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemGrid[idx(q.x, q.y)] && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
+      if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
     else if (!t.feature){
       if (t.ground === 'ash' && rng() < 0.05) t.ground = 'grass';
-      else if (t.ground === 'grass' && !t.struct && !itemGrid[idx(t.x, t.y)] && rng() < 0.004 && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
+      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < 0.004 && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
     }
   }
 }
@@ -202,3 +207,4 @@ function growPlants(){
 function rotCarcasses(){
   if (tick % 50 === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison') || tick - i.born < (i.kind === 'venison' ? 1500 : 900) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
+function steps(){ return []; }

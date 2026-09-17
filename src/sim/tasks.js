@@ -52,7 +52,7 @@ function startGather(a, kind){
   if (!camp.stashTile) return false;
   if (a.carrying && a.carrying.kind !== kind) return startDeliver(a);
   let found = null;
-  const p = bfs(a.x, a.y, (x, y) => { const it = itemGrid[idx(x, y)]; if (it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500);
+  const p = bfs(a.x, a.y, (x, y) => { const it = itemAt(x, y); if (it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500);
   if (!p){
     if (a.carrying) return startDeliver(a);
     const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
@@ -71,7 +71,7 @@ function startGather(a, kind){
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
       if (a.carrying.count < Math.min(6, 3 + Math.floor(a.skills.gather / 2))){
         let nxt = null;
-        const q = bfs(a.x, a.y, (x, y) => { const j = itemGrid[idx(x, y)]; if (j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300);
+        const q = bfs(a.x, a.y, (x, y) => { const j = itemAt(x, y); if (j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300);
         if (q && nxt) return chain(a, t, startGather(a, kind)) || chain(a, t, startDeliver(a)) || 'done';
       }
       return chain(a, t, startDeliver(a)) || 'done';
