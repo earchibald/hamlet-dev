@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hearth: a two-scale camp simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9eef0; --panel:#f7f9fa; --ink:#1b2631; --muted:#5a6773; --line:#cdd6dc;
+  --accent:#2a5f7c; --accent-ink:#fff; --good:#3b7a45; --warn:#9a6a12; --bad:#b0392b; --major:#1b2631; --bar-bg:#dde4e8;
+  --map-grass:#d9e4c6; --map-grass-fg:#91a86a; --map-soil:#e2d6bd; --map-sand:#ecdfb8; --map-ash:#c9c4bd; --map-ash-fg:#8b857c;
+  --map-water:#a6c6db; --map-water-fg:#43789e; --map-tree:#2c6532; --map-bush:#6e8a3d; --map-berry:#b02c5a; --map-reeds:#7c9a4a;
+  --map-boulder:#8c8880; --map-boulder-fg:#5a564f; --map-stick:#8a5a2b; --map-rock:#5e5a53; --map-carcass:#8a3a3a;
+  --map-fire-bg:#f3b35c; --map-fire:#c2331a; --map-fire2:#e5691c; --map-pit:#b9aa93; --map-snare:#4a6b8a; --map-stash:rgba(42,95,124,.18);
+  --map-night:18,26,52; --map-halo:rgba(247,249,250,.85); --map-select:#1b2631; --map-rabbit:#7a6248; --map-fox:#c5581c; --map-deer:#8a5a3c; --map-wolf:#3a3f4a; --map-sprite:#6a3fb5; --map-rain:#4a78a8; --map-snow:#ffffff; --map-corpse:#5a6773; --map-grid:rgba(27,38,49,.35); --agent-light:32%;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
+  --accent:#7fb3d1; --accent-ink:#10181e; --good:#7cc58a; --warn:#e0b25a; --bad:#ef7d6d; --major:#e3e9ed; --bar-bg:#2a343c;
+  --map-grass:#1d2718; --map-grass-fg:#3f532e; --map-soil:#29231b; --map-sand:#332d20; --map-ash:#25221f; --map-ash-fg:#4d4740;
+  --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
+  --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
+  --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --agent-light:70%; } }
+:root[data-theme="dark"]{
+  --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
+  --accent:#7fb3d1; --accent-ink:#10181e; --good:#7cc58a; --warn:#e0b25a; --bad:#ef7d6d; --major:#e3e9ed; --bar-bg:#2a343c;
+  --map-grass:#1d2718; --map-grass-fg:#3f532e; --map-soil:#29231b; --map-sand:#332d20; --map-ash:#25221f; --map-ash-fg:#4d4740;
+  --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
+  --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
+  --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --agent-light:70%; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto;padding:18px 20px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:14px}
+.brand h1{margin:0;font:700 30px/1 "JetBrains Mono",ui-monospace,Menlo,monospace;letter-spacing:-.02em}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:6px 0 0;color:var(--muted);max-width:66ch}
+.seed{display:flex;gap:8px;align-items:center}
+.seed input{width:170px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.btn{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:1px 8px;font-size:12px}
+.btn kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:6px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#where{font-weight:700}
+#clock{min-width:150px;color:var(--muted)}
+.hint{margin:8px 0 12px;color:var(--muted);min-height:1.45em}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+@media (max-width:980px){main{grid-template-columns:1fr}}
+.map-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
+#map{min-width:560px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 2px 18px;color:var(--muted);font-size:13px}
+.legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
+section.panel,details.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
+.panel h2{margin:0 0 8px;font-size:16px}
+details.panel summary{cursor:pointer;font-weight:700}
+details.panel ul{margin:8px 0 0;padding-left:18px} details.panel li{margin-bottom:5px}
+#chronicle{list-style:none;margin:0;padding:0;max-height:320px;overflow:auto}
+#chronicle li{padding:4px 0;border-bottom:1px solid var(--line)}
+#chronicle .when{color:var(--muted);font-size:12px;display:inline-block;min-width:92px}
+.k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
+#goals{list-style:none;margin:0;padding:0}
+.goal{padding:7px 0;border-bottom:1px solid var(--line)}
+.goal:last-child{border-bottom:0}
+.gt{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
+.gs{color:var(--muted);font-size:13px;margin-top:2px}
+.ongoing{font-size:11px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:6px;vertical-align:middle}
+.g-done .gt span:first-child{color:var(--good)} .g-locked{opacity:.55} .g-blocked .gt span:first-child{color:var(--muted)}
+.pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
+.pbtn{font-size:11px;padding:1px 7px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
+.pbtn:last-child{border-right:0}
+.pbtn.on{background:var(--accent);color:var(--accent-ink)}
+.settler{display:grid;grid-template-columns:18px 64px 70px 1fr;gap:8px;align-items:center;width:100%;text-align:left;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
+.settler:hover{border-color:var(--line)} .settler.on{border-color:var(--accent)} .settler.dead{opacity:.55}
+.sg{font:700 15px "JetBrains Mono",monospace;text-align:center}
+.ss{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{display:block;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden} .bar i{display:block;height:100%}
+#stats{margin-top:8px;color:var(--muted);font-size:13px}
+.need{display:grid;grid-template-columns:60px 1fr 30px;gap:8px;align-items:center;font-size:13px;margin:3px 0}
+.num{text-align:right;color:var(--muted)}
+.tip{position:fixed;z-index:10;width:310px;max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;font-size:13px}
+.tip[hidden]{display:none}
+.tip.pinned{pointer-events:auto;border-color:var(--accent)}
+.tip .close{float:right;margin:-4px -6px 0 8px;padding:0 7px;border:1px solid var(--line);border-radius:5px;background:none;cursor:pointer;line-height:1.5}
+.tip .hist{max-height:150px;overflow:auto}
+.ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
+.ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}
+.ins .why{display:flex;flex-wrap:wrap;gap:4px 10px} .ins .why .picked{color:var(--accent);font-weight:700} .ins .why .failed{color:var(--muted);text-decoration:line-through}
+.ins ul{list-style:none;margin:0;padding:0} .ins li{padding:1px 0}
+.chips{display:flex;flex-wrap:wrap;gap:5px} .chip{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:10px}
+.pos b{color:var(--good)} .neg b{color:var(--bad)}
+table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:30%}
+.muted{color:var(--muted);font-size:13px}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Hearth<span>@</span></h1>
+      <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
+    </div>
+    <div class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld">Make world</button></div>
+  </header>
+  <div class="toolbar">
+    <div class="group">
+      <button class="btn" id="worldBtn">World map<kbd>M</kbd></button>
+      <span id="where"></span>
+      <span class="group" id="nav"><button class="btn" id="nW">◀</button><button class="btn" id="nN">▲</button><button class="btn" id="nS">▼</button><button class="btn" id="nE">▶</button></span>
+      <span class="group" id="tools" role="toolbar" aria-label="Tools"></span>
+    </div>
+    <div class="group"><button class="btn" id="pause">Pause</button><button class="btn" id="stepBtn">Step</button><span class="group" id="speeds"></span><span id="clock"></span></div>
+  </div>
+  <p class="hint" id="hint"></p>
+  <main>
+    <div>
+      <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
+      <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
+      <div class="legend">
+        <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>#</b>boulder</span><span><b>~</b>water</span>
+        <span><b>/</b>stick</span><span><b>o</b>rock</span><span><b>%</b>carcass</span><span><b>=</b>log</span><span><b>○</b>fire pit</span><span><b>⌂</b>lean-to</span><span><b>Ξ</b>drying rack</span><span><b>▦</b>storehouse</span><span><b>ʌ</b>sapling</span><span><b>▤</b>stash</span><span><b>∩</b>snare</span><span><b>▲</b>fire</span>
+      </div>
+      <section class="panel"><h2>Chronicle</h2><ol id="chronicle"></ol></section>
+    </div>
+    <aside>
+      <section class="panel"><h2>Goals</h2><div class="group" id="camps" style="margin-bottom:8px"></div><ul id="goals"></ul><p class="muted" style="margin:8px 0 0">People pick their own work from the goals that are on. High makes a goal count for more. Off takes it away.</p></section>
+      <section class="panel"><h2>People</h2><div id="people"></div><div id="stats"></div></section>
+      <details class="panel"><summary>Things to try</summary><ul>
+        <li>Wait for the fire pit, then use Light on it. Then use Light on the grass instead and compare.</li>
+        <li>Let the fire go out. Watch the goal list, the moods, and who comes to fix it.</li>
+        <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
+        <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
+        <li>Use Poke on someone who is sitting by the fire when the woodpile is empty.</li>
+        <li>Open the world map and point at sectors. People go where the resources are.</li>
+        <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
+        <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
+        <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
+        <li>Wait for someone to see a light at the edge of the firelight. Then set an offering stone, or a ward, or neither, and watch what the difference costs.</li>
+        <li>Cut trees in a grove sector on purpose. Count the nights until the fire goes out on its own.</li>
+        <li>Pin an elder and watch who sits with them. Skills pass by the fire.</li>
+        <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the buttons above the goals.</li>
+      </ul></details>
+    </aside>
+  </main>
+</div>
+<div id="tip" class="tip ins" role="tooltip" hidden></div>
+<script>
+__SIM__
+__UI__
+</script>
+</body>
+</html>

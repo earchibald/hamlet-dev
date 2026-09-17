@@ -1,0 +1,38 @@
+// The simulation core as one script, assembled from the files below.
+// The files are plain scripts that share one scope. They are joined in this
+// order, and the order matters: core.js declares the constants and state the
+// others read at load time, and beings.js declares START before species.js
+// and fae.js add their actions to it. Function calls between files are free,
+// because function declarations hoist across the joined script.
+//
+// build.js inlines source() into the page. Tests call load() to run the sim
+// in Node, where the same script runs inside one function.
+const fs = require('fs');
+const path = require('path');
+
+const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'weather', 'main'];
+
+function source(){
+  return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
+}
+
+/* The names the tests reach into. State is exposed with getters, because the
+   sim reassigns `beings`, `items`, and `camp` as it runs. */
+const API = `return {
+  startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START,
+  seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood,
+  legPath, bfs, reachable, idx, secOf, secIdx, tileAt, sectorOfTile, passable,
+  campHumans, humans, stashFood,
+  get camp(){ return camp; }, set camp(c){ camp = c; },
+  get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
+  get items(){ return items; }, get world(){ return world; }, get sectors(){ return sectors; },
+  get tick(){ return tick; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
+  get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
+  get goalPriority(){ return goalPriority; },
+};`;
+
+function load(){
+  return new Function(source() + '\n' + API)();
+}
+
+module.exports = { FILES, source, load };

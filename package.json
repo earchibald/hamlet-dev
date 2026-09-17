@@ -1,0 +1,14 @@
+{
+  "name": "hamlet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hearth: a two-scale colony simulation. One person, one valley, a fire, and whatever the smoke brings.",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node tests/soak.js",
+    "soak": "node tests/soak.js",
+    "soak:quick": "SEEDS=r,x DAYS=10 node tests/soak.js",
+    "bless": "UPDATE_GOLDEN=1 node tests/soak.js",
+    "trace": "node tests/trace-deaths.js"
+  }
+}

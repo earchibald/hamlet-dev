@@ -1,0 +1,46 @@
+/* ---------- fire, storms, and lightning ---------- */
+function ignite(t){ if (t.fire > 0) return false; const f = tileFuel(t); if (f <= 0) return false; t.fire = f; fireCount++; return true; }
+function burnOut(t){
+  t.fire = 0;
+  if (t.feature === 'tree' || t.feature === 'hollow'){ const g = groves.find(g => g.sector === sectorOfTile(t)); if (g) g.anger = Math.min(100, g.anger + (t.feature === 'hollow' ? 60 : 3)); if (t.feature === 'hollow'){ log('A hollow pine burns. Whatever lived in it screams once and is silent.', [], 'bad'); const k = groves.indexOf(g); if (k >= 0) groves.splice(k, 1); } }
+  if (t.feature && MATERIALS[matOf(t)].flam > 0){ t.feature = null; t.berries = 0; }
+  if (!t.feature && t.ground === 'grass') t.ground = 'ash';
+  if (t.struct && t.struct.type === 'snare'){ const sn = t.struct.snare, k = sn.camp.snares.indexOf(sn); if (k >= 0) sn.camp.snares.splice(k, 1); t.struct = null; }
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)){ const c = t.struct.camp, k = t.struct.type; if (c){ if (k === 'rack') c.rack = null; else if (k === 'leanto') c.shelter = null; else if (k === 'storehouse') c.storehouse = null; else c.huts = c.huts.filter(h => h[0] !== t.x || h[1] !== t.y); log(`The ${k === 'leanto' ? 'lean-to' : k === 'rack' ? 'drying rack' : k} burns down.`, [], 'bad'); } t.struct = null; }
+  const before = items.length; items = items.filter(i => i.x !== t.x || i.y !== t.y || MATERIALS[ITEMS[i.kind].mat].flam === 0); if (items.length !== before) rebuildItemGrid();
+}
+
+/* Fire spreads to neighbours and burns down. Rain slows it. */
+function spreadFire(){
+  let count = 0;
+  for (let i = 0; i < W * H; i++){
+    const t = world[i]; if (t.fire <= 0) continue; count++;
+    t.fire--;
+    for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (!inb(nx, ny)) continue; const nb = world[idx(nx, ny)]; if (nb.fire > 0) continue; const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? 0.012 : 0.08)) ignite(nb); }
+    if (weather.storm) t.fire -= 2;
+    if (t.fire <= 0) burnOut(t);
+  }
+  fireCount = count;
+}
+/* Weather. Storms bring rain and lightning. */
+function updateWeather(){
+  if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + 150 + rint(300); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
+  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? 4000 : 2000) + rint(3000); }
+}
+/* Lightning near the camp, only in storms. More often when the hearth is out. */
+function tryLightning(){
+  if (camp.site && weather.storm){
+    const out = camp.pit && !pitLit();
+    if (rng() < (out ? 0.0035 : 0.0006)){
+      const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
+      let hit = null;
+      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
+      for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
+      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, 240); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
+    }
+  }
+}
+/* A stray strike anywhere in the world. */
+function strayLightning(){
+  if (weather.storm && rng() < 0.0008){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+}
