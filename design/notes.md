@@ -121,6 +121,7 @@ Fire is the thing the player is for at the start, and the thing that people lear
 - A wolf or fox in its own den bites any person on the den's floor, by day or night, with or without a brand. This is the one exception to the four conditions above. The soak allows one such death a seed and reports it. It has not yet fired in any soak seed, since nothing sends people onto a den's floor until the cave goals of the closing phase.
 - A den-bite death cause expires 600 ticks after the bite. An old bite is never blamed for a later, unrelated death.
 - Cold. Warmth falls at night and in winter, faster in rain, slower under a roof and for the hardy. Below 30, a person drops work and goes to the fire. Below 20 they take damage.
+- A camp whose fire is out and holds no blaze, moss, or firestones sends its people for firestones before firewood. A lone camper once froze to death over six days at a dead pit, because every warmth rule needed a lit pit and nothing raised the priority of getting a source.
 - Sprites. See below.
 
 ## 11. The sprites
@@ -161,7 +162,7 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
 - Someone is alive at the end.
-- The camps grow: at least 20 people counted ever, and at least one birth. A floor under the population, so a regression like the fishing bug that halved every seed does not stay green.
+- The camps grow: at least 8 people alive at day 70, and at least one birth. Across all six seeds together, at least 180 people counted ever and 15 births, so a regression like the fishing bug that halved every seed still goes red. (The old per-seed floor of 20 people ever was too noisy: `humans` is a roughly 2x random variable across unrelated commits, with 20 inside its tail.)
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - At most one person a seed dies in a den, and it is reported.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
@@ -183,6 +184,7 @@ Known weak spots:
 - A person whose task fails in the dark drops what they carry there, where nobody will fetch it. Phase 4 should send them out with their load.
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
 - A person who keeps returning to a defended den will die in three or four visits; the cave goals must draw the owners off or stop re-offering the den to a hurt person.
+- A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
 
 ## 15. Next
 

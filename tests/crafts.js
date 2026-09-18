@@ -219,3 +219,24 @@ test('with the axe, rocks are quarried from a rock face within thirty tiles', ()
   doOffer(api, a, 'quarry rocks');
   assert.equal(c.fae.favor, -10, 'the same face is not paid for twice');
 });
+
+test('a dead pit with no ignition source sends a brave adult for firestones before firewood', () => {
+  const { api, a, c } = readyCamp();
+  a.traits.bravery = 0.8;
+  c.stash.log = 0; c.stash.rock = 0;
+  /* A tree nearby so "cut a tree for logs" is on offer too, not just "haul". */
+  const tree = api.tileAt(c.site[0] + 4, c.site[1]); tree.ground = 'grass'; tree.feature = 'tree'; tree.struct = null;
+  const t = api.tileAt(...c.pit); t.struct.lit = false;
+  const byGoal = id => id === 'firewood' || id === 'firestones';
+  const topOf = id => api.offersFor(a).filter(o => o.goal.id === id).reduce((b, o) => !b || o.score > b.score ? o : b, null);
+
+  assert.equal(api.goalState(goal(api, 'firestones')).text.includes('cold'), true, 'the card says the camp puts fire first');
+  let stones = topOf('firestones'), wood = topOf('firewood');
+  assert.ok(stones, 'no firestones offer with a cold pit'); assert.ok(wood, 'no firewood offer to compare against');
+  assert.ok(stones.score > wood.score, `cold pit: firestones (${stones.score}) should outscore firewood (${wood.score})`);
+
+  t.struct.lit = true;
+  stones = topOf('firestones'); wood = topOf('firewood');
+  assert.ok(stones && wood, 'both offers should still be on the table with the pit lit');
+  assert.ok(wood.score > stones.score, `lit pit: firewood (${wood.score}) should outrank firestones (${stones.score}), as before`);
+});
