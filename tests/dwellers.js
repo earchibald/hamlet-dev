@@ -51,6 +51,34 @@ test('a wolf eats a kill where it fell when the den floor is unreachable', () =>
   assert.ok(killed, 'the wolf never made the kill');
   assert.equal(b.carrying, null, 'nothing left carried when the den could not be reached');
   assert.equal(b.needs.food, 100, 'the wolf ate the kill where it fell');
+  assert.ok(api.items.some(i => i.kind === 'carcass' && i.x === r.x && i.y === r.y), 'the carcass stays on the ground when it cannot be carried home');
+});
+
+test('a denned wolf whose den floor is unreachable still gets a rest task, not a stuck home task', () => {
+  const { api, b, den } = denned('wolf');
+  b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to go home to */
+  b.task = null; b.asleep = false;
+  const ok = api.START.home(b);
+  assert.ok(ok, 'START.home should fall back to resting rather than fail');
+  assert.equal(b.task.type, 'rest', `expected a rest task, got ${b.task && b.task.type}`);
+});
+
+test('an edge-arrived fox joins the fox den with room for a pair', () => {
+  const { api, den } = denned('fox');
+  const before = api.beings.filter(b => b.alive && b.species === 'fox' && b.den === den).length;
+  assert.ok(before < 2, 'the fox den should start short of a pair');
+  const t = den.exit; const f = api.makeBeing('fox', t.x, t.y, null, 0);
+  api.beings.push(f);
+  api.adoptDen(f);
+  assert.equal(f.den, den, 'the arriving fox should join the den with room for it');
+});
+
+test('an edge-arrived fox does not join a den already home to a pair', () => {
+  const { api, den } = denned('wolf'); /* the wolf den on seed r starts with two grown owners */
+  const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
+  api.beings.push(w);
+  api.adoptDen(w);
+  assert.notEqual(w.den, den, 'a full den should not take a third owner');
 });
 
 test('a den with two adults bears one young in spring, once a year', () => {
@@ -87,7 +115,7 @@ test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', 
   c.fae.known = true; c.fae.favor = -30; c.stash.pot = 1; c.stash.berries = 5; c.fae.lastPrank = 0;
   const sp = api.beings.find(b => b.species === 'sprite');
   sp.x = c.stashTile[0]; sp.y = c.stashTile[1]; sp.z = 0; sp.task = null;
-  api.tick = 22 * 1000; api.rngNext = null;
+  api.tick = 22 * 1000;
   let stolen = false;
   for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.START.prank(sp); sp.task.arrive(sp, sp.task); stolen = c.stash.pot === 0; }
   assert.ok(stolen, 'the pot was never taken in forty pranks');

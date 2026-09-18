@@ -71,7 +71,7 @@ Days: rabbit 3 adult, 14 old, 20 life. Deer 8, 36, 50. Fox 5, 26, 36. Wolf 6, 32
 
 Young do half the work and are kept from hunting, guarding, felling, and founding. Old work at 70 percent and teach well. Past the span, each day is a gamble weighted by hardiness. A person who dies by a lit fire "dies in their sleep, old and warm."
 
-Births: spring or summer, a roof, the stock food goal met, two adults who like each other at 35 or more, and 16 days since either last had a child. The child blends both parents' traits. Rabbits breed when two adults are within 10 tiles in a warm season. Fawns come in spring. Foxes and wolves wander in from the world edges. Wolves and foxes bear one young in their den each spring when two grown owners live there. Arrivals from the world's edge are half as frequent.
+Births: spring or summer, a roof, the stock food goal met, two adults who like each other at 35 or more, and 16 days since either last had a child. The child blends both parents' traits. Rabbits breed when two adults are within 10 tiles in a warm season. Fawns come in spring. Foxes and wolves wander in from the world edges. An arriving wolf or fox joins the nearest den of its own kind that still has room for a breeding pair. Wolves and foxes bear one young in their den each spring when two grown owners live there. Arrivals from the world's edge are half as frequent.
 
 Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed adjacent grass in spring and autumn at 1.2 percent per sample, and never next to another bush. Pines start as saplings, become trees after 12 days, and old pines fall in storms. A sapling becomes a solid tree only if the open tiles beside it still touch each other around it once it is solid. A sapling also does not become a tree under a standing being. Before this rule, saplings sealed one-tile gaps in dense forest. Two woodcutters were shut in pockets by the river and the world's edge, and one starved and one died of thirst, each two tiles from the tree that closed the way. The tile card says when a sapling is held back. Generation spreads bush ages over 60 days. A first draft gave them all similar ages and every bush died in the same week, which starved four camps.
 
@@ -119,6 +119,7 @@ Fire is the thing the player is for at the start, and the thing that people lear
 - Wolves hunt rabbits, and deer in winter, carrying a rabbit kill home to eat in the den when the floor can be reached, and eating it where it fell when it cannot. At night a hungry wolf raids a camp whose fire is out and takes meat. A lit fire keeps wolves at eight tiles. A brave person with a firebrand chases a wolf off, and it avoids that camp for a while.
 - A wolf will attack a person who is alone, at night, away from a lit fire, not holding fire. All four together. It has happened twice in 420 camp-days and nobody has died of it.
 - A wolf or fox in its own den bites any person on the den's floor, by day or night, with or without a brand. This is the one exception to the four conditions above. The soak allows one such death a seed and reports it. It has not yet fired in any soak seed, since nothing sends people onto a den's floor until the cave goals of the closing phase.
+- A den-bite death cause expires 600 ticks after the bite. An old bite is never blamed for a later, unrelated death.
 - Cold. Warmth falls at night and in winter, faster in rain, slower under a roof and for the hardy. Below 30, a person drops work and goes to the fire. Below 20 they take damage.
 - Sprites. See below.
 
@@ -132,7 +133,7 @@ A grove on a forest hill lives in a hollow under the hill instead of a pine: a p
 - Want: berries left on an offering stone. Old pines standing.
 - Hate: axes in the grove sector (-15 favour, +25 grudge on the person), snares in the grove sector (-2 a day), wards (-10), being struck.
 - Favour is per camp, -100 to 100, drifts toward 0. Above 30: bushes near camp get extra berries, snares catch 10 percent more, the pit burns 15 percent slower. Below -20: pranks; a pot, cord, or the basket goes missing. Below -60 or a grove out for revenge: the fire gets pinched out.
-- Theft of a made thing is gated at one chance in two behind the ordinary prank roll. In the soak, seed x lost nine made things in 70 days while the other seeds lost none or one.
+- Theft of a made thing happens only when favour is below -20, as pranks are, and is then gated at one chance in two behind the ordinary prank roll. In the soak, seed x lost nine made things in 70 days while the other seeds lost none or one.
 - A killed sprite: grove anger +60, five days of blight on the bushes near the nearest camp, and the grove comes back in a group.
 - Fight or run: a struck sprite with bravery above 0.6 and health left bites. Otherwise it flees, marks the camp, and returns with kin a day later.
 - A grove bears a new sprite in spring if calm and surrounded by 25 old pines.
@@ -181,6 +182,7 @@ Known weak spots:
 - The sprite-birth rule counts old pines on the sector's surface only; the pines on the hill above a hollow do not count yet.
 - A person whose task fails in the dark drops what they carry there, where nobody will fetch it. Phase 4 should send them out with their load.
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
+- A person who keeps returning to a defended den will die in three or four visits; the cave goals must draw the owners off or stop re-offering the den to a hurt person.
 
 ## 15. Next
 

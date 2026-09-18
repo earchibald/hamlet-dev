@@ -315,6 +315,7 @@ function updateBeing(a){
   for (const t of a.thoughts) t.left--; a.thoughts = a.thoughts.filter(t => t.left > 0);
   if (n.food <= 0 || (n.water !== undefined && n.water <= 0)){ a.hp -= 0.04; if (a.species === 'human') addThought(a, 'starving', n.water <= 0 ? 'Is dying of thirst' : 'Is starving', -25, 50); }
   else if (a.hp < 100) a.hp = Math.min(100, a.hp + 0.01 * (0.6 + a.traits.hardiness * 0.8));
+  if (a.species === 'human' && a.lastHurtAt && tick - a.lastHurtAt > 600){ a.lastHurt = null; a.lastHurtAt = null; }
   /* The life clock. Past the usual span, each day is a gift. */
   if (ageDays(a) > LIFE[a.species].life && rng() < 0.0006 / (0.5 + a.traits.hardiness)){
     const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;

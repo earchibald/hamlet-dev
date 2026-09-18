@@ -72,7 +72,7 @@ Object.assign(START, {
         const pit = pitTile(); const severe = c.fae.favor < -60 || (a.grove && a.grove.swarmUntil > tick);
         if (severe && pit && pit.struct.lit && rng() < 0.5){ pit.struct.lit = false; pit.struct.fuel = Math.min(pit.struct.fuel, 30); c.streak = 0; log('The fire dies to nothing in a moment, as if pinched out. Laughter in the dark.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'faefire', 'Sprites put the fire out', -10, 1000); }
         else if (victim && rng() < 0.6){ victim.needs.rest = Math.max(0, victim.needs.rest - 40); victim.asleep = false; addThought(victim, 'pinched', 'Pinched and tangled by sprites all night', -8, 900); log(`${victim.name} wakes with knotted hair and pinch marks. The sprites are not amused.`, [victim], 'bad'); }
-        else if ((c.stash.pot > 0 || c.stash.cord > 0 || c.tools.basket) && rng() < 0.5){
+        else if (c.fae.favor < -20 && (c.stash.pot > 0 || c.stash.cord > 0 || c.tools.basket) && rng() < 0.5){
           if (c.stash.pot > 0){ stashTake('pot'); log('A pot is gone from the stash, and there are tiny footprints in the clay.', campHumans(), 'bad'); }
           else if (c.stash.cord > 0){ stashTake('cord', Math.min(2, c.stash.cord)); log('A coil of cord is gone from the stash. Something small has been busy.', campHumans(), 'bad'); }
           else { c.tools.basket = 0; log('The basket is gone from the stash, and the tiny footprints lead into the dark.', campHumans(), 'bad'); }

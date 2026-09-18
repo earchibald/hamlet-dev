@@ -5,8 +5,8 @@ const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d <
 const SPECIES = {
   human:  { glyph: '@', label: 'human',  decay: { food: 0.035, water: 0.05, rest: 0.03, social: 0.02, warmth: 0 }, stride: 2, zmin: -2, zmax: 2 },
   rabbit: { glyph: 'r', label: 'rabbit', decay: { food: 0.07, rest: 0.03 }, stride: 2, zmin: 0, zmax: 0 },
-  fox:    { glyph: 'f', label: 'fox',    decay: { food: 0.025, water: 0.04, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2 },
-  wolf:   { glyph: 'w', label: 'wolf',   decay: { food: 0.02, water: 0.03, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2 },
+  fox:    { glyph: 'f', label: 'fox',    decay: { food: 0.025, water: 0.04, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 } },
+  wolf:   { glyph: 'w', label: 'wolf',   decay: { food: 0.02, water: 0.03, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 } },
   deer:   { glyph: 'd', label: 'deer',   decay: { food: 0.05, water: 0.04, rest: 0.03 }, stride: 2, zmin: 0, zmax: 2 },
   sprite: { glyph: '¤', label: 'sprite', decay: { glow: 0.03, play: 0.04, rest: 0.02 }, stride: 1, zmin: -2, zmax: 2 },
   gnome:  { glyph: 'g', label: 'gnome',  decay: { food: 0.03, rest: 0.03, social: 0.02 }, stride: 2, zmin: -2, zmax: 2 },
@@ -40,7 +40,7 @@ Object.assign(START, {
         if (near(a, prey) <= 1){
           if (prey.species === 'deer' && rng() > 0.45 + a.skills.hunt * 0.1){ addThought(prey, 'escaped', 'Broke free from a wolf', -8, 900); prey.hp -= 15; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); failTask(prey); START.flee(prey); return 'fail'; }
           prey.hp = 0; gainXp(a, 'hunt'); die(prey, `was caught by a ${SPECIES[a.species].label}`);
-          if (a.den && prey.species === 'rabbit' && nearAt(a, a.den.exit.x, a.den.exit.y) <= 30){ const it = itemAt(prey.x, prey.y, prey.z); if (it && it.kind === 'carcass'){ removeItem(it); a.carrying = { kind: 'carcass', count: 1 }; const r = chain(a, t, START.carryHome(a)); if (r) return r; a.carrying = null; } }
+          if (a.den && prey.species === 'rabbit' && nearAt(a, a.den.exit.x, a.den.exit.y) <= 30){ const it = itemAt(prey.x, prey.y, prey.z); if (it && it.kind === 'carcass'){ a.carrying = { kind: 'carcass', count: 1 }; const r = chain(a, t, START.carryHome(a)); if (r){ removeItem(it); return r; } a.carrying = null; } }
           t.label = 'Eating'; a.needs.food = 100; addThought(a, 'fed', 'Made a kill', 8, 600); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === prey.z && dist(x, y, prey.x, prey.y) <= 1, 400, a); if (!p) return 'fail';
         t.path = p.slice(0, 3); return 'continue';
@@ -87,10 +87,10 @@ Object.assign(START, {
   /* Go home to the den and rest there. */
   home(a){
     const c = a.den; if (!c) return false;
-    const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) return false;
+    const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) return START.rest(a);
     const spot = floor[a.id % floor.length];
     if (a.x === spot.x && a.y === spot.y && a.z === spot.z){ a.task = { type: 'rest', label: 'Resting in the den', path: [], wait: 60, arrive(a){ a.needs.rest = Math.min(100, a.needs.rest + 40); return 'done'; } }; return true; }
-    const p = legPath(a, spot.x, spot.y, 0, spot.z); if (!p) return false;
+    const p = legPath(a, spot.x, spot.y, 0, spot.z); if (!p) return START.rest(a);
     a.task = { type: 'travel', label: 'Going home to the den', path: p, arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = legPath(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; } return 'done'; } };
     return true;
   },
@@ -125,11 +125,20 @@ function spawnWildlife(){
     else for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (sectorOfTile(t).biome === 'meadow' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 20)){ beings.push(makeBeing('deer', t.x, t.y, null, 0)); beings.push(makeBeing('deer', t.x, t.y, null, 0)); break; } }
   }
   if (tick % 10000 === 2500 && beings.filter(b => b.alive && b.species === 'wolf').length < 2){
-    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const st = sectorOfTile(t); if (st.biome === 'forest' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 25)){ beings.push(makeBeing('wolf', t.x, t.y, null, 0)); break; } }
+    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const st = sectorOfTile(t); if (st.biome === 'forest' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 25)){ const w = makeBeing('wolf', t.x, t.y, null, 0); beings.push(w); adoptDen(w); break; } }
   }
   if (tick % 6000 === 0 && beings.filter(b => b.alive && b.species === 'fox').length < 2){
-    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'forest' || s.biome === 'rocky') && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 15)){ beings.push(makeBeing('fox', t.x, t.y, null, 0)); break; } }
+    for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'forest' || s.biome === 'rocky') && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 15)){ const f = makeBeing('fox', t.x, t.y, null, 0); beings.push(f); adoptDen(f); break; } }
   }
+}
+
+/* An edge-arrived wolf or fox joins the nearest den of its own kind that has room for a breeding pair. */
+function adoptDen(a){
+  if (a.species !== 'wolf' && a.species !== 'fox') return;
+  const open = caves.filter(c => c.kind === 'den' && c.owner === a.species &&
+    beings.filter(b => b.alive && b.den === c && stage(b) !== 'young').length < 2);
+  const c = open.sort((p, q) => dist(a.x, a.y, p.exit.x, p.exit.y) - dist(a.x, a.y, q.exit.x, q.exit.y))[0];
+  if (c) a.den = c;
 }
 
 /* Each den with two grown owners bears one young in spring, once a year. Edge arrivals are the floor, not the source. */
@@ -138,11 +147,10 @@ function denTick(){
   for (const c of caves){
     if (c.kind !== 'den' || !c.owner || c.owner === 'sprite') continue;
     if (c.lastBirth && tick - c.lastBirth < 20 * DAY) continue;
-    const grown = beings.filter(b => b.alive && b.species === c.owner && b.den === c && stage(b) === 'adult');
+    const grown = beings.filter(b => b.alive && b.species === c.owner && b.den === c && stage(b) !== 'young');
     if (grown.length < 2) continue;
     const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) continue;
-    /* The newborn has no id yet, so it lands on the first floor tile rather than one picked by id. */
-    const t = floor[0]; const y = makeBeing(c.owner, t.x, t.y, null, 0); y.z = t.z; y.born = tick; y.den = c; beings.push(y); c.lastBirth = tick;
+    const y = makeBeing(c.owner, 0, 0, null, 0); const t = floor[y.id % floor.length]; y.x = t.x; y.y = t.y; y.z = t.z; y.born = tick; y.den = c; beings.push(y); c.lastBirth = tick;
     log(c.owner === 'wolf' ? 'A wolf pup is born in the den under the hill.' : 'Fox kits are born in the den under the hill.', []);
   }
 }
@@ -153,10 +161,10 @@ function defendDen(a){
   const here = tileAt(a.x, a.y, a.z); if (!here || here.cave !== c) return;
   const h = beings.find(b => b.alive && b.species === 'human' && b.z === a.z && c.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z));
   if (!h) return;
-  const wolf = a.species === 'wolf';
-  h.hp -= wolf ? 20 + rint(15) : 6 + rint(5); h.lastHurt = `was killed in a den by a ${a.species}`; h.asleep = false;
-  addThought(h, 'denbite', wolf ? 'Bitten by a wolf in its own den' : 'Bitten by a fox in its den', wolf ? -20 : -8, 1500); drift(h, 'bravery', -0.02);
-  log(`A ${a.species} comes at ${h.name} in its den.`, [h], 'bad');
+  const label = SPECIES[a.species].label, bite = SPECIES[a.species].bite;
+  h.hp -= bite.hp + rint(bite.spread); h.lastHurt = `was killed in a den by a ${label}`; h.lastHurtAt = tick; h.asleep = false;
+  addThought(h, 'denbite', `Bitten by a ${label} in its den`, bite.mood, 1500); drift(h, 'bravery', -0.02);
+  log(`A ${label} comes at ${h.name} in its den.`, [h], 'bad');
   a.cooldown.defend = tick + 150; addThought(a, 'defend', 'Drove an intruder from the den', 6, 600);
   failTask(h); START.flee(h);
 }
