@@ -679,13 +679,9 @@ Append to `tests/ui.js`:
 const KEYS = ['KEYMAP', 'keyAction', 'ACTIONS'];
 const ev = (key, mods = {}) => ({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods });
 
-test('every key map entry names an action that exists, and every template button has a key', () => {
+test('every key map entry names an action that exists', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
   for (const k of api.KEYMAP) assert.equal(typeof api.ACTIONS[k.action], 'function', `${k.key} names ${k.action}`);
-  const html = fs.readFileSync('src/page.template.html', 'utf8');
-  const ids = [...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]);
-  const keyed = new Set(api.KEYMAP.map(k => k.button).filter(Boolean));
-  for (const id of ids) assert.ok(keyed.has(id), `button #${id} has no key`);
 });
 
 test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the map and the row in a drawer, numbers toggle drawers on the map and pick rows in one', () => {
@@ -836,13 +832,7 @@ const ACTIONS = {
 - [ ] **Step 5: Run the tests**
 
 Run: `node tests/ui.js`
-Expected: the button test fails on template buttons, because `hourBtn`, `showAllBtn`, `helpBtn`, `helpClose`, `speed1`, and the tab ids do not exist yet, and old buttons such as `worldBtn` have no key. That is the next task's work. Every other test passes:
-
-```bash
-node --test-name-pattern="dispatcher" tests/ui.js
-```
-
-Expected: PASS.
+Expected: PASS, every test.
 
 - [ ] **Step 6: Commit**
 
@@ -862,13 +852,30 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `src/ui/actions.js` (`say`, `setTool`, `setSpeed`, `setPaused`, `setView`, `newWorld`; remove the `openHelp` and `openStart` stubs)
 - Modify: `src/ui/main.js` (`initUI` wiring, `frame`)
 - Modify: `src/ui/panels.js` (`renderUI` calls `renderStrip` and a first `renderDrawers`)
-- Test: `tests/ui.js` (the button test from task 5 now passes)
+- Test: `tests/ui.js`
 
 **Interfaces:**
 - Produces: `renderStrip()`, `renderDrawers()`, `openHelp()`, `openStart()`, `closeDialogs()`, `anyDialogOpen()`. Element ids: `strip`, `clock`, `season`, `weather`, `campName`, `camps`, `gauges`, `chips`, `pause`, `stepBtn`, `hourBtn`, `speeds` with `speed1 speed4 speed16`, `helpBtn`, `viewBtn`, `where`, `nav` with `nW nN nS nE`, `levels` with `lvDown lvUp level`, `tools`, `foot`, `drawerTabs` with `tab-people` and the rest, `drawers`, `start` dialog with `seed` and `newWorld`, `help` dialog with `helpKeys`, `legend`, `tips`, `helpClose`.
 - The old ids `hint`, `stats`, `worldBtn`, `goals`, `people`, `chronicle` (as a page section) go. `say(msg)` now writes to `foot`.
 
-- [ ] **Step 1: Rewrite the template**
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/ui.js`. It fails now because the old template's buttons (`worldBtn`, `newWorld` without a row, the nav arrows) have no key map rows and the new ones do not exist yet:
+
+```js
+test('every template button has a key in the key map', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  const ids = [...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]);
+  const keyed = new Set(api.KEYMAP.map(k => k.button).filter(Boolean));
+  for (const id of ids) assert.ok(keyed.has(id), `button #${id} has no key`);
+});
+```
+
+Run: `node tests/ui.js`
+Expected: FAIL, `button #worldBtn has no key`.
+
+- [ ] **Step 2: Rewrite the template**
 
 Keep the `<head>` up to and including the three `:root` palette blocks exactly as they are. Replace everything from `*{box-sizing:border-box}` to the end of the file with:
 
@@ -1052,7 +1059,7 @@ __UI__
 
 The tools keep their names, Light and Poke, until plan B renames them. The `Camp site` tool stays in `TOOLS` until plan B removes it.
 
-- [ ] **Step 2: Write `strip.js`**
+- [ ] **Step 3: Write `strip.js`**
 
 Replace the banner-only `src/ui/strip.js` with:
 
@@ -1079,7 +1086,7 @@ function renderStrip(){
 }
 ```
 
-- [ ] **Step 3: Write `dialogs.js`**
+- [ ] **Step 4: Write `dialogs.js`**
 
 Replace the banner-only `src/ui/dialogs.js` with:
 
@@ -1100,7 +1107,7 @@ function openHelp(){
 }
 ```
 
-- [ ] **Step 4: Rewire `actions.js`**
+- [ ] **Step 5: Rewire `actions.js`**
 
 In `src/ui/actions.js`, replace these functions from the split with:
 
@@ -1120,7 +1127,7 @@ function newWorld(seed){ startWorld(seed); viewCamp = camps[0]; followId = null;
 
 Delete the stubs `openHelp` and `openStart` from the end of `actions.js`, since `dialogs.js` now defines them. `restore` is a task 7 function: add a stub `function restore(){ /* task 7 */ }` beside the `persist` stub for now.
 
-- [ ] **Step 5: Rewire `main.js`**
+- [ ] **Step 6: Rewire `main.js`**
 
 In `initUI`, replace the tool and speed button lines and the wiring for `newWorld`, `seed`, `worldBtn`, the nav and level buttons, the camps row, and the keydown handler with:
 
@@ -1159,7 +1166,7 @@ The start dialog opens over a world already made. Enter with an empty seed makes
 
 In `frame`, before `draw()`, add `notePulses();` so alerts see new lines once a frame.
 
-- [ ] **Step 6: Point `renderUI` at the strip and draw the empty drawers**
+- [ ] **Step 7: Point `renderUI` at the strip and draw the empty drawers**
 
 In `src/ui/panels.js`, rewrite `renderUI` as:
 
@@ -1190,13 +1197,13 @@ function renderDrawers(){
 
 `chronKey` is the old gate variable from `state.js` and is reused as the view key.
 
-- [ ] **Step 7: Build, test, and look**
+- [ ] **Step 8: Build, test, and look**
 
 ```bash
 node build.js && node tests/ui.js
 ```
 
-Expected: every test passes, including the button test from task 5: every `<button id>` in the template has a key map row. If one is missing, add its row; do not remove the button.
+Expected: every test passes, including the new button test: every `<button id>` in the template has a key map row. If one is missing, add its row; do not remove the button.
 
 Reload in Safari at 1440 by 900. Screenshot to `.superpowers/shots/a6-frame.png`. Check: the strip is one line, the map fills the rest with no page scroll, the tools and view buttons float top left, the tabs stand on the right, `?` opens help with a table of keys, Esc closes it, the start dialog shows on load and Enter makes a world.
 
@@ -1206,10 +1213,10 @@ return [document.body.scrollHeight <= innerHeight, document.getElementById('gaug
 
 Expected: `[true, 0 or more, 4]`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/page.template.html src/ui && git commit -m "The frame: a window-filling grid, the strip with gauges and chips, and the start and help dialogs
+git add src/page.template.html src/ui tests/ui.js && git commit -m "The frame: a window-filling grid, the strip with gauges and chips, and the start and help dialogs
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```

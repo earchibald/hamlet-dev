@@ -89,12 +89,8 @@ test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter a
   assert.deepEqual(api.keyAction(ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
   assert.deepEqual(api.keyAction(ev('Home'), 'map'), { action: 'home', arg: undefined });
   assert.deepEqual(api.keyAction(ev('w'), 'map'), { action: 'worldHere', arg: undefined });
-  assert.equal(api.keyAction(ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
-  assert.equal(api.keyAction(ev('f'), 'map').action, 'tool');
 });
 ```
-
-The `toolSticky` row is added in task 3; leave the last two assertions in and expect them to fail until then.
 
 - [ ] **Step 2: Run it to see it fail**
 
@@ -242,7 +238,7 @@ Remove `say(...)` from the `wcv` and `mcv` pointermove handlers and set the curs
 node build.js && node tests/ui.js
 ```
 
-Expected: every test passes except the two `toolSticky` assertions, which task 3 makes pass.
+Expected: every test passes.
 
 In Safari, reload, close the start dialog, and dispatch `ArrowRight` five times, then `ArrowRight` with `shiftKey: true`, then `Home`:
 
@@ -479,7 +475,7 @@ The old `inspectBeing(a)` reads `tipPinned` for the history length; change its s
 node build.js && node tests/ui.js
 ```
 
-Expected: pass, except the `toolSticky` assertions from task 1.
+Expected: pass.
 
 In Safari: reload, close the dialog, dispatch `2` then `o`. Expect a Goals window to appear and the Goals tab to show the dot. Drag its bar through `page_interactions` or a scripted pointer sequence, reload, and check the window comes back where it was left. Dispatch `Escape` and check the window closes and `ui.focus` is `map`. Screenshot `.superpowers/shots/b2-window.png`.
 
@@ -520,6 +516,7 @@ test('tools: three, inspect first, light fire and nudge one-shot, no camp site',
   assert.deepEqual(api.keyAction(ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });
   assert.deepEqual(api.keyAction(ev('f'), 'window:2'), { action: 'follow', arg: undefined });
   assert.deepEqual(api.keyAction(ev('f'), 'map'), { action: 'tool', arg: 'light' });
+  assert.equal(api.keyAction(ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
 });
 ```
 
@@ -619,7 +616,7 @@ In the template's Things to try, the first line reads `use Light fire on it` and
 node build.js && node tests/ui.js
 ```
 
-Expected: every test passes, including the task 1 `toolSticky` assertions.
+Expected: every test passes.
 
 In Safari: reload, close the dialog, advance until the pit exists (`for (let i = 0; i < 6000 && !camps[0].pit; i++) step(); renderUI(true)`), dispatch `Home`, `f`, `Enter`. Expect the hearth lit, the foot to say so, and `tool` back to `inspect`. Dispatch `F` with shift, then check `tool === 'light'` and `ui.sticky === true`, then `i`. Move the cursor onto a person and press Enter: an inspector window opens with needs, thoughts, and decision scores. Open two more on other people and check three windows stand together. Screenshot `.superpowers/shots/b3-inspectors.png`.
 
