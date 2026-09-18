@@ -145,6 +145,7 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 ## 13. Interface
 
 - World map: whole world at 3 pixels per tile, sector grid, camp markers, sector summary on hover.
+- Nearby view: the sector and its eight neighbours at 9 pixels per tile, drawn from the world map cache. Beings are glyphs. Hover shows the sector summary; a click opens the sector. M cycles sector, nearby, world map. Arrow keys step between sectors in the sector and nearby views.
 - Location view: one sector at 26 pixels per tile. Tools: Inspect (hover shows, click pins, Follow button), Light, Camp site, Poke. Hover cards work with every tool.
 - Goals panel with camp selector, People panel for the selected camp, Chronicle.
 - Rain and winter overlays, firelight glow at night.

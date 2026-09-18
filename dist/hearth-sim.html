@@ -59,7 +59,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items
 @media (max-width:980px){main{grid-template-columns:1fr}}
 .map-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
 canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
-#map{min-width:560px}
+#map,#mmap{min-width:560px}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 2px 18px;color:var(--muted);font-size:13px}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 section.panel,details.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
@@ -116,7 +116,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
   </header>
   <div class="toolbar">
     <div class="group">
-      <button class="btn" id="worldBtn">World map<kbd>M</kbd></button>
+      <button class="btn" id="viewBtn" title="Sector, nearby, world map">World map<kbd>M</kbd></button>
       <span id="where"></span>
       <span class="group" id="nav"><button class="btn" id="nW">◀</button><button class="btn" id="nN">▲</button><button class="btn" id="nS">▼</button><button class="btn" id="nE">▶</button></span>
       <span class="group" id="levels"><button class="btn" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
@@ -128,6 +128,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
   <main>
     <div>
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
+      <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
       <div class="legend">
         <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
@@ -144,7 +145,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
         <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
         <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
         <li>Use Poke on someone who is sitting by the fire when the woodpile is empty.</li>
-        <li>Open the world map and point at sectors. People go where the resources are.</li>
+        <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view of nine sectors, and the world map. Arrow keys step between sectors.</li>
         <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
         <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
         <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
@@ -2367,7 +2368,10 @@ function step(){ tick++; updateWorld(); camp = camps[0]; for (const a of beings)
 /* ============================================================
    INTERFACE. Reads the simulation state and draws it.
    ============================================================ */
-const T = 26, WS = 3;
+const T = 26, WS = 3, MS = 9;
+/* The three views, and the order M walks them: sector, nearby, world, sector. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',   hint: 'Point at a person, an animal, or a tile. Click to pin the details open.' },
   { id: 'light',   key: 'f', label: 'Light',     hint: 'Click the fire pit to light it. Click anything else, and you start a wildfire. The hover card shows what will burn.' },
@@ -2378,15 +2382,15 @@ const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solita
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
 let viewCamp = null;
 let lvl = 0;
-let cv, ctx, wcv, wctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
-let hover = null, whover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
+let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 const $ = id => document.getElementById(id);
 
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['sprite','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
-  P.agentL = cs.getPropertyValue('--agent-light').trim(); worldDirty = 0;
+  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : P.fox;
 function hash(x, y){ let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
@@ -2435,6 +2439,31 @@ function sectorSummary(s){
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
   return `${s.name}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
+}
+
+/* ---- nearby view: the sector and its eight neighbours, from the world cache at 9 px per tile ---- */
+const midOrigin = () => ({ ox: (cur.sx - 1) * LW, oy: (cur.sy - 1) * LH });
+function drawMid(){
+  if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
+  const { ox, oy } = midOrigin(), MW = 3 * LW * MS, MH = 3 * LH * MS;
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0); mctx.imageSmoothingEnabled = false;
+  mctx.fillStyle = P.void; mctx.fillRect(0, 0, MW, MH);
+  const x0 = Math.max(0, ox), y0 = Math.max(0, oy), x1 = Math.min(W, ox + 3 * LW), y1 = Math.min(H, oy + 3 * LH);
+  mctx.drawImage(ocv, x0 * WS, y0 * WS, (x1 - x0) * WS, (y1 - y0) * WS, (x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS);
+  const dark = darkness(); if (dark > 0){ mctx.fillStyle = `rgba(${P.night},${dark * 0.8})`; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); }
+  mctx.strokeStyle = P.grid; mctx.lineWidth = 1;
+  for (let k = 1; k < 3; k++){ mctx.beginPath(); mctx.moveTo(k * LW * MS + 0.5, 0); mctx.lineTo(k * LW * MS + 0.5, MH); mctx.moveTo(0, k * LH * MS + 0.5); mctx.lineTo(MW, k * LH * MS + 0.5); mctx.stroke(); }
+  mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  for (const a of beings){
+    if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
+    const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = a.asleep ? 'z' : SPECIES[a.species].glyph;
+    if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
+    mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
+  }
+  for (const c of camps) if (c.site){ const [x, y] = c.site; if (x < ox || x >= ox + 3 * LW || y < oy || y >= oy + 3 * LH) continue; mctx.strokeStyle = c === viewCamp ? P.select : P.grid; mctx.lineWidth = 1.5; mctx.strokeRect((x - ox) * MS - 4.5, (y - oy) * MS - 4.5, MS + 9, MS + 9); }
+  if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
+  mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect(LW * MS + 1, LH * MS + 1, LW * MS - 2, LH * MS - 2);
+  if (mhover){ mctx.globalAlpha = 0.5; mctx.strokeRect((mhover.sx - cur.sx + 1) * LW * MS + 1, (mhover.sy - cur.sy + 1) * LH * MS + 1, LW * MS - 2, LH * MS - 2); mctx.globalAlpha = 1; }
 }
 
 /* ---- location view ---- */
@@ -2511,7 +2540,7 @@ function drawLoc(){
   ctx.globalAlpha = 1;
   if (hover){ ctx.strokeStyle = P.select; ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.strokeRect(hover.lx * T + 0.5, hover.ly * T + 0.5, T - 1, T - 1); ctx.globalAlpha = 1; }
 }
-function draw(){ if (view === 'world') drawWorld(); else drawLoc(); }
+function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
 /* ---- inspection ---- */
 function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${color}"></i></span>`; }
@@ -2619,12 +2648,12 @@ function renderUI(force){
   $('clock').textContent = `${stamp()}, ${seasonOf()}${weather.storm ? (isWinter() ? ', sleet' : ', rain') : isNight() ? ', night' : ''}`;
   $('camps').innerHTML = camps.length > 1 ? camps.map(c => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}</button>`).join('') : '';
   const s = sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = view === 'world' ? 'World map' : `${s.name}, sector ${s.sx},${s.sy}`;
-  $('tools').hidden = view === 'world';
+  $('where').textContent = view === 'world' ? 'World map' : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy}`;
+  $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
-  $('levels').hidden = view === 'world';
+  $('levels').hidden = view !== 'loc';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
-  if (view === 'loc') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
+  if (view !== 'world') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
     const b = $(id), nx = cur.sx + dx, ny = cur.sy + dy, ok = nx >= 0 && ny >= 0 && nx < SW && ny < SH;
     b.disabled = !ok; b.title = ok ? sectors[secIdx(nx, ny)].name : '';
   }
@@ -2653,14 +2682,21 @@ function setPaused(p){ paused = p; $('pause').textContent = p ? 'Resume' : 'Paus
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
-  view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null;
-  $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('worldBtn').hidden = v === 'world';
-  if (v === 'world') say('Click a sector to go there. Point at one to see what it holds.'); else say(TOOLS.find(t => t.id === tool).hint);
+  view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
+  $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
+  $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
+  if (v === 'world') say('Click a sector to go there. Point at one to see what it holds.');
+  else if (v === 'mid') say('The sector and its eight neighbours. Arrow keys move. Click a sector to go there.');
+  else say(TOOLS.find(t => t.id === tool).hint);
   renderUI(true);
 }
 function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView('loc', { sx, sy }); }
+/* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
+function move(dx, dy){ const sx = cur.sx + dx, sy = cur.sy + dy; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView(view === 'world' ? 'loc' : view, { sx, sy }); }
+function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
+function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 function newWorld(seed){ startWorld(seed); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
 function applyTool(c, e){
@@ -2679,7 +2715,7 @@ function applyTool(c, e){
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
-  if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view !== 'loc' || s.sx !== cur.sx || s.sy !== cur.sy) setView('loc', s); if (a.z !== lvl) setLevel(a.z); } else followId = null; }
+  if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
   if (now - lastUi > 250){ renderUI(false); lastUi = now; }
@@ -2689,6 +2725,7 @@ function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
   wcv = $('wmap'); wctx = wcv.getContext('2d'); wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
   ocv = document.createElement('canvas'); ocv.width = W * WS; ocv.height = H * WS; octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
@@ -2701,8 +2738,8 @@ function initUI(){
   $('stepBtn').addEventListener('click', () => { setPaused(true); for (let k = 0; k < 2; k++) step(); renderUI(true); });
   $('newWorld').addEventListener('click', () => newWorld($('seed').value.trim() || randomSeed()));
   $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') newWorld($('seed').value.trim() || randomSeed()); });
-  $('worldBtn').addEventListener('click', () => { followId = null; setView('world'); });
-  $('nW').onclick = () => goto(cur.sx - 1, cur.sy); $('nE').onclick = () => goto(cur.sx + 1, cur.sy); $('nN').onclick = () => goto(cur.sx, cur.sy - 1); $('nS').onclick = () => goto(cur.sx, cur.sy + 1);
+  $('viewBtn').addEventListener('click', cycleView);
+  $('nW').onclick = () => move(-1, 0); $('nE').onclick = () => move(1, 0); $('nN').onclick = () => move(0, -1); $('nS').onclick = () => move(0, 1);
   $('lvUp').onclick = () => setLevel(lvl + 1); $('lvDown').onclick = () => setLevel(lvl - 1);
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b){ viewCamp = camps.find(c => c.id === Number(b.dataset.camp)); if (viewCamp.site){ followId = null; setView('loc', secOf(...viewCamp.site)); } renderUI(true); } });
   $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ goalPriority[b.dataset.goal] = Number(b.dataset.pri); renderUI(true); } });
@@ -2728,12 +2765,15 @@ function initUI(){
   wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); say(sectorSummary(sectors[secIdx(whover.sx, whover.sy)])); });
   wcv.addEventListener('pointerleave', () => { whover = null; say('Click a sector to go there.'); });
   wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
+  mcv.addEventListener('pointermove', e => { mhover = sectorFromMid(e); say(mhover ? sectorSummary(sectors[secIdx(mhover.sx, mhover.sy)]) : 'The edge of the world.'); });
+  mcv.addEventListener('pointerleave', () => { mhover = null; say('Click a sector to go there.'); });
+  mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;
     if (e.key === ' '){ e.preventDefault(); setPaused(!paused); return; }
-    if (e.key === 'Escape'){ if (tipPinned) hideTip(); else if (view === 'loc'){ followId = null; setView('world'); } return; }
-    if (e.key === 'm' || e.key === 'M'){ followId = null; setView(view === 'world' ? 'loc' : 'world'); return; }
-    if (view === 'loc'){ const nav = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (nav){ e.preventDefault(); goto(cur.sx + nav[0], cur.sy + nav[1]); return; } }
+    if (e.key === 'Escape'){ if (tipPinned) hideTip(); else if (view !== 'world'){ followId = null; setView('world'); } return; }
+    if (e.key === 'm' || e.key === 'M'){ cycleView(); return; }
+    if (view !== 'world'){ const nav = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (nav){ e.preventDefault(); move(...nav); return; } }
     if (view === 'loc' && e.key === ']'){ setLevel(lvl + 1); return; }
     if (view === 'loc' && e.key === '['){ setLevel(lvl - 1); return; }
     const t = TOOLS.find(t => t.key === e.key.toLowerCase()); if (t) setTool(t.id);
