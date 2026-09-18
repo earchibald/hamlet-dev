@@ -85,6 +85,7 @@ test('a creation ends: every god sleeps, the gate passes, the era flips, and the
   assert.equal(api.creation.gate.ok, true);
   assert.ok(api.liveRegions().some(r => api.hasMark(r, 'making', 'human')), 'no people were made');
   assert.ok(api.liveRegions().some(r => api.marksOf(r, 'rest').length), 'no god sleeps in a region');
+  assert.ok(!api.legends.some(e => /foxs|wolfs|deers|humans/.test(e.text)));
   const spark = api.legends.find(e => e.text === 'A spark stayed.');
   if (api.gods().some(g => g.pole === 'hot')) assert.ok(spark, 'the hot god slept without the spark');
   const again = load(); again.startCreation('r'); again.runAges();
@@ -123,9 +124,11 @@ test('flow runs through neighbouring countries, and pool marks one', () => {
   const before = flows();
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.flow.apply(g, r)); });
   assert.ok(flows() >= before + 2, 'flow touched fewer than two countries');
+  assert.ok(api.hasPole(r, 'wet'), 'flow left the country dry');
   const { g: s, r: p } = godWith(api, 'still');
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
   assert.ok(api.hasMark(p, 'pool'));
+  assert.ok(api.hasPole(p, 'wet'), 'pool left the country dry');
   assert.equal(api.GOD_ACTS.pool.targets(s).includes(p), false, 'a pooled region is offered again');
 });
 
@@ -232,4 +235,15 @@ test('the gods leave the last plains alone', () => {
   for (const r of [more.a, more.b]) { api.setPole(r, 'dry', dry, ''); api.setPole(r, 'above', above, ''); }
   assert.equal(api.startCandidates().length, 3);
   assert.equal(api.GOD_ACTS.raise.targets(above).length, 3, 'three plains left, and none is offered');
+});
+
+test('a world that outgrows its gods calls a new difference into being', () => {
+  const api = load(); api.startCreation('r');
+  api.step(); api.step();
+  const before = api.gods().length;
+  api.withGodRng(() => { for (let k = 0; k < 40; k++){ const r = api.liveRegions().find(api.canSplit); if (!r) break; api.splitRegion(r, api.gods()[0]); } });
+  assert.ok(api.liveRegions().length >= 6 * before);
+  api.withGodRng(() => api.outgrown());
+  assert.equal(api.gods().length, before + 1);
+  assert.equal(new Set(api.gods().map(g => g.contrast)).size, new Set(api.gods().slice(0, before).map(g => g.contrast)).size + 1);
 });

@@ -23,8 +23,8 @@ function addRegion(tiles, parent, by, at){
 }
 const regionById = id => field.byId.get(id);
 const liveRegions = () => field.regions.filter(r => !r.children);
-const regionAt = (x, y) => regionById(regionOf[idx(x, y)]);
-const canSplit = r => !r.children && r.area >= 2 * SECTOR_AREA;
+const regionAt = (x, y) => inb(x, y) ? regionById(regionOf[idx(x, y)]) : null;
+const canSplit = r => !r.children && r.area >= 2 * SECTOR_AREA && !r.marks.some(m => m.kind === 'rest');
 /* The live regions that share an edge with r. */
 function neighboursOf(r){
   const seen = new Set();
@@ -32,6 +32,8 @@ function neighboursOf(r){
     for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const id = regionOf[idx(nx, ny)]; if (id !== r.id) seen.add(id); } }
   return [...seen].map(regionById);
 }
+/* The boundaries between live regions. A boundary whose side has since been split is history, not a place. */
+const liveBoundaries = () => boundaries.filter(b => { const A = regionById(b.a), B = regionById(b.b); return A && !A.children && B && !B.children; });
 /* Split r across its longer side. A patient god draws a straight line; a restless one draws a winding
    one from noise. Each child keeps at least a sector of tiles, and inherits the parent's marks. The
    boundary is the line of a's tiles that touch b: a place of its own. Returns null when no cut in eight
@@ -50,7 +52,10 @@ function splitRegion(r, god){
     for (const i of r.tiles) (side(i) === 0 ? a : b).push(i);
     if (a.length < SECTOR_AREA || b.length < SECTOR_AREA) continue;
     const ca = addRegion(a, r.id, god.id, age), cb = addRegion(b, r.id, god.id, age);
-    for (const c of [ca, cb]) c.marks = r.marks.map(m => ({ ...m, inherited: true }));
+    for (const m of r.marks){
+      if (INHERITED[m.kind]){ ca.marks.push({ ...m, inherited: true }); cb.marks.push({ ...m, inherited: true }); }
+      else (m.at !== null && regionOf[m.at] === cb.id ? cb : ca).marks.push({ ...m, inherited: true });
+    }
     r.children = [ca.id, cb.id];
     const line = a.filter(i => { const x = i % W, y = (i - x) / W; return DIRS.some(([dx, dy]) => inb(x + dx, y + dy) && regionOf[idx(x + dx, y + dy)] === cb.id); });
     const boundary = { id: nextId++, a: ca.id, b: cb.id, tiles: line, by: god.id, pole: god.pole, age };

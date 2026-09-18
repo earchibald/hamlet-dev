@@ -4,7 +4,13 @@
 const CONTRASTS = { height: ['above', 'below'], water: ['wet', 'dry'], heat: ['hot', 'cold'], motion: ['still', 'moving'], sight: ['light', 'dark'] };
 const POLES = {};
 for (const c in CONTRASTS){ const [p, q] = CONTRASTS[c]; POLES[p] = { contrast: c, other: q }; POLES[q] = { contrast: c, other: p }; }
-function mark(target, kind, value, god, why){ const m = { kind, value, by: god ? god.id : null, age, why }; target.marks.push(m); return m; }
+/* Kinds that describe the ground go to both children of a split. The rest name one thing that exists once
+   (a making, a god's body, a twist), and go to the child that holds the mark's anchor tile. */
+const INHERITED = { pole: true, height: true, depth: true, scar: true, flow: true, pool: true, freeze: true, hide: true, show: true };
+function mark(target, kind, value, god, why, at){
+  if (at === undefined) at = target.tiles && target.tiles.length ? target.tiles[rint(target.tiles.length)] : null;
+  const m = { kind, value, by: god ? god.id : null, age, why, at }; target.marks.push(m); return m;
+}
 const marksOf = (t, kind) => t.marks.filter(m => m.kind === kind);
 const hasMark = (t, kind, value) => t.marks.some(m => m.kind === kind && (value === undefined || m.value === value));
 /* A region holds one pole per contrast. Setting a pole drops the other pole of its contrast. */

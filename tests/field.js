@@ -57,11 +57,21 @@ test('children inherit marks, and a region stops splitting at sector size', () =
   const cut = api.splitRegion(root, patient);
   assert.ok(api.hasPole(cut.a, 'dark') && api.hasPole(cut.b, 'dark'));
   assert.ok(cut.a.marks[0].inherited);
-  /* Split down until nothing can split. Every live region keeps at least a sector. */
+  /* Split down until nothing can split. Every live region keeps at least a sector. A region whose
+     aspect keeps it eligible by area but too narrow to halve along its long side stays whole after
+     a few tries; that is accepted, as splitRegion's own comment allows. */
   let n = 0;
-  for (let guard = 0; guard < 200; guard++){ const r = api.liveRegions().find(api.canSplit); if (!r) break; if (api.splitRegion(r, patient)) n++; }
+  const tries = new Map();
+  for (let guard = 0; guard < 500; guard++){
+    const r = api.liveRegions().find(q => api.canSplit(q) && (tries.get(q.id) || 0) < 5);
+    if (!r) break;
+    if (api.splitRegion(r, patient)) n++; else tries.set(r.id, (tries.get(r.id) || 0) + 1);
+  }
   assert.ok(n >= 10, `only ${n} splits`);
-  for (const r of api.liveRegions()){ assert.ok(r.area >= api.SECTOR_AREA); assert.equal(api.canSplit(r), false); }
+  for (const r of api.liveRegions()){
+    assert.ok(r.area >= api.SECTOR_AREA);
+    if (api.canSplit(r)) assert.ok((tries.get(r.id) || 0) >= 5, `${r.id} is still splittable and was not given up on`);
+  }
   assert.equal(api.liveRegions().reduce((s, r) => s + r.area, 0), api.W * api.H);
 });
 
@@ -98,6 +108,32 @@ test('poleShare is the share of the live field that carries a pole', () => {
   const share = api.poleShare('wet');
   assert.ok(Math.abs(share - cut.a.area / (api.W * api.H)) < 1e-9);
   assert.equal(api.poleShare('dry'), 0);
+});
+
+test('a split gives ground marks to both children and a singular mark to the child that holds it', () => {
+  const api = fresh();
+  const root = api.field.root;
+  api.setPole(root, 'wet', patient, '');
+  const at = root.tiles[0];
+  const m = api.mark(root, 'making', 'deer', patient, '', at);
+  assert.equal(m.at, at);
+  const cut = api.splitRegion(root, patient);
+  assert.ok(api.hasPole(cut.a, 'wet') && api.hasPole(cut.b, 'wet'));
+  const holders = [cut.a, cut.b].filter(c => api.hasMark(c, 'making', 'deer'));
+  assert.equal(holders.length, 1);
+  assert.equal(api.regionAt(at % api.W, Math.floor(at / api.W)), holders[0]);
+  api.mark(cut.a, 'rest', 1, patient, '');
+  assert.equal(api.canSplit(cut.a), false, 'a sleeping god\'s body was offered for splitting');
+});
+
+test('a boundary whose side was split is not live', () => {
+  const api = fresh();
+  const cut = api.splitRegion(api.field.root, patient);
+  assert.equal(api.liveBoundaries().length, 1);
+  api.splitRegion(cut.a, patient);
+  assert.equal(api.boundaries.length, 2);
+  assert.equal(api.liveBoundaries().length, 1);
+  assert.equal(api.liveBoundaries()[0].a, api.liveRegions().find(r => r.parent === cut.a.id).id, 'the live boundary is the new cut');
 });
 
 test('the era, the age, and the stamp', () => {
