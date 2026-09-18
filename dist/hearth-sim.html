@@ -1622,13 +1622,13 @@ const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, o
 const ageDays = a => (tick - a.born) / DAY;
 const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
-  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: 0.035, water: 0.05, rest: 0.03, social: 0.02, warmth: 0 }, stride: 2, zmin: -2, zmax: 2 },
+  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: 0.035, water: 0.05, rest: 0.03, social: 0.02, warmth: 0 }, stride: 2, zmin: -2, zmax: 2, folk: true },
   rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: 0.07, rest: 0.03 }, stride: 2, zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: 0.025, water: 0.04, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 } },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: 0.02, water: 0.03, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 } },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: 0.025, water: 0.04, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: 0.02, water: 0.03, rest: 0.02 }, stride: 2, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
   deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: 0.05, water: 0.04, rest: 0.03 }, stride: 2, zmin: 0, zmax: 2, prey: true },
-  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: 0.03, play: 0.04, rest: 0.02 }, stride: 1, zmin: -2, zmax: 2 },
-  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: 0.03, rest: 0.03, social: 0.02 }, stride: 2, zmin: -2, zmax: 2 },
+  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: 0.03, play: 0.04, rest: 0.02 }, stride: 1, zmin: -2, zmax: 2, fae: true },
+  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: 0.03, rest: 0.03, social: 0.02 }, stride: 2, zmin: -2, zmax: 2, folk: true },
 };
 const NAMES = ['Ada','Bram','Cora','Dov','Esk','Fen','Greta','Hal','Iva','Jory','Kit','Lune','Mott','Nell','Orrin','Pim','Quill','Rook','Sable','Tam','Ulla','Voss','Wren','Yara'];
 
@@ -2875,7 +2875,11 @@ const LEAVES = { hot: 'A spark stayed.' };
 /* The scar a winner's pole leaves on what it beat. */
 const SCAR_OF = { hot: 'burned', cold: 'broken', wet: 'drowned', dry: 'burned', above: 'cut', below: 'cut', still: 'broken', moving: 'cut', light: 'broken', dark: 'broken' };
 /* Who makes what. The people are made by a mingling. */
-const MAKES = { wet: ['deer', 'fox', 'gnome'], above: ['deer', 'sprite'], dark: ['sprite', 'fox'], light: ['sprite'], still: ['fox'], cold: ['wolf'], moving: ['wolf'], hot: ['rabbit'], dry: ['rabbit', 'gnome', 'wolf'], below: ['gnome'] };
+const MAKES = { wet: ['deer'], above: ['deer'], dark: ['sprite', 'fox'], light: ['sprite'], still: ['fox'], cold: ['wolf'], moving: ['wolf'], hot: ['rabbit'], dry: ['rabbit'], below: ['gnome'] };
+/* A world that can hold a life holds each kind of it: something eaten, something that hunts, something fae, and a
+   second people. The gate wants one making of each kind somewhere; the lack strains the poles that make one. */
+const KINDS = ['prey', 'hunter', 'fae', 'folk'];
+const polesThatMake = kind => Object.keys(MAKES).filter(p => MAKES[p].some(sp => SPECIES[sp][kind]));
 /* The poles a lack calls for, in order of preference. */
 const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['hot', 'cold'], food: ['hot', 'wet'], people: [], height: ['above'], depth: ['below'] };
 let godNamePool = [];
@@ -3139,21 +3143,23 @@ function touchesWet(r){ return liveBoundaries().some(b => b.pole === 'wet' && b.
 const startCandidates = () => liveRegions().filter(isStart);
 /* A god may sleep only when the world can hold a life: a start region that is dry, level (nothing raised, nothing dug), unscarred,
    and a sector or more; water beside it; fuel and food within two neighbours; the people made;
-   and a hill and a cave somewhere, since the life the day era knows dens, digs, and hides its finds in the deep. */
+   a hill and a cave somewhere, since the life the day era knows dens, digs, and hides its finds in the deep;
+   and each kind of life somewhere: something eaten, something that hunts, something fae, and a second people. */
 function restGate(){
   const live = liveRegions();
   const starts = startCandidates();
   if (!starts.length) return { ok: false, lack: 'start' };
   const people = live.some(r => hasMark(r, 'making', 'human'));
   const raised = live.some(r => marksOf(r, 'height').length), dug = live.some(r => marksOf(r, 'depth').length);
+  const kinds = KINDS.filter(k => !live.some(r => marksOf(r, 'making').some(m => SPECIES[m.value][k])));
   let lack = null;
   for (const s of starts){
     const one = ring(s, 1), two = ring(s, 2);
     const water = one.some(r => hasPole(r, 'wet') || touchesWet(r));
     const fuel = two.some(r => GROWS[biomeOf(r)]);
     const food = two.some(r => marksOf(r, 'making').some(m => SPECIES[m.value].prey));
-    if (water && fuel && food && people && raised && dug) return { ok: true, start: s };
-    if (!lack) lack = !water ? 'water' : !fuel ? 'fuel' : !food ? 'food' : !people ? 'people' : !raised ? 'height' : 'depth';
+    if (water && fuel && food && people && raised && dug && !kinds.length) return { ok: true, start: s };
+    if (!lack) lack = !water ? 'water' : !fuel ? 'fuel' : !food ? 'food' : !people ? 'people' : !raised ? 'height' : !dug ? 'depth' : kinds[0];
   }
   return { ok: false, lack, start: starts[0] };
 }
@@ -3170,7 +3176,8 @@ function strain(lack){
     }
     return;
   }
-  const pole = STRAIN[lack].find(p => !godOf(p)) || STRAIN[lack][0];
+  const poles = KINDS.includes(lack) ? polesThatMake(lack) : STRAIN[lack];
+  const pole = poles.find(p => !godOf(p)) || poles[0];
   const g = godOf(pole);
   if (!g) makeGod(pole, null, `The world cannot yet hold a life: it lacks ${lack}.`);
   else if (g.status === 'awake') g.needs.expression = Math.max(0, g.needs.expression - 10);
@@ -3203,13 +3210,17 @@ function backstop(){
   creation.backstops++;
   log(`Wearied, ${g.name} does what has to be done. The world lacks ${gate.lack}.`, [g], 'major');
   const live = liveRegions();
+  const starts = startCandidates();
+  let pool = live.filter(r => !isStart(r));
+  if (!pool.length) pool = starts.length > 1 ? starts.slice().sort((p, q) => p.area - q.area).slice(0, 1) : live;
   if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar' && m.kind !== 'height' && m.kind !== 'depth'); setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
   else if (gate.lack === 'water'){ const n = neighboursOf(gate.start)[0] || gate.start; setPole(n, 'wet', g, 'Made wet so the world could hold a life.'); }
   else if (gate.lack === 'fuel'){ setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
   else if (gate.lack === 'food'){ mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
   else if (gate.lack === 'people'){ mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
-  else if (gate.lack === 'height'){ const pool = live.filter(r => !isStart(r)); const r = (pool.length ? pool : live).slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
-  else if (gate.lack === 'depth'){ const pool = live.filter(r => !isStart(r)); const r = (pool.length ? pool : live).slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
+  else if (gate.lack === 'height'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
+  else if (gate.lack === 'depth'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
+  else if (KINDS.includes(gate.lack)){ const sp = Object.keys(SPECIES).find(s => SPECIES[s][gate.lack] && s !== 'human'); const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'making', sp, g, `The ${SPECIES[sp].plural}, so the world could hold a life.`); }
   for (const o of awakeGods()) o.needs.rest = Math.max(0, o.needs.rest - 20);
 }
 /* A world with many countries and few differences lacks differentiation. When the countries outnumber the

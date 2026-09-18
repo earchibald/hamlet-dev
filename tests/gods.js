@@ -261,7 +261,23 @@ test('the gate wants a hill and a cave, and the lacks strain above and below', (
   api.mark(n0, 'height', 1, a, '');
   assert.equal(api.restGate().lack, 'depth');
   api.mark(n0, 'depth', 1, a, '');
+  assert.equal(api.restGate().lack, 'hunter', 'rabbit is prey; hunter is still missing');
+  api.mark(n0, 'making', 'fox', a, '');
+  assert.equal(api.restGate().lack, 'fae');
+  /* The human mark already made folk present (human carries folk too), so once fae is
+     made the gate is satisfied without a gnome: prey, hunter, fae, and folk are all held. */
+  api.mark(n0, 'making', 'sprite', a, '');
   assert.equal(api.restGate().ok, true);
   assert.deepEqual(api.STRAIN.height, ['above']); assert.deepEqual(api.STRAIN.depth, ['below']);
   assert.deepEqual(api.MAKES.below, ['gnome']); assert.ok(api.MAKES.light.includes('sprite'));
+  assert.deepEqual(api.polesThatMake('folk'), ['below']);
+  assert.deepEqual(api.polesThatMake('fae'), ['dark', 'light']);
+  assert.deepEqual(api.MAKES.wet, ['deer']);
+});
+
+test('a lack of fae strains a pole that makes fae', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  api.withGodRng(() => api.strain('fae'));
+  assert.ok(api.polesThatMake('fae').some(p => api.godOf(p)), 'no god of a fae-making pole after the strain');
 });
