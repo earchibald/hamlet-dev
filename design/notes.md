@@ -204,7 +204,9 @@ The page opens in the gods era. The player watches the creation age by age. The 
 - The People drawer lists the gods. The bar is a god's rest, and the row says what it does. The god's card holds its needs, its thoughts, its opinions, its last decision scores, and the legends it stands in.
 - The Goals drawer and the Camp drawer say the valley is not made. The strip counts the countries and the gods awake in place of the season.
 
-At settle the view moves to the first person, the saved speed returns, and the foot says the gods sleep and one person wakes. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
+A god has no place in the ages, so a follow is refused. The foot says there is nothing to follow.
+
+At settle the view moves to the first person, the saved speed returns, and the foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
 
 The field on the world map, in the order it is drawn:
 
@@ -215,9 +217,9 @@ The field on the world map, in the order it is drawn:
 | A scar | The country is hatched, one tile in four, in the scar colour. |
 | A god | A gold star with its name, in the middle of the country it stands in. A sleeping god is faded. Gods that share a country stand side by side. |
 
-Hover gives the region card. It names the country by its poles and by the reason on its newest pole mark. The reason names the god. The far side of a line takes the other pole, so a god's epithet beside the country's poles would read as a mistake. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the god of that country.
+Hover gives the region card. It names the country by its poles and by the reason on its newest pole mark. The reason names the god. A backstop reason names no god, and then the god's name and epithet follow the reason. The far side of a line takes the other pole, so a god's epithet beside the country's poles would read as a mistake. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the first live god that stands in the country. The foot says "No god stands here." when none does.
 
-After settle, hover reads the marks. A hill says who raised it and why, a cave says who dug it, a scar says who fought over the ground, and a country row names the country on every surface tile. A card also says which god sleeps in that hill, cave, or country. A hill raised for a den says it was raised for the creatures, not by the act its mark tells of. The sector summary on the world map names the country too, and `C` shows the country lines over the world map.
+After settle, hover reads the marks. A hill says who raised it and when. The reason follows only when it is not the stock one, because a stock reason begins with the god's name and says the label twice. A cave says who dug it the same way. A scar says who fought over the ground, and a country row names the country on every surface tile. A card also says which god sleeps in that hill, cave, or country. A hill raised for a den says it was raised for the creatures, not by the act its mark tells of. The sector summary on the world map names the country too, and `C` shows the country lines over the world map.
 
 An age is named as the chronicle names it: `Before time`, then `Age N` counted from the Pulse.
 
