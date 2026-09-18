@@ -31,7 +31,14 @@ const KNOWN_DEATHS = {};
    `alive` per seed instead (a seed that actually collapses), and the sum of `humans` and `born`
    across all six seeds together, so a change that halves every population (as fishing once did)
    still fails. */
-const sums = { humans: 0, born: 0 };
+const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0 };
+
+/* The far country counters. A single seed may never send anyone to a cave, a den or a bench in 70 days,
+   because the dens, caves and burrows sit in their makers' countries now. So each is floored across the six
+   seeds together, at about a third of the measured sum, which catches a change that shuts a chain off
+   everywhere without going red on one seed's stream. `densCleared` is a printed diagnostic only
+   (design/notes.md, Known weak spots). */
+const FAR_FLOOR = { searched: 2, finds: 1, repaid: 5, benches: 1 };
 
 /* gamma's camp is capped by beds until one snare catch brings the hide for a hut (design/notes.md, Known weak spots); its floor is lower so an unrelated stream shift does not go red. */
 const ALIVE_FLOOR = { gamma: 6 };
@@ -59,6 +66,8 @@ for (const seed of SEEDS){
       assert.ok(c.settled && !c.failed, 'the creation did not settle');
       assert.equal(c.backstops, 0, 'the backstop fired');
       assert.ok(c.ages <= api.options.ageLimit, `${c.ages} ages`);
+      /* A settle at the cap is kept whatever it lacks, so a seed that walks up to the cap hides a bad valley. */
+      assert.ok(c.discards < api.MAX_DISCARDS, `${c.discards} discards`);
       assert.equal(c.gate.ok, true);
       for (const g of api.gods()) assert.ok(g.status === 'asleep' || g.status === 'dead', `${g.name} is ${g.status}`);
       for (const h of api.hills) assert.ok(h.mark && api.beingById(h.mark.by), 'a hill with no god behind it');
@@ -71,6 +80,7 @@ for (const seed of SEEDS){
     });
     await t.test('the camps grow', () => {
       sums.humans += counts.humans; sums.born += counts.born;
+      for (const k in FAR_FLOOR) sums[k] += counts[k];
       assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day 70, ${counts.born} born`);
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
@@ -99,6 +109,11 @@ for (const seed of SEEDS){
 test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
   t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
   assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
+});
+
+test('the far countries are reached', { skip: !isDefault && 'not the default run' }, t => {
+  t.diagnostic(`far country sums across ${SEEDS.join(', ')}: ` + Object.keys(FAR_FLOOR).map(k => `${k} ${sums[k]}`).join(', '));
+  for (const k in FAR_FLOOR) assert.ok(sums[k] >= FAR_FLOOR[k], `sum of ${k} ${sums[k]} (want >= ${FAR_FLOOR[k]})`);
 });
 
 test('the same seed tells the same story twice', () => {

@@ -111,8 +111,8 @@ test('fallen rock is cleared with the axe before the search', () => {
   assert.equal(cave.blocked, null); assert.ok(cave.story.some(s => s.includes('cleared')));
 });
 
-test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', () => {
-  const ready = readyDenCamp(); if (!ready) return;
+test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
   const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
@@ -135,8 +135,8 @@ test('two brave people with brands and the spear clear a wolf den; the wolves di
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
 
-test('a den reverts to homeless owners too, when the fire fails before they redig', () => {
-  const ready = readyDenCamp(); if (!ready) return;
+test('a den reverts to homeless owners too, when the fire fails before they redig', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
   const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
@@ -155,8 +155,8 @@ test('a den reverts to homeless owners too, when the fire fails before they redi
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
 
-test('the party keeps its brands lit until home, and the guard goal leaves a just-driven wolf alone', () => {
-  const ready = readyDenCamp(); if (!ready) return;
+test('the party keeps its brands lit until home, and the guard goal leaves a just-driven wolf alone', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
   const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
@@ -199,8 +199,8 @@ test('withBrand ends with no live ember when the chain does not start', () => {
   assert.equal(c.stash.ember || 0, 0);
 });
 
-test('a walled-off mate carries no ember, and an ember can never be stashed', () => {
-  const ready = readyDenCamp(); if (!ready) return;
+test('a walled-off mate carries no ember, and an ember can never be stashed', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
   const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);

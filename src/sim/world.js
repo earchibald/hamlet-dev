@@ -337,7 +337,7 @@ function digGnomeBurrow(start, avoid, sector){
   const list = sector ? [sector] : shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
   /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
-     out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
+     out by a mid-game move (gnomeTick's leaving rule). The world has changed since settle painted it, so the
      generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
      pit (or the first person, if no camp has a site yet) and require the new exit to sit in that region today. */
   const region = sector ? startRegion : (() => {
@@ -615,11 +615,29 @@ function paintLakes(){
 /* The first person: the start country's best walkable pocket. The most central tile is no good on its own. A lake
    or a chasm can cut the country in two, and the centre can fall in a pocket with nothing in it. So walk every
    pocket and take the one that opens onto the most world, because that is the valley the person will live in;
-   a wide pocket walled off from everything else is a prison. Then stand on its tile nearest the country's middle. */
+   a wide pocket walled off from everything else is a prison. Then stand on its tile nearest the country's middle.
+   A start country with no ground at all to stand on returns null. That is not a crash: settle reads it as a
+   failed tile check with lack `ground`, and throws the valley back. */
+function startMiddle(){ const { x0, y0, x1, y1 } = creation.gate.start.bbox; return [(x0 + x1) >> 1, (y0 + y1) >> 1]; }
+/* The one person the day era starts with. */
+function standFirstPerson(x, y){ const first = makeBeing('human', x, y, takeName(), rint(360)); first.camp = camp; beings.push(first); return first; }
+/* The settle is final and the start country still has no ground: the person stands on the nearest walkable
+   surface tile anywhere on the map, measured from the middle of that country. A person in the wrong country is
+   better than a page that throws. */
+function placeFirstPersonAnywhere(){
+  const [cx, cy] = startMiddle();
+  const offs = [];
+  for (let dy = -H; dy <= H; dy++) for (let dx = -W; dx <= W; dx++) offs.push([dx, dy]);
+  offs.sort((p, q) => (p[0] * p[0] + p[1] * p[1]) - (q[0] * q[0] + q[1] * q[1]));
+  const t = nearFind(cx, cy, q => passable(q.x, q.y, 0), offs, 0);
+  const best = { x: t ? t.x : cx, y: t ? t.y : cy, d: t ? dist(t.x, t.y, cx, cy) : 0 };
+  standFirstPerson(best.x, best.y);
+  return best;
+}
 function placeFirstPerson(){
-  const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+  const s = creation.gate.start; const [cx, cy] = startMiddle();
   const mine = new Set(s.tiles.filter(i => passable(i % W, (i - i % W) / W)));
-  if (!mine.size) throw new Error(`The start country has no ground to stand on.`);
+  if (!mine.size) return null;
   const seen = new Set(), base = ZOFF * W * H;
   let pocket = null, reach = -1;
   for (const i of mine){
@@ -632,7 +650,7 @@ function placeFirstPerson(){
   }
   let best = null;
   for (const i of pocket){ const x = i % W, y = (i - x) / W; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
-  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
+  standFirstPerson(best.x, best.y);
   return best;
 }
 /* Put n animals of a species down in the country `within`: a passable tile, at least 12 tiles from `avoid`

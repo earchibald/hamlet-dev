@@ -12,7 +12,14 @@ function settle(){
   /* The start country is dry, level and unscarred, so nothing after this line can move its ground: hills keep out
      of it, caves sit under hills, and scars need a scar mark. The person goes here because hillFits and rimExits
      both ask whether a hill opens onto the ground the first person can walk. */
-  const best = placeFirstPerson();
+  /* No ground at all in the start country is a failed check with lack `ground`, not a crash: the valley goes back
+     to the gods. When the settle is final the person stands on the nearest walkable tile anywhere on the map. */
+  let best = placeFirstPerson(), unfinished = false;
+  if (!best){
+    if (!creation.failed && creation.discards < MAX_DISCARDS){ undoSettle('ground'); return; }
+    logUnfinished('ground'); unfinished = true;
+    best = placeFirstPersonAnywhere();
+  }
   startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   /* Scars go before hills, so a chasm never cuts through a hill, and can take ground out of the walkable world. */
   paintScars();
@@ -37,12 +44,20 @@ function settle(){
   const check = tileCheckImpl(firstPerson());
   if (!check.ok){
     if (!creation.failed && creation.discards < MAX_DISCARDS){ undoSettle(check.lack); return; }
-    log(`The world is settled unfinished. It lacks ${check.lack}, and there is no age left to mend it.`, [], 'bad');
+    if (!unfinished) logUnfinished(check.lack);
   }
   placeBodies();
   era = 'days';
   const a = firstPerson();
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+}
+/* The one line a final settle writes. A failed creation has no ages left; a creation at the cap has ages left but
+   has spent its repaints. The two are different endings, so they read differently. */
+function logUnfinished(lack){
+  const why = creation.failed
+    ? 'there is no age left to mend it'
+    : `the world was thrown back ${MAX_DISCARDS} times and the gods will not paint it again`;
+  log(`The world is settled unfinished. It lacks ${lack}, and ${why}.`, [], 'bad');
 }
 /* The real test of a world: from where the first person stands, by a real path search, water, ground to camp on,
    fuel, and food are all in reach. The gate checks marks; this checks tiles. */

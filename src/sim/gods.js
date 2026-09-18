@@ -306,7 +306,10 @@ const startCandidates = () => liveRegions().filter(isStart);
 function restGate(){
   const live = liveRegions();
   const starts = startCandidates();
-  if (!starts.length) return { ok: false, lack: 'start' };
+  /* Every return carries a start, even the one that says there is no candidate: settle paints from
+     `creation.gate.start`, and a gate with no start at all would throw instead of discarding. With no candidate
+     the largest live country stands in, so the painters always have a country to read. */
+  if (!starts.length) return { ok: false, lack: 'start', start: live.slice().sort((p, q) => q.area - p.area)[0] };
   const people = live.some(r => hasMark(r, 'making', 'human'));
   const raised = live.some(r => marksOf(r, 'height').length), dug = live.some(r => marksOf(r, 'depth').length);
   const kinds = KINDS.filter(k => !live.some(r => marksOf(r, 'making').some(m => SPECIES[m.value][k])));

@@ -27,8 +27,8 @@ test('some soak seed digs dens for the foxes and the wolves that were made', () 
 const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
 const inDen = (b) => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
 
-test('a wolf rests in its den by day', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a wolf rests in its den by day', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.rest = 30;
@@ -39,8 +39,8 @@ test('a wolf rests in its den by day', () => {
   assert.ok(rested, `the wolf should be home and resting; it is at ${b.x},${b.y},${b.z} doing ${b.task && b.task.label} with rest ${Math.round(b.needs.rest)}`);
 });
 
-test('a wolf carries a kill home to its den before eating', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a wolf carries a kill home to its den before eating', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
@@ -56,8 +56,8 @@ test('a wolf carries a kill home to its den before eating', () => {
   assert.ok(api.chronicle.some(e => e.text.includes('drags')));
 });
 
-test('a wolf eats a kill where it fell when the den floor is unreachable', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a wolf eats a kill where it fell when the den floor is unreachable', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to carry the kill to */
@@ -73,8 +73,8 @@ test('a wolf eats a kill where it fell when the den floor is unreachable', () =>
   assert.ok(api.items.some(i => i.kind === 'carcass' && i.x === r.x && i.y === r.y), 'the carcass stays on the ground when it cannot be carried home');
 });
 
-test('a denned wolf whose den floor is unreachable still gets a rest task, not a stuck home task', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a denned wolf whose den floor is unreachable still gets a rest task, not a stuck home task', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to go home to */
   b.task = null; b.asleep = false;
@@ -83,8 +83,8 @@ test('a denned wolf whose den floor is unreachable still gets a rest task, not a
   assert.equal(b.task.type, 'rest', `expected a rest task, got ${b.task && b.task.type}`);
 });
 
-test('an edge-arrived fox joins the fox den with room for a pair', () => {
-  const home = denned('fox'); if (!home) return;
+test('an edge-arrived fox joins the fox den with room for a pair', ctx => {
+  const home = denned('fox'); if (!home) return ctx.skip('no soak seed has a fox in a den');
   const { api, den } = home;
   const before = api.beings.filter(b => b.alive && b.species === 'fox' && b.den === den).length;
   assert.ok(before < 2, 'the fox den should start short of a pair');
@@ -94,8 +94,8 @@ test('an edge-arrived fox joins the fox den with room for a pair', () => {
   assert.equal(f.den, den, 'the arriving fox should join the den with room for it');
 });
 
-test('an edge-arrived wolf does not join a den already home to a pair', () => {
-  const home = denned('wolf'); if (!home) return;
+test('an edge-arrived wolf does not join a den already home to a pair', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, den } = home; /* the wolf den on seed r starts with two grown owners */
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
   api.beings.push(w);
@@ -103,8 +103,8 @@ test('an edge-arrived wolf does not join a den already home to a pair', () => {
   assert.notEqual(w.den, den, 'a full den should not take a third owner');
 });
 
-test('an edge-arrived wolf does not join a den the camp holds', () => {
-  const home = denned('wolf'); if (!home) return;
+test('an edge-arrived wolf does not join a den the camp holds', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, den } = home;
   den.cleared = api.camps[0];
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
@@ -113,8 +113,8 @@ test('an edge-arrived wolf does not join a den the camp holds', () => {
   assert.equal(w.den, null, 'a cleared den should give the arrival no den');
 });
 
-test('a den with two adults bears one young in spring, once a year', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a den with two adults bears one young in spring, once a year', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, den } = home;
   const adults = api.beings.filter(b => b.alive && b.species === 'wolf' && b.den === den);
   assert.equal(adults.length, 2);
@@ -129,8 +129,8 @@ test('a den with two adults bears one young in spring, once a year', () => {
   assert.ok(api.chronicle.some(e => e.text.includes('pup') || e.text.includes('kit')));
 });
 
-test('a person who walks into a wolf den is attacked, brand or no brand, by day', () => {
-  const home = denned('wolf'); if (!home) return;
+test('a person who walks into a wolf den is attacked, brand or no brand, by day', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); b.x = t.x; b.y = t.y; b.z = t.z; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90;
@@ -142,8 +142,8 @@ test('a person who walks into a wolf den is attacked, brand or no brand, by day'
   assert.ok(api.chronicle.some(e => e.text.includes('in its den')));
 });
 
-test('one bite per den per 150 ticks: two adult wolves at home only bite once between them', () => {
-  const home = denned('wolf'); if (!home) return;
+test('one bite per den per 150 ticks: two adult wolves at home only bite once between them', ctx => {
+  const home = denned('wolf'); if (!home) return ctx.skip('no soak seed has a wolf in a den');
   const { api, b, den } = home;
   const owners = api.beings.filter(o => o.alive && o.species === 'wolf' && o.den === den);
   assert.equal(owners.length, 2, 'the wolf den on seed r starts with two grown owners');

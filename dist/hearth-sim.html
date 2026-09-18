@@ -751,7 +751,7 @@ function digGnomeBurrow(start, avoid, sector){
   const list = sector ? [sector] : shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
   /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
-     out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
+     out by a mid-game move (gnomeTick's leaving rule). The world has changed since settle painted it, so the
      generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
      pit (or the first person, if no camp has a site yet) and require the new exit to sit in that region today. */
   const region = sector ? startRegion : (() => {
@@ -1029,11 +1029,29 @@ function paintLakes(){
 /* The first person: the start country's best walkable pocket. The most central tile is no good on its own. A lake
    or a chasm can cut the country in two, and the centre can fall in a pocket with nothing in it. So walk every
    pocket and take the one that opens onto the most world, because that is the valley the person will live in;
-   a wide pocket walled off from everything else is a prison. Then stand on its tile nearest the country's middle. */
+   a wide pocket walled off from everything else is a prison. Then stand on its tile nearest the country's middle.
+   A start country with no ground at all to stand on returns null. That is not a crash: settle reads it as a
+   failed tile check with lack `ground`, and throws the valley back. */
+function startMiddle(){ const { x0, y0, x1, y1 } = creation.gate.start.bbox; return [(x0 + x1) >> 1, (y0 + y1) >> 1]; }
+/* The one person the day era starts with. */
+function standFirstPerson(x, y){ const first = makeBeing('human', x, y, takeName(), rint(360)); first.camp = camp; beings.push(first); return first; }
+/* The settle is final and the start country still has no ground: the person stands on the nearest walkable
+   surface tile anywhere on the map, measured from the middle of that country. A person in the wrong country is
+   better than a page that throws. */
+function placeFirstPersonAnywhere(){
+  const [cx, cy] = startMiddle();
+  const offs = [];
+  for (let dy = -H; dy <= H; dy++) for (let dx = -W; dx <= W; dx++) offs.push([dx, dy]);
+  offs.sort((p, q) => (p[0] * p[0] + p[1] * p[1]) - (q[0] * q[0] + q[1] * q[1]));
+  const t = nearFind(cx, cy, q => passable(q.x, q.y, 0), offs, 0);
+  const best = { x: t ? t.x : cx, y: t ? t.y : cy, d: t ? dist(t.x, t.y, cx, cy) : 0 };
+  standFirstPerson(best.x, best.y);
+  return best;
+}
 function placeFirstPerson(){
-  const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+  const s = creation.gate.start; const [cx, cy] = startMiddle();
   const mine = new Set(s.tiles.filter(i => passable(i % W, (i - i % W) / W)));
-  if (!mine.size) throw new Error(`The start country has no ground to stand on.`);
+  if (!mine.size) return null;
   const seen = new Set(), base = ZOFF * W * H;
   let pocket = null, reach = -1;
   for (const i of mine){
@@ -1046,7 +1064,7 @@ function placeFirstPerson(){
   }
   let best = null;
   for (const i of pocket){ const x = i % W, y = (i - x) / W; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
-  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
+  standFirstPerson(best.x, best.y);
   return best;
 }
 /* Put n animals of a species down in the country `within`: a passable tile, at least 12 tiles from `avoid`
@@ -3312,7 +3330,10 @@ const startCandidates = () => liveRegions().filter(isStart);
 function restGate(){
   const live = liveRegions();
   const starts = startCandidates();
-  if (!starts.length) return { ok: false, lack: 'start' };
+  /* Every return carries a start, even the one that says there is no candidate: settle paints from
+     `creation.gate.start`, and a gate with no start at all would throw instead of discarding. With no candidate
+     the largest live country stands in, so the painters always have a country to read. */
+  if (!starts.length) return { ok: false, lack: 'start', start: live.slice().sort((p, q) => q.area - p.area)[0] };
   const people = live.some(r => hasMark(r, 'making', 'human'));
   const raised = live.some(r => marksOf(r, 'height').length), dug = live.some(r => marksOf(r, 'depth').length);
   const kinds = KINDS.filter(k => !live.some(r => marksOf(r, 'making').some(m => SPECIES[m.value][k])));
@@ -3446,7 +3467,14 @@ function settle(){
   /* The start country is dry, level and unscarred, so nothing after this line can move its ground: hills keep out
      of it, caves sit under hills, and scars need a scar mark. The person goes here because hillFits and rimExits
      both ask whether a hill opens onto the ground the first person can walk. */
-  const best = placeFirstPerson();
+  /* No ground at all in the start country is a failed check with lack `ground`, not a crash: the valley goes back
+     to the gods. When the settle is final the person stands on the nearest walkable tile anywhere on the map. */
+  let best = placeFirstPerson(), unfinished = false;
+  if (!best){
+    if (!creation.failed && creation.discards < MAX_DISCARDS){ undoSettle('ground'); return; }
+    logUnfinished('ground'); unfinished = true;
+    best = placeFirstPersonAnywhere();
+  }
   startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   /* Scars go before hills, so a chasm never cuts through a hill, and can take ground out of the walkable world. */
   paintScars();
@@ -3471,12 +3499,20 @@ function settle(){
   const check = tileCheckImpl(firstPerson());
   if (!check.ok){
     if (!creation.failed && creation.discards < MAX_DISCARDS){ undoSettle(check.lack); return; }
-    log(`The world is settled unfinished. It lacks ${check.lack}, and there is no age left to mend it.`, [], 'bad');
+    if (!unfinished) logUnfinished(check.lack);
   }
   placeBodies();
   era = 'days';
   const a = firstPerson();
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+}
+/* The one line a final settle writes. A failed creation has no ages left; a creation at the cap has ages left but
+   has spent its repaints. The two are different endings, so they read differently. */
+function logUnfinished(lack){
+  const why = creation.failed
+    ? 'there is no age left to mend it'
+    : `the world was thrown back ${MAX_DISCARDS} times and the gods will not paint it again`;
+  log(`The world is settled unfinished. It lacks ${lack}, and ${why}.`, [], 'bad');
 }
 /* The real test of a world: from where the first person stands, by a real path search, water, ground to camp on,
    fuel, and food are all in reach. The gate checks marks; this checks tiles. */

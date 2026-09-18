@@ -278,8 +278,40 @@ test('a creation that runs out of ages settles unfinished at once', () => {
   assert.ok(api.creation.failed, 'the creation did not fail');
   assert.equal(api.era, 'days');
   assert.ok(api.creation.settled);
-  assert.ok(api.creation.discards <= api.MAX_DISCARDS, `${api.creation.discards} discards`);
+  /* A failed creation settles at once, so it never spends a repaint: the cap is never even approached. */
+  assert.ok(api.creation.discards < api.MAX_DISCARDS, `${api.creation.discards} discards`);
   assert.ok(api.legends.some(e => /settled unfinished/.test(e.text)), 'no legend of the unfinished settle');
+});
+
+/* Settle paints from `creation.gate.start`, and `unmake` can shut the gate with no god left awake, so a gate
+   with no start candidate must still hand the painters a country. The state before the first split is that
+   state: the field is one formless country with no pole on it, so nothing is dry and level and unscarred. */
+test('a gate with no start candidate still names a country', () => {
+  const api = load(); api.startCreation('r');
+  assert.equal(api.startCandidates().length, 0, 'the formless field already holds a start candidate');
+  const gate = api.restGate();
+  assert.equal(gate.ok, false);
+  assert.equal(gate.lack, 'start');
+  assert.ok(gate.start, 'the gate named no country to paint from');
+  assert.ok(api.liveRegions().includes(gate.start), 'the gate named a country that is not live');
+  assert.ok(Array.isArray(gate.start.tiles) && gate.start.bbox, 'the gate named something that is not a country');
+  /* Every other return of the gate carries a start too. */
+  for (const g of [gate, api.restGate()]) assert.ok(g.start, 'a gate with no start');
+});
+
+/* No ground to stand on is a failed check, not a crash: settle reads null and throws the valley back. */
+test('placeFirstPerson returns null when the start country has no ground', () => {
+  const api = settled();
+  const W = api.W, s = api.creation.gate.start;
+  const was = api.beings.length;
+  for (const i of s.tiles){ const t = api.world[i]; t.ground = 'water'; t.feature = null; t.struct = null; }
+  assert.equal(s.tiles.filter(i => api.passable(i % W, (i - i % W) / W, 0)).length, 0, 'the drowned country is still walkable');
+  assert.equal(api.placeFirstPerson(), null);
+  assert.equal(api.beings.length, was, 'a person stood up in a country with no ground');
+  /* The final path stands the person somewhere walkable rather than throwing. */
+  const best = api.placeFirstPersonAnywhere();
+  assert.ok(best && api.passable(best.x, best.y, 0), 'the last resort put the person on ground nobody can walk');
+  assert.equal(api.beings.length, was + 1);
 });
 
 /* The roll of what was made names only what a painter puts on the ground. The people come from the settle
