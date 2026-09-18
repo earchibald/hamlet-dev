@@ -73,7 +73,7 @@ test('an edge-arrived fox joins the fox den with room for a pair', () => {
   assert.equal(f.den, den, 'the arriving fox should join the den with room for it');
 });
 
-test('an edge-arrived fox does not join a den already home to a pair', () => {
+test('an edge-arrived wolf does not join a den already home to a pair', () => {
   const { api, den } = denned('wolf'); /* the wolf den on seed r starts with two grown owners */
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
   api.beings.push(w);

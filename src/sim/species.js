@@ -1,5 +1,5 @@
 /* Life clocks, in days. adult: grown up. old: slows down. life: the usual span. */
-const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, old: 60, life: 84 }, rabbit: { adult: 3, old: 14, life: 20 }, deer: { adult: 8, old: 36, life: 50 }, fox: { adult: 5, old: 26, life: 36 }, wolf: { adult: 6, old: 32, life: 46 }, gnome: { adult: 20, old: 80, life: 110 } };
+const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, old: 60, life: 84 }, rabbit: { adult: 3, old: 14, life: 20 }, deer: { adult: 8, old: 36, life: 50 }, fox: { adult: 5, old: 26, life: 36 }, wolf: { adult: 6, old: 32, life: 46 }, gnome: { adult: 20, old: 80, life: 110, seed: 35 } };
 const ageDays = a => (tick - a.born) / DAY;
 const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
@@ -68,7 +68,7 @@ Object.assign(START, {
     a.task = { type: 'stalk', label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0,
       arrive(a, t){
         if (!h.alive || ++t.progress > 160 || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-        if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, 2000); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + 2000; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); START.flee(h); return 'done'; }
+        if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, 2000); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + 2000; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); START.flee(h); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
       } };
     return true;
@@ -151,11 +151,10 @@ function spawnWildlife(){
 
 /* An edge-arrived wolf or fox joins the nearest den of its own kind that has room for a breeding pair. */
 function adoptDen(a){
-  if (a.species !== 'wolf' && a.species !== 'fox') return;
   const open = caves.filter(c => c.kind === 'den' && c.owner === a.species &&
     beings.filter(b => b.alive && b.den === c && stage(b) !== 'young').length < 2);
   const c = open.sort((p, q) => dist(a.x, a.y, p.exit.x, p.exit.y) - dist(a.x, a.y, q.exit.x, q.exit.y))[0];
-  if (c) a.den = c;
+  if (c){ a.den = c; log(`A ${SPECIES[a.species].label} has found the den under the hill and stays.`, []); }
 }
 
 /* Each den with two grown owners bears one young in spring, once a year. Edge arrivals are the floor, not the source. */

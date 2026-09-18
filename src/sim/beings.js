@@ -8,7 +8,7 @@ function makeBeing(species, x, y, name, hue){
   const L = LIFE[species];
   const b = {
     id: nextId++, species, name: name || `${sp.label[0].toUpperCase()}${sp.label.slice(1)} ${nextId}`, hue, x, y, z: 0, hp: 100, alive: true,
-    born: tick - Math.round((L.adult + rng() * (L.old - L.adult)) * DAY), parents: null, lastChild: -99999,
+    born: tick - Math.round((L.adult + rng() * ((L.seed || L.old) - L.adult)) * DAY), parents: null, lastChild: -99999,
     needs, traits: { bravery: r(), sociability: r(), diligence: r(), temper: r(), curiosity: r(), patience: r(), hardiness: r() },
     skills: { gather: 0, build: 0, cook: 0, trap: 0, craft: 0, woodcut: 0, hunt: 0, wary: 0 }, xp: {},
     thoughts: [], opinions: {}, rel: {}, task: null, carrying: null, status: 'Arriving', asleep: false,
@@ -71,6 +71,7 @@ function die(a, cause){
     for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'kin', 'One of us was killed by humans', -20, 4000);
   }
   else if (a.species === 'deer'){ addItem('venison', a.x, a.y, a.z); for (const o of beings) if (o.alive && o.species === 'deer' && near(o, a) <= 10){ addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200); o.skills.wary = Math.min(3, (o.skills.wary || 0) + 1); } }
+  else if (a.species === 'gnome'){ log(`A gnome ${cause}.`, [], 'death'); }
 }
 function chat(a, b){
   const compat = 1 - Math.abs(a.traits.sociability - b.traits.sociability) - 0.8 * Math.abs(a.traits.temper - b.traits.temper);
@@ -319,7 +320,7 @@ function updateBeing(a){
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
     else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
-    if (camp && !camp.gnomes.known && !a.asleep){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
+    if (camp && !camp.gnomes.known && !a.asleep){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);

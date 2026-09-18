@@ -24,6 +24,16 @@ for (const seed of SEEDS) test(`seed ${seed}: two or three gnome burrows under t
   assert.ok(api.LIFE.gnome && api.SPECIES.gnome && api.SPECIES.gnome.glyph === 'g');
 });
 
+test('gnomes start young: every gnome on seed r is between 20 and 35 days old at the start', () => {
+  const api = load(); api.startWorld('r');
+  const gnomes = api.beings.filter(b => b.species === 'gnome');
+  assert.ok(gnomes.length > 0, 'no gnomes to check');
+  for (const g of gnomes){
+    const age = api.ageDays(g);
+    assert.ok(age >= 20 && age <= 35, `gnome ${g.name} is ${age} days old, expected 20 to 35`);
+  }
+});
+
 test('mushrooms regrow on their patch', () => {
   const api = load(); api.startWorld('r');
   const c = api.caves.find(c => c.kind === 'burrow'); const t = c.patch[0]; t.shrooms = 0;
@@ -57,7 +67,10 @@ test('a gnome fears a brand and a wolf, and never attacks', () => {
 test('the first gnome seen at dusk is written down once per camp', () => {
   const api = load(); api.startWorld('r'); const c = api.camps[0]; const h = api.beings[0];
   const g = api.beings.find(b => b.species === 'gnome'); g.x = h.x + 3; g.y = h.y; g.z = 0; g.asleep = false;
-  api.tick = 20 * 1000 + 500; api.camp = c; api.updateBeing(h);
+  /* Hour 20 of day 20, and one tick past it so (tick + h.id) is even: Hal's stride of 2
+     must land on this tick, or the single updateBeing call below never reaches chooseTask
+     at all, and a bystanding "picks a spot for the camp" log would otherwise beat the sighting to chronicle[0]. */
+  api.tick = 20 * 1000 + Math.round(20 / 24 * 1000) + 1; api.camp = c; api.updateBeing(h);
   assert.equal(c.gnomes.known, true);
   assert.ok(api.chronicle[0].text.includes('small figure'), api.chronicle[0].text);
   assert.equal(api.goalState(api.GOALS.find(g => g.id === 'gnomes')).s, 'active');
