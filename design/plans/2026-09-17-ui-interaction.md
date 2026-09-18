@@ -17,7 +17,7 @@
 - Every clickable thing has a key printed on it, and `tests/ui.js` fails on a button without one.
 - Movement keys are provisional. Change them in `KEYMAP` only.
 - Work on branch `ui-rethink` in `~/Worktrees/hamlet-ui-rethink`. Commit after every task by path with the attribution trailer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
-- Run `node build.js` and `node tests/ui.js` after every task. The tests load the joined script with `new Function(...)` as `src/sim/index.js` does.
+- Run `node build.js` and `node tests/ui.js` after every task, and `node --test tests/door.js tests/options.js` at the end of tasks 0, 3, and 6. The tests load the joined script with `new Function(...)` as `src/sim/index.js` does.
 - Browser checks use the Safari MCP with the dev server on port 8701. `page_interactions` key presses do not reach the page; dispatch `new KeyboardEvent('keydown', { key, bubbles: true })` on `document` from `evaluate_javascript` instead.
 
 ---
@@ -62,15 +62,23 @@ cd ~/Worktrees/hamlet-ui-rethink && git fetch origin && git merge origin/dev
 
 Expected: a conflict in `src/ui.js`, which `dev` edits and this branch deleted. Resolve it by deleting `src/ui.js` (`git rm src/ui.js`) and carrying `dev`'s two edits into `src/ui/actions.js` by hand: the `light` and `poke` cases of `applyTool` call `inject` as the Interfaces block shows, and `newWorld` calls `startWorld(seed, {})`. Other conflicts, if any, resolve by keeping both sides. `dist/hearth-sim.html`: rebuild, do not hand-resolve. `tests/soak-golden.json`: take `dev`'s.
 
-- [ ] **Step 3: Rebuild and run everything**
+- [ ] **Step 3: What the door changed under the interface**
+
+Three follow-ups from the review of PR 1 (`.superpowers/sdd/pr1-review.md` has the full text). Do each only if PR 1 as merged makes it true:
+
+- `W` and `H` are variables set by `startWorld` now. The world canvas sizing in `initUI` (`wcv.width = W * WS * dpr` and its height, and the offscreen `ocv`) moves into `newWorld`, after `startWorld`, so a world of another size draws right. The sector canvases keep their sizing in `initUI`, since `LW` and `LH` are fixed.
+- If `src/sim/door.js` has a `priority` act, every write of `goalPriority[...]` under `src/ui/` (in `rowOpen`, `setPriority`, the drawer pointerdown, and `ACTIONS.goalPri`) becomes `inject({ source: 'player', act: 'priority', id, pri })`. If the door has no such act, leave the writes and say so in the report; the mythos branch owns that decision.
+- If the door has a `site` act, nothing to do here: Camp site is out of the interface from task 3 on, and `setSite` is not called under `src/ui/`.
+
+- [ ] **Step 4: Rebuild and run everything**
 
 ```bash
-node build.js && node tests/ui.js && node tests/terrain.js && node tests/crafts.js && node tests/soak.js 2>&1 | tail -6
+node build.js && node tests/ui.js && node --test tests/door.js tests/options.js && node tests/terrain.js && node tests/crafts.js && node tests/soak.js 2>&1 | tail -6
 ```
 
-Expected: all pass. `grep -rn "lightTile\|poke(" src/ui/` shows no direct call.
+Expected: all pass. `grep -rn "lightTile\|poke(\|setSite" src/ui/` shows no direct call.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Merge dev: the door, and the tools go through it
