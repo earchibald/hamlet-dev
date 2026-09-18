@@ -177,12 +177,13 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 - The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
 - Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Only a day-era line pulses. The creation writes a chronicle of major lines, all at tick 0 and all carrying an age, and they are the story of the world, not news from the camp, so they are never chips. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
 - The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
-- Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
+- Five drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals), Legends (the creation by age). Keys 1 to 5 toggle them. Legends is open in both eras and is never trimmed. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
 - Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
 - The hover card is as before. The pinned card is gone; the inspector window took its place, and the dead `tipPinned` state went with it.
 - A tile cursor lives on the map. Arrows move it, Shift by five. Alt with an arrow goes to the sector's edge on that side and keeps the row or the column; from the edge, each press goes one sector on, to the same edge there (not Ctrl: macOS takes Ctrl with an arrow for Mission Control). The four sector buttons step a whole sector. Enter applies the tool. Home goes to the hearth, W to the world map at the camp. The mouse moves it too. The foot names what is under it.
 - Tools: Inspect is the default. Light fire and Nudge are one-shot and return to Inspect. Shift with the key or the click keeps them. Camp site left the interface; `setSite` stays in the sim for tests.
 - Every act the player makes goes through the door, `inject()`: the `light` act and the `poke` act behind Nudge, and the `priority` act behind a goal row. Speeds run 1, 4, 16, 64.
+- `H` hurries the ages to settle. `C` shows the countries over the world map in the days. Both are view state. Neither passes the door.
 - Nudge's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
 - Floating windows: any drawer pops out with O and docks back with O. Enter or a click on a being or tile opens an inspector window; up to six stand at once, each live, F follows. Positions persist.
 - Alert chips: Alt+number jumps to the cause, Shift+Alt+number opens the mute menu: this chip, this kind here, this kind everywhere. Muted chips are listed in help and in the palette as Unmute rows.
@@ -192,6 +193,36 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 - A drowned country's dead pines draw `†` in the ash colour, and the tile card names them from the `FEATURES` table.
 - The feedback pass, second round. Every idle goal folds to the stage's count, not only recipes; Enter on the stage row unfolds it, and A shows all. Start and help each have their own focus, `dialog:start` and `dialog:help`; when they shared `dialog`, Enter in help opened Start. Enter in Start runs `makeWorld`, which closes the dialog with `make`, as its button does. A stage shows when the sim calls it reached and it has a row to show or a goal done, so idle `guard` alone no longer opens Settlement on day 2; `stagesShown()` gives the chord and the palette the same list. The map is pinned left, so it holds still when a drawer opens or shuts.
 - Every clickable thing has a key, printed on it. `tests/ui.js` fails on a button without one. Movement keys are provisional; change them in `KEYMAP` only.
+
+## 13a. Watching the creation
+
+The page opens in the gods era. The player watches the creation age by age. The day interface opens at settle.
+
+- One age passes in two seconds at pace 1. The four speed buttons set the pace: 1, 4, 16, or 64. The pace is not saved, and a new world starts at pace 1. Step moves one age. Hour and the goal chord are shut.
+- The ages wait while a dialog is open, so the creation does not run behind the start dialog.
+- `H` hurries the rest of the ages to settle.
+- The world map is the only view. There are no tiles, no sectors, and no people, so the location view is shut until settle.
+- The People drawer lists the gods. The bar is a god's rest, and the row says what it does. The god's card holds its needs, its thoughts, its opinions, its last decision scores, and the legends it stands in.
+- The Goals drawer and the Camp drawer say the valley is not made. The strip counts the countries and the gods awake in place of the season.
+
+A god has no place in the ages, so a follow is refused. The foot says there is nothing to follow.
+
+At settle the view moves to the first person, the saved speed returns, and the foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
+
+The field on the world map, in the order it is drawn:
+
+| Part | How it draws |
+|---|---|
+| A country | The mean of its poles' colours. Grey where it has no pole. |
+| A boundary | A line in the ink colour. A wet boundary is a water line. |
+| A scar | The country is hatched, one tile in four, in the scar colour. |
+| A god | A gold star with its name, in the middle of the country it stands in. A sleeping god is faded. Gods that share a country stand side by side. |
+
+Hover gives the region card. It names the country by its poles and by the reason on its newest pole mark. The reason names the god. A backstop reason names no god, and then the god's name and epithet follow the reason. The far side of a line takes the other pole, so a god's epithet beside the country's poles would read as a mistake. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the first live god that stands in the country. The foot says "No god stands here." when none does.
+
+After settle, hover reads the marks. A hill says who raised it and when. The reason follows only when it is not the stock one, because a stock reason begins with the god's name and says the label twice. A cave says who dug it the same way. A scar says who fought over the ground, and a country row names the country on every surface tile. A card also says which god sleeps in that hill, cave, or country. A hill raised for a den says it was raised for the creatures, not by the act its mark tells of. The sector summary on the world map names the country too, and `C` shows the country lines over the world map.
+
+An age is named as the chronicle names it: `Before time`, then `Age N` counted from the Pulse.
 
 ## 14. Testing
 
@@ -232,6 +263,8 @@ Known weak spots:
 - A camp short of one hide cannot raise its bed cap, and growth waits on a rabbit. One hide is now held for the hut while people sleep outside, so the waterskin and clothes cannot take it first, and the huts card offers a snare. That did not move seed gamma: its camp held no hide at all from day 11 to day 64, so the limit there is the snare catch rate itself, listed above.
 - The dens, caves and burrows now sit in their own countries, and a camp may never reach them in 70 days. `densCleared`, `searched`, `finds`, `borrowed`, `repaid` and `benches` are 0 on most seeds. The soak prints them per seed so the loss is visible, and floors `searched`, `finds`, `repaid` and `benches` across the six seeds together, at about a third of the measured sum. Den clearing is seen on one seed in six since the dens moved to their makers' countries, so `densCleared` stays a printed diagnostic and the soak does not assert it.
 - `rockfall` runs a full-map `reachable` for each boulder it lays, to count the cave mouths still joined to the world. It costs 113 to 237 ms a paint, under 2% of a seed's budget. Recorded and deferred: the cheap fix (one walk a hill, not one a boulder) would let two boulders across a narrow way each look safe alone, which is the bug the per-boulder walk was written to catch.
+- None of the six soak seeds makes a scar. The scar rows and the scar hatching are held by a hand-written mark in `tests/ui.js` alone.
+- A creation is about 20 ages, so it is about 40 seconds at pace 1 before the valley opens. A player who does not want to watch presses `H`.
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
 - The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
 - Fixed. The soak's cave cutoff check (see section 14) caught a real one: on seed r a burrow's own exit at 2,22,0 went unreachable from the first camp's stash from around day 56 on. The dig itself was not the cause: it was never relocated. A sapling could still take root on a cave's own mouth tile, and twelve days later it matured into a solid tree there, sealing the one doorway a den or burrow has. `growPlants` in `src/sim/world.js` now refuses to plant a sapling on any tile with `t.mouth` set. `digGnomeBurrow` also now checks a live `reachable()` region, not the generation-time `startRegion`, when it digs mid-game (a village driving a burrow off), and keeps a new exit at least 2 tiles from the map edge, so a relocation dig cannot repeat the same mistake by a different route.
@@ -248,4 +281,5 @@ The acts the door knows: light, poke, priority (a goal set off, on, or high), an
 - A second intelligent mob that trades or raids.
 - Names for events and long grudges in the chronicle, so the Legends-mode feel grows.
 - A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
-- Plan 4: watching the creation. The ages in the interface, the field view, the legends drawer, and hover on a mark to read the god and the reason behind a hill, a cave, a scar, or a country.
+- G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data. Tasks as data is what a save format waits on.
+- Then the lingering gods. A sleeping god wakes, later gods are born of side effects or of belief, and the four inhabit modes come through the door.

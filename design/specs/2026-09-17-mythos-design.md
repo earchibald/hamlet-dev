@@ -198,6 +198,8 @@ Numbers here are first guesses. The tempo in real years is G's to set, and this 
 - After settle, hover reads marks: a hill's card says who raised it and why; a chasm's card says who fought over it; a sector's card names its country and the god whose pole made it.
 - A legends panel lists the creation chronicle by age. It never scrolls off.
 
+**As built.** The pace control is the four speed buttons. In the ages they set `pace`; in the days they set `speed`. The ages wait while any dialog is open, so the creation does not run behind the start dialog. `H` hurries the ages to settle. The People drawer lists the gods, and the Goals drawer says the valley is not made. The Legends drawer is key `5` in both eras. In the days, `C` shows the countries over the world map. Pace and hurry do not pass the door: they change how fast the story is watched, not the story.
+
 ## 7. Size and the hooks
 
 - `startWorld(seed, options)`. Options now: `sw`, `sh` in sectors, `zmin`, `zmax`, `ageLimit`. Defaults: 10, 6, −2, 2, 200. The constants `SW, SH, W, H, ZMIN, ZMAX, ZOFF, NZ` become variables set before the field is made. The golden holds on defaults.
@@ -243,12 +245,12 @@ Load order: `core.js` first, then `field.js` and `marks.js` before `gods.js`, an
 
 ## 10. Phasing
 
-| Plan | Delivers | Done when |
-|---|---|---|
-| 1. The door and the options | `inject`, the log, the replay test, `startWorld(seed, options)`, variables for size, the register. | Soak green on defaults, fingerprint unmoved. Replay test green. |
-| 2. The field and the gods | Regions, marks, the god mob, the acts, the rest gate, `ageStep()`, `tests/ages.js`. No painting yet: settle calls today's `generate()` and discards the marks. | Ages end on every seed in `tests/ages.js`. Soak fingerprint unmoved. |
-| 3. Settle | The painters replace `generate()`. The tile check. Bodies, the gods' stream, the `godsTick()` slot. Creation assertions in the soak. | Soak green. Golden blessed once. Terrain test green on the range. |
-| 4. Watching | The era in the UI, the field view, the legends panel, hover on marks, pace and hurry. | The built page shows a creation and a playable valley on the dev server. Design notes updated. |
+| Plan | Delivers | Done when | State |
+|---|---|---|---|
+| 1. The door and the options | `inject`, the log, the replay test, `startWorld(seed, options)`, variables for size, the register. | Soak green on defaults, fingerprint unmoved. Replay test green. | done |
+| 2. The field and the gods | Regions, marks, the god mob, the acts, the rest gate, `ageStep()`, `tests/ages.js`. No painting yet: settle calls today's `generate()` and discards the marks. | Ages end on every seed in `tests/ages.js`. Soak fingerprint unmoved. | done |
+| 3. Settle | The painters replace `generate()`. The tile check. Bodies, the gods' stream, the `godsTick()` slot. Creation assertions in the soak. | Soak green. Golden blessed once. Terrain test green on the range. | done |
+| 4. Watching | The era in the UI, the field view, the legends panel, hover on marks, pace and hurry. | The built page shows a creation and a playable valley on the dev server. Design notes updated. | done |
 
 ## Later
 

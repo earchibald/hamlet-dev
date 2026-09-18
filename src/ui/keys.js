@@ -10,6 +10,7 @@ const DRAWERS = [
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4', fit: true },
+  { id: 'legends',   label: 'Legends',   key: '5' },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
@@ -18,8 +19,9 @@ const KEYMAP = [
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
   { key: 'Tab',        shift: true, focus: 'any', action: 'focusPrev', label: 'Previous panel' },
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
-  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick', button: 'stepBtn' },
+  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -79,6 +81,8 @@ for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
+/* After the stage rows, so that under the chord dialog C is still Crafts. */
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
