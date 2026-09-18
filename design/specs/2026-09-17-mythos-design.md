@@ -115,7 +115,7 @@ An act is an operator: a name, the pole that may use it, a target region, the ma
 | battle | two rivals | 1 | the winner's pole; the loser's mark becomes a scar | chasms, drowned forests, split hills, burned countries |
 | claim | any | 1 | its pole on a country beside its home; offends the god whose pole it replaced | the country changes nature |
 | make | any | 1 | a making mark with a species record | a creature, placed at settle |
-| twist | any, on a scar | 1 | a twist on a making | a variant that breaks one rule of its archetype |
+| twist | any, on a scar | 1 | a twist on a making | a variant that breaks one rule of its archetype, rare in a peaceful creation, since it needs a scar |
 | sleep | any | 1 | a rest mark | the god's body |
 
 Rules of the ages:
@@ -128,17 +128,20 @@ Rules of the ages:
 
 **Kinds of life.** A world that can hold a life holds each kind of it: something eaten, something that hunts, something fae, and a second people. The species table flags them: `prey` on rabbit and deer, `hunter` on fox and wolf, `fae` on sprite, `folk` on gnome. The gate wants one making of each kind somewhere; a lack of a kind strains the poles whose makings include one, and draws the making itself rather than the pole's expression. Species vary by seed within a kind: a valley with foxes and no wolves is a gentler valley.
 
-**Making, in this spec.** Species are the six that exist: rabbit, deer, fox, wolf, sprite, human. A making mark names one and a region. The gate needs only the people and one thing to eat. The other species are made because making restores expression, and a pole with an unmade species scores making high, so in practice every seed makes them all. `tests/ages.js` prints which species each seed made, so the scoring can be tuned if a seed comes up short. The rule for who makes what reads poles: wet makes deer, dark makes sprites and foxes, cold makes wolves, hot and dry make rabbits, and a mingling makes the people. Made species with variants and twists are D, later. The mark shape is fixed now so D needs no change to it.
+**Making, in this spec.** Species are the seven that exist: rabbit, deer, fox, wolf, sprite, gnome, human. A making mark names one and a region. Who makes what is the `MAKES` table: wet and above make deer; hot and dry make rabbits; dark makes sprites and foxes; light makes sprites; still makes foxes; cold and moving make wolves; below makes the gnomes; a mingling makes the people. The gate wants each kind of life; the species within a kind vary by seed. `tests/ages.js` prints which species each seed made.
 
 **The rest gate.** A god may sleep only when the checker passes. The checker, on regions:
 
 1. A start region exists: dry, level, not drowned or burned, of at least a sector. Level means nothing raised and nothing dug: the gate reads the height and depth marks, not the height pole. The height pole alone is highland or lowland, still walkable ground.
-2. A wet region or boundary touches it or its neighbour.
+2. A wet region or a wet god's boundary touches it or its neighbour, or water flowed through or pooled in one of them (a flow or pool mark).
 3. A region within two neighbours has a mark that grows fuel: forest, meadow, or marsh.
 4. A making mark for something eaten or that eats berries lies within two neighbours.
 5. A making mark for the people exists.
+6. A height mark exists somewhere: a hill.
+7. A depth mark exists somewhere: a cave.
+8. A making of each kind of life exists somewhere: prey, hunter, fae, folk.
 
-Until it passes, rest cannot be satisfied. The checker's failure names the lack, and the lack strains a contrast, and the god of that pole comes into being if it has not. When the last awake god sleeps, settle runs.
+Until it passes, rest cannot be satisfied. The checker's failure names the lack, and the lack strains a contrast, and the god of that pole comes into being if it has not. Lacks `height` and `depth` strain `above` and `below`; a lack of a kind strains the poles whose makings include one. When the last awake god sleeps, settle runs.
 
 ## 4. Settle, from marks to tiles
 
@@ -146,7 +149,7 @@ Settle is `generate()` taken apart into painters, one per mark kind, in a fixed 
 
 | Step | Reads | Keeps from today |
 |---|---|---|
-| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet god's live boundaries; fords where flow cut them; lakes and marsh from pool |
+| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet god's live boundaries; fords where flow cut them; lakes from pool; marsh is the wetland biome's own texture |
 | 2. Height | height marks | `uplift`, `hillShape`, `hillClimbable`, `raiseHill`, `cutSlopes`, with storeys from the mark; a snow line where cold is marked on high ground |
 | 3. Depth | depth marks, flow and pool below ground | `cutWaterCaves`, with levels from the mark; underground streams and lakes as water tiles on lower levels with a bank to walk; hollows and dens as today |
 | 4. Scars | scar marks | burned: ash that greens over seasons. cut: a chasm, a line of rock with a slope at each end. drowned: standing water with dead pines in it. broken: a boulder field. hallowed: nothing painted, the tile marked. |

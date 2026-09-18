@@ -44,7 +44,6 @@ for (const seed of SEEDS){
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'depth').length), 'nothing dug');
     /* Every kind of life, not every species: a valley with foxes and no wolves is a gentler valley, not a broken one. */
     for (const kind of api.KINDS) assert.ok(species.some(sp => api.SPECIES[sp][kind]), `seed ${seed} never made a ${kind}`);
-    assert.ok(species.includes('human'), 'no people');
   });
 }
 

@@ -2953,6 +2953,8 @@ const isLevel = r => !marksOf(r, 'height').length && !marksOf(r, 'depth').length
 const isStart = r => hasPole(r, 'dry') && isLevel(r) && !hasMark(r, 'scar', 'burned') && !hasMark(r, 'scar', 'drowned') && r.area >= SECTOR_AREA;
 /* Fewer than three level countries left: nothing more is raised or dug on one. */
 const fewLevel = () => liveRegions().filter(isLevel).length < 3;
+/* Fewer than three start candidates left: nothing more spoils one. */
+const fewStarts = () => startCandidates().length < 3;
 /* ---------- the acts ----------
    name: { poles: who may (null is anyone), targets(g): regions, score(g, r), apply(g, r): true if done,
    continue(g, task) for acts that take ages }. */
@@ -2990,7 +2992,7 @@ const GOD_ACTS = {
     /* A god sets its pole on a country beside its home. The peaceful way to spread a nature once the splitting is done;
        it offends whoever marked the country before, and offence makes rivals. */
     poles: null,
-    targets(g){ const home = settleHome(g); if (!home) return []; return [home, ...neighboursOf(home)].filter(r => !hasPole(r, g.pole) && !r.marks.some(m => m.kind === 'rest')); },
+    targets(g){ const home = settleHome(g); if (!home) return []; const few = fewStarts(); return [home, ...neighboursOf(home)].filter(r => !hasPole(r, g.pole) && !r.marks.some(m => m.kind === 'rest') && !(few && isStart(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.6 + 5 + rng() * 8,
     apply(g, r){ offend(r, g, g.contrast); setPole(r, g.pole, g, `${g.name} claimed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} claims a country: it is ${g.pole} now.`, [g]); return true; },
   },
@@ -2998,7 +3000,8 @@ const GOD_ACTS = {
     poles: Object.keys(MAKES),
     targets: g => liveRegions().filter(r => hasPole(r, g.pole) && MAKES[g.pole].some(sp => !hasMark(r, 'making', sp))),
     /* Making answers a lack of a kind of life directly: when the gate wants prey, a hunter, a fae, or a folk, the god
-       whose pole makes one is drawn to make it. */
+       whose pole makes one is drawn to make it. It reads `creation.gate`, the gate as it stood at the end of the
+       last age: the same lack `strain` answered, so the god it made or pressed reads the lack it was made for. */
     score(g, r){ const unmade = MAKES[g.pole].filter(sp => !liveRegions().some(q => hasMark(q, 'making', sp))); const lack = creation.gate && creation.gate.lack; const wanted = lack && (KINDS.includes(lack) || lack === 'food') && MAKES[g.pole].some(sp => SPECIES[sp][lack === 'food' ? 'prey' : lack]); return (100 - g.needs.expression) * 0.3 + g.traits.curiosity * 30 + (unmade.length ? 40 : 0) + (wanted ? 80 : 0) - 10 + rng() * 8; },
     apply(g, r){
       const sp = MAKES[g.pole].find(s => !liveRegions().some(q => hasMark(q, 'making', s))) || MAKES[g.pole].find(s => !hasMark(r, 'making', s));
@@ -3011,15 +3014,15 @@ const GOD_ACTS = {
   },
   raise: {
     poles: ['above'],
-    /* The gods leave the last level countries alone: nothing is raised on one while fewer than three remain. Nobody raises the formless whole. */
-    targets: g => { const few = fewLevel(); return liveRegions().filter(r => hasPole(r, 'above') && !(few && isLevel(r))); },
+    /* The gods leave the last level countries and the last start candidates alone. */
+    targets: g => { const few = fewLevel(), fewS = fewStarts(); return liveRegions().filter(r => hasPole(r, 'above') && !((few && isLevel(r)) || (fewS && isStart(r)))); },
     score: (g, r) => (100 - g.needs.expression) * 0.8 + 20 * g.traits.diligence + (marksOf(r, 'height').length ? -10 : 10) + rng() * 8,
     ...spendAges('height', 'raise the land', (g, n) => n >= 3 ? `${g.name} has raised a mountain, ${n} storeys of stone.` : `${g.name} has raised a hill of ${n} ${n === 1 ? 'storey' : 'storeys'}.`),
   },
   dig: {
     poles: ['below'],
-    /* The gods leave the last level countries alone: nothing is dug in one while fewer than three remain. */
-    targets: g => { const few = fewLevel(); return liveRegions().filter(r => hasPole(r, 'below') && !(few && isLevel(r))); },
+    /* The gods leave the last level countries and the last start candidates alone. */
+    targets: g => { const few = fewLevel(), fewS = fewStarts(); return liveRegions().filter(r => hasPole(r, 'below') && !((few && isLevel(r)) || (fewS && isStart(r)))); },
     score: (g, r) => (100 - g.needs.expression) * 0.8 + 20 * g.traits.diligence + (marksOf(r, 'depth').length ? -10 : 10) + rng() * 8,
     ...spendAges('depth', 'dig into the dark', (g, n) => n >= 3 ? `${g.name} has dug a deep, ${n} levels down.` : `${g.name} has dug a cave of ${n} ${n === 1 ? 'level' : 'levels'}.`),
   },
@@ -3046,7 +3049,7 @@ const GOD_ACTS = {
   burn: {
     poles: ['hot'],
     /* The last start candidates are not burned while fewer than three remain, as they are not raised. */
-    targets: g => { const few = startCandidates().length < 3; return liveRegions().filter(r => !marksOf(r, 'scar').length && !(few && isStart(r)) && r.marks.some(m => m.by !== null && m.by !== g.id && !m.inherited)); },
+    targets: g => { const few = fewStarts(); return liveRegions().filter(r => !marksOf(r, 'scar').length && !(few && isStart(r)) && r.marks.some(m => m.by !== null && m.by !== g.id && !m.inherited)); },
     score: (g, r) => (100 - g.needs.calm) * 0.6 + g.traits.temper * 20 - 30 + rng() * 8,
     apply(g, r){ offend(r, g); mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} burns a country to ash.`, [g], 'bad'); return true; },
   },
@@ -3071,7 +3074,7 @@ const GOD_ACTS = {
   battle: {
     poles: null,
     /* Rivals do not fight over the last start candidates while fewer than three remain. */
-    targets(g){ const out = []; const few = startCandidates().length < 3; for (const o of awakeGods()) if (o !== g && g.rel[o.id] === 'rival') for (const r of liveRegions()) if (!(few && isStart(r)) && !marksOf(r, 'scar').length && r.marks.some(m => m.kind === 'pole' && m.by === o.id && !m.inherited)) out.push(r); return out; },
+    targets(g){ const out = []; const few = fewStarts(); for (const o of awakeGods()) if (o !== g && g.rel[o.id] === 'rival') for (const r of liveRegions()) if (!(few && isStart(r)) && !marksOf(r, 'scar').length && r.marks.some(m => m.kind === 'pole' && m.by === o.id && !m.inherited)) out.push(r); return out; },
     score: (g, r) => (100 - g.needs.calm) * 0.7 + g.traits.bravery * 20 - 40 + rng() * 8,
     apply(g, r){
       const v = awakeGods().find(o => o !== g && g.rel[o.id] === 'rival' && r.marks.some(m => m.kind === 'pole' && m.by === o.id && !m.inherited)); if (!v) return false;
@@ -3103,10 +3106,10 @@ const GOD_ACTS = {
   mingle: {
     poles: null,
     targets(g){
-      const out = [];
+      const out = []; const few = fewStarts();
       for (const o of awakeGods()){ if (o === g || g.rel[o.id] !== 'lover' || o.contrast === g.contrast) continue;
         const near = new Set(); for (const id of [g.region, o.region]){ const r = id === null ? null : regionById(id); if (!r) continue; near.add(r); for (const n of neighboursOf(r)) near.add(n); }
-        for (const r of near) if (!(hasPole(r, g.pole) && hasPole(r, o.pole))) out.push(r); }
+        for (const r of near) if (!(hasPole(r, g.pole) && hasPole(r, o.pole)) && !(few && isStart(r))) out.push(r); }
       return out;
     },
     score: (g, r) => (100 - g.needs.company) * 0.7 + g.traits.sociability * 20 + (liveRegions().some(q => hasMark(q, 'making', 'human')) ? 0 : 30) + rng() * 8,
@@ -3238,7 +3241,7 @@ function backstop(){
   else if (gate.lack === 'people'){ mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
   else if (gate.lack === 'height'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
   else if (gate.lack === 'depth'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
-  else if (KINDS.includes(gate.lack)){ const sp = Object.keys(SPECIES).find(s => SPECIES[s][gate.lack] && s !== 'human'); const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'making', sp, g, `The ${SPECIES[sp].plural}, so the world could hold a life.`); }
+  else if (KINDS.includes(gate.lack)){ const sp = Object.keys(SPECIES).find(s => SPECIES[s][gate.lack]); const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'making', sp, g, `The ${SPECIES[sp].plural}, so the world could hold a life.`); }
   for (const o of awakeGods()) o.needs.rest = Math.max(0, o.needs.rest - 20);
 }
 /* A world with many countries and few differences lacks differentiation. When the countries outnumber the

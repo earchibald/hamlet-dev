@@ -122,13 +122,30 @@ test('flow runs through neighbouring countries, and pool marks one', () => {
   const { g, r } = godWith(api, 'wet');
   const flows = () => api.liveRegions().reduce((n, q) => n + api.marksOf(q, 'flow').length, 0);
   const before = flows();
+  const dryBefore = api.liveRegions().filter(q => !api.hasPole(q, 'wet')).map(q => q.id);
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.flow.apply(g, r)); });
   assert.ok(flows() >= before + 2, 'flow touched fewer than two countries');
-  assert.equal(api.hasPole(r, 'wet') && !api.hasPole(r, 'wet'), false); /* flow leaves a country's nature alone; the gate reads the flow mark as water */
-  const { g: s, r: p } = godWith(api, 'still');
+  const flowedDry = api.liveRegions().filter(q => api.hasMark(q, 'flow') && dryBefore.includes(q.id));
+  if (flowedDry.length) assert.ok(flowedDry.every(q => !api.hasPole(q, 'wet')), 'flow changed a dry country\'s nature');
+  const p = api.liveRegions().find(q => !api.hasPole(q, 'wet')) || api.liveRegions()[0];
+  const s = api.withGodRng(() => api.makeGod('still', p, 'Test.'));
+  api.setPole(p, 'still', s, 'test');
+  const pWasDry = !api.hasPole(p, 'wet');
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
   assert.ok(api.hasMark(p, 'pool'));
+  if (pWasDry) assert.ok(!api.hasPole(p, 'wet'), 'pool changed a dry country\'s nature');
   assert.equal(api.GOD_ACTS.pool.targets(s).includes(p), false, 'a pooled region is offered again');
+});
+
+test('the gate reads a flow or pool mark as water', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a] = api.awakeGods(); const r = api.regionById(a.region);
+  api.setPole(r, 'dry', a, ''); api.setPole(r, 'hot', a, '');
+  for (const n of api.neighboursOf(r)) api.setPole(n, 'dry', a, '');
+  assert.equal(api.restGate().lack, 'water');
+  api.mark(api.neighboursOf(r)[0], 'flow', 'surface', a, '');
+  assert.notEqual(api.restGate().lack, 'water');
 });
 
 test('burning scars another god\'s country and offends it', () => {
