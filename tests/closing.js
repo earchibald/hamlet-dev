@@ -14,6 +14,19 @@ function readyCamp(seed = 'r'){
   for (const k in a.needs) a.needs[k] = 90;
   return { api, a, c };
 }
+/* A wolf den is dug only in the country where a god made wolves, and only if that country holds a hill, so a
+   seed may have none. A den test takes the first soak seed that has one. */
+const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
+let wolfDenSeed;
+function seedWithWolfDen(){
+  if (wolfDenSeed !== undefined) return wolfDenSeed;
+  for (const s of SEEDS){ const api = load(); api.startWorld(s); if (api.caves.some(k => k.kind === 'den' && k.owner === 'wolf')) return wolfDenSeed = s; }
+  return wolfDenSeed = null;
+}
+function readyDenCamp(){ const s = seedWithWolfDen(); return s ? readyCamp(s) : null; }
+
+test('some soak seed digs a wolf den', () => { assert.ok(seedWithWolfDen(), 'no soak seed digs a wolf den'); });
+
 function doOffer(api, a, label, ticks = 2000){
   const o = api.offersFor(a).find(o => o.label === label || o.label.startsWith(label));
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
@@ -35,7 +48,7 @@ function campByCave(api, c, a, cave, gap = 2){
   a.x = c.stashTile[0]; a.y = c.stashTile[1]; a.z = 0;
 }
 
-test('a brave person takes a brand, walks to the deep chamber, and brings the find home', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+test('a brave person takes a brand, walks to the deep chamber, and brings the find home', () => {
   const { api, a, c } = readyCamp();
   const cave = api.caves.find(k => k.kind === 'water' && !k.blocked); assert.ok(cave, 'an open water cave on seed r');
   campByCave(api, c, a, cave);
@@ -52,7 +65,7 @@ test('a brave person takes a brand, walks to the deep chamber, and brings the fi
   assert.equal(a.z, 0, 'and comes home');
 });
 
-test('a cave is claimed once the search begins; interrupted, it releases and nothing counted as searched', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+test('a cave is claimed once the search begins; interrupted, it releases and nothing counted as searched', () => {
   const { api, a, c } = readyCamp();
   const cave = api.caves.find(k => k.kind === 'water' && !k.blocked); assert.ok(cave, 'an open water cave on seed r');
   campByCave(api, c, a, cave);
@@ -75,11 +88,14 @@ test('a cave is claimed once the search begins; interrupted, it releases and not
   assert.ok(api.offersFor(mate).some(o => o.label === 'search the cave with a brand'), 'the offer did not return once the claim cleared');
 });
 
-test('fallen rock is cleared with the axe before the search', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+test('fallen rock is cleared with the axe before the search', () => {
   const { api, a, c } = readyCamp();
   const cave = api.caves.find(k => k.kind === 'water' && k.blocked) || (() => { const k = api.caves.find(k => k.kind === 'water'); const t = k.tiles.find(t => t.z === -1 && t !== k.mouth && !t.slope); t.ground = 'rock'; k.blocked = t; k.story.push('Fallen rock blocks the way.'); return k; })();
   assert.ok(!api.keepsPaths(cave.blocked), 'the forced rock tile does not sit at a real chokepoint, unlike the ones world generation picks');
   campByCave(api, c, a, cave);
+  /* A mark-painted world can put a second cave within reach of the same camp. The others count as searched, so
+     the only cave on offer is the one with rock in it. */
+  for (const k of api.caves) if (k !== cave && k.kind === 'water') k.searched = c;
   api.tick = 9 * 1000;
   const labels = api.offersFor(a).map(o => o.label);
   assert.ok(labels.includes('clear the fallen rock'), labels.join(', ')); assert.ok(!labels.includes('search the cave with a brand'));
@@ -87,8 +103,9 @@ test('fallen rock is cleared with the axe before the search', { todo: 'plan 3 ta
   assert.equal(cave.blocked, null); assert.ok(cave.story.some(s => s.includes('cleared')));
 });
 
-test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
-  const { api, a, c } = readyCamp();
+test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', () => {
+  const ready = readyDenCamp(); if (!ready) return;
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
@@ -111,7 +128,8 @@ test('two brave people with brands and the spear clear a wolf den; the wolves di
 });
 
 test('a den reverts to homeless owners too, when the fire fails before they redig', () => {
-  const { api, a, c } = readyCamp();
+  const ready = readyDenCamp(); if (!ready) return;
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
@@ -130,7 +148,8 @@ test('a den reverts to homeless owners too, when the fire fails before they redi
 });
 
 test('the party keeps its brands lit until home, and the guard goal leaves a just-driven wolf alone', () => {
-  const { api, a, c } = readyCamp();
+  const ready = readyDenCamp(); if (!ready) return;
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; mate.hp = 100; api.beings.push(mate);
@@ -173,7 +192,8 @@ test('withBrand ends with no live ember when the chain does not start', () => {
 });
 
 test('a walled-off mate carries no ember, and an ember can never be stashed', () => {
-  const { api, a, c } = readyCamp();
+  const ready = readyDenCamp(); if (!ready) return;
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
   campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; mate.hp = 100; api.beings.push(mate);

@@ -73,7 +73,10 @@ test('rabbits never climb, deer do', () => {
 test('a wolf on a hilltop is not near a person below it', () => {
   const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, false);
-  const wolf = api.beings.find(b => b.species === 'wolf'); wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
+  /* Seed r's gods never made wolves. The hill is hand-built here, so the wolf on it is too. */
+  let wolf = api.beings.find(b => b.species === 'wolf');
+  if (!wolf){ wolf = api.makeBeing('wolf', x0 + 1, y0 + 1, null, 0); api.beings.push(wolf); }
+  wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
   const person = api.firstPerson(); person.x = x0 + 1; person.y = y0 + 3; person.z = 0;
   assert.equal(api.near(wolf, person), 8);
   const threats = api.threatsFor(person);
@@ -113,7 +116,9 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
       /* A den pocket at level 0 turns its footprint tiles to cave floor; every other footprint tile stays rock. */
       if (!t.cave) assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
       assert.ok(!start.has(i), 'a hill in the start country');
-      assert.ok(h.mark && h.mark.kind === 'height' || h.mark && h.mark.kind === 'depth', 'a hill without a mark');
+      /* A hill is raised by a height mark, or by the depth mark that needed rock for a cave, or by the making mark of
+         a species that dens. */
+      assert.ok(h.mark && ['height', 'depth', 'making'].includes(h.mark.kind), 'a hill without a mark');
       for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
         const qx = Math.min(api.W - 1, Math.max(0, t.x + dx)), qy = Math.min(api.H - 1, Math.max(0, t.y + dy));
         const q = api.tileAt(qx, qy);
@@ -228,14 +233,16 @@ for (const seed of SEEDS) test(`seed ${seed}: rock fell at the hill feet and blo
   }
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with one mouth, and start in them`, { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+/* A den is dug in the country where a god made foxes or wolves, and only if that country holds a hill, so a seed
+   can have none of one kind. `some seed digs a den for each hunter` below keeps the rule honest. */
+for (const seed of SEEDS) test(`seed ${seed}: every den has one mouth, stands in its owners' country, and holds them`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const dens = api.caves.filter(c => c.kind === 'den');
-  assert.ok(dens.length >= 1 && dens.length <= 4, `${dens.length} dens`);
-  assert.ok(new Set(dens.map(c => c.hill)).size >= Math.min(dens.length, Math.min(3, api.hills.length)), 'dens crowd onto too few hills');
-  assert.equal(dens.filter(c => c.owner === 'wolf').length, 1, 'one wolf den');
   for (const c of dens){
+    assert.ok(['fox', 'wolf'].includes(c.owner), `a den owned by ${c.owner}`);
+    const made = api.liveRegions().filter(r => api.marksOf(r, 'making').some(m => m.value === c.owner));
+    assert.ok(made.some(r => r.tiles.includes(api.idx(c.hill.x, c.hill.y))), `a ${c.owner} den outside the country the ${c.owner}s were made in`);
     const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
     assert.ok(floors.length >= 2 && floors.length <= 6, `den of ${floors.length} tiles`);
     const tileSet = new Set(c.tiles);
@@ -246,28 +253,38 @@ for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with on
     for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `den floor ${t.x},${t.y},${t.z} cannot be reached`);
     assert.ok(c.story.some(s => s.includes('Dug by foxes')));
     if (c.owner === 'wolf') assert.ok(c.story.some(s => s.includes('Widened by wolves')));
+    assert.ok(api.beings.some(b => b.den === c), `the den at ${c.exit.x},${c.exit.y} stands empty`);
   }
   for (const sp of ['wolf', 'fox']){
-    const homed = api.beings.filter(b => b.species === sp && b.den);
-    assert.ok(homed.length >= 1, `no ${sp} starts in a den`);
-    for (const b of homed) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
+    for (const b of api.beings.filter(b => b.species === sp && b.den)) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
   }
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in a hollow under it`, () => {
+test('some test seed digs a den for each hunter', () => {
+  const owners = new Set();
+  for (const seed of SEEDS){ const api = load(); api.startWorld(seed); for (const c of api.caves.filter(c => c.kind === 'den')) owners.add(c.owner); }
+  assert.ok(owners.has('wolf'), 'no test seed digs a wolf den');
+  assert.ok(owners.has('fox'), 'no test seed digs a fox den');
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: every grove carries a sprite making, and lives under a hill of its country when it has one`, () => {
   const api = load(); api.startWorld(seed);
-  let under = 0;
   for (const g of api.groves){
-    const hill = api.hills.find(h => api.secOf(h.x, h.y).sx === g.sector.sx && api.secOf(h.x, h.y).sy === g.sector.sy);
-    if (!hill){ assert.equal(g.cave, null); assert.equal(api.tileAt(g.x, g.y).feature, 'hollow'); continue; }
-    under++;
-    assert.ok(api.raised.some(t => t.hill === hill && t.feature === 'tree'), 'old pines stand on the hill above');
-    assert.ok(g.cave && g.cave.kind === 'hollow' && g.cave.owner === 'sprite', 'the grove has a hollow cave');
+    assert.ok(g.mark && g.mark.kind === 'making' && g.mark.value === 'sprite', 'a grove without a sprite making');
     const hollowTile = api.tileAt(g.x, g.y);
-    assert.equal(hollowTile.feature, 'hollow'); assert.equal(hollowTile.cave, g.cave);
+    assert.equal(hollowTile.feature, 'hollow');
+    const kin = api.beings.filter(b => b.species === 'sprite' && b.grove === g);
+    assert.ok(kin.length >= 1, 'a grove with no sprites');
+    if (!g.cave){ assert.ok(api.near({ x: g.x, y: g.y, z: 0 }, kin[0]) <= 4, 'a sprite far from its hollow'); continue; }
+    const hill = g.cave.hill;
+    assert.ok(hill, 'a hollow cave without a hill');
+    const country = api.liveRegions().find(r => r.tiles.includes(api.idx(hill.x, hill.y)));
+    assert.ok(country && api.marksOf(country, 'making').some(m => m.value === 'sprite'), 'a hollow under a hill of another country');
+    assert.ok(g.cave.kind === 'hollow' && g.cave.owner === 'sprite', 'the grove has a hollow cave');
+    assert.equal(hollowTile.cave, g.cave);
     assert.ok(g.cave.tiles.filter(t => api.passable(t.x, t.y, t.z)).length >= 2, 'room to dance');
     assert.ok(g.cave.exit && g.cave.exit.mouth === g.cave);
-    for (const sp of api.beings.filter(b => b.species === 'sprite' && b.grove === g)) assert.ok(g.cave.tiles.some(t => t.x === sp.x && t.y === sp.y && t.z === sp.z), `${sp.name} is not in the hollow`);
+    for (const sp of kin) assert.ok(g.cave.tiles.some(t => t.x === sp.x && t.y === sp.y && t.z === sp.z), `${sp.name} is not in the hollow`);
     assert.ok(g.cave.story.some(s => s.includes('oldest hollow')));
   }
 });
@@ -286,7 +303,7 @@ for (const seed of SEEDS) test(`seed ${seed}: a hill stands beside the walkable 
   assert.ok(api.hills.some(h => h.tiles.some(i => { const x = i % api.W, y = (i - x) / api.W; return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => region.has(api.idx3(x + dx, y + dy, 0))); })), 'no hill stands beside the walkable world');
 });
 
-test('standing in a hollow costs the camp favour and the sprites notice', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+test('standing in a hollow costs the camp favour and the sprites notice', () => {
   /* Use the first test seed whose groves include one under a hill. */
   let A = null, g = null;
   for (const s of SEEDS){ const api = load(); api.startWorld(s); g = api.groves.find(g => g.cave); if (g){ A = api; break; } }

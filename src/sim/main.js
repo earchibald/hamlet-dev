@@ -55,6 +55,7 @@ function updateWorld(){
   denTick();
   gnomeTick();
   spawnWildlife();
+  godsTick();
 }
 /* In the gods era a step is an age. In the days era it is a tick. A species with perTick false is not
    stepped by the tick: the gods keep their own clock. */
@@ -62,5 +63,5 @@ function step(){
   if (era === 'gods') return ageStep();
   tick++; updateWorld(); camp = camps[0];
   for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
-  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human');
+  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }

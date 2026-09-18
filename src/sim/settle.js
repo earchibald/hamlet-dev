@@ -18,9 +18,19 @@ function settle(){
   paintScars();
   startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   paintHeights();
+  /* A hill's footprint turns ground to rock, which can pinch a way shut. Refresh the region before the caves are
+     cut, so rimExits never hangs a cave mouth on ground the first person can no longer reach. */
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   paintDepths();
   rockfall();
-  generateRest(best);
+  /* Rockfall is the last step that can take a tile back out of the walkable world (a boulder where there was open
+     ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just washed out. */
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
+  items = []; itemGrid = new Array(NZ * W * H).fill(null);
+  for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
+  placeFinds();
+  paintCreatures(best);
+  placeBodies();
   era = 'days';
   const a = beings.find(b => b.species === 'human');
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
@@ -32,7 +42,17 @@ function paintHeights(){
     const count = clamp(Math.round(r.area / (4 * SECTOR_AREA)), 1, 3), storeys = clamp(m.value, 1, ZMAX);
     uplift(new Set(r.tiles), storeys, count, m);
   }
+  /* The hunters den in hillsides. A country where a god made a species that dens, and no god ever raised the
+     ground, gets one low hill, the way paintDepths raises one for a cave: a den mouth needs rock. */
+  for (const r of liveRegions()){
+    const m = marksOf(r, 'making').find(m => SPAWN[m.value] && SPAWN[m.value].den); if (!m) continue;
+    const set = new Set(r.tiles);
+    if (!hills.some(h => set.has(idx(h.x, h.y)))) uplift(set, 1, 1, m);
+  }
 }
+/* The ground the first person can walk, as it stands now. Every painter that turns ground to rock calls this
+   before the next painter reads it. */
+function refreshStart(){ const a = firstPerson(); if (a) startRegion = reachable(a.x, a.y, 0, NZ * W * H); }
 /* Caves from depth marks, under the country's hills. A country dug but never raised gets one low hill first,
    since a cave mouth needs rock. The stream still runs when water flowed or pooled under the country. */
 function paintDepths(){
@@ -40,7 +60,9 @@ function paintDepths(){
     const m = marksOf(r, 'depth')[0]; if (!m) continue;
     const set = new Set(r.tiles);
     let mine = hills.filter(h => set.has(idx(h.x, h.y)));
-    if (!mine.length) mine = uplift(set, 1, 1, m);
+    /* A hill raised here is rock where there was ground, so the region is walked again before its cave looks
+       for a mouth. */
+    if (!mine.length){ mine = uplift(set, 1, 1, m); refreshStart(); }
     const levels = clamp(m.value, 1, -ZMIN);
     const wetUnder = hasMark(r, 'flow', 'under') || hasMark(r, 'pool', 'under');
     /* The cave carries the depth mark that cut it, not the height mark that raised the hill above it. */
@@ -64,3 +86,45 @@ function scarDrowned(r){
 function scarBroken(r){ for (const i of r.tiles){ const t = world[i]; if (t.ground === 'grass' && !t.feature && rng() < 0.34 && keepsPaths(t)){ t.feature = 'boulder'; t.loose = null; } } }
 const SCAR_PAINTERS = { burned: scarBurned, cut: scarCut, drowned: scarDrowned, broken: scarBroken };
 function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r, 'scar')){ const p = SCAR_PAINTERS[m.value]; if (p) p(r); } }
+
+/* ---------- the creatures of the makings, and the gods' bodies ---------- */
+/* Who is spawned for a making, and how. Read by paintCreatures. */
+const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true }, wolf: { n: 2, den: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
+/* Every creature stands in the country where its god made it. A hunter gets a den first, and only what the den
+   could not hold is put out on the open ground. */
+function paintCreatures(first){
+  groves = [];
+  for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
+    const how = SPAWN[m.value]; if (!how) continue;
+    const within = new Set(r.tiles);
+    if (how.grove){ placeGrove(within, m); continue; }
+    if (how.burrows){ digGnomeBurrows(within); continue; }
+    let placed = 0;
+    if (how.den){ const c = digDens(within, m.value); if (c) placed = spawnInDens(m.value, how.n, c); }
+    if (placed < how.n) spawnAnimal(m.value, within, how.n - placed, first);
+  }
+}
+/* A sleeping god stands at its body: a hill, a cave's deep, the river, a lake, or the ground where it lay down.
+   One body holds one god, so every candidate already claimed is passed over, and two gods who slept in the same
+   country take the two tiles their own rest marks name. */
+function placeBodies(){
+  for (const g of gods()){
+    if (g.status !== 'asleep') continue;
+    const r = settleHome(g); const set = r ? new Set(r.tiles) : new Set();
+    let at = null, body = null;
+    const mine = hills.filter(h => !h.god && set.has(idx(h.x, h.y))).sort((p, q) => q.storeys - p.storeys);
+    const caves_ = caves.filter(c => !c.god && c.kind === 'water' && c.hill && set.has(idx(c.hill.x, c.hill.y)));
+    const free = r && !r.god;
+    if (g.pole === 'above' && mine.length){ body = mine[0]; const top = raised.find(t => t.hill === body && t.z === body.storeys && passable(t.x, t.y, t.z)) || raised.find(t => t.hill === body); at = top ? [top.x, top.y, top.z] : [body.x, body.y, 0]; }
+    else if (g.pole === 'below' && caves_.length && caves_[0].deep){ body = caves_[0]; at = [body.deep.x, body.deep.y, body.deep.z]; }
+    else if (g.pole === 'wet' && free){ const riv = world.find(t => t.river); if (riv){ body = r; at = [riv.x, riv.y, 0]; } }
+    else if (g.pole === 'still' && free){ const lake = world.find(t => t.lake === (r && r.id)); if (lake){ body = r; at = [lake.x, lake.y, 0]; } }
+    if (!at){
+      const m = r && (marksOf(r, 'rest').find(m => m.value === g.id) || r.marks.find(m => m.kind === 'rest'));
+      let i = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
+      if (world[i].god !== undefined && r){ const spare = r.tiles.find(j => world[j].god === undefined); if (spare !== undefined) i = spare; }
+      body = world[i]; at = [i % W, Math.floor(i / W), 0];
+    }
+    g.x = at[0]; g.y = at[1]; g.z = at[2]; g.body = body; if (body) body.god = g.id;
+  }
+}

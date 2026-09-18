@@ -3,27 +3,45 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
 
+/* A den is dug in the country where a god made foxes or wolves, so not every seed has one. A test takes the
+   first soak seed that does. `some soak seed digs dens` below keeps that honest: if a change leaves every seed
+   without a den, that test goes red rather than the rest going quiet. */
+const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
+const denSeed = {};
+function seedWithDen(species){
+  if (species in denSeed) return denSeed[species];
+  for (const s of SEEDS){ const api = load(); api.startWorld(s); if (api.beings.some(b => b.species === species && b.den)) return denSeed[species] = s; }
+  return denSeed[species] = null;
+}
 function denned(species){
-  const api = load(); api.startWorld('r');
+  const seed = seedWithDen(species); if (!seed) return null;
+  const api = load(); api.startWorld(seed);
   const b = api.beings.find(b => b.species === species && b.den);
-  assert.ok(b, `no ${species} with a den on seed r`);
   return { api, b, den: b.den };
 }
+
+test('some soak seed digs dens for the foxes and the wolves that were made', () => {
+  assert.ok(seedWithDen('wolf'), 'no soak seed has a wolf in a den');
+  assert.ok(seedWithDen('fox'), 'no soak seed has a fox in a den');
+});
 const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
 const inDen = (b) => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
 
 test('a wolf rests in its den by day', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.rest = 30;
   api.tick = 10 * 1000 + 500; /* midday */
-  run(api, b, 300);
-  assert.ok(inDen(b), `the wolf should be home; it is at ${b.x},${b.y},${b.z} doing ${b.task && b.task.label}`);
-  assert.ok(b.needs.rest > 30, 'and rested');
+  /* A wolf that has slept its fill leaves the den again, so the run stops at the rest, not at a fixed tick. */
+  let rested = false;
+  for (let k = 0; k < 400 && !rested; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; rested = inDen(b) && b.needs.rest > 30; }
+  assert.ok(rested, `the wolf should be home and resting; it is at ${b.x},${b.y},${b.z} doing ${b.task && b.task.label} with rest ${Math.round(b.needs.rest)}`);
 });
 
 test('a wolf carries a kill home to its den before eating', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
   api.tick = 22 * 1000 + 100; /* night */
@@ -39,7 +57,8 @@ test('a wolf carries a kill home to its den before eating', () => {
 });
 
 test('a wolf eats a kill where it fell when the den floor is unreachable', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to carry the kill to */
   for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
@@ -55,7 +74,8 @@ test('a wolf eats a kill where it fell when the den floor is unreachable', () =>
 });
 
 test('a denned wolf whose den floor is unreachable still gets a rest task, not a stuck home task', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to go home to */
   b.task = null; b.asleep = false;
   const ok = api.START.home(b);
@@ -64,7 +84,8 @@ test('a denned wolf whose den floor is unreachable still gets a rest task, not a
 });
 
 test('an edge-arrived fox joins the fox den with room for a pair', () => {
-  const { api, den } = denned('fox');
+  const home = denned('fox'); if (!home) return;
+  const { api, den } = home;
   const before = api.beings.filter(b => b.alive && b.species === 'fox' && b.den === den).length;
   assert.ok(before < 2, 'the fox den should start short of a pair');
   const t = den.exit; const f = api.makeBeing('fox', t.x, t.y, null, 0);
@@ -74,7 +95,8 @@ test('an edge-arrived fox joins the fox den with room for a pair', () => {
 });
 
 test('an edge-arrived wolf does not join a den already home to a pair', () => {
-  const { api, den } = denned('wolf'); /* the wolf den on seed r starts with two grown owners */
+  const home = denned('wolf'); if (!home) return;
+  const { api, den } = home; /* the wolf den on seed r starts with two grown owners */
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
   api.beings.push(w);
   api.adoptDen(w);
@@ -82,7 +104,8 @@ test('an edge-arrived wolf does not join a den already home to a pair', () => {
 });
 
 test('an edge-arrived wolf does not join a den the camp holds', () => {
-  const { api, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, den } = home;
   den.cleared = api.camps[0];
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
   api.beings.push(w);
@@ -91,7 +114,8 @@ test('an edge-arrived wolf does not join a den the camp holds', () => {
 });
 
 test('a den with two adults bears one young in spring, once a year', () => {
-  const { api, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, den } = home;
   const adults = api.beings.filter(b => b.alive && b.species === 'wolf' && b.den === den);
   assert.equal(adults.length, 2);
   api.tick = 1000; /* spring, and before either den wolf on seed r ages into 'old' */
@@ -106,7 +130,8 @@ test('a den with two adults bears one young in spring, once a year', () => {
 });
 
 test('a person who walks into a wolf den is attacked, brand or no brand, by day', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); b.x = t.x; b.y = t.y; b.z = t.z; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90;
   api.tick = 10 * 1000 + 500;
@@ -118,7 +143,8 @@ test('a person who walks into a wolf den is attacked, brand or no brand, by day'
 });
 
 test('one bite per den per 150 ticks: two adult wolves at home only bite once between them', () => {
-  const { api, b, den } = denned('wolf');
+  const home = denned('wolf'); if (!home) return;
+  const { api, b, den } = home;
   const owners = api.beings.filter(o => o.alive && o.species === 'wolf' && o.den === den);
   assert.equal(owners.length, 2, 'the wolf den on seed r starts with two grown owners');
   const t = den.tiles.find(t => api.passable(t.x, t.y, t.z));
@@ -130,7 +156,7 @@ test('one bite per den per 150 ticks: two adult wolves at home only bite once be
   assert.ok(h.hp >= 60 - 34, `the person lost more than 34 hp: ${60 - h.hp}`);
 });
 
-test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', () => {
   const api = load(); api.startWorld('r');
   const c = api.camps[0]; api.camp = c; const a = api.firstPerson();
   api.setSite(a.x, a.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y]; c.everLit = true;
@@ -142,7 +168,10 @@ test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', 
   for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.START.prank(sp); sp.task.arrive(sp, sp.task); stolen = c.stash.pot === 0; }
   assert.ok(stolen, 'the pot was never taken in forty pranks');
   assert.ok(api.chronicle.some(e => e.text.includes('pot is gone')));
-  c.fae.favor = 50; c.stone = [c.pit[0] + 3, c.pit[1]]; api.tileAt(...c.stone).struct = { type: 'stone', camp: c, offering: 0 };
+  /* The sprites leave nothing on a stone that already has something on it, so the tile is cleared first. */
+  c.fae.favor = 50; c.stone = [c.pit[0] + 3, c.pit[1]];
+  for (const i of api.items.filter(i => i.x === c.stone[0] && i.y === c.stone[1] && i.z === 0)) api.removeItem(i);
+  api.tileAt(...c.stone).struct = { type: 'stone', camp: c, offering: 0 };
   let cord = false;
   for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.START.watch(sp); sp.task.progress = 119; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; sp.task.arrive(sp, sp.task); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
   assert.ok(cord, 'no cord on the stone in forty nights');
@@ -154,7 +183,10 @@ test('a wolf raid takes fish as it takes meat', () => {
   const c = api.camps[0]; api.camp = c; const a = api.firstPerson();
   api.setSite(a.x, a.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
   c.stash.fish = 2; c.stash.carcass = 0; c.stash.cooked = 0; c.stash.smoked = 0;
-  const w = api.beings.find(b => b.species === 'wolf'); w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
+  /* Seed r's gods never made wolves, so the raider is put there by hand. */
+  let w = api.beings.find(b => b.species === 'wolf');
+  if (!w){ w = api.makeBeing('wolf', c.stashTile[0], c.stashTile[1], null, 0); api.beings.push(w); }
+  w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
   api.tick = 22 * 1000;
   assert.ok(api.START.raid(w), 'the raid should start with fish in the stash');
   w.task.arrive(w, w.task);

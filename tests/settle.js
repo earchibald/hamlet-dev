@@ -162,3 +162,40 @@ for (const seed of SOAK_SEEDS) test(`seed ${seed}: every founding site has the p
     assert.ok(api.GROWS[s.biome], `a founding site in a ${s.biome}`);
   }
 });
+
+test('every made species has a living member in its country, and nothing unmade exists', () => {
+  const api = settled();
+  const made = new Set(); for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')) made.add(m.value);
+  for (const sp of ['rabbit', 'deer', 'fox', 'wolf', 'sprite', 'gnome']){
+    const alive = api.beings.filter(b => b.alive && b.species === sp);
+    if (made.has(sp)) assert.ok(alive.length >= 1, `the ${api.SPECIES[sp].plural} were made and none lives`);
+    else assert.equal(alive.length, 0, `the ${api.SPECIES[sp].plural} were never made and yet live`);
+  }
+  for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')){
+    if (m.value === 'human') continue;
+    const here = api.beings.filter(b => b.alive && b.species === m.value && b.z === 0 && api.regionAt(b.x, b.y) === r);
+    const denned = api.beings.filter(b => b.alive && b.species === m.value && b.z !== 0);
+    assert.ok(here.length + denned.length >= 1, `the ${api.SPECIES[m.value].plural} made in country ${r.id} are not there`);
+  }
+});
+
+test('sprites live in a grove of their country, foxes and wolves in dens, gnomes in burrows', () => {
+  const api = settled();
+  for (const g of api.groves) assert.ok(g.mark && g.mark.kind === 'making' && g.mark.value === 'sprite');
+  for (const c of api.caves.filter(c => c.kind === 'den')) assert.ok(['fox', 'wolf'].includes(c.owner));
+  const gn = api.beings.filter(b => b.alive && b.species === 'gnome');
+  if (gn.length) assert.ok(api.caves.some(c => c.kind === 'burrow'), 'gnomes with no burrow');
+});
+
+test('a sleeping god stands at its body, and stays in the world through the days', () => {
+  const api = settled();
+  for (const g of api.gods()){
+    if (g.status !== 'asleep') continue;
+    assert.ok(api.hasTile(g.x, g.y, g.z), `${g.name} stands off the map`);
+    const body = g.body; assert.ok(body, `${g.name} has no body`);
+    assert.equal(body.god, g.id);
+  }
+  for (let i = 0; i < 400; i++) api.step();
+  assert.equal(api.gods().length, api.beings.filter(b => b.species === 'god').length);
+  for (const g of api.gods()) assert.ok(g.status !== 'awake');
+});

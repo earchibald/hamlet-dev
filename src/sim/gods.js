@@ -421,3 +421,7 @@ function startCreation(seed, opts = {}){
   beginCreation();
 }
 function runAges(max = options.ageLimit * 2 + 2){ let n = 0; while (era === 'gods' && n++ < max) step(); return age; }
+
+/* Once a day, the sleeping gods stir in their bodies. Built here so the fingerprint moves once; the waking rules
+   come after the time model (spec section 5). Draws nothing yet. */
+function godsTick(){ if (tick % DAY !== 0) return; withGodRng(() => { for (const g of gods()) if (g.status === 'asleep') g.needs.rest = 100; }); }

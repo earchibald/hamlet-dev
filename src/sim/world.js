@@ -165,10 +165,19 @@ function chamber(c, x, y, z, set){
 }
 /* Rock fell from the hills. Boulders lie at the feet where they cut no path, and one water passage in four is blocked. */
 function rockfall(){
+  const a = firstPerson();
+  /* Every cave mouth stands in the first person's region when it is cut. keepsPaths only looks at a boulder's own
+     ring, and two boulders across a narrow way each look safe alone, so the mouths are counted again after each one. */
+  const openMouths = () => { if (!a) return null; const reg = reachable(a.x, a.y, 0, NZ * W * H); return new Set(caves.filter(c => c.exit && reg.has(idx3(c.exit.x, c.exit.y, 0)))); };
+  let joined = openMouths();
   for (const h of hills){
     const set = new Set(h.tiles);
     const rim = shuffle(rimExits(h, set)); let want = 2 + rint(3);
-    for (const [t] of rim){ if (!want) break; if (t.feature || t.struct || t.mouth) continue; if (!keepsPaths(t)) continue; t.feature = 'boulder'; t.loose = null; want--; }
+    for (const [t] of rim){ if (!want) break; if (t.feature || t.struct || t.mouth) continue; if (!keepsPaths(t)) continue;
+      t.feature = 'boulder'; t.loose = null;
+      const now = joined && openMouths();
+      if (joined && [...joined].some(c => !now.has(c))){ t.feature = null; continue; }
+      joined = now || joined; want--; }
   }
   for (const c of caves){
     if (c.kind !== 'water' || rng() >= 0.25) continue;
@@ -179,17 +188,16 @@ function rockfall(){
   }
 }
 /* Foxes and wolves dug into the hillsides over generations. A den is a pocket of 2 to 6 tiles at level 0 inside the
-   rock, or a burrow of 2 to 4 tiles on level -1 under a slope. One mouth. The wolf den is on a forest hill when there is one. */
-function digDens(){
-  const forest = hills.filter(h => sectorOfTile(world[h.tiles[0]]).biome === 'forest');
-  const order = shuffle(forest).concat(shuffle(hills.filter(h => !forest.includes(h))));
-  const wants = ['wolf', 'fox', 'fox', 'fox'];
-  for (const owner of wants){
-    const fresh = order.filter(h => !caves.some(c => c.kind === 'den' && c.hill === h));
-    let done = null;
-    for (const h of fresh){ done = digDen(h, owner); if (done) break; }
-    if (!done) for (const h of order){ if (digDen(h, owner)) break; }
-  }
+   rock, or a burrow of 2 to 4 tiles on level -1 under a slope. One mouth. One den for one owner, inside the
+   country `within`. A hill with no den yet is tried first, and a forest hill before the rest. */
+function digDens(within, owner){
+  const mine = hills.filter(h => within.has(idx(h.x, h.y)));
+  const forest = mine.filter(h => sectorOfTile(world[h.tiles[0]]).biome === 'forest');
+  const order = shuffle(forest).concat(shuffle(mine.filter(h => !forest.includes(h))));
+  const fresh = order.filter(h => !caves.some(c => c.kind === 'den' && c.hill === h));
+  for (const h of fresh){ const c = digDen(h, owner); if (c) return c; }
+  for (const h of order){ const c = digDen(h, owner); if (c) return c; }
+  return null;
 }
 /* A tile is clear of other caves if none of its four neighbours on this level, the level above, or the level below
    belongs to another cave. Slopes join levels, so a pocket beside another cave's slope would gain a second mouth. */
@@ -235,10 +243,11 @@ function digDen(h, owner){
   }
   return null;
 }
-/* Put n animals of a species in its dens, two to a wolf den and one to a fox den. Returns how many were placed. */
-function spawnInDens(species, n){
+/* Put n animals of a species in its dens, two to a wolf den and one to a fox den. Returns how many were placed.
+   With a cave, that den only. */
+function spawnInDens(species, n, cave){
   let placed = 0;
-  for (const c of caves){
+  for (const c of (cave ? [cave] : caves)){
     if (c.kind !== 'den' || c.owner !== species) continue;
     const floors = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floors.length) continue;
     const per = species === 'wolf' ? 2 : 1;
@@ -284,7 +293,9 @@ function hollowUnderHill(sc, h){
        far tile even when each one looked safe on its own. A pine that would cut any floor tile off the hill's own
        floors is left ungrown. */
     const hillFloors = raised.filter(t => t.hill === h && GROUND[t.ground].walk && !t.slope);
-    for (const t of hillFloors) if (!t.feature && rng() < 0.3 && keepsPaths(t)){
+    /* A pine must not stand where a slope lands, or the way up the hill leads nowhere. */
+    const lands = t => DIRS.some(([dx, dy]) => { const u = hasTile(t.x + dx, t.y + dy, t.z - 1) ? tileAt(t.x + dx, t.y + dy, t.z - 1) : null; return u && u.slope; });
+    for (const t of hillFloors) if (!t.feature && !lands(t) && rng() < 0.3 && keepsPaths(t)){
       t.feature = 'tree'; t.planted = tick - (60 + rint(60)) * DAY;
       const anchor = hillFloors.find(f => f.feature !== 'tree');
       const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
@@ -349,12 +360,22 @@ function digGnomeBurrow(start, avoid, sector){
   }
   return null;
 }
-function digGnomeBurrows(){
+/* Up to three burrows under the country `within`, as far apart as the country has room for. */
+function digGnomeBurrows(within){
   const a = firstPerson(); const start = a ? [a.x, a.y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
   const want = 2 + rint(2); let made = 0;
-  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+  /* The sectors the country reaches, not the sectors it owns: a small country never covers most of a sector, and
+     sector.country names only the country that covers the most. */
+  const reaches = s => { for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (within.has(idx(x, y))) return true; return false; };
+  const mine = sectors.filter(reaches);
+  let cands = shuffle(mine.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
-  for (const s of cands){
+  /* A country the gods made gnomes in may hold no meadow beside a forest. A making must live somewhere, so any
+     sector of that country where things grow will do. The tile rules in digGnomeBurrow still decide. */
+  if (!cands.length) cands = shuffle(mine.filter(s => GROWS[s.biome]));
+  /* A small country holds one or two candidate sectors, and a burrow needs room for a mushroom patch. Each
+     sector is tried again until the country has the burrows it wants, or three passes have found no room. */
+  for (let pass = 0; pass < 3 && made < want; pass++) for (const s of cands){
     if (made >= want) break;
     const c = digGnomeBurrow(start, [], s);
     if (!c) continue;
@@ -592,55 +613,47 @@ function placeFirstPerson(){
   const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
   return best;
 }
-/* Everything after the ground and the hills: the dens, the finds, and the life.
-   It still picks sectors by biome. Task 4 makes it read marks. */
-function generateRest(best){
-  /* Rockfall is the only step before this one that can take a tile back out of the walkable world (a boulder where
-     there was open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just
-     washed out. */
-  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
-  digDens();
-  items = []; itemGrid = new Array(NZ * W * H).fill(null);
-  for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
-  placeFinds();
-  /* Animals */
-  const spawnAnimal = (sp, biomes, n) => {
-    for (let k = 0; k < n; k++){
-      for (let tries = 0; tries < 200; tries++){
-        const t = world[rint(W * H)]; const s = sectorOfTile(t);
-        if (biomes.includes(s.biome) && passable(t.x, t.y) && dist(t.x, t.y, best.x, best.y) > 12){ beings.push(makeBeing(sp, t.x, t.y, null, 0)); break; }
-      }
-    }
-  };
-  spawnAnimal('rabbit', ['meadow', 'wetland'], 14);
-  spawnAnimal('fox', ['forest', 'rocky'], 3 - spawnInDens('fox', 3));
-  spawnAnimal('wolf', ['forest'], 2 - spawnInDens('wolf', 2));
-  digGnomeBurrows();
-  /* Groves. The oldest pines in the deepest forests are hollow, and something lives in them. */
-  groves = [];
-  const forests = sectors.filter(sc => sc.biome === 'forest').map(sc => ({ sc, n: sectorCount(sc, 'trees', t => t.feature === 'tree') })).sort((p, q) => q.n - p.n).slice(0, 3);
-  for (const { sc } of forests){
-    const hill = hills.find(h => secOf(h.x, h.y).sx === sc.sx && secOf(h.x, h.y).sy === sc.sy);
-    if (hill && hollowUnderHill(sc, hill)) continue;
-    for (let tries = 0; tries < 300; tries++){
-      const t = tileAt(sc.sx * LW + 2 + rint(LW - 4), sc.sy * LH + 2 + rint(LH - 4));
-      if (t.feature === 'tree' && nearFind(t.x, t.y, q => passable(q.x, q.y), DIRS)){
-        t.feature = 'hollow'; t.planted = tick - 300 * DAY;
-        const g = { x: t.x, y: t.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick, cave: null }; groves.push(g);
-        for (let k = 0; k < 3; k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.grove = g; beings.push(sp); } }
-        break;
-      }
-    }
-  }
-  for (let g = 0; g < 3; g++){
+/* Put n animals of a species down in the country `within`: a passable tile, at least 12 tiles from `avoid`
+   (the first person). Returns how many stood up. */
+function spawnAnimal(sp, within, n, avoid){
+  const tiles = [...within]; if (!tiles.length) return 0;
+  let made = 0;
+  for (let k = 0; k < n; k++){
     for (let tries = 0; tries < 200; tries++){
-      const t = world[rint(W * H)]; const s = sectorOfTile(t);
-      if (s.biome === 'meadow' && passable(t.x, t.y) && dist(t.x, t.y, best.x, best.y) > 18){
-        for (let k = 0; k < 2 + rint(2); k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1]]); if (q) beings.push(makeBeing('deer', q.x, q.y, null, 0)); }
-        break;
-      }
+      const t = world[tiles[rint(tiles.length)]];
+      if (passable(t.x, t.y) && dist(t.x, t.y, avoid.x, avoid.y) > 12){ beings.push(makeBeing(sp, t.x, t.y, null, 0)); made++; break; }
     }
   }
+  return made;
+}
+/* The grove of a country where the sprites were made. Under a hill of the country if one will take a hollow,
+   else the oldest pine of the country: the one with the most pines around it. Turning a pine into a hollow closes
+   nothing, because a pine is solid already. A country with too few pines gets a ring planted round the hollow
+   first, and there the hollow tile must be one that closes no path. The grove carries the making mark. */
+function placeGrove(within, mark){
+  const hill = hills.find(h => within.has(idx(h.x, h.y)));
+  if (hill){ const g = hollowUnderHill(sectorOfTile(world[hill.tiles[0]]), hill); if (g){ g.mark = mark; return g; } }
+  const tiles = [...within];
+  const trees = tiles.filter(i => world[i].feature === 'tree');
+  const pines = t => RING.filter(([dx, dy]) => inb(t.x + dx, t.y + dy) && world[idx(t.x + dx, t.y + dy)].feature === 'tree').length;
+  const open = t => !t.struct && !t.mouth && !t.cave && !t.slope && !t.hill && nearFind(t.x, t.y, q => passable(q.x, q.y), DIRS);
+  let best = null;
+  const take = (i, ok) => { const t = world[i]; if (!ok(t)) return; const n = pines(t); if (!best || n > best.n) best = { t, n }; };
+  for (const i of trees) take(i, open);
+  if (!best) for (const i of tiles) take(i, t => open(t) && !t.feature && passable(t.x, t.y) && keepsPaths(t));
+  if (!best) return null;
+  const t = best.t;
+  if (trees.length < 8) for (const [dx, dy] of RING){
+    const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
+    if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
+    q.feature = 'tree'; q.planted = tick - 60 * DAY;
+    /* The hollow keeps two open sides, so the sprites have a door and a way back to it. */
+    if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2){ q.feature = null; delete q.planted; }
+  }
+  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
+  const g = { x: t.x, y: t.y, sector: sectorOfTile(t), anger: 0, swarmUntil: 0, lastBirth: tick, cave: null, mark }; groves.push(g);
+  for (let k = 0; k < 3; k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.grove = g; beings.push(sp); } }
+  return g;
 }
 
 /* A sapling becomes a solid tree only if it does not close a path. The open
