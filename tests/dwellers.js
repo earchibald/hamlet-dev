@@ -52,3 +52,15 @@ test('a den with two adults bears one young in spring, once a year', () => {
   assert.equal(pup.den, den); assert.equal(pup.born, api.tick - 500); assert.ok(inDen(pup));
   assert.ok(api.chronicle.some(e => e.text.includes('pup') || e.text.includes('kit')));
 });
+
+test('a person who walks into a wolf den is attacked, brand or no brand, by day', () => {
+  const { api, b, den } = denned('wolf');
+  const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); b.x = t.x; b.y = t.y; b.z = t.z; b.task = null; b.asleep = false;
+  for (const k in b.needs) b.needs[k] = 90;
+  api.tick = 10 * 1000 + 500;
+  const h = api.beings[0]; h.x = t.x; h.y = t.y; h.z = t.z; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; h.hp = 100; h.thoughts = [];
+  api.camp = api.camps[0]; api.updateBeing(b);
+  assert.ok(h.hp < 100, 'the wolf should have bitten');
+  assert.ok(h.thoughts.some(t => t.key === 'denbite'));
+  assert.ok(api.chronicle.some(e => e.text.includes('in its den')));
+});

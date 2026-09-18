@@ -11,7 +11,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runDays, countEvents, fingerprint, oddDeaths, cutOff, campLine } = require('./lib/run');
+const { runDays, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine } = require('./lib/run');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -47,6 +47,10 @@ for (const seed of SEEDS){
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
+    });
+    await t.test('at most one person a seed dies in a den', () => {
+      const d = denDeaths(events); if (d.length) t.diagnostic(`${seed}: den deaths: ${d.join('; ')}`);
+      assert.ok(d.length <= 1, `den deaths: ${d.join('; ')}`);
     });
     await t.test('nobody is cut off from their camp', () => {
       assert.deepEqual(stranded, [], 'a person who cannot walk home is trapped, and a trap is a bug');

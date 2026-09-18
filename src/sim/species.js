@@ -143,3 +143,17 @@ function denTick(){
     log(c.owner === 'wolf' ? 'A wolf pup is born in the den under the hill.' : 'Fox kits are born in the den under the hill.', []);
   }
 }
+
+/* A grown owner standing in its den attacks any person on the den's tiles, by day or night, brand or no brand. One bite every 150 ticks. */
+function defendDen(a){
+  const c = a.den; if (!c || stage(a) === 'young' || (a.cooldown.defend || 0) > tick) return;
+  const here = tileAt(a.x, a.y, a.z); if (!here || here.cave !== c) return;
+  const h = beings.find(b => b.alive && b.species === 'human' && b.z === a.z && c.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z));
+  if (!h) return;
+  const wolf = a.species === 'wolf';
+  h.hp -= wolf ? 20 + rint(15) : 6 + rint(5); h.lastHurt = `was killed in a den by a ${a.species}`; h.asleep = false;
+  addThought(h, 'denbite', wolf ? 'Bitten by a wolf in its own den' : 'Bitten by a fox in its den', wolf ? -20 : -8, 1500); drift(h, 'bravery', -0.02);
+  log(`A ${a.species} comes at ${h.name} in its den.`, [h], 'bad');
+  a.cooldown.defend = tick + 150; addThought(a, 'defend', 'Drove an intruder from the den', 6, 600);
+  failTask(h); START.flee(h);
+}

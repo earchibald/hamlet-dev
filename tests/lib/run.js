@@ -25,8 +25,10 @@ function runDays(seed, days, onTick){
 }
 
 const OLD_AGE = /died of old age|old and warm/;
+const DEN_DEATH = /was killed in a den by/;
 const deaths = events => events.filter(e => e.kind === 'death');
-const oddDeaths = events => deaths(events).filter(e => !OLD_AGE.test(e.text)).map(e => e.text);
+const oddDeaths = events => deaths(events).filter(e => !OLD_AGE.test(e.text) && !DEN_DEATH.test(e.text)).map(e => e.text);
+const denDeaths = events => deaths(events).filter(e => DEN_DEATH.test(e.text)).map(e => e.text);
 
 /* The numbers the soak watches. Same names as the first soak script. */
 function countEvents(api, events){
@@ -80,4 +82,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, scriptGod, countEvents, fingerprint, deaths, oddDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, runDays, scriptGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, cutOff, campLine, OLD_AGE };
