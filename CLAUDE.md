@@ -5,12 +5,14 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 ## Layout
 - `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), world, path, camps, beings, species, fae, tasks, goals, weather, main.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
+- `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/ui.js`: the canvas interface. Reads state, draws, handles tools. Never changes the rules.
 - `src/page.template.html`: the page shell. `__SIM__` and `__UI__` are replaced by `build.js`.
 - `dist/hearth-sim.html`: the built single file. It is what gets published as the Claude artifact. Keep it working. Run `node build.js` after every change to `src/`.
 - `tests/soak.js`: six seeds for 70 days, with assertions and a golden record. Run it after every change to the core. If the numbers moved and the move is what you meant, bless them with `UPDATE_GOLDEN=1 node tests/soak.js`.
 - `tests/lib/run.js`: the shared runner. The script god, the event collector, the counters, and the fingerprint.
 - `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
+- `tests/crafts.js`: each recipe through the real offers. Fast.
 
 ## Rules of work
 - Write in plain English in the game's text. One idea per sentence.
