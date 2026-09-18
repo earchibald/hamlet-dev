@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'door'];
+const FILES = ['core', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'gods', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -27,6 +27,9 @@ const API = `return {
   near, nearAt, dist,
   initField, splitRegion, regionById, liveRegions, regionAt, canSplit, neighboursOf, SECTOR_AREA,
   CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
+  startCreation, runAges, ageStep, restGate, strain, godOptions, decideGod, godNeeds, settleHome, GOD_ACTS, GOD_NAMES, EPITHET, BODY, SCAR_OF, MAKES, STRAIN,
+  gods, awakeGods, godOf, makeGod, withGodRng, rint,
+  get godRng(){ return godRng; },
   get era(){ return era; }, get age(){ return age; }, get pulseAge(){ return pulseAge; }, get legends(){ return legends; }, get creation(){ return creation; },
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
