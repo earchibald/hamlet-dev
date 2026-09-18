@@ -1,5 +1,6 @@
 /* ---------- start, tick, and god actions ---------- */
-function startWorld(seed){
+function startWorld(seed, opts = {}){
+  setOptions(opts); allocSearch();
   seedText = String(seed); rng = mulberry32(hashSeed(seedText));
   tick = Math.round(DAY * 7 / 24); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);

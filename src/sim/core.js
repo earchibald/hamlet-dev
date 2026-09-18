@@ -10,14 +10,23 @@
    tables, the seeded random numbers, the shared state, time,
    and the chronicle. Every other file reads these.
    ============================================================ */
-const SW = 10, SH = 6, LW = 28, LH = 20, W = SW * LW, H = SH * LH, DAY = 1000, TPS = 12;
+const LW = 28, LH = 20, DAY = 1000, TPS = 12;
+/* World size in sectors and the level range are start options. startWorld sets them before anything is allocated. */
+let SW = 10, SH = 6, W = SW * LW, H = SH * LH;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const RING = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 const NEAR = [[0,0], ...DIRS];
 /* The eight neighbours in order around the ring, so a walk along it stays on adjacent tiles. */
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
-const ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
+let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2 };
+let options;
+function setOptions(o){
+  options = { ...DEFAULT_OPTIONS, ...o };
+  SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
+  ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
+}
 
 /* Data tables. Rules read properties. Rules do not check names. */
 const MATERIALS = {

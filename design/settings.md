@@ -4,8 +4,8 @@ One line per start option and per future setting. Add a line the day the hook is
 
 | Setting | Owner spec | State | Notes |
 |---|---|---|---|
-| `sw`, `sh` (world size in sectors) | mythos, section 7 | idea | Defaults 10 and 6. The golden holds on defaults. |
-| `zmin`, `zmax` (level range) | mythos, section 7 | idea | Defaults −2 and 2. Mountains and deeps use the range. |
+| `sw`, `sh` (world size in sectors) | mythos, section 7 | hook | Defaults 10 and 6. startWorld(seed, { sw, sh }). The UI passes {}. The canvases are sized at page load, so an options control must resize them. |
+| `zmin`, `zmax` (level range) | mythos, section 7 | hook | Defaults −2 and 2. startWorld(seed, { zmin, zmax }). Generation still cuts caves to −2 and raises two storeys, so a range narrower than the default is not yet lawful. |
 | `ageLimit` | mythos, section 4 | idea | Default 200. Past it the backstop fires. |
 | Pace of the ages, hurry to settle | mythos, section 6 | idea | One age every two seconds by default. |
 | Speeds in the day era | topography, god interface | built | 1, 4, 16, 64. |

@@ -333,7 +333,7 @@ function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern'
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
-function newWorld(seed){ startWorld(seed); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
+function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
