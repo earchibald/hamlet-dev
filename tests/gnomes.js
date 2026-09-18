@@ -41,6 +41,18 @@ test('mushrooms regrow on their patch', () => {
   assert.ok(grew, 'no mushrooms in 4000 samples');
 });
 
+test('a gnome never picks mushrooms off a patch tile whose feature is gone', () => {
+  const api = load(); api.startWorld('r');
+  const c = api.caves.find(c => c.kind === 'burrow');
+  for (const t of c.patch) t.shrooms = 0;
+  const cleared = c.patch[0]; cleared.feature = null; cleared.shrooms = 3;
+  const g = api.beings.find(b => b.species === 'gnome' && b.den === c);
+  g.x = c.exit.x; g.y = c.exit.y; g.z = 0; g.task = null;
+  for (const k in g.needs) g.needs[k] = 90; g.needs.food = 30;
+  assert.equal(api.START.shrooms(g), false, 'shrooms should not target a tile whose feature was cleared');
+  assert.equal(cleared.shrooms, 3, 'the cleared tile is untouched');
+});
+
 const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
 const inDen = b => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
 
@@ -61,7 +73,14 @@ test('a gnome fears a brand and a wolf, and never attacks', () => {
   g.x = h.x + 2; g.y = h.y; g.z = 0; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 };
   assert.ok(api.threatsFor(g).length > 0, 'a brand is a threat');
   h.carrying = null; assert.equal(api.threatsFor(g).length, 0, 'a bare person is not');
-  assert.equal(api.SPECIES.gnome.attacks, undefined);
+  /* A gnome at home has no bite row in SPECIES; defendDen must not throw when a person stands on its burrow floor. */
+  const floor = g.den.tiles.find(t => api.passable(t.x, t.y, t.z));
+  g.x = floor.x; g.y = floor.y; g.z = floor.z;
+  h.x = floor.x; h.y = floor.y; h.z = floor.z; h.hp = 100; h.thoughts = [];
+  api.camp = h.camp || api.camps[0];
+  assert.doesNotThrow(() => { api.updateBeing(g); api.updateBeing(h); });
+  assert.equal(h.hp, 100);
+  assert.ok(h.thoughts.some(t => t.key === 'burrow'), 'the person should feel the disturbance of the burrow');
 });
 
 test('the first gnome seen at dusk is written down once per camp', () => {

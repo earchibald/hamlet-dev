@@ -227,7 +227,7 @@ const ITEMS = {
   clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
   pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
   cuttings: { name: 'bundle of cuttings', plural: 'cuttings', mat: 'plant', fuel: 3, gather: 'take' },
-  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 },
+  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 }, // nothing gathers this yet; reserved for a later phase
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
@@ -1403,14 +1403,18 @@ function updateBeing(a){
   if (a.camp) camp = a.camp;
   for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
   if (a.species === 'human'){
-    const season = seasonOf(), under = a.z < 0 || !!tileAt(a.x, a.y, a.z).cave, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
+    const hereTile = tileAt(a.x, a.y, a.z);
+    const season = seasonOf(), under = a.z < 0 || !!hereTile.cave, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
     const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = under || hasTile(a.x, a.y, a.z + 1) || (camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
     n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (a.clothes ? 0.6 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? 0.5 : 0), 0, 100);
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
     else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
-    if (camp && !camp.gnomes.known && !a.asleep){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
-    { const here = tileAt(a.x, a.y, a.z); if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; a.cooldown.disturb = tick + 1000; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, 800); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, 2000); } }
+    /* Gnomes are drowsy from hour 6 to 19, and the sighting predicate already requires !drowsy(b); skip the
+       scan of every being outright in those hours, so a camp waiting to learn of its neighbours is not paying
+       a per-tick cost with no chance of a hit. */
+    if (camp && !camp.gnomes.known && !a.asleep && !(hourOf() >= 6 && hourOf() < 19)){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
+    { const here = hereTile; if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; here.cave.disturbedBy = camp; a.cooldown.disturb = tick + 1000; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, 800); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, 2000); } }
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);
@@ -1574,7 +1578,7 @@ Object.assign(START, {
   /* Eat mushrooms off the burrow's patch. */
   shrooms(a){
     const c = a.den; if (!c) return false;
-    const ripe = c.patch.filter(t => t.shrooms > 0); if (!ripe.length) return false;
+    const ripe = c.patch.filter(t => t.feature === 'mushrooms' && t.shrooms > 0); if (!ripe.length) return false;
     const t = ripe[a.id % ripe.length]; const p = legPath(a, t.x, t.y, 1, 0); if (!p) return false;
     a.task = { type: 'eat', label: 'Picking mushrooms on the patch', path: p, progress: 0,
       arrive(a, k){ if (nearAt(a, t.x, t.y) > 1){ const q = legPath(a, t.x, t.y, 1, 0); if (!q) return 'fail'; k.path = q; return 'continue'; } if (t.shrooms <= 0) return 'fail'; if (++k.progress < 8) return 'continue'; t.shrooms--; a.needs.food = Math.min(100, a.needs.food + 35); return a.needs.food < 70 && t.shrooms > 0 ? 'continue' : 'done'; } };
@@ -1592,18 +1596,19 @@ Object.assign(START, {
   borrow(a){
     const c = a.den; if (!c || !c.bench || c.holding || !isNight()) return false;
     if (c.lastRepaid && tick - c.lastRepaid < 6 * DAY) return false;
-    const k = camps.find(k => k.stashTile && !k.ward && dist(k.stashTile[0], k.stashTile[1], c.exit.x, c.exit.y) <= 40 && (k.stash.pot > 0 || k.stash.cord > 0 || k.tools.basket)); if (!k) return false;
+    const cands = camps.filter(k => k.stashTile && !k.ward && dist(k.stashTile[0], k.stashTile[1], c.exit.x, c.exit.y) <= 40 && (k.stash.pot > 0 || k.stash.cord > 0 || k.tools.basket));
+    const k = cands.sort((p, q) => dist(p.stashTile[0], p.stashTile[1], c.exit.x, c.exit.y) - dist(q.stashTile[0], q.stashTile[1], c.exit.x, c.exit.y))[0]; if (!k) return false;
     const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'borrow', label: 'Slipping over to the camp for something useful', path: p, fast: true,
       arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         if (c.holding) return 'fail';
         const kind = k.stash.pot > 0 ? 'pot' : k.stash.cord > 0 ? 'cord' : k.tools.basket ? 'basket' : null; if (!kind) return 'fail';
-        camp = k; c.holding = { kind, camp: k, since: tick };
+        const prev = camp; camp = k; c.holding = { kind, camp: k, since: tick };
         if (kind === 'basket') k.tools.basket = 0; else stashTake(kind, 1);
         addThought(a, 'borrowed', 'Borrowed a clever thing', 6, 1500);
         log(`${kind === 'basket' ? 'The basket' : `A ${ITEMS[kind].name}`} is gone from the stash. Small footprints lead toward the meadow.`, campHumans(), 'bad');
         if (!k.gnomes.known){ k.gnomes.known = true; }
-        return 'done'; } };
+        camp = prev; return 'done'; } };
     return true;
   },
   /* Two days on, the thing comes back with a gift beside it. */
@@ -1613,11 +1618,11 @@ Object.assign(START, {
     const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'repay', label: 'Carrying the thing back, with a gift', path: p,
       arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
-        const h = c.holding; if (!h) return 'fail'; camp = k; if (h.kind === 'basket') k.tools.basket = 1; else stashAdd(h.kind, 1);
+        const h = c.holding; if (!h) return 'fail'; const prev = camp; camp = k; if (h.kind === 'basket') k.tools.basket = 1; else stashAdd(h.kind, 1);
         const gift = ['cord', 'clay', 'pot'][rint(3)]; stashAdd(gift, 1); c.holding = null; c.lastRepaid = tick;
         addThought(a, 'repaid', 'Paid a debt', 5, 1500); for (const o of campHumans()) addThought(o, 'gnomegift', 'The neighbours brought something back, and more', 5, 1200);
         log(`The ${h.kind === 'basket' ? 'basket' : ITEMS[h.kind].name} is back in the stash, and a ${ITEMS[gift].name} beside it. Neighbours, then.`, campHumans(), 'good');
-        return 'done'; } };
+        camp = prev; return 'done'; } };
     return true;
   },
 });
@@ -1670,11 +1675,11 @@ function denTick(){
 
 /* A grown owner standing in its den attacks any person on the den's tiles, by day or night, brand or no brand. One bite every 150 ticks. */
 function defendDen(a){
-  const c = a.den; if (!c || stage(a) === 'young' || (a.cooldown.defend || 0) > tick) return;
+  const c = a.den, bite = SPECIES[a.species].bite; if (!c || !bite || stage(a) === 'young' || (a.cooldown.defend || 0) > tick) return;
   const here = tileAt(a.x, a.y, a.z); if (!here || here.cave !== c) return;
   const h = beings.find(b => b.alive && b.species === 'human' && b.z === a.z && c.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z));
   if (!h) return;
-  const label = SPECIES[a.species].label, bite = SPECIES[a.species].bite;
+  const label = SPECIES[a.species].label;
   h.hp -= bite.hp + rint(bite.spread); h.lastHurt = `was killed in a den by a ${label}`; h.lastHurtAt = tick; h.asleep = false;
   addThought(h, 'denbite', `Bitten by a ${label} in its den`, bite.mood, 1500); drift(h, 'bravery', -0.02);
   log(`A ${label} comes at ${h.name} in its den.`, [h], 'bad');
@@ -1688,7 +1693,7 @@ function gnomeTick(){
   for (const c of caves){
     if (c.kind !== 'burrow' || c.owner !== 'gnome') continue;
     if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; c.lastRepaid = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
-    const loud = camps.find(k => k.site && k.village && dist(k.site[0], k.site[1], c.exit.x, c.exit.y) <= 30) || (c.disturbed >= 2 ? camps.find(k => k.site) : null);
+    const loud = camps.find(k => k.site && k.village && dist(k.site[0], k.site[1], c.exit.x, c.exit.y) <= 30) || (c.disturbed >= 2 ? (c.disturbedBy || camps.find(k => k.site)) : null);
     if (loud && !c.leaving){ c.leaving = tick; camp = loud; log('The gnomes under the meadow find the village too loud. Small bundles move about at night.', campHumans(), 'info'); }
     if (c.leaving && tick - c.leaving >= 3 * DAY){
       const fresh = digGnomeBurrow([c.exit.x, c.exit.y], camps.filter(k => k.site && k.village).map(k => k.site));
@@ -2312,7 +2317,7 @@ const GOALS = [
       return { s: 'active', text: `Favour ${f}. ${mood}${g.length ? ` ${g.length} grove${g.length > 1 ? 's are' : ' is'} angry.` : ''}${camp.fae.blightUntil > tick ? ' A blight is on the bushes.' : ''} They like berries left for them, and old pines standing. They hate axes in their groves, snares near them, and wards.` };
     } },
   { id: 'gnomes', title: 'The hidden neighbours',
-    state(){ if (!camp.gnomes.known) return { s: 'blocked', text: 'Nothing seen yet. The meadow edges are not empty.' }; const holes = caves.filter(c => c.kind === 'burrow' && c.owner === 'gnome').length; return { s: 'active', text: `Gnomes live in ${holes} burrow${holes === 1 ? '' : 's'} under the meadow edges. They come out at dusk, farm mushrooms, and copy what they see. They borrow made things and bring them back with a gift. They never fight, and they leave when a village grows loud.` }; } },
+    state(){ if (!camp.gnomes.known) return { s: 'blocked', text: 'Nothing seen yet. The meadow edges are not empty.' }; const near = camp.site ? c => dist(c.exit.x, c.exit.y, ...camp.site) <= 60 : () => true; const holes = caves.filter(c => c.kind === 'burrow' && c.owner === 'gnome' && near(c)).length; return { s: 'active', text: `Gnomes live in ${holes} burrow${holes === 1 ? '' : 's'} under the meadow edges. They come out at dusk, farm mushrooms, and copy what they see. They borrow made things and bring them back with a gift. They never fight, and they leave when a village grows loud.` }; } },
   { id: 'stone', title: 'Set an offering stone', need: { rock: 2 },
     state(){ if (!camp.fae.known) return { s: 'blocked', text: 'Needs a reason. Nobody has seen the sprites.' }; if (camp.stone) return { s: 'done', text: 'A flat stone at the edge of the firelight, where berries are left at dusk.' }; return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 2)}/2. Gifts taken from it earn favour, and favour brings glowing moss.` }; },
     offers(a){ if (!camp.fae.known || camp.stone || !camp.pit) return []; if (camp.stash.rock < 2) return [{ label: 'gather rocks for the offering stone', score: 30, start: a => startGather(a, 'rock') }]; const site = openSpotNear(camp.pit, 4, 6); if (!site) return [];

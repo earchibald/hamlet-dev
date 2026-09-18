@@ -66,7 +66,7 @@ const ITEMS = {
   clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
   pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
   cuttings: { name: 'bundle of cuttings', plural: 'cuttings', mat: 'plant', fuel: 3, gather: 'take' },
-  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 },
+  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 }, // nothing gathers this yet; reserved for a later phase
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
