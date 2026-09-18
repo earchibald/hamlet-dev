@@ -110,3 +110,19 @@ test('with a rod the camp fishes when food is short, and fish cook to two meals'
   doOffer(api, a, 'smoke a fish over the fire');
   assert.equal(c.stash.smoked, 2);
 });
+
+test('hide clothes go to the coldest person and keep them warmer', () => {
+  const { api, a, c } = readyCamp();
+  c.workshop = [c.pit[0] + 2, c.pit[1]]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c };
+  c.stash.hide = 3; c.stash.cord = 1; a.needs.warmth = 40;
+  assert.equal(api.goalState(goal(api, 'clothes')).s, 'active');
+  doOffer(api, a, 'sew hide clothes');
+  assert.equal(a.clothes, true); assert.equal(c.stash.hide, 0);
+  assert.equal(api.goalState(goal(api, 'clothes')).s, 'idle', 'everyone is clothed');
+  api.tick = 60 * 1000 + 100; /* a winter night */
+  const bare = api.beings.find(b => b.species === 'human' && b !== a) || api.makeBeing('human', a.x, a.y, 'Test', 0);
+  if (!api.beings.includes(bare)) api.beings.push(bare);
+  bare.camp = c; bare.clothes = false; bare.needs.warmth = 60; a.needs.warmth = 60; bare.x = a.x; bare.y = a.y; bare.z = 0; bare.traits.hardiness = a.traits.hardiness; bare.homeless = false; bare.asleep = false; a.asleep = false; bare.born = a.born;
+  api.updateBeing(a); api.updateBeing(bare);
+  assert.ok(60 - a.needs.warmth < 60 - bare.needs.warmth, `clothed loss ${60 - a.needs.warmth} should be less than bare ${60 - bare.needs.warmth}`);
+});

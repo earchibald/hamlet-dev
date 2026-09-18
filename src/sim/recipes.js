@@ -20,6 +20,9 @@ const RECIPES = [
     verb: 'binds', done: 'A stick, a line of cord, a bone hook. The river feeds the camp now.', blurb: 'A stick and two coils of cord. Opens fishing.' },
   { id: 'fish', title: 'Fish the river', after: 'rod', tools: ['rod'], place: 'water', gather: a => startFish(a), standing: { stash: 'fish', n: 4 }, active: () => camp.stash.fish < 4 && stashFood() + camp.stash.fish * 2 < foodTarget(), score: 38, offerLabel: 'fish the river',
     blurb: 'A fish cooks to two meals or smokes on the rack. People fish when food is short.' },
+  { id: 'clothes', title: 'Sew hide clothes', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: 70, makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 42,
+    verb: 'sews', status: () => `${campHumans().filter(h => h.clothes).length} of ${campHumans().length} clothed.`,
+    blurb: 'Three hides and a coil of cord. The coldest person wears them, and loses warmth slower.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -58,6 +61,7 @@ const MAKERS = {
   item(r, a, at){ stashAdd(r.makes.item, r.makes.n); },
   tool(r, a, at){ camp.tools[r.makes.tool] = 1; },
   struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp }; camp[r.makes.struct] = at; },
+  wear(r, a, at){ const who = campHumans().filter(h => !h[r.makes.wear]).sort((p, q) => p.needs.warmth - q.needs.warmth)[0] || a; who[r.makes.wear] = true; addThought(who, 'clothes', 'Warm in new hide clothes', 5, 1500); log(`${a.name} sews hide clothes, and ${who === a ? 'wears them' : `${who.name} wears them`}.`, [a, who], 'good'); return 'logged'; },
 };
 function recipeGoal(r){
   return { id: r.id, title: r.title, standing: !!r.standing, recipe: r,
@@ -67,7 +71,7 @@ function recipeGoal(r){
       if (r.standing){
         const have = camp.stash[r.standing.stash] || 0;
         const ready = r.active ? r.active() : have < r.standing.n;
-        const text = `${have}/${r.standing.n} ${ITEMS[r.standing.stash].plural} stored. ${r.blurb}`;
+        const text = r.standing.n === 0 ? r.status() : `${have}/${r.standing.n} ${ITEMS[r.standing.stash].plural} stored. ${r.blurb}`;
         if (!ready) return { s: 'idle', text };
         if (r.needs && !stashHas(r.needs)){
           const missing = Object.keys(r.needs).find(k => (camp.stash[k] || 0) < r.needs[k]);
@@ -93,9 +97,10 @@ function recipeGoal(r){
         if (key === 'struct' && tileAt(...at).struct) return;
         if (!stashHas(r.needs)) return;
         takeNeeds(r.needs);
-        MAKERS[key](r, a, at);
+        const result = MAKERS[key](r, a, at);
         if (r.skill) gainXp(a, r.skill);
-        log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${ITEMS[r.makes.item].plural}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
+        if (result !== 'logged')
+          log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${ITEMS[r.makes.item].plural}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
       }, r.skill) }];
     } };
 }

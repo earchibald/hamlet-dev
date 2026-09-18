@@ -151,6 +151,7 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
 - Someone is alive at the end.
+- The camps grow: at least 20 people counted ever, and at least one birth. A floor under the population, so a regression like the fishing bug that halved every seed does not stay green.
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.

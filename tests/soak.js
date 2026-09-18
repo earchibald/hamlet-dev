@@ -42,6 +42,9 @@ for (const seed of SEEDS){
     await t.test('someone is alive at the end', () => {
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
     });
+    await t.test('the camps grow', () => {
+      assert.ok(counts.humans >= 20 && counts.born >= 1, `only ${counts.humans} people ever, ${counts.born} born`);
+    });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
     });
