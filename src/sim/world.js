@@ -329,8 +329,7 @@ function forestBeside(s){
    `start` keeps the 25-tile rule (the exit is never beside it); `avoid` is a list of [x, y] village sites
    the new exit must clear by at least 50 tiles. `sector`, passed only by digGnomeBurrows' own candidate
    loop at generation, tries just that sector, so the founding dig draws exactly the numbers it always
-   drew; left out, a mid-game move picks one meadow sector itself and tries only it, so a burrow that
-   cannot find room this call is free to try a different sector next time it is called. */
+   drew. Left out, the call is a mid-game move, and the rule below says which sectors it tries. */
 function digGnomeBurrow(start, avoid, sector){
   /* A mid-game move tries every meadow sector that has a forest beside it or a hill in it, not only the first.
      Since the mythos the meadows lie where the gods put them, and the first sector drawn is often in a country

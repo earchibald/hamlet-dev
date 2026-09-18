@@ -51,7 +51,9 @@ test('the same seed paints the same valley twice', () => {
 
 /* The first person stands in the widest part of the start country, not in a pocket cut off from it. */
 const SOAK_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
-/* Every pocket of the start country, largest first, and the one the first person stands in. */
+/* Every pocket of the start country, largest first, and the one the first person stands in. The six tests below
+   restate the tile check's `room` rule on purpose: they check that settle really discards a small pocket, not
+   that the half-the-country threshold is the right one. The discard test covers the threshold itself. */
 function startPockets(api){
   const W = api.W, s = api.creation.gate.start;
   const a = api.beings.find(b => b.species === 'human');
@@ -214,7 +216,10 @@ test('a sleeping god stands at its body, and stays in the world through the days
   for (const g of api.gods()){
     if (g.status !== 'asleep') continue;
     assert.ok(api.hasTile(g.x, g.y, g.z), `${g.name} stands off the map`);
-    const body = g.body; assert.ok(body, `${g.name} has no body`);
+    /* One body holds one god, so a god may lie down in no body at all, but only when every live country is
+       already taken. Anywhere else a body-less god is a bug. */
+    const body = g.body;
+    if (!body){ assert.ok(api.liveRegions().every(r => r.god), `${g.name} has no body and a country is free`); continue; }
     assert.equal(body.god, g.id);
     /* A body is a record -- a hill, a cave, or a country -- and never a bare tile. */
     assert.ok(Array.isArray(body.tiles), `${g.name} sleeps in a tile, not a hill, a cave, or a country`);
@@ -249,6 +254,32 @@ test('a settle that fails is discarded, the last sleeper wakes, and the ages go 
   assert.ok(api.creation.settled);
   assert.ok(api.beings.some(b => b.species === 'human'), 'no first person after the second settle');
   assert.ok(api.world.length && api.hills.length, 'the second valley was never painted');
+});
+
+/* A check that never passes would throw the world back for ever: every discard repaints the whole valley, and a
+   page steps the ages one at a time. After MAX_DISCARDS the next settle is kept, whatever it lacks. */
+test('a world thrown back too often is settled unfinished, and the ages end', () => {
+  const api = load(); api.startCreation('r');
+  api.setTileCheck(() => ({ ok: false, lack: 'water' }));
+  api.runAges();
+  assert.equal(api.era, 'days');
+  assert.ok(api.creation.settled);
+  assert.equal(api.creation.discards, api.MAX_DISCARDS, `${api.creation.discards} discards`);
+  assert.ok(api.legends.some(e => /settled unfinished/.test(e.text)), 'no legend of the unfinished settle');
+  assert.ok(api.beings.some(b => b.species === 'human'), 'no first person after the unfinished settle');
+});
+
+/* A creation that runs past twice the age limit has failed. That settle is final: it is kept whatever it lacks,
+   so a discard cannot wake a god and start the same age over again. */
+test('a creation that runs out of ages settles unfinished at once', () => {
+  const api = load(); api.startCreation('r', { ageLimit: 2 });
+  api.setTileCheck(() => ({ ok: false, lack: 'water' }));
+  api.runAges();
+  assert.ok(api.creation.failed, 'the creation did not fail');
+  assert.equal(api.era, 'days');
+  assert.ok(api.creation.settled);
+  assert.ok(api.creation.discards <= api.MAX_DISCARDS, `${api.creation.discards} discards`);
+  assert.ok(api.legends.some(e => /settled unfinished/.test(e.text)), 'no legend of the unfinished settle');
 });
 
 /* The roll of what was made names only what a painter puts on the ground. The people come from the settle

@@ -30,9 +30,15 @@ function settle(){
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   placeFinds();
   paintCreatures(best);
-  /* The gate read marks; this reads tiles. A valley that will not hold a life is undone, and the ages go on. */
+  /* The gate read marks; this reads tiles. A valley that will not hold a life is undone, and the ages go on.
+     Two settles are final and are kept whatever they lack: the one after a failed creation, which has no ages
+     left to go on with, and the one after MAX_DISCARDS throwbacks, because every discard repaints the whole
+     valley and a shaky world must not repaint for ever. */
   const check = tileCheckImpl(firstPerson());
-  if (!check.ok){ undoSettle(check.lack); return; }
+  if (!check.ok){
+    if (!creation.failed && creation.discards < MAX_DISCARDS){ undoSettle(check.lack); return; }
+    log(`The world is settled unfinished. It lacks ${check.lack}, and there is no age left to mend it.`, [], 'bad');
+  }
   placeBodies();
   era = 'days';
   const a = firstPerson();
@@ -63,10 +69,16 @@ function tileCheck(a){
 /* A test seam. The settle calls the seam, so a test can make a world fail the check on purpose. */
 let tileCheckImpl = tileCheck;
 function setTileCheck(fn){ tileCheckImpl = fn; }
-/* A failed settle is undone: the tiles, the hills, the caves, the items, and every being that is not a god. */
+/* How often one creation may throw its valley back. The next settle after the cap is kept, whatever it lacks.
+   Seed gamma is the worst of the six soak seeds and throws its valley back four times before one holds, so the
+   cap is twice that: it never refuses a world the painters could still mend, and it still bounds the repaints. */
+const MAX_DISCARDS = 8;
+/* A failed settle is undone: the tiles, the hills, the caves, the items, the roll of what was made, and every
+   being that is not a god. The next paintCreatures writes the roll again. */
 function discardSettle(){
   levels = null; world = null; raised = []; hills = []; caves = []; groves = []; items = []; itemGrid = null; sectors = [];
   beings = beings.filter(b => b.species === 'god');
+  creation.made = {};
   startRegion = null;
 }
 /* The world is thrown back. The god who lay down last stands up again, its country is free to be marked once
