@@ -44,7 +44,7 @@ function countEvents(api, events){
     born: ev(' is born to '), oldAge: ev('old age') + ev('old and warm'), taught: ev('learned '),
     huts: api.camps.reduce((n, c) => n + c.huts.length, 0), storehouses: api.camps.filter(c => c.storehouse).length, villages: api.camps.filter(c => c.village).length,
     deerSpeared: ev('brings down a deer'), deerByWolves: ev('was caught by a wolf'), deer: alive('deer'), wolves: alive('wolf'), rabbits: alive('rabbit'),
-    spoiled: ev('gone off'), caught: ev('caught in a snare'), fished: ev('lands a fish'), froze: ev('froze'),
+    spoiled: ev('gone off'), caught: ev('caught in a snare'), fished: api.camps.reduce((n, c) => n + (c.fished || 0), 0), froze: ev('froze'),
     deaths: byCause, alive: hs.filter(h => h.alive).length, humans: hs.length, camps: api.camps.length,
   };
 }

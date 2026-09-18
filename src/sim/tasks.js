@@ -122,8 +122,12 @@ function startFish(a){
     arrive(a, t){
       if (!nearFind(a.x, a.y, water, DIRS, a.z)) return 'fail';
       t.label = 'Casting from the bank'; t.progress += workSpeed(a, 'hunt');
-      if (t.progress < 60) return 'continue';
-      if (rng() < 0.35 + a.skills.hunt * 0.08 + a.traits.patience * 0.25){ a.carrying = { kind: 'fish', count: 1 }; gainXp(a, 'hunt'); log(`${a.name} lands a fish.`, [a], 'good'); addThought(a, 'fish', 'Caught a fish', 3, 500); return chain(a, t, startDeliver(a)) || 'done'; }
+      if (t.progress < 110) return 'continue';
+      if (rng() < Math.min(0.75, 0.22 + a.skills.hunt * 0.06 + a.traits.patience * 0.18)){
+        a.carrying = { kind: 'fish', count: 1 }; gainXp(a, 'hunt'); camp.fished++;
+        if (camp.fished === 1) log(`${a.name} lands a fish.`, [a], 'good');
+        else if (camp.fished === 10 || camp.fished === 50 || camp.fished % 100 === 0) log(`${a.name} lands the camp's ${camp.fished}th fish.`, [a], 'good');
+        addThought(a, 'fish', 'Caught a fish', 3, 500); return chain(a, t, startDeliver(a)) || 'done'; }
       addThought(a, 'nofish', 'Nothing bit', -1, 300); return 'done';
     } };
   return true;
