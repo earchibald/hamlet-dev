@@ -79,7 +79,7 @@ for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person stands in th
 /* The gate says nothing about tiles, so a country can pass it and still be shattered into pockets by the
    water the painters lay down. Seed gamma's start country breaks into 450, 127, 83, 48 and smaller.
    Task 5's tile check is what discards such a settle. */
-for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person can walk most of the start country`, { todo: 'plan 3 task 5: the tile check discards a settle whose start pocket is too small; seed gamma is shattered' }, () => {
+for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person can walk most of the start country`, () => {
   const api = load(); api.startWorld(seed);
   const { open, held } = startPockets(api);
   assert.ok(held >= open / 2, `${held} of ${open} passable start tiles are reachable`);
@@ -217,4 +217,39 @@ test('a sleeping god stands at its body, and stays in the world through the days
   for (let i = 0; i < 400; i++) api.step();
   assert.equal(api.gods().length, api.beings.filter(b => b.species === 'god').length);
   for (const g of api.gods()) assert.ok(g.status !== 'awake');
+});
+
+test('the tile check names what the first person cannot reach', () => {
+  const api = settled();
+  const a = api.beings.find(b => b.species === 'human');
+  assert.deepEqual(api.tileCheck(a), { ok: true });
+  /* Wall the person in with rock: nothing is in reach, and the check names the first lack it meets. */
+  for (const t of api.world) if (api.dist(t.x, t.y, a.x, a.y) <= 14 && !(t.x === a.x && t.y === a.y)){ t.ground = 'rock'; t.feature = null; }
+  const r = api.tileCheck(a);
+  assert.equal(r.ok, false);
+  assert.ok(['water', 'ground', 'fuel', 'food'].includes(r.lack), r.lack);
+});
+
+test('a settle that fails is discarded, the last sleeper wakes, and the ages go on', () => {
+  const api = load(); api.startCreation('r');
+  /* Force the first paint to fail: the seam lies once, and every settle after it tells the truth. */
+  const real = api.tileCheck; let lied = false;
+  api.setTileCheck(a => { if (!lied){ lied = true; return { ok: false, lack: 'water' }; } return real(a); });
+  api.runAges();
+  /* One discard is forced. Seed r's second valley may be thrown back on its own merits, so count at least one. */
+  assert.ok(api.creation.discards >= 1, `${api.creation.discards} discards`);
+  assert.ok(api.legends.some(e => /would not hold a life: it lacks water/.test(e.text)), 'no legend of the forced discard');
+  assert.equal(api.era, 'days');
+  assert.ok(api.creation.settled);
+  assert.ok(api.beings.some(b => b.species === 'human'), 'no first person after the second settle');
+  assert.ok(api.world.length && api.hills.length, 'the second valley was never painted');
+});
+
+/* The roll of what was made names only what a painter puts on the ground. The people come from the settle
+   itself, not from a spawn, so they are never on it. */
+test('the roll of the makings names only what a painter spawns', () => {
+  const api = settled();
+  assert.ok(!api.creation.made.human, 'the people are on the roll of spawned creatures');
+  assert.ok(api.creation.made.rabbit, 'seed r made no rabbits; the rabbit gate would be shut');
+  for (const sp in api.creation.made) assert.ok(api.SPAWN[sp], `${sp} is on the roll and no painter spawns it`);
 });

@@ -30,10 +30,57 @@ function settle(){
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   placeFinds();
   paintCreatures(best);
+  /* The gate read marks; this reads tiles. A valley that will not hold a life is undone, and the ages go on. */
+  const check = tileCheckImpl(firstPerson());
+  if (!check.ok){ undoSettle(check.lack); return; }
   placeBodies();
   era = 'days';
-  const a = beings.find(b => b.species === 'human');
+  const a = firstPerson();
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+}
+/* The real test of a world: from where the first person stands, by a real path search, water, ground to camp on,
+   fuel, and food are all in reach. The gate checks marks; this checks tiles. */
+function tileCheck(a){
+  const full = NZ * W * H;
+  const wet = (x, y, z) => z === 0 && !!nearFind(x, y, t => t.ground === 'water', NEAR, 0);
+  if (!bfs(a.x, a.y, 0, wet, full, a)) return { ok: false, lack: 'water' };
+  const ground = (x, y, z) => z === 0 && dist(x, y, a.x, a.y) <= 12 && passable(x, y, 0) && !tileAt(x, y).feature && tileAt(x, y).ground !== 'sand';
+  if (!bfs(a.x, a.y, 0, ground, full, a)) return { ok: false, lack: 'ground' };
+  const fuelAt = t => t.feature === 'tree' || t.feature === 'bush' || t.loose === 'stick' || (itemAt(t.x, t.y, 0) && itemAt(t.x, t.y, 0).kind === 'stick');
+  const fuel = (x, y, z) => z === 0 && !!nearFind(x, y, fuelAt, NEAR, 0);
+  if (!bfs(a.x, a.y, 0, fuel, full, a)) return { ok: false, lack: 'fuel' };
+  const food = (x, y, z) => z === 0 && (!!nearFind(x, y, t => t.feature === 'bush' && t.berries > 0, NEAR, 0) || beings.some(b => b.alive && SPECIES[b.species].prey && b.z === 0 && dist(b.x, b.y, x, y) <= 2));
+  if (!bfs(a.x, a.y, 0, food, full, a)) return { ok: false, lack: 'food' };
+  /* Room. The gate named a start country from its marks, but water, a lake, or a chasm can shatter the ground
+     under it. The person must be able to walk most of the country the gate chose, or it is a pocket, not a home. */
+  const s = creation.gate.start;
+  const here = reachable(a.x, a.y, 0, full);
+  const open = s.tiles.filter(i => passable(i % W, (i - i % W) / W, 0));
+  const held = open.filter(i => here.has(idx3(i % W, (i - i % W) / W, 0))).length;
+  if (held * 2 < open.length) return { ok: false, lack: 'room' };
+  return { ok: true };
+}
+/* A test seam. The settle calls the seam, so a test can make a world fail the check on purpose. */
+let tileCheckImpl = tileCheck;
+function setTileCheck(fn){ tileCheckImpl = fn; }
+/* A failed settle is undone: the tiles, the hills, the caves, the items, and every being that is not a god. */
+function discardSettle(){
+  levels = null; world = null; raised = []; hills = []; caves = []; groves = []; items = []; itemGrid = null; sectors = [];
+  beings = beings.filter(b => b.species === 'god');
+  startRegion = null;
+}
+/* The world is thrown back. The god who lay down last stands up again, its country is free to be marked once
+   more, and the era stays `gods`, so runAges goes on. */
+function undoSettle(lack){
+  creation.discards++; creation.settled = false;
+  discardSettle();
+  const last = gods().filter(g => g.status === 'asleep').sort((p, q) => (q.sleptAt || 0) - (p.sleptAt || 0))[0];
+  if (last){
+    last.status = 'awake'; last.asleep = false; last.needs.rest = 60;
+    for (const r of liveRegions()) r.marks = r.marks.filter(m => !(m.kind === 'rest' && m.value === last.id));
+    addThought(last, 'wouldnothold', 'The world would not hold', -10, 4);
+    log(`${last.name} wakes. The world would not hold a life: it lacks ${lack}. The ages go on.`, [last], 'bad');
+  } else log(`The world would not hold a life: it lacks ${lack}. The ages go on.`, [], 'bad');
 }
 /* Hills from height marks: one to three per country by area, storeys from the mark up to the range. */
 function paintHeights(){
@@ -98,8 +145,8 @@ function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]);
 function paintCreatures(first){
   groves = [];
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
-    if (m.value in SPAWN) creation.made[m.value] = true;
     const how = SPAWN[m.value]; if (!how) continue;
+    creation.made[m.value] = true;
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
     if (how.burrows){ digGnomeBurrows(within); continue; }
@@ -129,7 +176,11 @@ function placeBodies(){
     if (!at){
       const m = r && (marksOf(r, 'rest').find(m => m.value === g.id) || r.marks.find(m => m.kind === 'rest'));
       const anchor = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
-      const home = r && !r.god ? r : (liveRegions().find(q => !q.god) || r);
+      const ax0 = anchor % W, ay0 = (anchor - anchor % W) / W;
+      /* One body holds one god, so a god whose own country is taken takes the nearest free country by its rest
+         anchor, not the first in the list. When no country is free it lies down in no body at all. */
+      const away = q => dist((q.bbox.x0 + q.bbox.x1) / 2, (q.bbox.y0 + q.bbox.y1) / 2, ax0, ay0);
+      const home = r && !r.god ? r : liveRegions().filter(q => !q.god).sort((p, q) => away(p) - away(q))[0];
       if (home){
         const held = new Set(home.tiles);
         const ax = anchor % W, ay = (anchor - ax) / W;

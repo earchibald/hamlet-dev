@@ -323,7 +323,7 @@ for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable
   for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} ${c.hill ? `under hill ${c.hill.x},${c.hill.y}` : `at ${c.exit.x},${c.exit.y}`} opens onto a sealed pocket`);
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: a hill stands beside the walkable world`, { todo: 'plan 3 task 5: the tile check discards a settle whose start pocket is too small, so a hill can still stand off the first person\'s region' }, () => {
+for (const seed of SEEDS) test(`seed ${seed}: a hill stands beside the walkable world`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const b = api.firstPerson(); const region = api.reachable(b.x, b.y, 0, full);

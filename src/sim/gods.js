@@ -268,7 +268,7 @@ const GOD_ACTS = {
     score: (g, r) => (100 - g.needs.rest) * 1.2 - 20 + rng() * 8,
     apply(g, r){
       mark(r, 'rest', g.id, g, `${g.name} sleeps here, and is ${BODY[g.pole]}.`);
-      g.status = 'asleep'; g.asleep = true; g.needs.rest = 100; g.region = r.id; r.lastBy = g.id; r.lastAge = age;
+      g.status = 'asleep'; g.asleep = true; g.needs.rest = 100; g.region = r.id; g.sleptAt = age; r.lastBy = g.id; r.lastAge = age;
       log(`${g.name} lies down and sleeps, and is ${BODY[g.pole]}.`, [g], 'major');
       if (LEAVES[g.pole]) log(LEAVES[g.pole], [g], 'major');
       return true;
@@ -413,7 +413,7 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null, made: {} };
+  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {} };
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){
