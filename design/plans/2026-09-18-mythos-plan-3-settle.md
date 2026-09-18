@@ -386,6 +386,32 @@ Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn"
 **Interfaces:**
 - Produces: `uplift(within, storeys, count, mark)`: raises up to `count` hills whose feet lie inside the tile set `within`, each with `storeys`, and stamps `h.mark = mark`; returns the hills made. `cutWaterCaves(hillList, levels, wetUnder)`: cuts a cave under each hill in the list, `levels` deep (1 or 2, capped by `-ZMIN`), and the stream still runs (a pond at the mouth) when `wetUnder` is true; stamps `c.mark`. `paintHeights()`, `paintDepths()`, `paintScars()` in `settle.js`. Scar painters `scarBurned(r)`, `scarCut(r)`, `scarDrowned(r)`, `scarBroken(r)`.
 
+- [ ] **Step 0: Forests everywhere there is dark or cold, and the gate wants a forest near the start**
+
+Task 2 found that a mark-painted world has almost no forest: `BIOME_OF` made forest only from dry and cold, and the gods rarely make cold. Trees grow where the dark god hides things as much as where it is cold, and the day era needs wood. Two table changes and one gate change, before the painters:
+
+In `src/sim/marks.js`, `BIOME_OF` becomes:
+
+```js
+const BIOME_OF = [
+  { needs: ['wet', 'moving'], biome: 'river' },
+  { needs: ['wet', 'still'], biome: 'wetland' },
+  { needs: ['wet'], biome: 'wetland' },
+  { needs: ['dry', 'cold'], biome: 'forest' },
+  { needs: ['dry', 'dark'], biome: 'forest' },
+  { needs: ['dry', 'hot'], biome: 'meadow' },
+  { needs: ['dry', 'light'], biome: 'meadow' },
+  { needs: ['dry', 'above'], biome: 'rocky' },
+  { needs: [], biome: 'meadow' },
+];
+```
+
+and `biomeOf` treats a `hide` mark as the dark pole for this purpose: before the table loop, `if (hasPole(r, 'dry') && !poleOf(r, 'heat') && !poleOf(r, 'sight') && hasMark(r, 'hide')) return 'forest';`.
+
+In `src/sim/gods.js` `restGate`, the fuel item becomes a forest within two neighbours of the start: `const fuel = two.some(r => biomeOf(r) === 'forest');` with the comment "fuel is a forest: the day era needs wood, not only grass". `STRAIN.fuel` becomes `['cold', 'dark']`. `GROWS` stays for other readers.
+
+Tests: in `tests/field.js`'s biome test, after the forest assertion add `api.setPole(r, 'dark', patient, ''); r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'cold')); assert.equal(api.biomeOf(r), 'forest');` and `r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'dark')); api.mark(r, 'hide', true, patient, ''); assert.equal(api.biomeOf(r), 'forest');`. In `tests/gods.js`'s gate test, the fuel step must set a neighbour to dry and cold (or dark) rather than hot; adjust the setup so the lack sequence still reads water, fuel, food, people, height, depth, kinds. Run `node --test tests/ages.js`: every seed must still settle with no backstop on the soak seeds; report the age range. Update the spec's biome sentence in section 1 and gate item 3 to match.
+
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/settle.js`:
