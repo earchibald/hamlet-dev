@@ -20,7 +20,7 @@ const MAKES = { wet: ['deer'], above: ['deer'], dark: ['sprite', 'fox'], light: 
 const KINDS = ['prey', 'hunter', 'fae', 'folk'];
 const polesThatMake = kind => Object.keys(MAKES).filter(p => MAKES[p].some(sp => SPECIES[sp][kind]));
 /* The poles a lack calls for, in order of preference. */
-const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['hot', 'cold'], food: ['hot', 'wet'], people: [], height: ['above'], depth: ['below'] };
+const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['cold', 'dark'], food: ['hot', 'wet'], people: [], height: ['above'], depth: ['below'] };
 let godNamePool = [];
 const gods = () => beings.filter(b => b.species === 'god');
 const awakeGods = () => gods().filter(g => g.status === 'awake');
@@ -300,7 +300,7 @@ function touchesWet(r){ return liveBoundaries().some(b => b.pole === 'wet' && b.
 /* A start candidate: dry, level (nothing raised, nothing dug), unscarred, a sector or more. */
 const startCandidates = () => liveRegions().filter(isStart);
 /* A god may sleep only when the world can hold a life: a start region that is dry, level (nothing raised, nothing dug), unscarred,
-   and a sector or more; water beside it; fuel and food within two neighbours; the people made;
+   and a sector or more; water beside it; a forest for fuel and food within two neighbours; the people made;
    a hill and a cave somewhere, since the life the day era knows dens, digs, and hides its finds in the deep;
    and each kind of life somewhere: something eaten, something that hunts, something fae, and a second people. */
 function restGate(){
@@ -315,7 +315,8 @@ function restGate(){
     const one = ring(s, 1), two = ring(s, 2);
     /* Water: a wet country, a wet god's boundary, or a country that water flowed through or pooled in. A flowed country keeps its nature; the river runs through it. */
     const water = one.some(r => hasPole(r, 'wet') || hasMark(r, 'flow') || hasMark(r, 'pool') || touchesWet(r));
-    const fuel = two.some(r => GROWS[biomeOf(r)]);
+    /* Fuel is a forest: the day era needs wood, not only grass. */
+    const fuel = two.some(r => biomeOf(r) === 'forest');
     const food = two.some(r => marksOf(r, 'making').some(m => SPECIES[m.value].prey));
     if (water && fuel && food && people && raised && dug && !kinds.length) return { ok: true, start: s };
     if (!lack) lack = !water ? 'water' : !fuel ? 'fuel' : !food ? 'food' : !people ? 'people' : !raised ? 'height' : !dug ? 'depth' : kinds[0];

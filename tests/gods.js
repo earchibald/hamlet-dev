@@ -269,7 +269,9 @@ test('the gate wants a hill and a cave, and the lacks strain above and below', (
   api.step();
   const [a] = api.awakeGods(); const r = api.regionById(a.region);
   /* Build a world that passes every old item, then check the two new ones in order. */
-  api.setPole(r, 'dry', a, ''); for (const n of api.neighboursOf(r)) api.setPole(n, 'wet', a, '');
+  api.setPole(r, 'dry', a, '');
+  /* The neighbour is the water and the fuel both: a flow mark reads as water, and dry cold ground is forest. */
+  for (const n of api.neighboursOf(r)){ api.setPole(n, 'dry', a, ''); api.setPole(n, 'cold', a, ''); api.mark(n, 'flow', 'surface', a, ''); }
   api.setPole(r, 'hot', a, '');
   api.mark(r, 'making', 'rabbit', a, ''); api.mark(r, 'making', 'human', a, '');
   const n0 = api.neighboursOf(r)[0];

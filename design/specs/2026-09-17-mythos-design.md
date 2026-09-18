@@ -60,7 +60,7 @@ A mark record: `{ kind, value, by (god id), age, why (a sentence), at (an anchor
 | making | a species record | make, twist | settle, the species tables |
 | rest | the sleeping god | sleep | painters, day-era waking |
 
-Biomes come from mark combinations in a table, `BIOME_OF`, not from noise. First proposal: wet and moving is river, wet and still is marsh, dry and cold is forest, dry and hot is meadow, dry and above is stony, burned is ash that greens over seasons. Noise stays for texture inside a region: where the trees stand, where the boulders lie. Noise never shapes the world.
+Biomes come from mark combinations in a table, `BIOME_OF`, not from noise. First proposal: wet and moving is river, wet and still is marsh, dry and cold is forest, dry and dark is forest too, dry and hot is meadow, dry and light is meadow, dry and above is stony, burned is ash that greens over seasons. A dry country with a hide mark and no heat or sight pole is forest as well: trees grow where a god hides things. Noise stays for texture inside a region: where the trees stand, where the boulders lie. Noise never shapes the world.
 
 ## 2. The gods as mobs
 
@@ -134,7 +134,7 @@ Rules of the ages:
 
 1. A start region exists: dry, level, not drowned or burned, of at least a sector. Level means nothing raised and nothing dug: the gate reads the height and depth marks, not the height pole. The height pole alone is highland or lowland, still walkable ground.
 2. A wet region or a wet god's boundary touches it or its neighbour, or water flowed through or pooled in one of them (a flow or pool mark).
-3. A region within two neighbours has a mark that grows fuel: forest, meadow, or marsh.
+3. A region within two neighbours is forest. Fuel is wood, and the day era needs wood, not only grass.
 4. A making mark for something eaten or that eats berries lies within two neighbours.
 5. A making mark for the people exists.
 6. A height mark exists somewhere: a hill.
