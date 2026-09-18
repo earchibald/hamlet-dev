@@ -14,9 +14,9 @@ const LEAVES = { hot: 'A spark stayed.' };
 /* The scar a winner's pole leaves on what it beat. */
 const SCAR_OF = { hot: 'burned', cold: 'broken', wet: 'drowned', dry: 'burned', above: 'cut', below: 'cut', still: 'broken', moving: 'cut', light: 'broken', dark: 'broken' };
 /* Who makes what. The people are made by a mingling. */
-const MAKES = { wet: ['deer'], dark: ['sprite', 'fox'], cold: ['wolf'], hot: ['rabbit'], dry: ['rabbit'] };
+const MAKES = { wet: ['deer', 'fox', 'gnome'], above: ['deer', 'sprite'], dark: ['sprite', 'fox'], light: ['sprite'], still: ['fox'], cold: ['wolf'], moving: ['wolf'], hot: ['rabbit'], dry: ['rabbit', 'gnome', 'wolf'], below: ['gnome'] };
 /* The poles a lack calls for, in order of preference. */
-const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['hot', 'cold'], food: ['hot', 'wet'] };
+const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['hot', 'cold'], food: ['hot', 'wet'], people: [], height: ['above'], depth: ['below'] };
 let godNamePool = [];
 const gods = () => beings.filter(b => b.species === 'god');
 const awakeGods = () => gods().filter(g => g.status === 'awake');
@@ -277,20 +277,22 @@ function touchesWet(r){ return liveBoundaries().some(b => b.pole === 'wet' && b.
 /* A start candidate: dry, level (nothing raised, nothing dug), unscarred, a sector or more. */
 const startCandidates = () => liveRegions().filter(isStart);
 /* A god may sleep only when the world can hold a life: a start region that is dry, level (nothing raised, nothing dug), unscarred,
-   and a sector or more; water beside it; fuel and food within two neighbours; and the people made. */
+   and a sector or more; water beside it; fuel and food within two neighbours; the people made;
+   and a hill and a cave somewhere, since the life the day era knows dens, digs, and hides its finds in the deep. */
 function restGate(){
   const live = liveRegions();
   const starts = startCandidates();
   if (!starts.length) return { ok: false, lack: 'start' };
   const people = live.some(r => hasMark(r, 'making', 'human'));
+  const raised = live.some(r => marksOf(r, 'height').length), dug = live.some(r => marksOf(r, 'depth').length);
   let lack = null;
   for (const s of starts){
     const one = ring(s, 1), two = ring(s, 2);
     const water = one.some(r => hasPole(r, 'wet') || touchesWet(r));
     const fuel = two.some(r => GROWS[biomeOf(r)]);
     const food = two.some(r => marksOf(r, 'making').some(m => SPECIES[m.value].prey));
-    if (water && fuel && food && people) return { ok: true, start: s };
-    if (!lack) lack = !water ? 'water' : !fuel ? 'fuel' : !food ? 'food' : 'people';
+    if (water && fuel && food && people && raised && dug) return { ok: true, start: s };
+    if (!lack) lack = !water ? 'water' : !fuel ? 'fuel' : !food ? 'food' : !people ? 'people' : !raised ? 'height' : 'depth';
   }
   return { ok: false, lack, start: starts[0] };
 }
@@ -345,6 +347,8 @@ function backstop(){
   else if (gate.lack === 'fuel'){ setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
   else if (gate.lack === 'food'){ mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
   else if (gate.lack === 'people'){ mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
+  else if (gate.lack === 'height'){ const pool = live.filter(r => !isStart(r)); const r = (pool.length ? pool : live).slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
+  else if (gate.lack === 'depth'){ const pool = live.filter(r => !isStart(r)); const r = (pool.length ? pool : live).slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
   for (const o of awakeGods()) o.needs.rest = Math.max(0, o.needs.rest - 20);
 }
 /* A world with many countries and few differences lacks differentiation. When the countries outnumber the

@@ -247,3 +247,21 @@ test('a world that outgrows its gods calls a new difference into being', () => {
   assert.equal(api.gods().length, before + 1);
   assert.equal(new Set(api.gods().map(g => g.contrast)).size, new Set(api.gods().slice(0, before).map(g => g.contrast)).size + 1);
 });
+
+test('the gate wants a hill and a cave, and the lacks strain above and below', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a] = api.awakeGods(); const r = api.regionById(a.region);
+  /* Build a world that passes every old item, then check the two new ones in order. */
+  api.setPole(r, 'dry', a, ''); for (const n of api.neighboursOf(r)) api.setPole(n, 'wet', a, '');
+  api.setPole(r, 'hot', a, '');
+  api.mark(r, 'making', 'rabbit', a, ''); api.mark(r, 'making', 'human', a, '');
+  const n0 = api.neighboursOf(r)[0];
+  assert.equal(api.restGate().lack, 'height');
+  api.mark(n0, 'height', 1, a, '');
+  assert.equal(api.restGate().lack, 'depth');
+  api.mark(n0, 'depth', 1, a, '');
+  assert.equal(api.restGate().ok, true);
+  assert.deepEqual(api.STRAIN.height, ['above']); assert.deepEqual(api.STRAIN.depth, ['below']);
+  assert.deepEqual(api.MAKES.below, ['gnome']); assert.ok(api.MAKES.light.includes('sprite'));
+});
