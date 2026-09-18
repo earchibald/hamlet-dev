@@ -177,6 +177,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="pause">Pause<kbd>Space</kbd></button>
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
+      <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
@@ -3946,6 +3947,10 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
+   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+const AGE_MS = 2000;
+let pace = 1, lastEra = 'days';
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -4019,6 +4024,12 @@ function countryLine(r){
 function godRows(){
   return gods().map(g => ({ a: g, m: g.needs.rest, trouble: g.status === 'awake' && g.needs.calm < 20,
     status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
+}
+
+/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
+function agesDue(acc, dt, pace){
+  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+  return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
 function daysOfWood(){
@@ -4265,6 +4276,7 @@ const KEYMAP = [
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
   { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -4386,6 +4398,7 @@ function drawWorldCache(){
   }
 }
 function drawWorld(){
+  if (inAges()){ wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.fillStyle = P.hill; wctx.fillRect(0, 0, W * WS, H * WS); return; }
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);
@@ -4678,7 +4691,7 @@ function renderClock(){
 function renderStrip(){
   renderClock();
   /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
-  $('campName').textContent = camp.name;
+  $('campName').textContent = inAges() ? 'The ages' : camp.name;
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
@@ -4748,8 +4761,9 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
-  const s = sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
@@ -4904,16 +4918,18 @@ function setTool(id, sticky = false){
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
+  if (inAges()) v = 'world';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
+function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
@@ -4931,18 +4947,28 @@ function applyAt(){
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
-  startWorld(seed, {});
+  startCreation(seed, {});
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = firstPerson(); setView('loc', secOf(a.x, a.y));
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore();
+  lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
+function onSettle(){
+  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  setSpeed(ui.savedSpeed || 1);
+  const a = firstPerson();
+  if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
+  say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
 }
 function applyTool(c, e){
   switch (tool){
@@ -4991,10 +5017,11 @@ function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.inde
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
-  slower(){ setSpeed(speed === 64 ? 16 : speed === 16 ? 4 : 1); setPaused(false); },
-  faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
-  speed(s){ setSpeed(s); setPaused(false); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
@@ -5044,7 +5071,7 @@ const ACTIONS = {
   paletteMove(d){ paletteMove(d); },
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
-  chord(){ openChord(); },
+  chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
   stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },
@@ -5055,7 +5082,13 @@ const ACTIONS = {
 
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
-  if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+  if (!paused){
+    /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
+    if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+    else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+  }
+  if (lastEra === 'gods' && !inAges()) onSettle();
+  lastEra = era;
   if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
@@ -5078,6 +5111,7 @@ function initUI(){
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);
+  $('hurryBtn').addEventListener('click', ACTIONS.hurry);
   $('helpBtn').addEventListener('click', ACTIONS.help);
   $('helpClose').addEventListener('click', closeDialogs);
   $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
@@ -5114,9 +5148,9 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => { if (inAges()) return; whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
-  wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
+  wcv.addEventListener('pointerdown', e => { if (inAges()) return; const s = sectorFrom(e); goto(s.sx, s.sy); });
   mcv.addEventListener('pointermove', e => {
     mhover = sectorFromMid(e);
     if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }

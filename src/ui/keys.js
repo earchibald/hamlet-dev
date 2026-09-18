@@ -19,6 +19,7 @@ const KEYMAP = [
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
   { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },

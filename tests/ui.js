@@ -450,4 +450,32 @@ test('after settle the view model is the day-era one again', () => {
   assert.equal(api.drawerRows('goals')[0].kind, 'stage');
 });
 
+test('ages come due one in two seconds at pace 1, and never more than eight in a frame', () => {
+  const api = loadUI(['state', 'derive'], ['agesDue', 'AGE_MS']);
+  assert.equal(api.AGE_MS, 2000);
+  assert.deepEqual(api.agesDue(0, 1000, 1), { n: 0, acc: 0.5 });
+  assert.deepEqual(api.agesDue(0.5, 1000, 1), { n: 1, acc: 0 });
+  assert.deepEqual(api.agesDue(0, 250, 16), { n: 2, acc: 0 });
+  assert.deepEqual(api.agesDue(0, 250, 1000), { n: 8, acc: 0 });
+});
+
+test('H hurries the ages from any focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const e = { key: 'h', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+  assert.equal(api.keyAction(e, 'map').action, 'hurry');
+  assert.equal(api.keyAction(e, 'drawer:people').action, 'hurry');
+  assert.equal(typeof api.ACTIONS.hurry, 'function');
+});
+
+test('a creation watched age by age is the creation that startWorld runs', () => {
+  const a = sim.load(), b = sim.load();
+  a.startWorld('gamma');
+  b.startCreation('gamma', {}); let n = 0; while (b.era === 'gods' && n++ < 1000) b.step();
+  assert.equal(b.era, 'days');
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  const pa = a.firstPerson(), pb = b.firstPerson();
+  assert.deepEqual([pb.x, pb.y, pb.name], [pa.x, pa.y, pa.name]);
+  assert.equal(b.tick, a.tick);
+});
+
 module.exports = { loadUI };

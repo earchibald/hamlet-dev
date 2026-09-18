@@ -28,6 +28,12 @@ function godRows(){
     status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
 }
 
+/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
+function agesDue(acc, dt, pace){
+  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+  return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
+}
+
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;

@@ -29,6 +29,7 @@ function drawWorldCache(){
   }
 }
 function drawWorld(){
+  if (inAges()){ wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.fillStyle = P.hill; wctx.fillRect(0, 0, W * WS, H * WS); return; }
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);

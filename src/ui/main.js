@@ -2,7 +2,13 @@
 
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
-  if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+  if (!paused){
+    /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
+    if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+    else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+  }
+  if (lastEra === 'gods' && !inAges()) onSettle();
+  lastEra = era;
   if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
@@ -25,6 +31,7 @@ function initUI(){
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);
+  $('hurryBtn').addEventListener('click', ACTIONS.hurry);
   $('helpBtn').addEventListener('click', ACTIONS.help);
   $('helpClose').addEventListener('click', closeDialogs);
   $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
@@ -61,9 +68,9 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => { if (inAges()) return; whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
-  wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
+  wcv.addEventListener('pointerdown', e => { if (inAges()) return; const s = sectorFrom(e); goto(s.sx, s.sy); });
   mcv.addEventListener('pointermove', e => {
     mhover = sectorFromMid(e);
     if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }

@@ -18,6 +18,10 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
+   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+const AGE_MS = 2000;
+let pace = 1, lastEra = 'days';
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
