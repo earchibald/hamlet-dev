@@ -17,7 +17,7 @@ The game is played by a god-player. The player does not tag tiles or give orders
 - A river winds across the world. Fords every 47 tiles keep the sides connected.
 - The world has five levels, −2 to +2. Level 0 is the surface. A level is an array like the surface, mostly empty: open air above, solid earth below. Six to ten hills stand on rocky and forest ground: rock at level 0 with a floor of stone or grass above it, and a second storey on the tall ones. A hill is only raised where it can be climbed: its first-storey floor is one piece, and some walkable tile beside it can hold a slope. Each storey has one or two slopes on its rim. Everything else is cliff.
 - Slopes are the only way between levels. From a slope you step to any of its four neighbours one level up, and from those you step back down onto it. Rabbits never climb. Deer climb hills. Everyone else goes anywhere.
-- Under every tall hill a stream once ran. It cut a winding passage 8 to 20 tiles long from under the hill to a mouth at the foot, with a chamber or two and a drop to level −2. One stream in three still runs and leaves a pond at the mouth. Rock fell after: boulders at the feet, and one passage in four blocked by fallen rock until someone has tools. Every cave exit opens onto the ground the first person can walk to, and hills only stand beside that ground. The passage is a walk of 8 to 20 steps that branches when it is boxed in, and its deep chamber lies at the walk's farthest point from the exit.
+- Under every tall hill a stream once ran. It cut a winding passage 8 to 20 tiles long from under the hill to a mouth at the foot, with a chamber or two and a drop to level −2. One stream in three still runs and leaves a pond at the mouth. Rock fell after: boulders at the feet, and one passage in four blocked by fallen rock until someone has tools. Every cave exit opens onto the ground the first person can walk to, and hills only stand beside that ground. The passage is a walk of 8 to 20 steps that branches when it is boxed in, and its deep chamber lies at the walk's farthest point from the exit. Generation runs uplift, water, rockfall, dens, finds, people and animals, then groves; finds go after the items list exists, and a hollow has no deep chamber, so the order of finds and groves does not matter.
 - Foxes and wolves dug dens into the hillsides: pockets of two to six tiles inside the rock, or burrows under a slope. Each has one mouth. The wolf pair and the three foxes start at home and remember it. No den or hollow tile sits beside another cave's tile on its own level or the levels above and below, so no two caves join through a slope.
 - Every deep chamber holds one find: firestones, glowing moss, or old bones. Gathering never goes below the surface. Fetching a find is a later goal.
 - Below the surface there is no rain, the warmth falls at the spring-night rate all year, and it is dark. A person down there without a burning ember cannot see to work: their task fails and they feel their way out at half speed. Foxes, wolves, and sprites see in the dark.
@@ -57,7 +57,7 @@ Traits, 0 to 1: bravery, sociability, diligence, temper, curiosity, patience, ha
 
 Skills: gather, build, cook, trap, craft, woodcut, hunt, wary. Animals use hunt and wary. Curiosity speeds learning. Two people sitting by the same fire pass skills when one is two levels ahead. Elders teach twice as fast.
 
-Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way.
+Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way. The search for water stopped after 3000 tiles, and a camp founded 59 steps from the nearest river let two people die of thirst beside a full stash; a failed near search now walks the whole world once and covers the first stretch, as legPath does.
 
 ## 6. Daily rhythms
 
@@ -164,6 +164,8 @@ Known weak spots:
 - Runs take about 15 seconds per seed. Profile before adding more per-tick work.
 - Some readers still see only the surface: plants grow on the surface, sector resource counts read the surface, lightning strikes surface tiles, and ash on a hill floor never returns to grass.
 - Dens exist but nobody uses them yet. Sleeping in a den, carrying prey home, births, and defence are phase 3 of topography. Finds lie in the deep until phase 4 gives people a reason to go.
+- The sprite-birth rule counts old pines on the sector's surface only; the pines on the hill above a hollow do not count yet.
+- A person whose task fails in the dark drops what they carry there, where nobody will fetch it. Phase 4 should send them out with their load.
 
 ## 15. Next
 

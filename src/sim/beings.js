@@ -90,8 +90,20 @@ const START = {
       const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1);
       if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, 300); return 'done'; } }; return true; }
     }
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    a.task = { type: 'drink', label: 'Going to drink', path: p, arrive(a){ a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
+    /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
+       world once and covers the first stretch, the same way legPath does. Thirst must never have no answer. */
+    const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
+    const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
+    let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
+    if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+    if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, 600);
+    a.task = { type: 'drink', label: far ? 'Walking a long way for water' : 'Going to drink', path: p,
+      arrive(a, t){
+        if (!wet(a.x, a.y, a.z)){
+          const q = walkFar(a); if (!q) return 'fail';
+          t.path = q; t.label = 'Walking a long way for water'; return 'continue';
+        }
+        a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
     return true;
   },
   eat(a){
@@ -279,12 +291,12 @@ function updateBeing(a){
   if (a.camp) camp = a.camp;
   for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
   if (a.species === 'human'){
-    const season = seasonOf(), under = a.z < 0, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
+    const season = seasonOf(), under = a.z < 0 || !!tileAt(a.x, a.y, a.z).cave, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
     const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = under || hasTile(a.x, a.y, a.z + 1) || (camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
     n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? 0.5 : 0), 0, 100);
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
-    else if (weather.storm && roofed) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
+    else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   for (const t of a.thoughts) t.left--; a.thoughts = a.thoughts.filter(t => t.left > 0);
@@ -305,7 +317,11 @@ function updateBeing(a){
   }
   /* Below the surface it is dark. Without a burning ember a person cannot see to work, and feels their way out at half speed. */
   a.inDark = a.species === 'human' && a.z < 0 && !(a.carrying && a.carrying.kind === 'ember');
-  if (a.inDark && !hasThought(a, 'dark')){ addThought(a, 'dark', 'It is too dark down here to see', -6, 400); if (a.task) failTask(a); }
+  if (a.inDark){
+    if (!hasThought(a, 'dark')) addThought(a, 'dark', 'It is too dark down here to see', -6, 400);
+    /* No work in the dark: any task that is not a walk back to the light fails, and the walk is slow. */
+    if (a.task && a.task.type !== 'flee' && !(a.task.path.length && a.task.path[a.task.path.length - 1][2] >= 0)) failTask(a);
+  }
   const fast = a.task && a.task.fast;
   if (!fast && (tick + a.id) % sp.stride) return;
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, 500); }

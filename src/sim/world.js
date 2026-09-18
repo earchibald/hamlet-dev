@@ -176,9 +176,10 @@ function digDens(){
   const order = shuffle(forest).concat(shuffle(hills.filter(h => !forest.includes(h))));
   const wants = ['wolf', 'fox', 'fox', 'fox'];
   for (const owner of wants){
-    for (const h of order){
-      if (digDen(h, owner)) break;
-    }
+    const fresh = order.filter(h => !caves.some(c => c.kind === 'den' && c.hill === h));
+    let done = null;
+    for (const h of fresh){ done = digDen(h, owner); if (done) break; }
+    if (!done) for (const h of order){ if (digDen(h, owner)) break; }
   }
 }
 /* A tile is clear of other caves if none of its four neighbours on this level, the level above, or the level below
@@ -269,6 +270,17 @@ function hollowUnderHill(sc, h){
     if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
     const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - 300 * DAY;
     c.story.push('The oldest hollow in the valley.');
+    /* Old pines stand on the hill above the hollow. Slopes and rock stay bare. keepsPaths only looks at a tile's own
+       ring, which is not enough on the narrow floor around a tall hill's core: a run of trees can still wall off a
+       far tile even when each one looked safe on its own. A pine that would cut any floor tile off the hill's own
+       floors is left ungrown. */
+    const hillFloors = raised.filter(t => t.hill === h && GROUND[t.ground].walk && !t.slope);
+    for (const t of hillFloors) if (!t.feature && rng() < 0.3 && keepsPaths(t)){
+      t.feature = 'tree'; t.planted = tick - (60 + rint(60)) * DAY;
+      const anchor = hillFloors.find(f => f.feature !== 'tree');
+      const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
+      if (!region || !hillFloors.every(f => f.feature === 'tree' || region.has(idx3(f.x, f.y, f.z)))){ t.feature = null; t.planted = undefined; }
+    }
     const g = { x: inner.x, y: inner.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick, cave: c }; groves.push(g);
     for (const t of c.tiles){ if (t === inner || !passable(t.x, t.y, 0) || beings.some(b => b.x === t.x && b.y === t.y && b.z === 0)) continue; if (beings.filter(b => b.species === 'sprite' && b.grove === g).length >= 3) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }
     while (beings.filter(b => b.species === 'sprite' && b.grove === g).length < 3){ const t = c.tiles.find(t => t !== inner && passable(t.x, t.y, 0)); if (!t) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }

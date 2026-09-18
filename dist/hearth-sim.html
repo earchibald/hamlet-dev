@@ -440,9 +440,10 @@ function digDens(){
   const order = shuffle(forest).concat(shuffle(hills.filter(h => !forest.includes(h))));
   const wants = ['wolf', 'fox', 'fox', 'fox'];
   for (const owner of wants){
-    for (const h of order){
-      if (digDen(h, owner)) break;
-    }
+    const fresh = order.filter(h => !caves.some(c => c.kind === 'den' && c.hill === h));
+    let done = null;
+    for (const h of fresh){ done = digDen(h, owner); if (done) break; }
+    if (!done) for (const h of order){ if (digDen(h, owner)) break; }
   }
 }
 /* A tile is clear of other caves if none of its four neighbours on this level, the level above, or the level below
@@ -533,6 +534,17 @@ function hollowUnderHill(sc, h){
     if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
     const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - 300 * DAY;
     c.story.push('The oldest hollow in the valley.');
+    /* Old pines stand on the hill above the hollow. Slopes and rock stay bare. keepsPaths only looks at a tile's own
+       ring, which is not enough on the narrow floor around a tall hill's core: a run of trees can still wall off a
+       far tile even when each one looked safe on its own. A pine that would cut any floor tile off the hill's own
+       floors is left ungrown. */
+    const hillFloors = raised.filter(t => t.hill === h && GROUND[t.ground].walk && !t.slope);
+    for (const t of hillFloors) if (!t.feature && rng() < 0.3 && keepsPaths(t)){
+      t.feature = 'tree'; t.planted = tick - (60 + rint(60)) * DAY;
+      const anchor = hillFloors.find(f => f.feature !== 'tree');
+      const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
+      if (!region || !hillFloors.every(f => f.feature === 'tree' || region.has(idx3(f.x, f.y, f.z)))){ t.feature = null; t.planted = undefined; }
+    }
     const g = { x: inner.x, y: inner.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick, cave: c }; groves.push(g);
     for (const t of c.tiles){ if (t === inner || !passable(t.x, t.y, 0) || beings.some(b => b.x === t.x && b.y === t.y && b.z === 0)) continue; if (beings.filter(b => b.species === 'sprite' && b.grove === g).length >= 3) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }
     while (beings.filter(b => b.species === 'sprite' && b.grove === g).length < 3){ const t = c.tiles.find(t => t !== inner && passable(t.x, t.y, 0)); if (!t) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }
@@ -1097,8 +1109,20 @@ const START = {
       const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1);
       if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, 300); return 'done'; } }; return true; }
     }
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    a.task = { type: 'drink', label: 'Going to drink', path: p, arrive(a){ a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
+    /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
+       world once and covers the first stretch, the same way legPath does. Thirst must never have no answer. */
+    const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
+    const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
+    let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
+    if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+    if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, 600);
+    a.task = { type: 'drink', label: far ? 'Walking a long way for water' : 'Going to drink', path: p,
+      arrive(a, t){
+        if (!wet(a.x, a.y, a.z)){
+          const q = walkFar(a); if (!q) return 'fail';
+          t.path = q; t.label = 'Walking a long way for water'; return 'continue';
+        }
+        a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, 300); return 'done'; } };
     return true;
   },
   eat(a){
@@ -1286,12 +1310,12 @@ function updateBeing(a){
   if (a.camp) camp = a.camp;
   for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
   if (a.species === 'human'){
-    const season = seasonOf(), under = a.z < 0, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
+    const season = seasonOf(), under = a.z < 0 || !!tileAt(a.x, a.y, a.z).cave, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
     const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = under || hasTile(a.x, a.y, a.z + 1) || (camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
     n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? 0.5 : 0), 0, 100);
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
-    else if (weather.storm && roofed) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
+    else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   for (const t of a.thoughts) t.left--; a.thoughts = a.thoughts.filter(t => t.left > 0);
@@ -1312,7 +1336,11 @@ function updateBeing(a){
   }
   /* Below the surface it is dark. Without a burning ember a person cannot see to work, and feels their way out at half speed. */
   a.inDark = a.species === 'human' && a.z < 0 && !(a.carrying && a.carrying.kind === 'ember');
-  if (a.inDark && !hasThought(a, 'dark')){ addThought(a, 'dark', 'It is too dark down here to see', -6, 400); if (a.task) failTask(a); }
+  if (a.inDark){
+    if (!hasThought(a, 'dark')) addThought(a, 'dark', 'It is too dark down here to see', -6, 400);
+    /* No work in the dark: any task that is not a walk back to the light fails, and the walk is slow. */
+    if (a.task && a.task.type !== 'flee' && !(a.task.path.length && a.task.path[a.task.path.length - 1][2] >= 0)) failTask(a);
+  }
   const fast = a.task && a.task.fast;
   if (!fast && (tick + a.id) % sp.stride) return;
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, 500); }
@@ -1772,7 +1800,7 @@ const GOALS = [
       if (!p.lit && p.fuel > 0 && nearbyBlaze()) out.push({ label: 'fetch an ember from the blaze', score: 95, start: a => startFetchEmber(a) });
       if (!p.lit && p.fuel > 0 && camp.tools.firestones && !(a.cooldown['strike sparks'] > tick)) out.push({ label: 'strike sparks', score: 80, start: a => startBuild(a, camp.pit, 40, 'Striking sparks into the tinder', a => { if (p.lit || p.fuel <= 0) return; if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, 1000); gainXp(a, 'craft'); } else { addThought(a, 'sparks', 'Sparks, but no flame', -3, 300); a.cooldown['strike sparks'] = tick + 150; } }) });
       if (!p.lit && p.fuel > 0 && camp.stash.moss > 0) out.push({ label: 'light the pit with glowing moss', score: 92, start: a => startBuild(a, camp.pit, 10, 'Blowing on the glowing moss', a => { if (p.lit || camp.stash.moss <= 0 || p.fuel <= 0) return; camp.stash.moss--; p.lit = true; camp.everLit = true; log(`${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, 1000); }) });
-      if (looseCount('moss')(sectors[secIdx(...Object.values(secOf(...camp.site)))]) > 0 || (camp.fae.favor >= 0 && groves.some(g => dist(g.x, g.y, ...camp.site) <= 40 && items.some(i => i.kind === 'moss' && dist(i.x, i.y, g.x, g.y) <= 2)))) out.push({ label: 'gather glowing moss', score: camp.stash.moss === 0 ? 40 : 20, start: a => startGather(a, 'moss') });
+      if (looseCount('moss')(sectors[secIdx(...Object.values(secOf(...camp.site)))]) > 0 || (camp.fae.favor >= 0 && groves.some(g => dist(g.x, g.y, ...camp.site) <= 40 && items.some(i => i.kind === 'moss' && i.z >= 0 && dist(i.x, i.y, g.x, g.y) <= 2)))) out.push({ label: 'gather glowing moss', score: camp.stash.moss === 0 ? 40 : 20, start: a => startGather(a, 'moss') });
       if (!p.lit && p.fuel <= 0 && camp.stash.stick >= 4) out.push({ label: 'lay the fire again', score: 60, start: a => startBuild(a, camp.pit, 15, 'Laying the fire', a => { if (camp.stash.stick >= 4){ camp.stash.stick -= 4; p.fuel = 160; log(`${a.name} lays fresh wood in the pit.`, [a]); } }) });
       return out;
     } },
@@ -2221,7 +2249,7 @@ function inspectTile(x, y, z = 0){
   if (t.feature) rows.push(['Feature', FEATURES[t.feature].name + (t.feature === 'bush' ? `, ${t.berries} berries` : '')]);
   if (t.hill) rows.push(['Hill', `${t.hill.storeys === 2 ? 'A tall hill' : 'A low hill'} of old stone, ${t.hill.storeys === 2 ? 'two storeys' : 'one storey'} high. Cliffs all round but for the slopes.`]);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
-  if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.kind === 'den' && t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
+  if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
   if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : 'Foxes'} live here.` : ''}`]);
   if (t.cave && t.cave.blocked === t) rows.push(['Fallen rock', 'blocks the way. Tools could clear it.']);
   if (z < 0) rows.push(['Dark', 'People need a burning ember down here.']);
