@@ -93,7 +93,7 @@ A chip reads `1 Sable is cold`. The number is its key. Alt+number, or a click, m
 
 A chip from a camp that is not on screen carries the camp's name: `2 Pinehill: hearth is out`.
 
-Alerts read existing state. No new field is stored in the sim.
+Alerts read existing state. No new field is stored in the sim by this spec. Two alerts wait on the naming spec: the spoil chip reads the `tag` that spec puts on chronicle lines, and the People rule that keeps a dead member for a day reads the `diedAt` stamp that spec adds.
 
 ## 5. The drawers
 

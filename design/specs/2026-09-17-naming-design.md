@@ -165,6 +165,8 @@ Input to the UI plans.
 
 Rules read the record. Rules do not check name text.
 
+Two small stamps for the interface, both data: `a.diedAt`, the tick of death, set where a person dies, and the `tag` on chronicle lines from section 3, which the spoil alert reads.
+
 **Tests.** `tests/names.js`, fast, on the soak runner:
 
 - The same seed gives the same names twice.
