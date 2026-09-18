@@ -76,7 +76,7 @@ function makeNoise(scale){
    lower level you climb out by, or the pocket tile beside the outside for a den at level 0. exit: the surface tile
    you step out onto; it points back through t.mouth. deep: the find spot. blocked: a rock tile in the passage.
    steps: how many walk tiles the water cut. */
-function makeCave(kind, hill){ const c = { id: nextId++, kind, hill, owner: null, tiles: [], mouth: null, exit: null, deep: null, blocked: null, steps: 0, story: [] }; caves.push(c); return c; }
+function makeCave(kind, hill){ const c = { id: nextId++, kind, hill, owner: null, tiles: [], mouth: null, exit: null, deep: null, blocked: null, searched: null, steps: 0, story: [] }; caves.push(c); return c; }
 /* Turn a tile into cave floor for cave c. Below the surface the tile is made; on the surface the rock is cut.
    A tile another cave owns is left alone: the caller gets null and must go round it. */
 function carve(c, x, y, z){

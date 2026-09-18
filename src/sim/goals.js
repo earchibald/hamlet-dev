@@ -205,6 +205,25 @@ const GOALS = [
       return { s: ready ? 'active' : 'blocked', text: `${campHumans().length}/5 people, camp ${Math.floor((tick - camp.founded) / DAY)}/8 days old. Parties leave in spring or summer. Two go with coals and food.` };
     },
     offers(a){ if (!camp.shelter || camp.sentParty || camps.length >= 6 || campHumans().length < 5 || tick - camp.founded <= 8 * DAY || !(seasonOf() === 'spring' || seasonOf() === 'summer') || a.traits.bravery < 0.5) return []; return [{ label: 'lead a party to a new valley', score: 40, start: a => startFoundCamp(a) }]; } },
+  { id: 'caves', title: 'Search the caves',
+    state(){
+      if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
+      const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      if (!near.length) return { s: 'blocked', text: 'No cave mouth within forty tiles of the camp.' };
+      const open = near.filter(c => !c.searched && !c.blocked), blocked = near.filter(c => c.blocked), done = near.filter(c => c.searched);
+      if (!open.length && !blocked.length) return { s: 'done', text: `${done.length} cave${done.length > 1 ? 's' : ''} searched. Nothing left in the dark but the dark.` };
+      const ready = camp.tools.spear && pitLit();
+      return { s: ready ? 'active' : 'blocked', text: `${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
+    },
+    offers(a){
+      if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
+      const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40); const out = [];
+      for (const c of near){
+        if (c.blocked && camp.tools.axe) out.push({ label: 'clear the fallen rock', score: 40, start: a => startClearRock(a, c) });
+        else if (!c.blocked && !c.searched) out.push({ label: 'search the cave with a brand', score: 36 + a.traits.curiosity * 20, start: a => startSearchCave(a, c) });
+      }
+      return out;
+    } },
 ];
 function goalState(g){ if (g.locked) return { s: 'locked', text: g.locked }; return g.state(); }
 function offersFor(a){

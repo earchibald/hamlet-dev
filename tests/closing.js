@@ -1,0 +1,58 @@
+// Closing: cave goals, den contention, site scoring. Fast: hand-built situations on a real world.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { load } = require('../src/sim');
+
+function readyCamp(seed = 'r'){
+  const api = load(); api.startWorld(seed);
+  const a = api.beings[0]; const c = api.camps[0]; api.camp = c;
+  api.setSite(a.x, a.y);
+  const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
+  c.everLit = true; c.bestStreak = 4000; c.tools.axe = 1; c.tools.spear = 1;
+  for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]){ const q = api.tileAt(t.x + dx, t.y + dy); q.ground = 'soil'; q.feature = null; q.struct = null; q.fire = 0; }
+  a.x = c.stashTile[0]; a.y = c.stashTile[1]; a.z = 0; a.task = null; a.asleep = false; a.homeless = false; a.cooldown = {}; a.traits.bravery = 0.9;
+  for (const k in a.needs) a.needs[k] = 90;
+  return { api, a, c };
+}
+function doOffer(api, a, label, ticks = 2000){
+  const o = api.offersFor(a).find(o => o.label === label);
+  assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
+  assert.ok(o.start(a), `offer "${label}" would not start`);
+  a.task.started = api.tick; a.task.key = label;
+  for (let k = 0; k < ticks && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
+  assert.equal(a.task, null, `"${label}" did not finish in ${ticks} ticks`);
+}
+/* Move the camp beside a water cave's exit so the search is short. */
+function campByCave(api, c, a, cave){
+  const e = cave.exit; api.setSite(e.x + 2, e.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
+  for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]){ const q = api.tileAt(t.x + dx, t.y + dy); if (q.mouth) continue; q.ground = 'soil'; q.feature = null; q.struct = null; }
+  a.x = c.stashTile[0]; a.y = c.stashTile[1]; a.z = 0;
+}
+
+test('a brave person takes a brand, walks to the deep chamber, and brings the find home', () => {
+  const { api, a, c } = readyCamp();
+  const cave = api.caves.find(k => k.kind === 'water' && !k.blocked); assert.ok(cave, 'an open water cave on seed r');
+  campByCave(api, c, a, cave);
+  const find = api.items.find(i => i.x === cave.deep.x && i.y === cave.deep.y && i.z === -2); assert.ok(find);
+  api.tick = 9 * 1000;
+  assert.equal(api.goalState(api.GOALS.find(g => g.id === 'caves')).s, 'active');
+  doOffer(api, a, 'search the cave with a brand', 3000);
+  assert.equal(cave.searched, c);
+  assert.ok(!api.items.includes(find), 'the find was picked up');
+  if (find.kind === 'firestones') assert.equal(c.tools.firestones, 1);
+  else if (find.kind === 'moss') assert.ok(c.stash.moss >= 1);
+  else assert.ok(api.chronicle.some(e => e.text.includes('old bones')));
+  assert.ok(api.chronicle.some(e => e.text.includes('into the dark') || e.text.includes('comes up out of')), 'the search is in the chronicle');
+  assert.equal(a.z, 0, 'and comes home');
+});
+
+test('fallen rock is cleared with the axe before the search', () => {
+  const { api, a, c } = readyCamp();
+  const cave = api.caves.find(k => k.kind === 'water' && k.blocked) || (() => { const k = api.caves.find(k => k.kind === 'water'); const t = k.tiles.find(t => t.z === -1 && t !== k.mouth && !t.slope); t.ground = 'rock'; k.blocked = t; k.story.push('Fallen rock blocks the way.'); return k; })();
+  campByCave(api, c, a, cave);
+  api.tick = 9 * 1000;
+  const labels = api.offersFor(a).map(o => o.label);
+  assert.ok(labels.includes('clear the fallen rock'), labels.join(', ')); assert.ok(!labels.includes('search the cave with a brand'));
+  doOffer(api, a, 'clear the fallen rock', 3000);
+  assert.equal(cave.blocked, null); assert.ok(cave.story.some(s => s.includes('cleared')));
+});
