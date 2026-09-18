@@ -111,6 +111,14 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
+/* Floating windows. */
+#windows{position:absolute;inset:0;z-index:4;pointer-events:none}
+.win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
+.win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
+.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
+.win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
+.win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
 /* The hover and pinned card, as before. */
 .tip{position:fixed;z-index:10;width:310px;max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;font-size:13px}
 .tip[hidden]{display:none} .tip.pinned{pointer-events:auto;border-color:var(--accent)}
@@ -178,6 +186,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div id="foot"></div>
     <div id="drawerTabs"></div>
     <div id="drawers"></div>
+    <div id="windows"></div>
   </main>
 </div>
 <div id="tip" class="tip ins" role="tooltip" hidden></div>
@@ -2953,7 +2962,11 @@ const ui = {
   chronFilter: 'all',  /* 'all' or 'major' */
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
+  windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
+  nextWin: 1,
+  rects: {},           /* remembered rect per window kind or drawer id, from storage */
 };
+const WIN_MAX = 6;
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -2961,7 +2974,7 @@ let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -2971,6 +2984,7 @@ function restore(){
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
   } catch (e) { /* no storage, or bad data */ }
 }
 
@@ -3123,6 +3137,25 @@ function cursorPhrase(){
   return parts.join(', ');
 }
 
+/* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
+const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
+const winKey = w => w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect';
+function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
+function winOpen(kind, target){
+  const have = winFind(kind, target); if (have) return have;
+  const r = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80 + 24 * (ui.windows.length % 5), y: 80 + 24 * (ui.windows.length % 5), w: 330, h: 420 };
+  const w = { id: ui.nextWin++, kind, target, ...r };
+  ui.windows.push(w);
+  const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
+  return w;
+}
+function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.focus === `window:${id}`) ui.focus = 'map'; }
+/* Where Tab goes: the map, each docked drawer in order, then each window in order. */
+function focusRing(){
+  const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -3167,6 +3200,11 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
+  { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
+  { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
+  { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
+  { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
@@ -3183,7 +3221,7 @@ for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', acti
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', or 'dialog'. Returns { action, arg } or null. */
 function keyAction(e, focus){
-  const kind = focus.startsWith('drawer:') ? 'drawer' : focus;
+  const kind = focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;
@@ -3364,12 +3402,12 @@ function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 
 const needColor = v => v < 25 ? 'var(--bad)' : v < 50 ? 'var(--warn)' : 'var(--good)';
 function moodWord(a, m){ if (!a.alive) return 'Dead'; return m >= 65 ? 'Happy' : m >= 45 ? 'Content' : m >= 30 ? 'Uneasy' : m >= 15 ? 'Unhappy' : 'Miserable'; }
 function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 0.7 ? w[2] : w[1]; }
-function inspectBeing(a){
+function inspectBeing(a, full = tipPinned){
   const m = mood(a), sp = SPECIES[a.species];
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   const thoughts = a.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const why = a.lastChoice ? `<div class="why">${a.lastChoice.opts.slice(0, 6).map(o => { const k = o.label || o.type; return `<span class="${k === a.lastChoice.picked ? 'picked' : o.failed ? 'failed' : ''}">${k} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
-  const hist = a.history.slice(0, tipPinned ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
+  const hist = a.history.slice(0, full ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   const s = secOf(a.x, a.y);
   let extra = '';
   if (a.species === 'human'){
@@ -3380,13 +3418,13 @@ function inspectBeing(a){
     const learned = [a.skills.wary ? `wary ${a.skills.wary}` : '', a.skills.hunt ? `hunter ${a.skills.hunt}` : ''].filter(Boolean);
     extra = `<h3>Nature and learning</h3><div class="chips"><span class="chip">${traitWord('bravery', a.traits.bravery)}</span>${a.species === 'deer' ? `<span class="chip">${traitWord('sociability', a.traits.sociability)}</span>` : ''}<span class="chip">${habit}</span>${learned.map(l => `<span class="chip">${l}</span>`).join('')}${drowsy(a) ? '<span class="chip">resting hours</span>' : ''}${a.grove ? `<span class="chip">grove in ${a.grove.sector.name.toLowerCase()} ${a.grove.sector.sx},${a.grove.sector.sy}, anger ${a.grove.anger}</span>` : ''}${a.den ? `<span class="chip">${a.den.hill ? `den under the hill at ${a.den.hill.x},${a.den.hill.y}` : `burrow at ${a.den.exit.x},${a.den.exit.y}`}</span>` : ''}</div>`;
   }
-  const follow = tipPinned && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
+  const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}">${a.name}</strong><span>${moodWord(a, m)} (${m})</span></div>
     <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
-    ${hist ? `<h3>${tipPinned ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
+    ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
 }
 function inspectTile(x, y, z = 0){
   const s = secOf(x, y), where = `${sectors[secIdx(s.sx, s.sy)].name}, ${x - s.sx * LW},${y - s.sy * LH}`;
@@ -3489,6 +3527,54 @@ function renderStrip(){
   $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
 }
 
+/* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
+   A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
+function winTitle(w){
+  if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${moodWord(a, mood(a))}</span>` : 'Gone'; }
+  const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
+}
+function renderWindows(){
+  const box = $('windows'), seen = new Set();
+  for (const w of ui.windows){
+    seen.add(w.id);
+    let el = box.querySelector(`[data-win="${w.id}"]`);
+    if (!el){
+      el = document.createElement('section'); el.className = 'win'; el.dataset.win = w.id;
+      el.innerHTML = `<div class="bar"><span class="title"></span><span><span class="k">${w.kind === 'drawer' ? 'O dock' : 'F follow'} · Esc</span> <button class="btn small" data-close aria-label="Close">×</button></span></div><div class="body"></div><div class="grip"></div>`;
+      box.appendChild(el);
+    }
+    el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
+    el.classList.toggle('focus', ui.focus === `window:${w.id}`);
+    el.querySelector('.title').innerHTML = winTitle(w);
+    const body = el.querySelector('.body'), keep = body.scrollTop;
+    if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
+    else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
+    body.scrollTop = keep;
+  }
+  for (const el of [...box.children]) if (!seen.has(Number(el.dataset.win))) el.remove();
+}
+/* Drag by the bar, resize by the grip. Positions persist per kind. */
+function wireWindows(){
+  const box = $('windows'); let drag = null;
+  box.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.win'); if (!el) return; const w = ui.windows.find(w => w.id === Number(el.dataset.win)); if (!w) return;
+    ui.focus = `window:${w.id}`; ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
+    if (e.target.closest('[data-close]')){ winClose(w.id); persist(); renderUI(true); return; }
+    const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderUI(true); return; }
+    const grip = e.target.closest('.grip'), bar = e.target.closest('.bar');
+    if (!grip && !bar) return;
+    drag = { w, grip: !!grip, x0: e.clientX, y0: e.clientY, x: w.x, y: w.y, wd: w.w, ht: w.h }; el.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  box.addEventListener('pointermove', e => {
+    if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (drag.grip){ drag.w.w = Math.max(220, drag.wd + dx); drag.w.h = Math.max(120, drag.ht + dy); }
+    else { drag.w.x = Math.max(0, drag.x + dx); drag.w.y = Math.max(0, drag.y + dy); }
+    renderWindows();
+  });
+  box.addEventListener('pointerup', () => { if (!drag) return; const w = drag.w; ui.rects[w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect'] = { x: w.x, y: w.y, w: w.w, h: w.h }; persist(); drag = null; });
+}
+
 /* The side panels: clock, camps, goals, people, chronicle. */
 
 /* ---- panels ---- */
@@ -3513,6 +3599,7 @@ function renderUI(force){
   }
   renderTip();
   renderDrawers();
+  renderWindows();
 }
 const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
 const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
@@ -3524,10 +3611,10 @@ function drawerHTML(d){
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
-  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
-  const host = $('drawers');
-  for (const sec of [...host.children]) if (!ui.open.includes(sec.dataset.drawer)) sec.remove();
-  ui.open.forEach((id, n) => {
+  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
+  for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
+  docked.forEach((id, n) => {
     const d = DRAWERS.find(d => d.id === id);
     let sec = host.querySelector(`section[data-drawer="${id}"]`);
     if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
@@ -3536,23 +3623,23 @@ function renderDrawers(){
     for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
   });
-  for (const id of ui.open){
+  for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
     ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
-  document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
+  document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){
   const rows = drawerRows('people');
-  $('count-people').textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
     return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
-  $('count-goals').textContent = '';
+  const c = $('count-goals'); if (c) c.textContent = '';
   el.innerHTML = rows.map((r, i) => {
     if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
@@ -3567,13 +3654,13 @@ function renderChronicle(el){
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
-  $('count-chronicle').textContent = ` · ${rows.length}`;
+  const c = $('count-chronicle'); if (c) c.textContent = ` · ${rows.length}`;
   el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
   const c = campSummary();
   const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
-  $('count-camp').textContent = '';
+  const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
@@ -3676,7 +3763,7 @@ function openDrawer(id, on){
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
-const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : null;
+const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
 function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true); }
 function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
 function rowOpen(){
@@ -3687,11 +3774,7 @@ function rowOpen(){
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){
-  const ring = ['map', ...ui.open.map(id => `drawer:${id}`)];
-  const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length;
-  ui.focus = ring[j]; renderUI(true);
-}
+function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -3711,7 +3794,11 @@ const ACTIONS = {
   drawer(id){ openDrawer(id); },
   focusNext(){ focusStep(1); },
   focusPrev(){ focusStep(-1); },
-  back(){ if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; } if (tipPinned) hideTip(); },
+  back(){
+    if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
+    if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    if (tipPinned) hideTip();
+  },
   rowUp(){ rowMove(-1); },
   rowDown(){ rowMove(1); },
   rowOpen(){ rowOpen(); },
@@ -3722,6 +3809,11 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  popOut(){
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
+    persist(); renderUI(true);
+  },
 };
 
 /* The frame loop and page wiring: initUI() sets up canvases and events, frame() drives the loop. */
@@ -3772,7 +3864,8 @@ function initUI(){
     const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
-  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
+  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
+  wireWindows();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
@@ -3792,8 +3885,9 @@ function initUI(){
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });
-  setTool('inspect'); setSpeed(1);
+  setTool('inspect');
   newWorld(randomSeed());
+  if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
   openStart();
   requestAnimationFrame(frame);
 }

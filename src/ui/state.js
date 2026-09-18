@@ -34,7 +34,11 @@ const ui = {
   chronFilter: 'all',  /* 'all' or 'major' */
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
+  windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
+  nextWin: 1,
+  rects: {},           /* remembered rect per window kind or drawer id, from storage */
 };
+const WIN_MAX = 6;
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -42,7 +46,7 @@ let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -52,5 +56,6 @@ function restore(){
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
   } catch (e) { /* no storage, or bad data */ }
 }

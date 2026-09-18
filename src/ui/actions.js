@@ -71,7 +71,7 @@ function openDrawer(id, on){
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
-const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : null;
+const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
 function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true); }
 function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
 function rowOpen(){
@@ -82,11 +82,7 @@ function rowOpen(){
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){
-  const ring = ['map', ...ui.open.map(id => `drawer:${id}`)];
-  const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length;
-  ui.focus = ring[j]; renderUI(true);
-}
+function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -106,7 +102,11 @@ const ACTIONS = {
   drawer(id){ openDrawer(id); },
   focusNext(){ focusStep(1); },
   focusPrev(){ focusStep(-1); },
-  back(){ if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; } if (tipPinned) hideTip(); },
+  back(){
+    if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
+    if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    if (tipPinned) hideTip();
+  },
   rowUp(){ rowMove(-1); },
   rowDown(){ rowMove(1); },
   rowOpen(){ rowOpen(); },
@@ -117,4 +117,9 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  popOut(){
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
+    persist(); renderUI(true);
+  },
 };

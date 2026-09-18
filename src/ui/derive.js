@@ -146,3 +146,22 @@ function cursorPhrase(){
   parts.push(GROUND[t.ground].name);
   return parts.join(', ');
 }
+
+/* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
+const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
+const winKey = w => w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect';
+function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
+function winOpen(kind, target){
+  const have = winFind(kind, target); if (have) return have;
+  const r = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80 + 24 * (ui.windows.length % 5), y: 80 + 24 * (ui.windows.length % 5), w: 330, h: 420 };
+  const w = { id: ui.nextWin++, kind, target, ...r };
+  ui.windows.push(w);
+  const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
+  return w;
+}
+function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.focus === `window:${id}`) ui.focus = 'map'; }
+/* Where Tab goes: the map, each docked drawer in order, then each window in order. */
+function focusRing(){
+  const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+}

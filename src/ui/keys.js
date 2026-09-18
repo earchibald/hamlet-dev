@@ -42,6 +42,11 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
+  { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
+  { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
+  { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
+  { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
@@ -58,7 +63,7 @@ for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', acti
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', or 'dialog'. Returns { action, arg } or null. */
 function keyAction(e, focus){
-  const kind = focus.startsWith('drawer:') ? 'drawer' : focus;
+  const kind = focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;

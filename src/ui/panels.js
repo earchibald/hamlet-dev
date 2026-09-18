@@ -22,6 +22,7 @@ function renderUI(force){
   }
   renderTip();
   renderDrawers();
+  renderWindows();
 }
 const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
 const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
@@ -33,10 +34,10 @@ function drawerHTML(d){
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
-  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
-  const host = $('drawers');
-  for (const sec of [...host.children]) if (!ui.open.includes(sec.dataset.drawer)) sec.remove();
-  ui.open.forEach((id, n) => {
+  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
+  for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
+  docked.forEach((id, n) => {
     const d = DRAWERS.find(d => d.id === id);
     let sec = host.querySelector(`section[data-drawer="${id}"]`);
     if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
@@ -45,23 +46,23 @@ function renderDrawers(){
     for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
   });
-  for (const id of ui.open){
+  for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
     ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
-  document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
+  document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){
   const rows = drawerRows('people');
-  $('count-people').textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
     return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
-  $('count-goals').textContent = '';
+  const c = $('count-goals'); if (c) c.textContent = '';
   el.innerHTML = rows.map((r, i) => {
     if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
@@ -76,13 +77,13 @@ function renderChronicle(el){
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
-  $('count-chronicle').textContent = ` · ${rows.length}`;
+  const c = $('count-chronicle'); if (c) c.textContent = ` · ${rows.length}`;
   el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
   const c = campSummary();
   const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
-  $('count-camp').textContent = '';
+  const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.

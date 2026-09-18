@@ -166,7 +166,7 @@ test('every template button prints a key, and every keyed button id is in the te
 
 test('every key map row has a focus the dispatcher knows', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'dialog'].includes(k.focus), `${k.key} has focus ${k.focus}`);
+  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog'].includes(k.focus), `${k.key} has focus ${k.focus}`);
 });
 
 test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {
@@ -220,6 +220,30 @@ test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter a
   assert.deepEqual(api.keyAction(ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
   assert.deepEqual(api.keyAction(ev('Home'), 'map'), { action: 'home', arg: undefined });
   assert.deepEqual(api.keyAction(ev('w'), 'map'), { action: 'worldHere', arg: undefined });
+});
+
+const WIN = [...DERIVE, 'winOpen', 'winClose', 'winFind', 'focusRing', 'WIN_MAX'];
+
+test('windows: open reuses a window for the same target, the seventh inspector closes the oldest, and the focus ring lists map, docked drawers, then windows', () => {
+  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const w1 = api.winOpen('inspect', { being: 1 });
+  assert.equal(api.winOpen('inspect', { being: 1 }), w1, 'same target, same window');
+  for (let i = 2; i <= 7; i++) api.winOpen('inspect', { being: i });
+  assert.equal(api.ui.windows.filter(w => w.kind === 'inspect').length, api.WIN_MAX);
+  assert.equal(api.winFind('inspect', { being: 1 }), undefined, 'the oldest went');
+  api.ui.open = ['people', 'goals']; api.winOpen('drawer', 'goals');
+  const ring = api.focusRing();
+  assert.equal(ring[0], 'map'); assert.ok(ring.includes('drawer:people')); assert.ok(!ring.includes('drawer:goals'), 'a popped-out drawer is a window now');
+  assert.ok(ring.filter(f => f.startsWith('window:')).length === api.ui.windows.length);
+  api.winClose(api.ui.windows[0].id); assert.equal(api.ui.windows.length, api.WIN_MAX);
+});
+
+test('window keys: O pops out or docks, Esc closes a focused window, Tab walks the ring', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(api.keyAction(ev('o'), 'drawer:goals'), { action: 'popOut', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('o'), 'window:3'), { action: 'popOut', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('Escape'), 'window:3'), { action: 'back', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
 });
 
 module.exports = { loadUI };
