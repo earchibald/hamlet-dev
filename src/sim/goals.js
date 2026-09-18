@@ -68,9 +68,10 @@ const GOALS = [
     state(){ if (!camp.everLit) return { s: 'blocked', text: 'Needs a lit fire.' };
       const raw = camp.stash.carcass + camp.stash.venison;
       const waiting = [camp.stash.venison > 0 ? `${camp.stash.venison} deer` : '', camp.stash.carcass > 0 ? `${camp.stash.carcass} carcass` : ''].filter(Boolean).join(' and ');
-      return { s: raw > 0 ? 'active' : 'idle', text: raw > 0 ? `${waiting} waiting.` : 'Nothing to cook. Cooked meat is a better meal than berries.' }; },
+      return { s: camp.stash.carcass > 0 || camp.stash.fish > 0 ? 'active' : 'idle', text: camp.stash.carcass > 0 || camp.stash.fish > 0 ? `${camp.stash.carcass} carcass and ${camp.stash.fish} fish waiting.` : 'Nothing to cook. Cooked meat is a better meal than berries.' }; },
     offers(a){ if (!pitLit()) return [];
       if (camp.stash.venison > 0) return [{ label: 'butcher and cook the deer', score: 62, start: a => startBuild(a, camp.pit, 60, 'Butchering the deer', a => { if (camp.stash.venison <= 0) return; camp.stash.venison--; stashAdd('cooked', 5); stashAdd('hide', 2); if (camp.rack) stashAdd('smoked', 4); gainXp(a, 'cook'); log(`${a.name} butchers the deer. Meat for days${camp.rack ? ', and strips on the rack' : ''}.`, campHumans(), 'good'); }) }];
+      if (camp.stash.fish > 0) return [{ label: 'cook the fish', score: camp.stash.cooked === 0 ? 55 : 35, start: a => startBuild(a, camp.pit, 25, 'Cooking fish over the fire', a => { if (camp.stash.fish > 0){ stashTake('fish'); stashAdd('cooked', 2); gainXp(a, 'cook'); log(`${a.name} cooks a fish over the fire.`, [a], 'good'); } }) }];
       if (camp.stash.carcass <= 0) return []; return [{ label: 'cook the catch', score: camp.stash.cooked === 0 ? 55 : 35, start: a => startBuild(a, camp.pit, 35, 'Cooking over the fire', a => { if (camp.stash.carcass > 0){ camp.stash.carcass--; stashAdd('cooked', 3); stashAdd('hide', 1); gainXp(a, 'cook'); camp.bestCook = Math.max(camp.bestCook || 0, a.skills.cook); log(`${a.name} cooks a rabbit over the fire and keeps the hide.`, [a], 'good'); } }) }]; } },
   { id: 'snare', title: 'Set snares for rabbits', standing: true, max: 4,
     state(){
@@ -182,7 +183,12 @@ const GOALS = [
       return [{ label: 'build the drying rack', score: 45, start: a => startBuild(a, site, 50, 'Building a drying rack', a => { if (camp.rack || camp.stash.stick < 6) return; camp.stash.stick -= 6; tileAt(...site).struct = { type: 'rack', camp }; camp.rack = site; gainXp(a, 'build'); log(`${a.name} lashes sticks into a drying rack beside the fire.`, [a], 'good'); }) }]; } },
   { id: 'smoke', title: 'Smoke meat for lean days', standing: true,
     state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS * 4} days long in all, and the bushes give nothing then.` }; },
-    offers(a){ if (!camp.rack || !pitLit() || camp.stash.carcass < 1 || camp.stash.smoked >= 8) return []; return [{ label: 'smoke a rabbit over the fire', score: seasonOf() === 'autumn' ? 66 : camp.stash.smoked < 4 ? 60 : 30, start: a => startBuild(a, camp.rack, 45, 'Smoking meat', a => { if (camp.stash.carcass < 1) return; stashTake('carcass'); stashAdd('smoked', 2); stashAdd('hide', 1); gainXp(a, 'cook'); log(`${a.name} hangs strips of rabbit in the smoke. They will keep.`, [a]); }) }]; } },
+    offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
+      const out = [];
+      if (camp.stash.carcass >= 1) out.push({ label: 'smoke a rabbit over the fire', score: seasonOf() === 'autumn' ? 66 : camp.stash.smoked < 4 ? 60 : 30, start: a => startBuild(a, camp.rack, 45, 'Smoking meat', a => { if (camp.stash.carcass < 1) return; stashTake('carcass'); stashAdd('smoked', 2); stashAdd('hide', 1); gainXp(a, 'cook'); log(`${a.name} hangs strips of rabbit in the smoke. They will keep.`, [a]); }) });
+      if (camp.stash.fish >= 1) out.push({ label: 'smoke a fish over the fire', score: seasonOf() === 'autumn' ? 64 : camp.stash.smoked < 4 ? 58 : 28, start: a => startBuild(a, camp.rack, 40, 'Smoking fish', a => { if (camp.stash.fish < 1) return; stashTake('fish'); stashAdd('smoked', 2); gainXp(a, 'cook'); log(`${a.name} hangs a fish in the smoke. It will keep.`, [a]); }) });
+      return out;
+    } },
   { id: 'guard', title: 'Keep wolves off', standing: true,
     state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nearAt(w, ...camp.pit)} tiles from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
     offers(a){ const w = wolfNear(); if (!w || !pitLit() || a.traits.bravery < 0.35) return []; return [{ label: 'drive off the wolf with a firebrand', score: 72 + a.traits.bravery * 20, start: a => startDriveOff(a, w) }]; } },

@@ -113,6 +113,21 @@ function startPickFibre(a){
     } };
   return true;
 }
+/* Fishing: stand by the water, cast for a while, and land a fish by hunting skill and patience. */
+function startFish(a){
+  if (a.carrying && a.carrying.kind !== 'fish') return startDeliver(a);
+  const water = t => t.ground === 'water';
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, water, DIRS, z), 3000, a); if (!p) return false;
+  a.task = { type: 'work', label: 'Going to the water with the rod', path: p, progress: 0,
+    arrive(a, t){
+      if (!nearFind(a.x, a.y, water, DIRS, a.z)) return 'fail';
+      t.label = 'Casting from the bank'; t.progress += workSpeed(a, 'hunt');
+      if (t.progress < 60) return 'continue';
+      if (rng() < 0.35 + a.skills.hunt * 0.08 + a.traits.patience * 0.25){ a.carrying = { kind: 'fish', count: 1 }; gainXp(a, 'hunt'); log(`${a.name} lands a fish.`, [a], 'good'); addThought(a, 'fish', 'Caught a fish', 3, 500); return chain(a, t, startDeliver(a)) || 'done'; }
+      addThought(a, 'nofish', 'Nothing bit', -1, 300); return 'done';
+    } };
+  return true;
+}
 function startSetSnare(a){
   const c = camp.site; let best = null;
   const s = secOf(c[0], c[1]);

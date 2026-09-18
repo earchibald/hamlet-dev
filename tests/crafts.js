@@ -89,3 +89,24 @@ test('startBuild speeds work by the passed skill, not just the label', () => {
   };
   assert.ok(runs(4) < runs(0), 'craft 4 should finish in fewer runTask calls than craft 0');
 });
+
+test('with a rod the camp fishes when food is short, and fish cook to two meals', () => {
+  const { api, a, c } = readyCamp();
+  c.tools.rod = 1;
+  const w = api.tileAt(c.stashTile[0] + 3, c.stashTile[1]); w.ground = 'water'; w.feature = null; w.struct = null;
+  c.stash.berries = 0; c.stash.cooked = 0; c.stash.smoked = 0;
+  assert.equal(api.goalState(goal(api, 'fish')).s, 'active');
+  let caught = 0;
+  for (let tries = 0; tries < 12 && !c.stash.fish; tries++){ doOffer(api, a, 'fish the river'); }
+  assert.ok(c.stash.fish >= 1, 'no fish in twelve casts');
+  assert.ok(api.chronicle.some(e => e.text.includes('lands a fish')));
+  c.stash.berries = 30;
+  assert.equal(api.goalState(goal(api, 'fish')).s, 'idle', 'plenty of food, no need to fish');
+  c.stash.fish = 1; c.stash.cooked = 0;
+  doOffer(api, a, 'cook the fish');
+  assert.equal(c.stash.fish, 0); assert.equal(c.stash.cooked, 2);
+  c.stash.fish = 1; c.rack = c.stashTile; api.tileAt(...c.rack).struct = { type: 'rack', camp: c };
+  c.stash.smoked = 0; c.stash.carcass = 0;
+  doOffer(api, a, 'smoke a fish over the fire');
+  assert.equal(c.stash.smoked, 2);
+});

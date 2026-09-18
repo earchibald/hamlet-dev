@@ -61,6 +61,7 @@ const ITEMS = {
   bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0 },
   fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
   cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
+  fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },

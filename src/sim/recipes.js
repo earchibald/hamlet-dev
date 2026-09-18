@@ -18,6 +18,8 @@ const RECIPES = [
     verb: 'weaves', done: 'A basket of cord and reed. Gatherers carry three more.', blurb: 'Three coils of cord. A gatherer with a basket carries three more.' },
   { id: 'rod', title: 'Make a fishing rod', after: 'workshop', needs: { stick: 1, cord: 2 }, place: 'workshop', skill: 'craft', work: 40, makes: { tool: 'rod' }, score: 44,
     verb: 'binds', done: 'A stick, a line of cord, a bone hook. The river feeds the camp now.', blurb: 'A stick and two coils of cord. Opens fishing.' },
+  { id: 'fish', title: 'Fish the river', after: 'rod', tools: ['rod'], place: 'water', gather: a => startFish(a), standing: { stash: 'fish', n: 4 }, active: () => stashFood() < foodTarget(), score: 46, offerLabel: 'fish the river',
+    blurb: 'A fish cooks to two meals or smokes on the rack. People fish when food is short.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
