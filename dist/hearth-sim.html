@@ -56,6 +56,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #weather.on{color:var(--warn)}
 #campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em}
 #camps{display:flex;gap:4px}
+#gauges{display:inline-flex;gap:12px;align-items:center}
 .gauge{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .gauge .bar{width:64px;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden;display:inline-block}
 .gauge .bar i{display:block;height:100%}
@@ -63,7 +64,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .gauge.warn .t{color:var(--warn)} .gauge.bad .t{color:var(--bad)}
 .g-good i{background:var(--good)} .g-warn i{background:var(--warn)} .g-bad i{background:var(--bad)}
 #chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:12px;border:1px solid;font-size:12px;cursor:default;background:none}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:12px;border:1px solid;font-size:12px;cursor:default;background:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip kbd{margin:0;opacity:.7}
 .chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
@@ -71,6 +72,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel)}
 .mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox.drawers-open .views{right:392px}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -2919,7 +2921,8 @@ function gaugeHTML(id, g){
   return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
 }
 function chipHTML(a){
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.type}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${a.text}</span>`;
+  const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.text.replace(/"/g, '&quot;')}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
 }
 function renderStrip(){
   $('clock').textContent = stamp();
@@ -2930,7 +2933,7 @@ function renderStrip(){
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
-  $('chips').innerHTML = alerts().map(chipHTML).join('');
+  $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
 }
 
 /* The side panels: clock, camps, goals, people, chronicle. */
@@ -2957,6 +2960,7 @@ function renderUI(force){
 function renderDrawers(){
   $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
   $('drawers').innerHTML = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2>${d.label}<span class="k">${d.key}</span></h2><div class="body" id="body-${id}"></div></section>`; }).join('');
+  document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
 }
 
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */

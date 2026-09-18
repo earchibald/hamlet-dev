@@ -5,7 +5,8 @@ function gaugeHTML(id, g){
   return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
 }
 function chipHTML(a){
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.type}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${a.text}</span>`;
+  const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.text.replace(/"/g, '&quot;')}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
 }
 function renderStrip(){
   $('clock').textContent = stamp();
@@ -16,5 +17,5 @@ function renderStrip(){
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
-  $('chips').innerHTML = alerts().map(chipHTML).join('');
+  $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
 }

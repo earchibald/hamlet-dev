@@ -56,6 +56,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #weather.on{color:var(--warn)}
 #campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em}
 #camps{display:flex;gap:4px}
+#gauges{display:inline-flex;gap:12px;align-items:center}
 .gauge{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .gauge .bar{width:64px;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden;display:inline-block}
 .gauge .bar i{display:block;height:100%}
@@ -63,7 +64,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .gauge.warn .t{color:var(--warn)} .gauge.bad .t{color:var(--bad)}
 .g-good i{background:var(--good)} .g-warn i{background:var(--warn)} .g-bad i{background:var(--bad)}
 #chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:12px;border:1px solid;font-size:12px;cursor:default;background:none}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:12px;border:1px solid;font-size:12px;cursor:default;background:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip kbd{margin:0;opacity:.7}
 .chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
@@ -71,6 +72,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel)}
 .mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox.drawers-open .views{right:392px}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}

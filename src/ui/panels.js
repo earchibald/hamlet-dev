@@ -22,4 +22,5 @@ function renderUI(force){
 function renderDrawers(){
   $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
   $('drawers').innerHTML = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2>${d.label}<span class="k">${d.key}</span></h2><div class="body" id="body-${id}"></div></section>`; }).join('');
+  document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
 }
