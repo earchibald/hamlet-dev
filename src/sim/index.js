@@ -21,7 +21,7 @@ function source(){
 const API = `return {
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS, LIFE,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startFish, startGather, startBuild, addItem, removeItem, stashAdd,
+  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startPickFibre, startFish, startGather, startBuild, addItem, removeItem, stashAdd,
   runTask, updateBeing, dropCarried, makeBeing, checkPitfall, denTick, gnomeTick, adoptDen, spawnWildlife, withBrand,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,

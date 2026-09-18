@@ -976,7 +976,9 @@ function chooseSite(a){
     if (water <= 8){ sc += 20 - water; why.push('water close by'); } else sc -= 10;
     if (trees === 0){ sc += 10; why.push('no trees to catch fire'); } else sc -= trees * 6;
     if (bushes){ sc += Math.min(8, bushes * 2); why.push('berries nearby'); }
+    let faces = 0, dens = 0; for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++){ if (!inb(x + dx, y + dy)) continue; const q = tileAt(x + dx, y + dy); if (GROUND[q.ground].quarry && Math.abs(dx) + Math.abs(dy) <= 12) faces++; } for (const k of caves) if (k.kind === 'den' && k.owner === 'wolf' && !k.cleared && dist(k.exit.x, k.exit.y, x, y) <= 20) dens++;
     if (t.ground === 'soil' || t.ground === 'sand'){ sc += 5; why.push('bare ground'); }
+    if (faces){ sc += 8; why.push('stone close by'); } if (dens){ sc -= 15; why.push('a wolf den too near'); }
     sc -= dist(x, y, a.x, a.y) * 0.15;
     const edge = Math.min(x - s.sx * LW, (s.sx + 1) * LW - 1 - x, y - s.sy * LH, (s.sy + 1) * LH - 1 - y); if (edge < 4) sc -= (4 - edge) * 3;
     if (!best || sc > best.sc) best = { x, y, sc, why };

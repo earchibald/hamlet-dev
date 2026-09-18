@@ -89,3 +89,13 @@ test('withBrand ends with no live ember when the chain does not start', () => {
   assert.equal(a.carrying, null);
   assert.equal(c.stash.ember || 0, 0);
 });
+
+test('a camp site likes stone close by and dislikes a wolf den', () => {
+  const api = load(); api.startWorld('r'); const a = api.beings[0]; const c = api.camps[0]; api.camp = c;
+  api.chooseSite(a); const base = c.siteReason;
+  assert.ok(typeof base === 'string');
+  /* A rock face beside the chosen spot. */
+  const [sx, sy] = c.site; const q = api.tileAt(sx + 3, sy); q.ground = 'rock'; q.feature = null; q.hill = { x: q.x, y: q.y, r: 1, storeys: 1, tiles: [api.idx(q.x, q.y)] };
+  c.site = null; c.siteReason = ''; api.chooseSite(a);
+  assert.ok(c.siteReason.includes('stone close by'), c.siteReason);
+});
