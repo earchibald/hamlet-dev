@@ -312,7 +312,10 @@ test('windows: open reuses a window for the same target, the seventh inspector c
   assert.notEqual(w2.x, w1.x, 'a second inspector steps across'); assert.notEqual(w2.y, w1.y, 'and down');
   api.ui.rects.inspect = { x: 200, y: 150, w: 330, h: 420 };
   const w3 = api.winOpen('inspect', { being: 3 });
-  assert.equal(w3.x, 200 + 24 * 2, 'a saved rect is the base, not the whole answer'); assert.equal(w3.y, 150 + 24 * 2);
+  assert.equal(w3.x, 200, 'a saved rect is the base, and its first slot is free'); assert.equal(w3.y, 150);
+  const w3b = api.winOpen('inspect', { being: 30 });
+  assert.equal(w3b.x, 200 + 24, 'the next one steps from the saved rect'); assert.equal(w3b.y, 150 + 24);
+  api.winClose(w3b.id);
   for (let i = 2; i <= 7; i++) api.winOpen('inspect', { being: i });
   assert.equal(api.ui.windows.filter(w => w.kind === 'inspect').length, api.WIN_MAX);
   assert.equal(api.winFind('inspect', { being: 1 }), undefined, 'the oldest went');
@@ -379,6 +382,64 @@ test('palette and chord keys', () => {
   assert.deepEqual(keyHit(api, ev('f'), 'dialog:chord'), { action: 'stage', arg: 'fire' });
   assert.deepEqual(keyHit(api, ev('ArrowDown'), 'dialog:palette'), { action: 'paletteMove', arg: 1 });
   assert.deepEqual(keyHit(api, ev('Enter'), 'dialog:palette'), { action: 'paletteRun', arg: undefined });
+});
+
+/* The feedback pass. */
+test('a focused row wins over an any row, whatever the order in the table', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.equal(api.keyAction(ev('Escape'), 'dialog').focus, 'dialog', 'the dialog row answers, not the any row above it');
+  assert.equal(api.keyAction(ev('Escape'), 'map').focus, 'any');
+  assert.deepEqual(keyHit(api, ev('f'), 'window:2'), { action: 'follow', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'window:2'), { action: 'follow', arg: undefined }, 'Shift+F in a window does not stick Light fire');
+  assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'light' });
+});
+
+test('the one-shot tool hints say Enter', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['TOOLS']);
+  for (const t of api.TOOLS) assert.ok(/Enter/.test(t.hint), `${t.id} hint omits Enter`);
+});
+
+test('windows: a reopened inspector takes the first free slot', () => {
+  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const w1 = api.winOpen('inspect', { being: 1 }); api.winOpen('inspect', { being: 2 }); api.winOpen('inspect', { being: 3 });
+  const slot = { x: w1.x, y: w1.y };
+  api.winClose(w1.id);
+  const w4 = api.winOpen('inspect', { being: 4 });
+  for (const w of api.ui.windows) if (w !== w4) assert.ok(w.x !== w4.x || w.y !== w4.y, 'the new window covers an open one');
+  assert.deepEqual({ x: w4.x, y: w4.y }, slot, 'the freed slot is used again');
+});
+
+test('a name matches whole words only, so a prefix pair does not misattribute', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'namesIn', 'pulseWho']);
+  assert.equal(api.namesIn('Anna is cold', 'Ann'), false);
+  assert.equal(api.namesIn('Anna is cold', 'Anna'), true);
+  assert.equal(api.namesIn('A wolf took Ann.', 'Ann'), true);
+  assert.equal(api.namesIn("Ann's fire went out", 'Ann'), true);
+  assert.equal(api.namesIn('Tam (the elder) spoke', 'Tam (the elder)'), true, 'a name with punctuation is matched as text');
+  api.startWorld('r'); api.camp = api.camps[0];
+  const a = api.beings.find(b => b.species === 'human'); a.name = 'Ann';
+  assert.equal(api.pulseWho('Anna is cold'), undefined);
+  assert.equal(api.pulseWho('Ann is cold'), a.id);
+});
+
+test('a mute reads as a sentence, not as its key', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'muteLabel']);
+  api.startWorld('r'); api.camp = api.camps[0];
+  const c = api.camps[0];
+  assert.equal(api.muteLabel('cold'), 'Cold alerts, everywhere');
+  assert.equal(api.muteLabel(`cold:${c.id}`), `Cold alerts at ${c.name}`);
+  assert.equal(api.muteLabel(`cold:${c.id}:Ada is cold`), `Ada is cold, at ${c.name}`);
+  assert.equal(api.muteLabel(`event:${c.id}:A line: with a colon`), `A line: with a colon, at ${c.name}`);
+  assert.equal(api.muteLabel('cold:999'), 'Cold alerts at a camp that is gone');
+});
+
+test('opening a sector keeps a cursor that is already in it, and carries the offset when it is not', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'cursorInSector', 'LW', 'LH']);
+  api.startWorld('r');
+  const { LW, LH } = api;
+  const mid = { x: 2 * LW + (LW >> 1), y: 1 * LH + (LH >> 1), z: 0 };
+  assert.deepEqual(api.cursorInSector(mid, 2, 1), mid, 'the hovered centre stays');
+  assert.deepEqual(api.cursorInSector({ x: 3, y: 4, z: 0 }, 2, 1), { x: 2 * LW + 3, y: 1 * LH + 4, z: 0 }, 'the offset is carried');
 });
 
 test('the legends drawer lists every line of the creation, oldest first', () => {
