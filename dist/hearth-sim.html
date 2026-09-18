@@ -86,6 +86,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
 #drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.drawer.fit{flex:0 1 auto;max-height:40%}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
@@ -105,6 +106,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .pbtn:last-child{border-right:0} .pbtn.on{background:var(--accent);color:var(--accent-ink)}
 .g-done .gt{color:var(--good)} .g-blocked .gt{color:var(--muted)}
 .bar{display:block;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden} .bar i{display:block;height:100%}
+.bar.mood{display:inline-block;width:70px;margin-left:8px;vertical-align:middle}
 #chronicle{list-style:none;margin:0;padding:0}
 #chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
 #chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -120,10 +122,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
-/* The hover and pinned card, as before. */
+/* The hover card. */
 .tip{position:fixed;z-index:10;width:310px;max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;font-size:13px}
-.tip[hidden]{display:none} .tip.pinned{pointer-events:auto;border-color:var(--accent)}
-.tip .close{float:right;margin:-4px -6px 0 8px;padding:0 7px;border:1px solid var(--line);border-radius:5px;background:none;cursor:pointer;line-height:1.5}
+.tip[hidden]{display:none}
 .tip .hist{max-height:150px;overflow:auto}
 .ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
 .ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}
@@ -2879,7 +2880,7 @@ const GOALS = [
       const open = near.filter(c => !c.searched && !c.blocked), blocked = near.filter(c => c.blocked), done = near.filter(c => c.searched);
       if (!open.length && !blocked.length) return { s: 'done', text: `${done.length} cave${done.length > 1 ? 's' : ''} searched. Nothing left in the dark but the dark.` };
       const ready = camp.tools.spear && pitLit();
-      return { s: ready ? 'active' : 'blocked', text: `${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
+      return { s: ready ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
     },
     offers(a){
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
@@ -2902,7 +2903,7 @@ const GOALS = [
         return { s: 'done', text: `${near.length} den${near.length > 1 ? 's' : ''} near, held by ${by.join(' and ')}.` };
       }
       const party = campHumans().filter(denReady).length;
-      return { s: camp.tools.spear && pitLit() && party >= 2 ? 'active' : 'blocked', text: `${wild.length} den${wild.length > 1 ? 's' : ''} near: ${wild.map(c => c.owner === 'wolf' ? 'wolves' : 'foxes').join(', ')}. Two brave people with brands and the spear drive the beasts out. They dig a new den elsewhere, and come back if the fire fails for a day.` };
+      return { s: camp.tools.spear && pitLit() && party >= 2 ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${wild.length} den${wild.length > 1 ? 's' : ''} near: ${wild.map(c => c.owner === 'wolf' ? 'wolves' : 'foxes').join(', ')}. Two brave people with brands and the spear drive the beasts out. They dig a new den elsewhere, and come back if the fire fails for a day.` };
     },
     offers(a){
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
@@ -3932,15 +3933,15 @@ const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
 /* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
-  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
-  { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Shift makes the tool stick.' },
+  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Enter or click lights it. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
 let viewCamp = null;
 let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
-let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
+let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 const $ = id => document.getElementById(id);
 
@@ -4012,11 +4013,29 @@ function gauges(){
 const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`) || (text != null && ui.mutes.has(`${type}:${campId}:${text}`));
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+/* A mute key as the player reads it. The chip's text may hold a colon, so only the first two are split on. */
+const ALERT_LABEL = { fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
+function muteLabel(m){
+  const i = m.indexOf(':'), j = i < 0 ? -1 : m.indexOf(':', i + 1);
+  const type = i < 0 ? m : m.slice(0, i), kind = `${ALERT_LABEL[type] || type} alerts`;
+  if (i < 0) return `${kind}, everywhere`;
+  const c = camps.find(c => String(c.id) === (j < 0 ? m.slice(i + 1) : m.slice(i + 1, j))), at = c ? c.name : 'a camp that is gone';
+  return j < 0 ? `${kind} at ${at}` : `${m.slice(j + 1)}, at ${at}`;
+}
+
+/* True when the text names this one. Whole words only: 'Ann' is not in 'Anna is cold'. */
+function namesIn(text, name){
+  for (let i = text.indexOf(name); i >= 0; i = text.indexOf(name, i + 1)){
+    const before = text[i - 1], after = text[i + name.length];
+    if (!(before && /\p{L}/u.test(before)) && !(after && /\p{L}/u.test(after))) return true;
+  }
+  return false;
+}
 
 /* The first living person a line names, so the chip can jump to them. The camp's own people come first. */
 function pulseWho(text){
-  const who = campHumans().find(b => text.includes(b.name))
-    || beings.find(b => b.alive && b.species === 'human' && text.includes(b.name));
+  const who = campHumans().find(b => namesIn(text, b.name))
+    || beings.find(b => b.alive && b.species === 'human' && namesIn(text, b.name));
   return who ? who.id : undefined;
 }
 
@@ -4134,6 +4153,11 @@ function cursorAfter(c, dx, dy, mult, view){
   const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
+/* The cursor when a sector opens. A cursor already in that sector stays, so a hovered centre is kept. Any other keeps its place in its own sector. */
+function cursorInSector(c, sx, sy){
+  const s = secOf(c.x, c.y);
+  return { x: c.x - s.sx * LW + sx * LW, y: c.y - s.sy * LH + sy * LH, z: c.z };
+}
 /* One phrase for what is under the cursor. A being first, then the tile. */
 function cursorPhrase(){
   const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
@@ -4151,13 +4175,14 @@ function cursorPhrase(){
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
-/* Inspectors share one saved rect, so each new one steps 24 px down and across from the count already open.
+/* Inspectors share one saved rect, so each new one steps 24 px down and across, into the first slot no open inspector holds.
    A drawer window keeps one rect per drawer id and opens where it was left. */
 const WIN_STEP = 24;
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;
   const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
-  const n = kind === 'inspect' ? ui.windows.filter(w => w.kind === 'inspect').length : 0;
+  const held = (n) => ui.windows.some(w => w.kind === 'inspect' && w.x === saved.x + WIN_STEP * n && w.y === saved.y + WIN_STEP * n);
+  let n = 0; if (kind === 'inspect') while (held(n)) n++;
   const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
@@ -4186,7 +4211,7 @@ function paletteRows(){
   for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
   camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
   for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
-  for (const m of ui.mutes) out.push({ label: `Unmute: ${m}`, key: '', action: 'unmute', arg: m, group: 9 });
+  for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
   for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
   return out;
 }
@@ -4206,13 +4231,15 @@ function paletteMatch(query, rows){
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog.
+   'dialog' only inside a dialog. A focused row wins over an 'any' row on the same key.
+   A quiet row works but stays out of the help table.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
+/* A drawer with `fit` is as tall as its rows, up to a cap. The others share the height that is left. */
 const DRAWERS = [
-  { id: 'people',    label: 'People',    key: '1' },
+  { id: 'people',    label: 'People',    key: '1', fit: true },
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
-  { id: 'camp',      label: 'Camp',      key: '4' },
+  { id: 'camp',      label: 'Camp',      key: '4', fit: true },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
@@ -4272,7 +4299,8 @@ const KEYMAP = [
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
-/* Stage letters are checked before the tool keys below, since those rows fire on any focus and would shadow them. */
+/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick Light fire. */
+KEYMAP.push({ key: 'f',          shift: true, focus: 'window', action: 'follow', label: 'Follow this person', quiet: true });
 for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
@@ -4294,8 +4322,9 @@ function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
-  for (const k of KEYMAP){
-    if (k.focus !== 'any' && k.focus !== kind) continue;
+  /* The focused rows answer first, then the 'any' rows. The order of the table does not decide it. */
+  for (const want of [kind, 'any']) for (const k of KEYMAP){
+    if (k.focus !== want) continue;
     const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
     if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
@@ -4487,7 +4516,7 @@ function drawLoc(){
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
-/* Inspection: hover and pinned detail on a being or a tile. */
+/* Inspection: the hover card and the window card for a being or a tile. */
 
 /* ---- inspection ---- */
 function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${color}"></i></span>`; }
@@ -4507,7 +4536,8 @@ function inspectGod(g){
     <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${g.status === 'dead' ? 'Dead' : 'Asleep'} since age ${g.sleptAt || g.born}. ${body}</div>
     ${said ? `<h3>What the legends say</h3><ul class="hist">${said}</ul>` : ''}`;
 }
-function inspectBeing(a, full = tipPinned){
+/* full is the window's card: the long history and the Follow button. The hover tip shows the short one. */
+function inspectBeing(a, full = false){
   if (a.species === 'god') return inspectGod(a);
   const m = mood(a), sp = SPECIES[a.species];
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
@@ -4577,13 +4607,12 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
   const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
-  tip.innerHTML = close + body;
+  tip.innerHTML = body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
-  tip.classList.toggle('pinned', tipPinned); tip.setAttribute('role', tipPinned ? 'dialog' : 'tooltip'); tip.hidden = false;
+  tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight, gap = 14, vw = window.innerWidth, vh = window.innerHeight;
   let { x, y, left } = tipAnchor;
   let px = left ? x - w - gap : x + gap;
@@ -4591,7 +4620,7 @@ function renderTip(){
   const py = clamp(left ? y : y + gap, 8, Math.max(8, vh - h - 8));
   tip.style.left = Math.max(8, px) + 'px'; tip.style.top = py + 'px';
 }
-function hideTip(){ tipTarget = null; tipAnchor = null; tipPinned = false; renderTip(); }
+function hideTip(){ tipTarget = null; tipAnchor = null; renderTip(); }
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
@@ -4599,7 +4628,6 @@ function pinCell(c, e){
   ui.focus = `window:${w.id}`; hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
-  if (tipPinned) return;
   const same = tipTarget && tipTarget.cell && tipTarget.cell[0] === c.x && tipTarget.cell[1] === c.y && tipTarget.cell[2] === c.z;
   if (!same) tipTarget = targetForCell(c);
   tipAnchor = { x: e.clientX, y: e.clientY, left: false }; renderTip();
@@ -4624,7 +4652,6 @@ function renderClock(){
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
 }
 function renderStrip(){
-  renderClock();
   /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
   $('campName').textContent = camp.name;
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
@@ -4727,7 +4754,7 @@ function renderDrawers(){
   docked.forEach((id, n) => {
     const d = DRAWERS.find(d => d.id === id);
     let sec = host.querySelector(`section[data-drawer="${id}"]`);
-    if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
+    if (!sec){ sec = document.createElement('section'); sec.className = d.fit ? 'drawer fit' : 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
     if (host.children[n] !== sec) host.insertBefore(sec, host.children[n] || null);
     sec.classList.toggle('focus', ui.focus === 'drawer:' + id);
     for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
@@ -4744,7 +4771,7 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
@@ -4798,8 +4825,8 @@ function muteChoice(k){
 function openHelp(){
   closeDialogs();
   const seen = new Set();
-  $('helpKeys').innerHTML = KEYMAP.map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
-  $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(m)}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
+  $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
+  $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
   ui.focus = 'dialog'; $('help').showModal();
 }
 
@@ -4843,7 +4870,7 @@ function setView(v, s){
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
+function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
@@ -4912,10 +4939,10 @@ function rowOpen(){
   if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
-  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => r.e.text.includes(b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
+  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
+function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -4943,7 +4970,7 @@ const ACTIONS = {
     if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
     /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
     if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
-    if (tipPinned) hideTip();
+    hideTip();
   },
   rowUp(){ rowMove(-1); },
   rowDown(){ rowMove(1); },
@@ -5025,9 +5052,6 @@ function initUI(){
   $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
   $('lvUp').onclick = ACTIONS.levelUp; $('lvDown').onclick = ACTIONS.levelDown;
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b) ACTIONS.campN(camps.findIndex(c => c.id === Number(b.dataset.camp)) + 1); });
-  $('tip').addEventListener('pointerdown', e => {
-    const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderTip(); }
-  });
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
@@ -5041,7 +5065,7 @@ function initUI(){
   wireWindows();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
-  cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
+  cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
   wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });

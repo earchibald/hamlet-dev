@@ -17,7 +17,7 @@ function setView(v, s){
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
+function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
@@ -86,10 +86,10 @@ function rowOpen(){
   if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
-  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => r.e.text.includes(b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
+  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
+function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -117,7 +117,7 @@ const ACTIONS = {
     if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
     /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
     if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
-    if (tipPinned) hideTip();
+    hideTip();
   },
   rowUp(){ rowMove(-1); },
   rowDown(){ rowMove(1); },
