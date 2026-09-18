@@ -37,3 +37,45 @@ function applyTool(c, e){
   }
   renderUI(true);
 }
+
+/* The action table. Every key and every click ends here. The only place view state changes. */
+function persist(){ /* task 7 */ }
+function openDrawer(id, on){ /* task 7 */ }
+function rowMove(d){ /* task 7 */ }
+function rowOpen(){ /* task 7 */ }
+function rowPick(n){ /* task 7 */ }
+function setPriority(d){ /* task 7 */ }
+function openHelp(){ /* task 6 */ }
+function openStart(){ /* task 6 */ }
+function focusStep(d){
+  const ring = ['map', ...ui.open.map(id => `drawer:${id}`)];
+  const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length;
+  ui.focus = ring[j]; renderUI(true);
+}
+const ACTIONS = {
+  pause(){ setPaused(!paused); },
+  step(){ setPaused(true); step(); renderUI(true); },
+  hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  slower(){ setSpeed(speed === 16 ? 4 : 1); setPaused(false); },
+  faster(){ setSpeed(speed === 1 ? 4 : 16); setPaused(false); },
+  speed(s){ setSpeed(s); setPaused(false); },
+  tool(id){ setTool(id); },
+  view(){ cycleView(); },
+  levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
+  levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
+  nav([dx, dy]){ move(dx, dy); },
+  drawer(id){ openDrawer(id); },
+  focusNext(){ focusStep(1); },
+  focusPrev(){ focusStep(-1); },
+  back(){ if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; } if (tipPinned) hideTip(); },
+  rowUp(){ rowMove(-1); },
+  rowDown(){ rowMove(1); },
+  rowOpen(){ rowOpen(); },
+  rowPick(n){ rowPick(n); },
+  priorityUp(){ setPriority(1); },
+  priorityDown(){ setPriority(-1); },
+  showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  help(){ openHelp(); },
+  start(){ openStart(); },
+};

@@ -111,4 +111,30 @@ test('the view key changes when the world does', () => {
   const api = day21(); const k1 = api.viewKey(); for (let i = 0; i < 300; i++) api.step(); assert.notEqual(api.viewKey(), k1);
 });
 
+const KEYS = ['KEYMAP', 'keyAction', 'ACTIONS'];
+const ev = (key, mods = {}) => ({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods });
+
+test('every key map entry names an action that exists', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  for (const k of api.KEYMAP) assert.equal(typeof api.ACTIONS[k.action], 'function', `${k.key} names ${k.action}`);
+});
+
+test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the map and the row in a drawer, numbers toggle drawers on the map and pick rows in one', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(api.keyAction(ev('Escape'), 'map'), { action: 'back', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('Escape'), 'drawer:goals'), { action: 'back', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'map'), { action: 'nav', arg: [-1, 0] });
+  assert.deepEqual(api.keyAction(ev('ArrowDown'), 'drawer:people'), { action: 'rowDown', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'drawer:goals'), { action: 'priorityDown', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('2'), 'map'), { action: 'drawer', arg: 'goals' });
+  assert.deepEqual(api.keyAction(ev('2'), 'drawer:people'), { action: 'rowPick', arg: 2 });
+  assert.deepEqual(api.keyAction(ev('Tab'), 'drawer:people'), { action: 'focusNext', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('Tab', { shiftKey: true }), 'map'), { action: 'focusPrev', arg: undefined });
+  assert.deepEqual(api.keyAction(ev(' '), 'drawer:goals'), { action: 'pause', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('.'), 'map'), { action: 'step', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('>', { shiftKey: true }), 'map'), { action: 'hour', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('F2'), 'map'), { action: 'campN', arg: 2 });
+  assert.equal(api.keyAction(ev('q'), 'map'), null);
+});
+
 module.exports = { loadUI };
