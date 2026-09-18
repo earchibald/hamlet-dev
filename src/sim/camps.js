@@ -134,8 +134,10 @@ function updateCamps(){
     if (tick % 100 === 0) spoilFood();
     if (tick % 300 === 0) faeTick();
     if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, 3000); }
-    /* Births. Two people who like each other, a roof, food to spare, and a warm season. */
-    if (tick % 400 === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= 6 && rng() < 0.35){
+    /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
+       A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
+       the land feeds, and winter, when nothing can be gathered, then killed it together. */
+    if (tick % 400 === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= foodTarget() && rng() < 0.35){
       const hs = campHumans().filter(h => stage(h) === 'adult' && tick - h.lastChild > 16 * DAY);
       let pair = null;
       for (const p of hs) for (const q of hs) if (p.id < q.id && (p.opinions[q.id] || 0) >= 35 && (q.opinions[p.id] || 0) >= 35 && (!pair || (p.opinions[q.id] + q.opinions[p.id]) > pair.v)) pair = { p, q, v: p.opinions[q.id] + q.opinions[p.id] };
@@ -153,7 +155,7 @@ function updateCamps(){
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + 900 + rint(900);
-      if (pitLit() && stashFood() >= 2 && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? 0.85 : 0.7)){
+      if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? 0.85 : 0.7)){
         const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
         const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
         const ok = edges.filter(i => region.has(i));
