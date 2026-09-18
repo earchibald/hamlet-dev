@@ -142,6 +142,21 @@ A grove on a forest hill lives in a hollow under the hill instead of a pine: a p
 
 Protection: the offering stone (2 rocks) and ward posts (6 charred sticks, sprites keep 9 tiles from the fire, costs favour, blocks gifts as well as pranks). People build wards only after favour has gone bad.
 
+## 11a. The gnomes
+
+Gnomes are a second people, hidden from the player until seen. They never attack.
+
+- **Home.** Two or three burrows a world, dug like fox dens under meadow edges beside a forest or a hill, at least 25 tiles from the start sector. Two or three gnomes to a burrow. A burrow sits at level −1 with a slope at its mouth, and a mushroom patch of 4 or more tiles covers the soil around the mouth. Gnomes start aged 20 to 35 days, live 110 days, and have no births: a burrow's line of gnomes only shrinks.
+- **Hours.** Asleep in the burrow from 06:00 to 19:00. Out from dusk to dawn. They tend the patch every night, not only when hungry.
+- **Needs and food.** Food, rest, and company. Mushrooms on their own patch regrow at a chance of 0.3 a sample and give 35 food each. Gnomes also eat wild berries. They never eat meat, and never take from a camp's stash.
+- **Company.** A gnome near its kin huddles with them, the way sprites do.
+- **Copying.** A camp workshop within 40 tiles gives an unbenched burrow a bench of its own within a few days: a one-in-three chance every 500 ticks. Chronicle: "Small tools clink under the meadow at night."
+- **Borrowing.** With a bench, at night, a gnome takes one made thing at a time from an unwarded camp stash within 40 tiles: a pot, then a coil of cord, then the basket. It returns two days later with a gift beside the taken thing: cord, clay, or a pot. A burrow does not borrow again for six days after a repayment. The cave's `holding` field stops two gnomes of the same burrow from both borrowing the same night, a race a soak run once caught.
+- **Leaving.** A village within 30 tiles, or two disturbances, is too loud. Three days later the gnomes dig a new hole 50 or more tiles from every village and move in, carrying their bench, debt, and repayment timer with them. The old hole stands empty and abandoned, and a player can still inspect it. The on-demand dig tries one sector a call and retries every three days if it finds no room.
+- **Neutral.** Gnomes never attack. They flee a brand within 5 tiles and a wolf within 6. They ignore sprites, and sprites ignore them.
+- **Seeing them.** Glyph `g`, mushrooms `ɸ`. Tooltips on the being, the burrow, and the patch. A person awake near a gnome in gnome hours writes the first-sight chronicle line. A camp can also come to know of gnomes from footprints left after a borrow. The goal card "The hidden neighbours" tracks what a camp knows.
+- **What the soak counts.** Gnomes alive at day 70, gnome deaths (must be zero), `campsThatSawGnomes`, benches, borrowed, repaid, and `gnomesLeft`.
+
 ## 12. Founding and travel
 
 Newcomers spawn only at world edges from which the camp is reachable, and never in winter. They walk to the camp; camp-based actions (eat at the stash, sleep in the hut) require having arrived. Founding parties leave in spring or summer with coals, and pick a meadow at least three sectors from every camp.
@@ -173,6 +188,8 @@ The soak asserts, per seed:
 
 `tests/crafts.js` runs each recipe through the real goal offers on a hand-built camp: the offer appears, the person does the work, the thing exists, and the goal moves from blocked to active to done or idle.
 
+`tests/gnomes.js` checks the gnomes: burrows exist and are reachable, gnomes sleep by day and wake at dusk to tend the patch, mushrooms regrow, a burrow copies a nearby workshop, a borrow returns with a repayment and cannot be doubled up or repeated inside six days, a loud village sends a burrow to a new hole 50 or more tiles away, and first sight is written down once.
+
 Known weak spots:
 - Snare catches are low, 1 to 5 per world in 70 days, since rabbits became a real population.
 - Deer pits rarely catch, since deer range far from camps.
@@ -185,6 +202,8 @@ Known weak spots:
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
 - A person who keeps returning to a defended den will die in three or four visits; the cave goals must draw the owners off or stop re-offering the den to a hurt person.
 - A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
+- Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
+- The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
 
 ## 15. Next
 
