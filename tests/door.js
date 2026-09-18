@@ -43,7 +43,7 @@ test('a poke through the door names the person in the chronicle and is logged by
   assert.deepEqual(api.doorLog, [{ tick: api.tick, source: 'player', act: 'poke', id: a.id }]);
   /* chooseTask runs after the nudge and may write its own lines, so look for the line, not at the top. */
   assert.ok(api.chronicle.some(e => e.text === `${a.name} feels a nudge from above.`), 'no chronicle line for the nudge');
-  assert.equal(api.inject({ source: 'player', act: 'poke', id: -1 }), 'Nobody is there to poke.');
+  assert.equal(api.inject({ source: 'player', act: 'poke', id: -1 }), 'Nobody is there to nudge.');
   assert.equal(api.doorLog.length, 2);
   assert.equal(api.doorLog[1].id, -1);
 });
@@ -60,4 +60,39 @@ test('the replay record names the seed and the options', () => {
   const a = api.beings[0];
   api.inject({ source: 'player', act: 'poke', id: a.id });
   assert.deepEqual(api.replay, { seed: 'r', options: { sw: 12, sh: 8, zmin: -2, zmax: 2 }, log: [{ tick: api.tick, source: 'player', act: 'poke', id: a.id }] });
+});
+
+test('a goal priority is an act: refused for a bad goal or value, logged, and in the chronicle', () => {
+  const api = load(); api.startWorld('r');
+  assert.equal(api.inject({ source: 'player', act: 'priority', id: 'no-such-goal', pri: 2 }), 'No such goal.');
+  assert.equal(api.inject({ source: 'player', act: 'priority', id: 'snare', pri: 5 }), 'A priority is off, on, or high.');
+  assert.equal(api.doorLog.length, 2, 'lawful acts that did nothing are still logged');
+  assert.equal(api.inject({ source: 'player', act: 'priority', id: 'snare', pri: 2 }), 'Set snares for rabbits: high.');
+  assert.equal(api.goalPriority.snare, 2);
+  assert.ok(api.chronicle.some(e => e.text === 'A wish from above: set snares for rabbits is wanted most.'));
+});
+
+test('the camp site is an act with its guards inside the door', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.beings[0]; api.camp = api.camps[0];
+  let water = null, open = null;
+  for (const t of api.world){ if (!water && t.ground === 'water') water = t; if (!open && t.ground === 'grass' && !t.feature && !t.struct) open = t; if (water && open) break; }
+  assert.equal(api.inject({ source: 'player', act: 'site', x: open.x, y: open.y, z: 1 }), 'The camp must be on the valley floor.');
+  assert.equal(api.inject({ source: 'player', act: 'site', x: water.x, y: water.y, z: 0 }), 'The camp site must be open ground you can stand on.');
+  assert.equal(api.inject({ source: 'player', act: 'site', x: open.x, y: open.y, z: 0 }), 'Camp site set. The fire pit will go here.');
+  assert.deepEqual(api.camps[0].site, [open.x, open.y]);
+  assert.ok(api.chronicle.some(e => e.text === 'The camp site moves. Someone felt it was right.'));
+  api.camps[0].pit = [open.x, open.y];
+  assert.equal(api.inject({ source: 'player', act: 'site', x: open.x, y: open.y, z: 0 }), 'The fire pit is already built. The camp stays where it is.');
+  assert.equal(api.doorLog.length, 4);
+});
+
+test('an event that carries a tick must arrive at that tick', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.beings[0];
+  assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick - 1 }), 'Not now.');
+  assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick + 1 }), 'Not now.');
+  assert.deepEqual(api.doorLog, []);
+  assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick }), `${a.name} looks up, then gets to it.`);
+  assert.deepEqual(api.doorLog, [{ source: 'player', act: 'poke', id: a.id, tick: api.tick }]);
 });

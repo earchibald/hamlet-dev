@@ -338,12 +338,8 @@ function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
     case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
-    case 'camp': {
-      if (camp.pit){ say('The fire pit is already built. The camp stays where it is.'); break; }
-      if (c.z !== 0){ say('The camp must be on the valley floor.'); break; }
-      const t = tileAt(c.x, c.y); if (!passable(c.x, c.y) || t.feature){ say('The camp site must be open ground you can stand on.'); break; }
-      camp = viewCamp; setSite(c.x, c.y); camp.siteReason = 'you chose it'; log('The camp site moves. Someone felt it was right.', humans()); say('Camp site set. The fire pit will go here.'); break; }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to poke.'); break; }
+    case 'camp': camp = viewCamp; say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z })); break;
+    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   renderUI(true);
 }
@@ -377,7 +373,7 @@ function initUI(){
   $('nW').onclick = () => move(-1, 0); $('nE').onclick = () => move(1, 0); $('nN').onclick = () => move(0, -1); $('nS').onclick = () => move(0, 1);
   $('lvUp').onclick = () => setLevel(lvl + 1); $('lvDown').onclick = () => setLevel(lvl - 1);
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b){ viewCamp = camps.find(c => c.id === Number(b.dataset.camp)); if (viewCamp.site){ followId = null; setView('loc', secOf(...viewCamp.site)); } renderUI(true); } });
-  $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ goalPriority[b.dataset.goal] = Number(b.dataset.pri); renderUI(true); } });
+  $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ say(inject({ source: 'player', act: 'priority', id: b.dataset.goal, pri: Number(b.dataset.pri) })); renderUI(true); } });
   const tipForRow = (e, pin) => {
     const b = e.target.closest('[data-being]'); if (!b) return; const id = Number(b.dataset.being);
     if (pin && tipPinned && tipTarget && tipTarget.being === id){ hideTip(); return; }

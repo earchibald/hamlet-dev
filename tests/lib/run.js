@@ -11,13 +11,12 @@ const DAY = 1000;
 function scriptGod(api, i){
   for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 });
 }
-/* A god that replays a log: every event whose tick has passed goes through the door, in order, and
-   nothing else happens. The guard is <= rather than ===, so an event whose exact tick is skipped
-   (the step order does not land on every tick) is still applied at the next opportunity, rather
-   than silently dropped. */
+/* A god that replays a log: every event goes through the door at its own tick, in order, and nothing
+   else happens. The door refuses an event that arrives at the wrong tick, so an event this god has
+   let slip past is an error here, never a silent drop. */
 function logGod(log){
   let k = 0;
-  return api => { while (k < log.length && log[k].tick <= api.tick){ const { tick, ...e } = log[k++]; api.inject(e); } };
+  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
 }
 /* A god built from a replay record ({ seed, options, log }): replays its log. Meant to be used with
    runDays(replay.seed, days, onTick, replayGod(replay), replay.options), so a seed, its options,
