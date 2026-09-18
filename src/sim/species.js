@@ -201,12 +201,15 @@ function denTick(){
     const y = makeBeing(c.owner, 0, 0, null, 0); const t = floor[y.id % floor.length]; y.x = t.x; y.y = t.y; y.z = t.z; y.born = tick; y.den = c; beings.push(y); c.lastBirth = tick;
     log(c.owner === 'wolf' ? 'A wolf pup is born in the den under the hill.' : 'Fox kits are born in the den under the hill.', []);
   }
-  /* Displaced owners dig a new den within three days, on a hill with no den of theirs. */
-  for (const w of beings){ if (!w.alive || !w.oldDen || w.den || tick - w.oldDen.clearedAt < 3 * DAY) continue;
+  /* Displaced owners dig a new den within three days, on a hill with no den of theirs. A failed try
+     (no hill would take a den) waits 500 ticks before trying again, so a den-less wolf does not draw
+     a shuffle every single tick. */
+  for (const w of beings){ if (!w.alive || !w.oldDen || w.den || tick - w.oldDen.clearedAt < 3 * DAY || (w.digAgain || 0) > tick) continue;
     const oldDen = w.oldDen, owner = w.species;
     const others = hills.filter(h => h !== oldDen.hill && !caves.some(c => c.kind === 'den' && c.hill === h && c.owner === owner && !c.cleared));
     let fresh = null; for (const h of shuffle(others)){ fresh = digDen(h, owner); if (fresh) break; }
     if (fresh){ fresh.from = oldDen; for (const o of beings) if (o.alive && o.oldDen === oldDen && !o.den){ o.den = fresh; o.oldDen = null; } fresh.story.push('Dug after the old den was taken.'); log(owner === 'wolf' ? 'The wolves have dug a new den under another hill.' : 'The foxes have dug a new den under another hill.', []); }
+    else w.digAgain = tick + 500;
   }
   /* A cleared den goes back to its owners when the camp's fire has been out a whole day. Both owners who
      redug elsewhere and owners still homeless come home. */
@@ -224,9 +227,11 @@ function denTick(){
   }
 }
 
-/* A grown owner standing in its den attacks any person on the den's tiles, by day or night, brand or no brand. One bite every 150 ticks. */
+/* A grown owner standing in its den attacks any person on the den's tiles, by day or night, brand or no brand.
+   One bite every 150 ticks, shared by the whole den: the cooldown lives on the den, not the animal, so two
+   grown owners cannot both bite the same person in one tick. */
 function defendDen(a){
-  const c = a.den, bite = SPECIES[a.species].bite; if (!c || !bite || stage(a) === 'young' || (a.cooldown.defend || 0) > tick) return;
+  const c = a.den, bite = SPECIES[a.species].bite; if (!c || !bite || stage(a) === 'young' || (c.lastBite || 0) + 150 > tick) return;
   const here = tileAt(a.x, a.y, a.z); if (!here || here.cave !== c) return;
   const h = beings.find(b => b.alive && b.species === 'human' && b.z === a.z && c.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z));
   if (!h) return;
@@ -234,7 +239,7 @@ function defendDen(a){
   h.hp -= bite.hp + rint(bite.spread); h.lastHurt = `was killed in a den by a ${label}`; h.lastHurtAt = tick; h.asleep = false;
   addThought(h, 'denbite', `Bitten by a ${label} in its den`, bite.mood, 1500); drift(h, 'bravery', -0.02);
   log(`A ${label} comes at ${h.name} in its den.`, [h], 'bad');
-  a.cooldown.defend = tick + 150; addThought(a, 'defend', 'Drove an intruder from the den', 6, 600);
+  c.lastBite = tick; addThought(a, 'defend', 'Drove an intruder from the den', 6, 600);
   failTask(h); START.flee(h);
 }
 

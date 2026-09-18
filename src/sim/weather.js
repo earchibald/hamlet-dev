@@ -13,6 +13,7 @@ function burnOut(t){
 
 /* Fire spreads to neighbours and burns down. Rain slows it. Surface tiles first, then the tiles off the surface. */
 function spreadFire(){
+  if (fireCount <= 0) return;
   let count = 0;
   for (const t of world) if (t.fire > 0){ count++; burnTile(t); }
   for (const t of raised) if (t.fire > 0){ count++; burnTile(t); }

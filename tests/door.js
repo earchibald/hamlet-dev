@@ -87,6 +87,40 @@ test('the camp site is an act with its guards inside the door', () => {
   assert.equal(api.doorLog.length, 4);
 });
 
+test('a site on an unreachable tile is refused through inject', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.beings[0]; api.camp = api.camps[0];
+  let open = null;
+  for (const t of api.world){ if (t.ground === 'grass' && !t.feature && !t.struct && api.dist(t.x, t.y, a.x, a.y) > 5){ open = t; break; } }
+  assert.ok(open, 'no open tile far from the first person');
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ if (!api.hasTile(open.x + dx, open.y + dy, 0)) continue; const q = api.tileAt(open.x + dx, open.y + dy); q.ground = 'water'; q.feature = null; q.struct = null; }
+  const msg = api.inject({ source: 'player', act: 'site', x: open.x, y: open.y, z: 0, camp: api.camps[0].id });
+  assert.equal(msg, 'Nobody can walk there from where they stand.');
+  assert.equal(api.camps[0].site, null);
+});
+
+test('the site act carries its camp: a second camp\'s site is not carried onto the first on replay', () => {
+  const api = load(); api.startWorld('r');
+  const c1 = api.camps[0]; const c2 = api.makeCamp('Second camp');
+  let open1 = null, open2 = null;
+  for (const t of api.world){ if (t.ground === 'grass' && !t.feature && !t.struct){ if (!open1) open1 = t; else if (!open2 && api.dist(t.x, t.y, open1.x, open1.y) > 6){ open2 = t; break; } } }
+  assert.ok(open1 && open2, 'two distinct open tiles');
+  api.camp = c2;
+  const msg = api.inject({ source: 'player', act: 'site', x: open2.x, y: open2.y, z: 0, camp: c2.id });
+  assert.equal(msg, 'Camp site set. The fire pit will go here.');
+  assert.deepEqual(c2.site, [open2.x, open2.y]);
+  assert.equal(c1.site, null, 'the first camp is unchanged');
+  const replay = api.replay;
+
+  /* Replay the log onto a fresh world exactly as the test runner does: camp defaults to camps[0]. */
+  const api2 = load(); api2.startWorld(replay.seed, replay.options);
+  const c1b = api2.camps[0]; const c2b = api2.makeCamp('Second camp');
+  api2.camp = c1b;
+  for (const e of replay.log) api2.inject(e);
+  assert.deepEqual(c2b.site, [open2.x, open2.y], 'the second camp got its site back');
+  assert.equal(c1b.site, null, 'the first camp did not inherit the second camp\'s site');
+});
+
 test('an event that carries a tick must arrive at that tick', () => {
   const api = load(); api.startWorld('r');
   const a = api.beings[0];

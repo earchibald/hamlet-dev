@@ -52,7 +52,7 @@ function countEvents(api, events){
   const hs = api.beings.filter(b => b.species === 'human');
   const byCause = {}; for (const e of deaths(events)){ const k = e.text.replace(/^\w+ /, '').replace(/\.$/, ''); byCause[k] = (byCause[k] || 0) + 1; }
   return {
-    storms: ev('storm rolls') + ev('Sleet'), strikes: ev('Lightning strikes'), embers: ev('sets the ember'), sparks: ev('coaxes a spark'),
+    storms: ev('storm rolls') + ev('Sleet'), strikes: ev('Lightning strikes') - ev('Lightning strikes the pit'), embers: ev('sets the ember'), sparks: ev('coaxes a spark'),
     wolfRaids: ev('wolf slips'), mauled: ev('mauls'), drivenOff: ev('chases the wolf'),
     seen: api.camps.filter(c => c.fae.known).length, favor: api.camps.map(c => c.fae.favor), gifts: ev('are gone by morning'),
     moss: ev('glowing moss lies') + ev('blows. The fire'), pranks: ev('tiny footprints') + ev('pinch marks') + ev('pinched out'),
@@ -92,14 +92,24 @@ function fingerprint(api, events){
   };
 }
 
-/* Living humans who cannot walk to their camp's stash. Checked once a day by the soak:
-   one full-map search per camp. A person who is cut off starves or dies of thirst in a pocket. */
+/* Living humans, and every den, water cave, and burrow, that cannot be walked to from the first
+   camp's stash. Checked once a day by the soak: one full-map search per camp. A person who is cut
+   off starves or dies of thirst in a pocket; a cave nobody can reach is a bug in the terrain the
+   same as a person who is. Abandoned caves are skipped: nothing needs to reach them any more. */
 function cutOff(api){
   const out = [];
   for (const c of api.camps){
     if (!c.stashTile) continue;
     const region = api.reachable(c.stashTile[0], c.stashTile[1], 0, api.levels.length * api.world.length);
     for (const h of api.beings) if (h.alive && h.species === 'human' && h.camp === c && !region.has(api.idx3(h.x, h.y, h.z))) out.push(`${h.name} at ${h.x},${h.y},${h.z} on day ${api.dayOf()}, ${api.seasonOf()}, cut off from ${c.name}`);
+  }
+  const first = api.camps[0];
+  if (first && first.stashTile){
+    const region = api.reachable(first.stashTile[0], first.stashTile[1], 0, api.levels.length * api.world.length);
+    for (const cave of api.caves){
+      if (cave.abandoned || !cave.exit || !['den', 'water', 'burrow'].includes(cave.kind)) continue;
+      if (!region.has(api.idx3(cave.exit.x, cave.exit.y, cave.exit.z))) out.push(`${cave.kind} cave at ${cave.exit.x},${cave.exit.y},${cave.exit.z} on day ${api.dayOf()}, ${api.seasonOf()}, cut off from ${first.name}`);
+    }
   }
   return out;
 }

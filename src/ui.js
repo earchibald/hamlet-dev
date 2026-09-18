@@ -315,7 +315,12 @@ function renderUI(force){
   if (force || key !== chronKey){ chronKey = key; $('chronicle').innerHTML = chronicle.map(e => `<li class="k-${e.kind}"><span class="when">${e.when}</span> ${e.text}</li>`).join(''); }
 }
 function say(msg){ $('hint').textContent = msg; }
-function setTool(id){ tool = id; document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); say(TOOLS.find(t => t.id === id).hint); if (tipPinned) hideTip(); }
+function setTool(id){
+  tool = id;
+  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  say(id === 'camp' && viewCamp && viewCamp.pit ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === id).hint);
+  if (tipPinned) hideTip();
+}
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); }
 function setPaused(p){ paused = p; $('pause').textContent = p ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -344,9 +349,7 @@ function applyTool(c, e){
     case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'camp': {
       camp = viewCamp;
-      const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || beings[0];
-      if (!reachable(first.x, first.y, first.z, 4000).has(idx3(c.x, c.y, 0))){ say('Nobody can walk there from where they stand.'); break; }
-      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z }));
+      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z, camp: viewCamp.id }));
       break;
     }
     case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }

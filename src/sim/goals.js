@@ -220,7 +220,7 @@ const GOALS = [
       const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40); const out = [];
       for (const c of near){
         if (c.blocked && camp.tools.axe) out.push({ label: 'clear the fallen rock', score: 40, start: a => startClearRock(a, c) });
-        else if (!c.blocked && !c.searched) out.push({ label: 'search the cave with a brand', score: 36 + a.traits.curiosity * 20, start: a => startSearchCave(a, c) });
+        else if (!c.blocked && !c.searched && (!c.claimed || !beings.some(b => b.alive && b.id === c.claimed))) out.push({ label: 'search the cave with a brand', score: 36 + a.traits.curiosity * 20, start: a => startSearchCave(a, c) });
       }
       return out;
     } },
@@ -230,14 +230,20 @@ const GOALS = [
       const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
       if (!near.length) return { s: 'blocked', text: 'No den within forty tiles.' };
       const held = near.filter(c => c.cleared === camp), wild = near.filter(c => !c.cleared);
-      if (!wild.length) return { s: 'done', text: `${held.length} den${held.length > 1 ? 's' : ''} cleared. It goes back to the beasts if the fire is out for a day.` };
-      const party = campHumans().filter(h => h.traits.bravery >= 0.5 && stage(h) !== 'young').length;
+      if (!wild.length){
+        if (held.length) return { s: 'done', text: `${held.length} den${held.length > 1 ? 's' : ''} cleared. It goes back to the beasts if the fire is out for a day.` };
+        const by = [...new Set(near.map(c => c.cleared.name))];
+        return { s: 'done', text: `${near.length} den${near.length > 1 ? 's' : ''} near, held by ${by.join(' and ')}.` };
+      }
+      const party = campHumans().filter(denReady).length;
       return { s: camp.tools.spear && pitLit() && party >= 2 ? 'active' : 'blocked', text: `${wild.length} den${wild.length > 1 ? 's' : ''} near: ${wild.map(c => c.owner === 'wolf' ? 'wolves' : 'foxes').join(', ')}. Two brave people with brands and the spear drive the beasts out. They dig a new den elsewhere, and come back if the fire fails for a day.` };
     },
     offers(a){
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
       const wild = caves.filter(c => c.kind === 'den' && c.owner && !c.cleared && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
-      return wild.map(c => ({ label: 'clear the den with brands', score: c.owner === 'wolf' ? 44 : 30, start: a => startClearDen(a, c) }));
+      /* The den goes in the label, so a failed offer's cooldown (keyed on the label) does not cool down
+         every other den too. */
+      return wild.map(c => ({ label: `clear the den with brands (${c.owner === 'wolf' ? 'wolves' : 'foxes'} under the hill at ${c.exit.x},${c.exit.y})`, score: c.owner === 'wolf' ? 44 : 30, start: a => startClearDen(a, c) }));
     } },
 ];
 function goalState(g){ if (g.locked) return { s: 'locked', text: g.locked }; return g.state(); }
