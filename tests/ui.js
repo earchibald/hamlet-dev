@@ -137,4 +137,12 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
   assert.equal(api.keyAction(ev('q'), 'map'), null);
 });
 
+test('every template button has a key in the key map', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  const ids = [...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]);
+  const keyed = new Set(api.KEYMAP.map(k => k.button).filter(Boolean));
+  for (const id of ids) assert.ok(keyed.has(id), `button #${id} has no key`);
+});
+
 module.exports = { loadUI };
