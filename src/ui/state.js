@@ -12,12 +12,17 @@ const TOOLS = [
   { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
-const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
+const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief', expression: 'Expression', company: 'Company', calm: 'Calm' };
 let viewCamp = null;
 let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
+   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+const AGE_MS = 2000;
+let pace = 1, lastEra = 'days';
+let fieldKey = '';     /* what the cached field was drawn from */
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -28,7 +33,7 @@ const ui = {
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
   open: ['people', 'goals'], /* drawers open, in order */
   focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
-  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
@@ -39,6 +44,7 @@ const ui = {
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
+  overlay: false,      /* the countries drawn over the world map in the days */
 };
 const WIN_MAX = 6;
 

@@ -2,12 +2,91 @@
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 
+/* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
+   that reads the valley asks inAges() first. */
+const inAges = () => era === 'gods';
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
+const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
+function standsIn(g){
+  let r = g.region === null || g.region === undefined ? null : regionById(g.region);
+  while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
+  return r || null;
+}
+/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
+   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
+function countryLine(r){
+  if (!r) return 'no country';
+  const poles = marksOf(r, 'pole');
+  if (!poles.length) return 'formless, not yet anything';
+  const m = poles.slice().sort((p, q) => q.age - p.age)[0];
+  /* A backstop reason names no god. Then the god of the mark is named after the reason. */
+  const g = m.by === null || m.by === undefined ? null : beingById(m.by);
+  const why = m.why.replace(/\.$/, '');
+  const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
+  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
+function godRows(){
+  return gods().map(g => ({ a: g, m: g.needs.rest, trouble: g.status === 'awake' && g.needs.calm < 20,
+    status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
+}
+
+/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
+function agesDue(acc, dt, pace){
+  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+  return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
+}
+
+/* The mean of a list of #rrggbb colours, as rgb(). */
+function mixHex(list){
+  let r = 0, g = 0, b = 0;
+  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
+  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
+}
+/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
+function fieldColor(r, pal){
+  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
+  return cs.length ? mixHex(cs) : pal['field-none'];
+}
+
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
+const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
+const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
+const markLine = m => `${markWhen(m)} ${m.why}`;
+/* A stock reason begins with the marking god's name and says the label twice. It is left out. Any other reason is kept. */
+const markSaid = m => { const g = m.by === null || m.by === undefined ? null : beingById(m.by); return !m.why || (g && m.why.startsWith(g.name)) ? markWhen(m) : markLine(m); };
+function markRows(x, y, z){
+  if (!field || inAges() || !hasTile(x, y, z)) return [];
+  const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
+  /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
+     hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markSaid(t.hill.mark)] :['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
+  if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
+  const c = t.cave || t.mouth;
+  if (c && c.mark) rows.push(['Dug by', markSaid(c.mark)]);
+  if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
+  if (!r) return rows;
+  if (z === 0){
+    const seen = new Set();
+    for (const m of marksOf(r, 'scar')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Scar', `${SCAR_WORD[m.value] || m.value}. ${markLine(m)}`]); }
+    const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
+    if (made.length) rows.push(['Made here', made.join(' ')]);
+  }
+  rows.push(['Country', countryLine(r) + '.']);
+  if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
+  return rows;
+}
+
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
   return fuel / (PIT_BURN * DAY);
 }
 function gauges(){
+  if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const days = daysOfWood();
   const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : days < 1 ? 'under a day of wood' : `${Math.floor(days)} days of wood`, level: !p.lit ? 'bad' : days < 1 ? 'bad' : days < 2 ? 'warn' : 'good' };
@@ -51,6 +130,7 @@ function pulseWho(text){
 
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
+  if (inAges()){ ui.pulses = []; return; }
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
@@ -78,6 +158,7 @@ function burningNearCamp(){
 
 /* Alerts for the current camp. Conditions read state. Chips are numbered from one. */
 function alerts(){
+  if (inAges()) return [];
   const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
@@ -134,28 +215,32 @@ function campSummary(){
 }
 
 function seasonLine(){
+  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
   return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
 }
 
 /* The rows a drawer's keys act on, in the order the drawer shows them. */
 function drawerRows(id){
-  if (id === 'people') return peopleRows().map(r => ({ kind: 'person', id: r.a.id, r }));
+  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r }));
   if (id === 'goals'){
+    if (inAges()) return [];
     const out = [];
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
   if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
-    cursor.x, cursor.y, cursor.z].join('#');
+    cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
 /* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
@@ -170,6 +255,7 @@ function cursorInSector(c, sx, sy){
 }
 /* One phrase for what is under the cursor. A being first, then the tile. */
 function cursorPhrase(){
+  if (inAges()) return countryLine(regionAt(cursor.x, cursor.y));
   const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
   if (a) return `${a.name}${a.species === 'god' ? ' ' + a.epithet : ''}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
   if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
@@ -217,12 +303,13 @@ function paletteRows(){
     out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
   }
   for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
-  for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
-  for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
-  camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
-  for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  if (!inAges()) for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
+  if (!inAges()) for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
+  if (!inAges()) camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
+  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
   for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
-  for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  if (!inAges()) for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  for (const g of gods()) out.push({ label: `Inspect ${g.name} ${g.epithet}`, key: '', action: 'inspect', arg: g.id, group: 9 });
   return out;
 }
 /* Fuzzy match: every word of the query is a substring of the label. Prefix matches first, then shorter labels. Empty query: help, chips, tools and drawers, recent, the rest. */

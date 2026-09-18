@@ -16,6 +16,7 @@
   --map-boulder:#8c8880; --map-boulder-fg:#5a564f; --map-stick:#8a5a2b; --map-rock:#5e5a53; --map-carcass:#8a3a3a;
   --map-fire-bg:#f3b35c; --map-fire:#c2331a; --map-fire2:#e5691c; --map-pit:#b9aa93; --map-snare:#4a6b8a; --map-stash:rgba(42,95,124,.18);
   --map-night:18,26,52; --map-halo:rgba(247,249,250,.85); --map-select:#1b2631; --map-rabbit:#7a6248; --map-fox:#c5581c; --map-deer:#8a5a3c; --map-wolf:#3a3f4a; --map-sprite:#6a3fb5; --map-gnome:#7a5c2e; --map-god:#a8761b; --map-rain:#4a78a8; --map-snow:#ffffff; --map-corpse:#5a6773; --map-grid:rgba(27,38,49,.35); --map-hill:#a9a297; --map-hill-fg:#6f685d; --map-stone:#d3cec4; --map-stone-fg:#9a9388; --agent-light:32%;
+  --field-none:#b9b6ae; --field-wet:#6fa3c7; --field-dry:#d9c48a; --field-hot:#d9824a; --field-cold:#a9c4d6; --field-above:#e6e1d6; --field-below:#6b6458; --field-light:#f2e9b8; --field-dark:#4a4f6a; --field-still:#9fb8a8; --field-moving:#c7b7d9; --field-scar:#7a2f2f; --field-line:#1b2631;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
@@ -24,7 +25,8 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; } }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%;
+  --field-none:#4a4640; --field-wet:#2f6f9e; --field-dry:#8a7a45; --field-hot:#b0562a; --field-cold:#5d8296; --field-above:#8f897c; --field-below:#26221d; --field-light:#b8a85a; --field-dark:#1c2038; --field-still:#4f6a5a; --field-moving:#6f5f8a; --field-scar:#d46a6a; --field-line:#e3e9ed; } }
 :root[data-theme="dark"]{
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
   --accent:#7fb3d1; --accent-ink:#10181e; --good:#7cc58a; --warn:#e0b25a; --bad:#ef7d6d; --major:#e3e9ed; --bar-bg:#2a343c;
@@ -32,7 +34,8 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%;
+  --field-none:#4a4640; --field-wet:#2f6f9e; --field-dry:#8a7a45; --field-hot:#b0562a; --field-cold:#5d8296; --field-above:#8f897c; --field-below:#26221d; --field-light:#b8a85a; --field-dark:#1c2038; --field-still:#4f6a5a; --field-moving:#6f5f8a; --field-scar:#d46a6a; --field-line:#e3e9ed; }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
@@ -111,6 +114,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
 #chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 #chronicle .when{color:var(--muted);font-size:11px;font-family:"JetBrains Mono",monospace;display:inline-block;min-width:88px}
+#legends{list-style:none;margin:0;padding:0}
+#legends li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
+#legends li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+#legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
@@ -174,6 +181,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="pause">Pause<kbd>Space</kbd></button>
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
+      <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
@@ -189,6 +197,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
+      <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
@@ -3937,12 +3946,17 @@ const TOOLS = [
   { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
-const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
+const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief', expression: 'Expression', company: 'Company', calm: 'Calm' };
 let viewCamp = null;
 let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
+   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+const AGE_MS = 2000;
+let pace = 1, lastEra = 'days';
+let fieldKey = '';     /* what the cached field was drawn from */
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -3953,7 +3967,7 @@ const ui = {
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
   open: ['people', 'goals'], /* drawers open, in order */
   focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
-  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
@@ -3964,6 +3978,7 @@ const ui = {
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
+  overlay: false,      /* the countries drawn over the world map in the days */
 };
 const WIN_MAX = 6;
 
@@ -3992,12 +4007,91 @@ function restore(){
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 
+/* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
+   that reads the valley asks inAges() first. */
+const inAges = () => era === 'gods';
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
+const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
+function standsIn(g){
+  let r = g.region === null || g.region === undefined ? null : regionById(g.region);
+  while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
+  return r || null;
+}
+/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
+   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
+function countryLine(r){
+  if (!r) return 'no country';
+  const poles = marksOf(r, 'pole');
+  if (!poles.length) return 'formless, not yet anything';
+  const m = poles.slice().sort((p, q) => q.age - p.age)[0];
+  /* A backstop reason names no god. Then the god of the mark is named after the reason. */
+  const g = m.by === null || m.by === undefined ? null : beingById(m.by);
+  const why = m.why.replace(/\.$/, '');
+  const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
+  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
+function godRows(){
+  return gods().map(g => ({ a: g, m: g.needs.rest, trouble: g.status === 'awake' && g.needs.calm < 20,
+    status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
+}
+
+/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
+function agesDue(acc, dt, pace){
+  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+  return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
+}
+
+/* The mean of a list of #rrggbb colours, as rgb(). */
+function mixHex(list){
+  let r = 0, g = 0, b = 0;
+  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
+  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
+}
+/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
+function fieldColor(r, pal){
+  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
+  return cs.length ? mixHex(cs) : pal['field-none'];
+}
+
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
+const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
+const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
+const markLine = m => `${markWhen(m)} ${m.why}`;
+/* A stock reason begins with the marking god's name and says the label twice. It is left out. Any other reason is kept. */
+const markSaid = m => { const g = m.by === null || m.by === undefined ? null : beingById(m.by); return !m.why || (g && m.why.startsWith(g.name)) ? markWhen(m) : markLine(m); };
+function markRows(x, y, z){
+  if (!field || inAges() || !hasTile(x, y, z)) return [];
+  const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
+  /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
+     hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markSaid(t.hill.mark)] :['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
+  if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
+  const c = t.cave || t.mouth;
+  if (c && c.mark) rows.push(['Dug by', markSaid(c.mark)]);
+  if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
+  if (!r) return rows;
+  if (z === 0){
+    const seen = new Set();
+    for (const m of marksOf(r, 'scar')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Scar', `${SCAR_WORD[m.value] || m.value}. ${markLine(m)}`]); }
+    const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
+    if (made.length) rows.push(['Made here', made.join(' ')]);
+  }
+  rows.push(['Country', countryLine(r) + '.']);
+  if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
+  return rows;
+}
+
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
   return fuel / (PIT_BURN * DAY);
 }
 function gauges(){
+  if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const days = daysOfWood();
   const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : days < 1 ? 'under a day of wood' : `${Math.floor(days)} days of wood`, level: !p.lit ? 'bad' : days < 1 ? 'bad' : days < 2 ? 'warn' : 'good' };
@@ -4041,6 +4135,7 @@ function pulseWho(text){
 
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
+  if (inAges()){ ui.pulses = []; return; }
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
@@ -4068,6 +4163,7 @@ function burningNearCamp(){
 
 /* Alerts for the current camp. Conditions read state. Chips are numbered from one. */
 function alerts(){
+  if (inAges()) return [];
   const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
@@ -4124,28 +4220,32 @@ function campSummary(){
 }
 
 function seasonLine(){
+  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
   return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
 }
 
 /* The rows a drawer's keys act on, in the order the drawer shows them. */
 function drawerRows(id){
-  if (id === 'people') return peopleRows().map(r => ({ kind: 'person', id: r.a.id, r }));
+  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r }));
   if (id === 'goals'){
+    if (inAges()) return [];
     const out = [];
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
   if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
-    cursor.x, cursor.y, cursor.z].join('#');
+    cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
 /* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
@@ -4160,6 +4260,7 @@ function cursorInSector(c, sx, sy){
 }
 /* One phrase for what is under the cursor. A being first, then the tile. */
 function cursorPhrase(){
+  if (inAges()) return countryLine(regionAt(cursor.x, cursor.y));
   const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
   if (a) return `${a.name}${a.species === 'god' ? ' ' + a.epithet : ''}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
   if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
@@ -4207,12 +4308,13 @@ function paletteRows(){
     out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
   }
   for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
-  for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
-  for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
-  camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
-  for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  if (!inAges()) for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
+  if (!inAges()) for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
+  if (!inAges()) camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
+  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
   for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
-  for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  if (!inAges()) for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  for (const g of gods()) out.push({ label: `Inspect ${g.name} ${g.epithet}`, key: '', action: 'inspect', arg: g.id, group: 9 });
   return out;
 }
 /* Fuzzy match: every word of the query is a substring of the label. Prefix matches first, then shorter labels. Empty query: help, chips, tools and drawers, recent, the rest. */
@@ -4240,6 +4342,7 @@ const DRAWERS = [
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4', fit: true },
+  { id: 'legends',   label: 'Legends',   key: '5' },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
@@ -4248,8 +4351,9 @@ const KEYMAP = [
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
   { key: 'Tab',        shift: true, focus: 'any', action: 'focusPrev', label: 'Previous panel' },
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
-  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick', button: 'stepBtn' },
+  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -4306,6 +4410,8 @@ for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
+/* After the stage rows, so that under the chord dialog C is still Crafts. */
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
@@ -4347,6 +4453,8 @@ function keyName(k){
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
+  for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
+  fieldKey = '';
   P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
@@ -4372,11 +4480,55 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
+/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
+/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+const BOUNDARY_INK = { wet: 'water-fg' };
+function drawBoundaries(g, alpha){
+  for (const b of liveBoundaries()){
+    g.fillStyle = P[BOUNDARY_INK[b.pole] || 'field-line']; g.globalAlpha = BOUNDARY_INK[b.pole] ? 1 : alpha;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; g.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  g.globalAlpha = 1;
+}
+function drawFieldCache(){
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const r of liveRegions()){
+    octx.fillStyle = fieldColor(r, P);
+    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  }
+  drawBoundaries(octx, 0.7);
+}
+function drawField(){
+  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  if (key !== fieldKey){ drawFieldCache(); fieldKey = key; }
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.drawImage(ocv, 0, 0);
+  /* A god has no tile in the ages. It is drawn in the middle of the country it stands in. Gods that share a country stand side by side. */
+  const at = new Map();
+  for (const g of gods()){ if (g.status === 'dead') continue; const r = standsIn(g); if (!r) continue; if (!at.has(r.id)) at.set(r.id, []); at.get(r.id).push(g); }
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  for (const [id, list] of at){
+    const b = regionById(id).bbox, cx = (b.x0 + b.x1 + 1) / 2 * WS, cy = (b.y0 + b.y1 + 1) / 2 * WS;
+    list.forEach((g, k) => {
+      const x = cx + (k - (list.length - 1) / 2) * 46;
+      wctx.globalAlpha = g.status === 'awake' ? 1 : 0.55;
+      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, x, cy); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, x, cy);
+      wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.strokeText(g.name, x, cy + 14); wctx.fillStyle = P.select; wctx.fillText(g.name, x, cy + 14);
+    });
+  }
+  wctx.globalAlpha = 1;
+  wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
+}
 function drawWorld(){
+  if (inAges()){ drawField(); return; }
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);
   const dark = darkness(); if (dark > 0){ wctx.fillStyle = `rgba(${P.night},${dark * 0.8})`; wctx.fillRect(0, 0, W * WS, H * WS); }
+  /* After the night wash, so the country lines read at night too. */
+  if (ui.overlay) drawBoundaries(wctx, 0.85);
   wctx.strokeStyle = P.grid; wctx.lineWidth = 1;
   for (let sx = 1; sx < SW; sx++){ wctx.beginPath(); wctx.moveTo(sx * LW * WS + 0.5, 0); wctx.lineTo(sx * LW * WS + 0.5, H * WS); wctx.stroke(); }
   for (let sy = 1; sy < SH; sy++){ wctx.beginPath(); wctx.moveTo(0, sy * LH * WS + 0.5); wctx.lineTo(W * WS, sy * LH * WS + 0.5); wctx.stroke(); }
@@ -4403,6 +4555,7 @@ function sectorSummary(s){
   if (theGods.length) parts.push(theGods.map(g => `${g.name} ${g.epithet}, ${g.status}`).join('; '));
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
+  if (s.country != null && regionById(s.country)) parts.push(countryLine(regionById(s.country)));
   return `${s.name}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
 }
 
@@ -4527,13 +4680,23 @@ function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 
    traits the day era reads, and its needs are its own four. So it gets its own card, and the shared one never
    reads a field a god lacks. The card says who it is, what it became, and where its body lies. */
 function inspectGod(g){
-  const s = secOf(g.x, g.y);
-  const where = `${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}`;
-  const body = g.status === 'dead' ? 'Unmade. Nothing on the field was its pole any more.'
-    : `${g.name} lies down and is ${BODY[g.pole]}, in the ${where}.`;
-  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">age ${e.age === undefined ? '-' : e.age}</span> ${e.text}</li>`).join('');
+  const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
+  let where;
+  if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in the ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
+  const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
+  const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
+  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  let marked = false;
+  const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
+  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
-    <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${g.status === 'dead' ? 'Dead' : 'Asleep'} since age ${g.sleptAt || g.born}. ${body}</div>
+    <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
+    ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
+    <h3>Thoughts</h3><ul>${thoughts}</ul>
+    <h3>Opinions</h3><div class="muted">${opinions}</div>
+    <h3>Last decision (highest score wins)</h3>${why}
     ${said ? `<h3>What the legends say</h3><ul class="hist">${said}</ul>` : ''}`;
 }
 /* full is the window's card: the long history and the Follow button. The hover tip shows the short one. */
@@ -4598,16 +4761,29 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'snare') rows.push(['Snare', t.struct.snare.catch ? 'holds a rabbit' : t.struct.snare.armed ? 'armed' : 'sprung, needs a stick']);
   if (t.struct && t.struct.type === 'pitfall') rows.push(['Deer pit', t.struct.pit.catch ? 'a deer lies in it' : 'covered with logs and cord, on a deer path. One deer in eight steps in.']);
   if (z === 0 && camp.stashTile && camp.stashTile[0] === x && camp.stashTile[1] === y) rows.push(['Stash', Object.entries(camp.stash).filter(([k, v]) => v > 0).map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty']);
+  rows.push(...markRows(x, y, z));
   rows.push(['Burns', t.fire > 0 ? `yes, ${t.fire} ticks left` : tileFuel(t) > 0 ? `flammability ${tileFlam(t).toFixed(2)}, fuel ${tileFuel(t)}` : 'no']);
   const who = beings.filter(a => a.alive && a.x === x && a.y === y && a.z === z).map(a => a.name); if (who.length) rows.push(['Here', who.join(', ')]);
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+function inspectRegion(r){
+  if (!r) return '<div class="muted">Nothing is here.</div>';
+  const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
+  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  if (here.length) rows.push(['Here', here.join('; ')]);
+  const seen = new Set(), why = [];
+  for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
+  return `<table class="kv">${rows.map(x => `<tr><td>${x[0]}</td><td>${x[1]}</td></tr>`).join('')}</table>${why.length ? `<h3>What was done here</h3><ul class="hist">${why.join('')}</ul>` : ''}`;
+}
 function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
+  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
+    : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
   tip.innerHTML = body;
@@ -4653,7 +4829,7 @@ function renderClock(){
 }
 function renderStrip(){
   /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
-  $('campName').textContent = camp.name;
+  $('campName').textContent = inAges() ? 'The ages' : camp.name;
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
@@ -4664,7 +4840,7 @@ function renderStrip(){
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
   const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
 }
 function renderWindows(){
@@ -4682,7 +4858,7 @@ function renderWindows(){
     el.querySelector('.title').innerHTML = winTitle(w);
     const body = el.querySelector('.body'), keep = body.scrollTop;
     body.classList.toggle('ins', w.kind === 'inspect');
-    if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
+    if (w.kind === 'drawer') DRAWER_RENDER[w.target](body, w.target);
     else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
     body.scrollTop = keep;
   }
@@ -4723,8 +4899,10 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
-  const s = sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
+  $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
@@ -4762,7 +4940,7 @@ function renderDrawers(){
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
-    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    DRAWER_RENDER[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
@@ -4770,12 +4948,13 @@ function renderDrawers(){
 function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
-  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a);
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
   const c = $('count-goals'); if (c) c.textContent = '';
+  if (inAges()){ el.innerHTML = '<div class="muted">No goals yet. The valley is not made.</div>'; return; }
   el.innerHTML = rows.map((r, i) => {
     if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
@@ -4794,11 +4973,28 @@ function renderChronicle(el){
   el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
+  if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
   const c = campSummary();
   const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* The creation, by age, oldest first. The sim never trims it, so it never scrolls off. It rebuilds only when a
+   line arrives, the world is new, or the cursor moves. */
+function renderLegends(el){
+  const key = seedText + ':' + legends.length + ':' + (focusedDrawer() === 'legends' ? ui.row.legends : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  const rows = drawerRows('legends');
+  const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
+  let when = null;
+  el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
+    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+  }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
+}
+/* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
+const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp, legends: renderLegends };
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
@@ -4861,16 +5057,18 @@ function setTool(id, sticky = false){
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
+  if (inAges()) v = 'world';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
+function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
@@ -4883,23 +5081,42 @@ function cursorTo(x, y, z){
 function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
+  if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
   if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
   const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
+const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
-  startWorld(seed, {});
+  startCreation(seed, {});
+  fieldKey = '';
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = firstPerson(); setView('loc', secOf(a.x, a.y));
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
+function onSettle(){
+  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  /* Eight gods become one person, so a row index from the ages would point past the list. */
+  followId = null; ui.row.people = 0; ui.row.goals = 0;
+  setSpeed(ui.savedSpeed || speed || 1);
+  /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  const a = firstPerson();
+  if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
+  say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
 }
 function applyTool(c, e){
   switch (tool){
@@ -4938,22 +5155,27 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
+  /* A legend opens the first god it names. */
+  else if (r.kind === 'legend'){ const g = gods().find(g => r.e.text.includes(g.name)); if (g) ACTIONS.inspect(g.id); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
-  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
+  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ if (!inAges()) cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
-  slower(){ setSpeed(speed === 64 ? 16 : speed === 16 ? 4 : 1); setPaused(false); },
-  faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
-  speed(s){ setSpeed(s); setPaused(false); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; cursorTo(a.x, a.y, a.z); renderUI(true); },
-  follow(id){ const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  /* A god has no tile in the ages, and following would drag the view back every frame. */
+  follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
   levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
   levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
@@ -4999,7 +5221,7 @@ const ACTIONS = {
   paletteMove(d){ paletteMove(d); },
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
-  chord(){ openChord(); },
+  chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
   stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },
@@ -5010,8 +5232,14 @@ const ACTIONS = {
 
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
-  if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
-  if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+  if (!paused){
+    /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
+    if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+    else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+  }
+  if (lastEra === 'gods' && !inAges()) onSettle();
+  lastEra = era;
+  if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
   /* Pulses read every goal's state. Once a render, not once a frame. */
@@ -5033,6 +5261,7 @@ function initUI(){
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);
+  $('hurryBtn').addEventListener('click', ACTIONS.hurry);
   $('helpBtn').addEventListener('click', ACTIONS.help);
   $('helpClose').addEventListener('click', closeDialogs);
   $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
@@ -5049,6 +5278,7 @@ function initUI(){
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
   $('viewBtn').addEventListener('click', ACTIONS.view);
+  $('overlayBtn').addEventListener('click', ACTIONS.overlay);
   $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
   $('lvUp').onclick = ACTIONS.levelUp; $('lvDown').onclick = ACTIONS.levelDown;
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b) ACTIONS.campN(camps.findIndex(c => c.id === Number(b.dataset.camp)) + 1); });
@@ -5066,9 +5296,12 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => { if (inAges()){ const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 }; tipTarget = { field: [c.x, c.y] }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return; } whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
-  wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
+  wcv.addEventListener('pointerdown', e => {
+    if (inAges()){ const c = tileFromWorld(e); openGodAt(c.x, c.y); return; }
+    const s = sectorFrom(e); goto(s.sx, s.sy);
+  });
   mcv.addEventListener('pointermove', e => {
     mhover = sectorFromMid(e);
     if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }

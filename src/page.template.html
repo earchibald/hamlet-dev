@@ -16,6 +16,7 @@
   --map-boulder:#8c8880; --map-boulder-fg:#5a564f; --map-stick:#8a5a2b; --map-rock:#5e5a53; --map-carcass:#8a3a3a;
   --map-fire-bg:#f3b35c; --map-fire:#c2331a; --map-fire2:#e5691c; --map-pit:#b9aa93; --map-snare:#4a6b8a; --map-stash:rgba(42,95,124,.18);
   --map-night:18,26,52; --map-halo:rgba(247,249,250,.85); --map-select:#1b2631; --map-rabbit:#7a6248; --map-fox:#c5581c; --map-deer:#8a5a3c; --map-wolf:#3a3f4a; --map-sprite:#6a3fb5; --map-gnome:#7a5c2e; --map-god:#a8761b; --map-rain:#4a78a8; --map-snow:#ffffff; --map-corpse:#5a6773; --map-grid:rgba(27,38,49,.35); --map-hill:#a9a297; --map-hill-fg:#6f685d; --map-stone:#d3cec4; --map-stone-fg:#9a9388; --agent-light:32%;
+  --field-none:#b9b6ae; --field-wet:#6fa3c7; --field-dry:#d9c48a; --field-hot:#d9824a; --field-cold:#a9c4d6; --field-above:#e6e1d6; --field-below:#6b6458; --field-light:#f2e9b8; --field-dark:#4a4f6a; --field-still:#9fb8a8; --field-moving:#c7b7d9; --field-scar:#7a2f2f; --field-line:#1b2631;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
@@ -24,7 +25,8 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; } }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%;
+  --field-none:#4a4640; --field-wet:#2f6f9e; --field-dry:#8a7a45; --field-hot:#b0562a; --field-cold:#5d8296; --field-above:#8f897c; --field-below:#26221d; --field-light:#b8a85a; --field-dark:#1c2038; --field-still:#4f6a5a; --field-moving:#6f5f8a; --field-scar:#d46a6a; --field-line:#e3e9ed; } }
 :root[data-theme="dark"]{
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
   --accent:#7fb3d1; --accent-ink:#10181e; --good:#7cc58a; --warn:#e0b25a; --bad:#ef7d6d; --major:#e3e9ed; --bar-bg:#2a343c;
@@ -32,7 +34,8 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%;
+  --field-none:#4a4640; --field-wet:#2f6f9e; --field-dry:#8a7a45; --field-hot:#b0562a; --field-cold:#5d8296; --field-above:#8f897c; --field-below:#26221d; --field-light:#b8a85a; --field-dark:#1c2038; --field-still:#4f6a5a; --field-moving:#6f5f8a; --field-scar:#d46a6a; --field-line:#e3e9ed; }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
@@ -111,6 +114,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
 #chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 #chronicle .when{color:var(--muted);font-size:11px;font-family:"JetBrains Mono",monospace;display:inline-block;min-width:88px}
+#legends{list-style:none;margin:0;padding:0}
+#legends li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
+#legends li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+#legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
@@ -174,6 +181,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="pause">Pause<kbd>Space</kbd></button>
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
+      <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
@@ -189,6 +197,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
+      <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>

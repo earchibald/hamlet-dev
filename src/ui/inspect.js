@@ -9,13 +9,23 @@ function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 
    traits the day era reads, and its needs are its own four. So it gets its own card, and the shared one never
    reads a field a god lacks. The card says who it is, what it became, and where its body lies. */
 function inspectGod(g){
-  const s = secOf(g.x, g.y);
-  const where = `${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}`;
-  const body = g.status === 'dead' ? 'Unmade. Nothing on the field was its pole any more.'
-    : `${g.name} lies down and is ${BODY[g.pole]}, in the ${where}.`;
-  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">age ${e.age === undefined ? '-' : e.age}</span> ${e.text}</li>`).join('');
+  const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
+  let where;
+  if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in the ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
+  const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
+  const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
+  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  let marked = false;
+  const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
+  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
-    <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${g.status === 'dead' ? 'Dead' : 'Asleep'} since age ${g.sleptAt || g.born}. ${body}</div>
+    <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
+    ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
+    <h3>Thoughts</h3><ul>${thoughts}</ul>
+    <h3>Opinions</h3><div class="muted">${opinions}</div>
+    <h3>Last decision (highest score wins)</h3>${why}
     ${said ? `<h3>What the legends say</h3><ul class="hist">${said}</ul>` : ''}`;
 }
 /* full is the window's card: the long history and the Follow button. The hover tip shows the short one. */
@@ -80,16 +90,29 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'snare') rows.push(['Snare', t.struct.snare.catch ? 'holds a rabbit' : t.struct.snare.armed ? 'armed' : 'sprung, needs a stick']);
   if (t.struct && t.struct.type === 'pitfall') rows.push(['Deer pit', t.struct.pit.catch ? 'a deer lies in it' : 'covered with logs and cord, on a deer path. One deer in eight steps in.']);
   if (z === 0 && camp.stashTile && camp.stashTile[0] === x && camp.stashTile[1] === y) rows.push(['Stash', Object.entries(camp.stash).filter(([k, v]) => v > 0).map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty']);
+  rows.push(...markRows(x, y, z));
   rows.push(['Burns', t.fire > 0 ? `yes, ${t.fire} ticks left` : tileFuel(t) > 0 ? `flammability ${tileFlam(t).toFixed(2)}, fuel ${tileFuel(t)}` : 'no']);
   const who = beings.filter(a => a.alive && a.x === x && a.y === y && a.z === z).map(a => a.name); if (who.length) rows.push(['Here', who.join(', ')]);
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+function inspectRegion(r){
+  if (!r) return '<div class="muted">Nothing is here.</div>';
+  const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
+  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  if (here.length) rows.push(['Here', here.join('; ')]);
+  const seen = new Set(), why = [];
+  for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
+  return `<table class="kv">${rows.map(x => `<tr><td>${x[0]}</td><td>${x[1]}</td></tr>`).join('')}</table>${why.length ? `<h3>What was done here</h3><ul class="hist">${why.join('')}</ul>` : ''}`;
+}
 function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
+  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
+    : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
   tip.innerHTML = body;

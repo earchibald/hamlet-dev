@@ -8,8 +8,10 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
-  const s = sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
+  $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
@@ -47,7 +49,7 @@ function renderDrawers(){
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
-    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    DRAWER_RENDER[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
@@ -55,12 +57,13 @@ function renderDrawers(){
 function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
-  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a);
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
   const c = $('count-goals'); if (c) c.textContent = '';
+  if (inAges()){ el.innerHTML = '<div class="muted">No goals yet. The valley is not made.</div>'; return; }
   el.innerHTML = rows.map((r, i) => {
     if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
@@ -79,11 +82,28 @@ function renderChronicle(el){
   el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
+  if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
   const c = campSummary();
   const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* The creation, by age, oldest first. The sim never trims it, so it never scrolls off. It rebuilds only when a
+   line arrives, the world is new, or the cursor moves. */
+function renderLegends(el){
+  const key = seedText + ':' + legends.length + ':' + (focusedDrawer() === 'legends' ? ui.row.legends : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  const rows = drawerRows('legends');
+  const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
+  let when = null;
+  el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
+    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+  }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
+}
+/* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
+const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp, legends: renderLegends };
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;

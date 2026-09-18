@@ -8,16 +8,18 @@ function setTool(id, sticky = false){
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
+  if (inAges()) v = 'world';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
+function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
@@ -30,23 +32,42 @@ function cursorTo(x, y, z){
 function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
+  if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
   if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
   const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
+const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
-  startWorld(seed, {});
+  startCreation(seed, {});
+  fieldKey = '';
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = firstPerson(); setView('loc', secOf(a.x, a.y));
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
+function onSettle(){
+  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  /* Eight gods become one person, so a row index from the ages would point past the list. */
+  followId = null; ui.row.people = 0; ui.row.goals = 0;
+  setSpeed(ui.savedSpeed || speed || 1);
+  /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  const a = firstPerson();
+  if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
+  say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
 }
 function applyTool(c, e){
   switch (tool){
@@ -85,22 +106,27 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
+  /* A legend opens the first god it names. */
+  else if (r.kind === 'legend'){ const g = gods().find(g => r.e.text.includes(g.name)); if (g) ACTIONS.inspect(g.id); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
-  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
+  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ if (!inAges()) cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
-  slower(){ setSpeed(speed === 64 ? 16 : speed === 16 ? 4 : 1); setPaused(false); },
-  faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
-  speed(s){ setSpeed(s); setPaused(false); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; cursorTo(a.x, a.y, a.z); renderUI(true); },
-  follow(id){ const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  /* A god has no tile in the ages, and following would drag the view back every frame. */
+  follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
   levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
   levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
@@ -146,7 +172,7 @@ const ACTIONS = {
   paletteMove(d){ paletteMove(d); },
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
-  chord(){ openChord(); },
+  chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
   stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },

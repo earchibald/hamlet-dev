@@ -5,9 +5,11 @@ const fs = require('fs');
 const sim = require('../src/sim');
 const ui = require('../src/ui');
 
-/* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into. */
-function loadUI(files, names){
-  const api = sim.API.replace('return {', 'return { ' + names.join(', ') + ',');
+/* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into.
+   `extra` maps a key to an expression, so a test can read a `let` variable through a small reader function. */
+function loadUI(files, names, extra = {}){
+  const more = Object.entries(extra).map(([k, v]) => `${k}: ${v}`).join(', ');
+  const api = sim.API.replace('return {', 'return { ' + names.join(', ') + ',' + (more ? ' ' + more + ',' : ''));
   return new Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 
@@ -172,7 +174,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -440,6 +442,272 @@ test('opening a sector keeps a cursor that is already in it, and carries the off
   const mid = { x: 2 * LW + (LW >> 1), y: 1 * LH + (LH >> 1), z: 0 };
   assert.deepEqual(api.cursorInSector(mid, 2, 1), mid, 'the hovered centre stays');
   assert.deepEqual(api.cursorInSector({ x: 3, y: 4, z: 0 }, 2, 1), { x: 2 * LW + 3, y: 1 * LH + 4, z: 0 }, 'the offset is carried');
+});
+
+test('the legends drawer lists every line of the creation, oldest first', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...DERIVE, 'DRAWERS']);
+  api.startWorld('alpha'); api.camp = api.camps[0];
+  const rows = api.drawerRows('legends');
+  assert.equal(rows.length, api.legends.length);
+  assert.ok(rows.length > 20, `only ${rows.length} legends`);
+  assert.ok(rows.every(r => r.kind === 'legend'));
+  assert.match(rows[0].e.text, /formless/);
+  assert.deepEqual(api.DRAWERS.map(d => d.key), ['1', '2', '3', '4', '5']);
+  assert.equal(api.DRAWERS[4].id, 'legends');
+  assert.equal(api.ui.row.legends, 0);
+});
+
+const AGES = [...DERIVE, 'inAges', 'ageName', 'nOf', 'standsIn', 'countryLine', 'godRows', 'cursorPhrase', 'paletteRows'];
+function inTheAges(seed = 'alpha', n = 6){
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...AGES, 'inspectGod']);
+  api.startCreation(seed, {}); api.camp = api.camps[0];
+  for (let i = 0; i < n; i++) api.step();
+  assert.equal(api.era, 'gods', 'the probe must still be in the ages');
+  return api;
+}
+
+test('in the ages the view model holds: no gauges, no chips, no goals, and the gods are the people', () => {
+  const api = inTheAges();
+  assert.equal(api.inAges(), true);
+  assert.deepEqual(api.gauges(), { hearth: null, food: null, water: null, beds: null });
+  assert.deepEqual(api.alerts(), []);
+  assert.deepEqual(api.drawerRows('goals'), []);
+  const people = api.drawerRows('people');
+  assert.equal(people.length, api.gods().length);
+  assert.ok(people.every(r => r.kind === 'person' && r.r.a.species === 'god'));
+  assert.doesNotThrow(() => api.notePulses());
+  assert.doesNotThrow(() => api.paletteRows());
+  assert.match(api.seasonLine(), /countr/);
+  assert.equal(typeof api.cursorPhrase(), 'string');
+});
+
+test('in the ages the view key moves with the age and holds still between', () => {
+  const api = inTheAges(); const k = api.viewKey();
+  assert.equal(api.viewKey(), k);
+  api.step(); assert.notEqual(api.viewKey(), k);
+});
+
+test('ageName counts from the Pulse, standsIn finds a live country and changes nothing, countryLine names the god', () => {
+  const api = inTheAges('alpha', 8);
+  assert.equal(api.ageName(0), 'Before time');
+  assert.equal(api.ageName(api.pulseAge), 'Age 1');
+  assert.equal(api.nOf(1, 'god', 'gods'), '1 god'); assert.equal(api.nOf(3, 'god', 'gods'), '3 gods');
+  const g = api.gods().find(g => g.status === 'awake'), before = g.region, r = api.standsIn(g);
+  assert.ok(r && !r.children, 'a live region');
+  assert.equal(g.region, before, 'standsIn must not move the god');
+  const made = api.liveRegions().find(q => q.marks.some(m => m.kind === 'pole'));
+  assert.ok(api.gods().some(q => api.countryLine(made).includes(q.name)), api.countryLine(made));
+});
+
+test('the god card shows the needs, the thoughts, the opinions, and the last decision while the god is awake', () => {
+  const api = inTheAges('alpha', 8);
+  const html = api.inspectGod(api.gods().find(g => g.status === 'awake'));
+  for (const word of ['Expression', 'Company', 'Rest', 'Calm', 'Thoughts', 'Opinions', 'Last decision']) assert.ok(html.includes(word), `the card lacks ${word}`);
+});
+
+test('after settle the view model is the day-era one again', () => {
+  const api = loadUI(['state', 'derive', 'keys'], AGES);
+  api.startWorld('alpha'); api.camp = api.camps[0];
+  assert.equal(api.inAges(), false);
+  assert.equal(api.drawerRows('people').length, 1);
+  assert.equal(api.drawerRows('goals')[0].kind, 'stage');
+});
+
+test('ages come due one in two seconds at pace 1, and never more than eight in a frame', () => {
+  const api = loadUI(['state', 'derive'], ['agesDue', 'AGE_MS']);
+  assert.equal(api.AGE_MS, 2000);
+  assert.deepEqual(api.agesDue(0, 1000, 1), { n: 0, acc: 0.5 });
+  assert.deepEqual(api.agesDue(0.5, 1000, 1), { n: 1, acc: 0 });
+  assert.deepEqual(api.agesDue(0, 250, 16), { n: 2, acc: 0 });
+  assert.deepEqual(api.agesDue(0, 250, 1000), { n: 8, acc: 0 });
+});
+
+test('H hurries the ages from any focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const e = { key: 'h', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+  assert.equal(api.keyAction(e, 'map').action, 'hurry');
+  assert.equal(api.keyAction(e, 'drawer:people').action, 'hurry');
+  assert.equal(typeof api.ACTIONS.hurry, 'function');
+});
+
+test('a creation watched age by age is the creation that startWorld runs', () => {
+  const a = sim.load(), b = sim.load();
+  a.startWorld('gamma');
+  b.startCreation('gamma', {}); let n = 0; while (b.era === 'gods' && n++ < 1000) b.step();
+  assert.equal(b.era, 'days');
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  const pa = a.firstPerson(), pb = b.firstPerson();
+  assert.deepEqual([pb.x, pb.y, pb.name], [pa.x, pa.y, pa.name]);
+  assert.equal(b.tick, a.tick);
+});
+
+const PAL = { 'field-none': '#808080', 'field-wet': '#0000ff', 'field-dry': '#ffff00', 'field-hot': '#ff0000', 'field-cold': '#00ffff', 'field-above': '#ffffff', 'field-below': '#000000', 'field-light': '#ffffff', 'field-dark': '#000000', 'field-still': '#00ff00', 'field-moving': '#ff00ff' };
+
+test('the field colour is grey with no pole, and the mean of the poles with some', () => {
+  const api = loadUI(['state', 'derive'], ['mixHex', 'fieldColor']);
+  assert.equal(api.mixHex(['#000000', '#ffffff']), 'rgb(128,128,128)');
+  assert.equal(api.mixHex(['#ff0000']), 'rgb(255,0,0)');
+  api.startCreation('alpha', {});
+  assert.equal(api.fieldColor(api.liveRegions()[0], PAL), '#808080', 'the formless is grey');
+  for (let i = 0; i < 8; i++) api.step();
+  const made = api.liveRegions().filter(r => r.marks.some(m => m.kind === 'pole'));
+  assert.ok(made.length >= 2);
+  for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
+});
+
+test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], ['inspectRegion']);
+  api.startCreation('alpha', {}); for (let i = 0; i < 10; i++) api.step();
+  const r = api.liveRegions().slice().sort((p, q) => q.marks.length - p.marks.length)[0];
+  const html = api.inspectRegion(r);
+  assert.ok(html.includes('Country') && html.includes('Becoming'));
+  assert.ok(r.marks.every(m => html.includes(m.why)), 'every why is on the card');
+});
+
+test('C shows and hides the countries from any focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  const e = { key: 'c', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+  assert.equal(api.keyAction(e, 'map').action, 'overlay');
+  assert.equal(api.keyAction(e, 'dialog:chord').action, 'stage', 'under the chord, C is still Crafts');
+  assert.equal(api.ui.overlay, false);
+});
+
+test('a hill says who raised it, a cave says who dug it, and every surface tile names its country', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'godLine']);
+  api.startWorld('alpha');
+  const names = api.gods().map(g => g.name);
+  const hillTile = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind === 'height');
+  /* Settle raises a low hill for a den where a making needs one. That hill holds the making's mark, and says so. */
+  const denHill = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind !== 'height');
+  if (denHill){ const dr = api.markRows(denHill.x, denHill.y, 0); assert.ok(dr.some(r => r[0] === 'Raised for' && /den/.test(r[1])), JSON.stringify(dr)); assert.ok(!dr.some(r => r[0] === 'Raised by')); }
+  const hr = api.markRows(hillTile.x, hillTile.y, 0);
+  const raised = hr.find(r => r[0] === 'Raised by');
+  assert.ok(raised && names.some(n => raised[1].includes(n)), JSON.stringify(hr));
+  assert.match(raised[1], /Age \d+|Before time/i);
+  assert.ok(!/raised it/i.test(raised[1]), 'the label says Raised by, so the row does not say it again');
+  assert.ok(hr.filter(r => r[0] === 'Made here').length <= 1, 'the makings share one row');
+  assert.ok(hr.some(r => r[0] === 'Country'));
+  const cave = api.caves.find(c => c.mark && c.deep);
+  const cr = api.markRows(cave.deep.x, cave.deep.y, cave.deep.z);
+  assert.ok(cr.some(r => r[0] === 'Dug by' && names.some(n => r[1].includes(n))), JSON.stringify(cr));
+  assert.deepEqual(api.markRows(-1, -1, 0), []);
+});
+
+test('a scarred country says who fought over it', () => {
+  /* None of the six soak seeds has a scar, so the test writes one. A mark is data, and markRows reads data. */
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows']);
+  api.startWorld('alpha');
+  const r = api.liveRegions()[0], g = api.gods()[0];
+  r.marks.push({ kind: 'scar', value: 'cut', by: g.id, age: api.pulseAge + 3, why: `${g.name} beat another god here.`, at: null });
+  const i = r.tiles[0], x = i % api.W, y = (i - x) / api.W;
+  const scar = api.markRows(x, y, 0).find(row => row[0] === 'Scar');
+  assert.ok(scar, 'a scarred country has a scar row');
+  assert.ok(scar[1].includes('A cut in the earth') && scar[1].includes(g.name) && scar[1].includes('in age 4'), scar[1]);
+});
+
+/* The final fix wave. */
+const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'fieldColor', 'ui'])];
+
+test('the view model answers at every age of a creation that throws its valley back', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], WATCH);
+  api.startCreation('gamma', {}); api.camp = api.camps[0];
+  let n = 0;
+  while (api.era === 'gods' && n++ < 1000){
+    api.step();
+    if (api.era !== 'gods') break;
+    assert.doesNotThrow(() => {
+      api.viewKey(); api.cursorPhrase(); api.seasonLine(); api.gauges(); api.alerts(); api.paletteRows(); api.notePulses();
+      for (const id of ['people', 'goals', 'chronicle', 'camp', 'legends']) api.drawerRows(id);
+      for (const g of api.gods()) api.inspectGod(g);
+      for (const r of api.liveRegions()){ api.inspectRegion(r); api.fieldColor(r, PAL); }
+    }, `age ${api.age}`);
+  }
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+  assert.ok(api.creation.discards >= 1, `seed gamma threw back ${api.creation.discards} valleys`);
+});
+
+/* One fake element answers every DOM call the render functions make. It is small on purpose: the test is about
+   the actions, not about the DOM. Every stub is put on globalThis and taken off again in the finally. */
+function domStub(){
+  const el = {
+    innerHTML: '', textContent: '', hidden: false, disabled: false, value: '', title: '',
+    style: {}, dataset: {}, children: [], scrollTop: 0, offsetWidth: 220, offsetHeight: 140, className: '',
+    classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
+    setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
+    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){},
+    showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
+    getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
+  };
+  el.querySelector = () => el; el.querySelectorAll = () => []; el.closest = () => el;
+  const doc = {
+    documentElement: el, body: el,
+    getElementById: () => el, querySelector: () => el, querySelectorAll: () => [],
+    createElement: () => el, addEventListener(){}, removeEventListener(){},
+  };
+  const store = {};
+  return { el, doc, storage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } } };
+}
+
+test('every action holds in the ages: the view stays on the world, nothing follows, and the creation runs on', () => {
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'performance', 'innerWidth', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc;
+    globalThis.localStorage = storage;
+    globalThis.performance = { now: () => 0 };
+    globalThis.innerWidth = 1200;
+    globalThis.window = { innerWidth: 1200, innerHeight: 900, devicePixelRatio: 1, addEventListener(){}, matchMedia: () => ({ addEventListener(){} }) };
+    const files = ui.FILES.filter(f => f !== 'main');
+    const api = loadUI(files, ['ACTIONS', 'ui', 'inAges'], { __view: '() => view', __follow: '() => followId' });
+    api.startCreation('alpha', {}); api.camp = api.camps[0];
+    for (let i = 0; i < 6; i++) api.step();
+    assert.equal(api.era, 'gods', 'the probe must start in the ages');
+    const god = api.gods()[0].id;
+    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 4, drawer: 'legends', campN: 1,
+      cursor: [1, 0, 1], nav: [1, 0], stage: 'fire', goalPri: { id: 'firepit', pri: 1 }, gotoSector: { sx: 0, sy: 0 },
+      jumpChip: 1, muteMenu: 1, muteChoice: 1, rowPick: 1, palettePick: 1, paletteMove: 1, unmute: 'x' };
+    /* `hurry` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it. */
+    const SKIP = new Set(['hurry']);
+    let ran = 0;
+    for (const name of Object.keys(api.ACTIONS)){
+      if (SKIP.has(name)) continue;
+      assert.doesNotThrow(() => api.ACTIONS[name](ARG[name]), `${name} threw`);
+      ran++;
+      assert.equal(api.__view(), 'world', `${name} left the world map`);
+      assert.equal(api.__follow(), null, `${name} started a follow in the ages`);
+      assert.equal(api.era, 'gods', `${name} ended the ages`);
+    }
+    assert.ok(ran >= 40, `only ${ran} actions ran`);
+    assert.equal(typeof el.innerHTML, 'string');
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
+});
+
+test('a mark keeps a reason that is not the stock one, and a country names the god its reason leaves out', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'countryLine']);
+  api.startWorld('alpha');
+  const hillTile = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind === 'height');
+  const g = api.beingById(hillTile.hill.mark.by) || api.gods()[0];
+  const raisedBy = () => api.markRows(hillTile.x, hillTile.y, 0).find(r => r[0] === 'Raised by');
+  /* The backstop writes a real reason. It is not the stock one, so the row keeps it. */
+  hillTile.hill.mark = { ...hillTile.hill.mark, by: g.id, why: 'Raised so the world could hold a life.' };
+  const kept = raisedBy();
+  assert.ok(kept[1].includes('Raised so the world could hold a life.'), kept[1]);
+  assert.ok(kept[1].includes(g.name), kept[1]);
+  /* The stock reason begins with the god's name and would say the label twice, so it is left out. */
+  hillTile.hill.mark = { ...hillTile.hill.mark, why: `${g.name} raised it.` };
+  const stock = raisedBy();
+  assert.ok(!/raised it/i.test(stock[1]), stock[1]);
+  assert.ok(stock[1].includes(g.name), stock[1]);
+  /* countryLine: a backstop pole reason names no god, so the god of the mark is added after it. */
+  const r = api.liveRegions().find(q => q.marks.some(m => m.kind === 'pole'));
+  const pole = r.marks.filter(m => m.kind === 'pole').sort((p, q) => q.age - p.age)[0];
+  pole.by = g.id; pole.why = 'Made dry so the world could hold a life';
+  assert.ok(api.countryLine(r).includes(`by ${g.name} ${g.epithet}`), api.countryLine(r));
+  pole.why = `${g.name} made it dry.`;
+  assert.ok(!api.countryLine(r).includes(`by ${g.name} ${g.epithet}`), 'a reason that names the god is not doubled');
+  assert.ok(api.countryLine(r).includes(g.name));
 });
 
 module.exports = { loadUI };
