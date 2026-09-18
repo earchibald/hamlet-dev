@@ -211,9 +211,9 @@ function pitfallSite(){
     let bushes = 0; for (const [rx, ry] of RING) if (inb(x + rx, y + ry) && tileAt(x + rx, y + ry).feature === 'bush') bushes++;
     if (!bushes) continue;
     if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4) || camp.pitfalls.some(p => dist(p.x, p.y, x, y) < 8)) continue;
-    const deer = beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, x, y) <= 10).length;
-    if (!deer) continue;
-    const sc = deer * 5 + bushes * 3 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
+    const traffic = RING.concat([[0, 0]]).reduce((n, [dx, dy]) => n + ((hasTile(x + dx, y + dy, 0) ? tileAt(x + dx, y + dy).deer : 0) || 0), 0);
+    if (traffic < 4) continue;
+    const sc = traffic * 2 + bushes * 3 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
   }
   return best ? [best.x, best.y] : null;
 }
@@ -237,9 +237,9 @@ function startQuarry(a){
       if (t.progress < 25) return 'continue';
       a.carrying = { kind: 'rock', count: 2 }; gainXp(a, 'build');
       face.quarried = true;
-      /* The first quarry to strike a hollowed hill pays favour, once per face, however often it is opened before or after. */
-      if (!face.hollowPaid){ const hollow = face.hill && caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
-        if (hollow){ face.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, 900); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
+      /* The first quarry to strike a hollowed hill pays favour, once per hill, however often it is opened before or after. */
+      if (face.hill && !face.hill.hollowPaid){ const hollow = caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
+        if (hollow){ face.hill.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, 900); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
       log(`${a.name} quarries two rocks from the face.`, [a]);
       return chain(a, t, startDeliver(a)) || 'done';
     } };

@@ -48,6 +48,7 @@ function dropCarried(a){
   if (!a.carrying) return;
   const c = a.carrying; a.carrying = null;
   if (c.kind === 'berries' || c.kind === 'cooked' || c.kind === 'ember' || c.kind === 'water' || c.kind === 'spear') return;
+  if (c.kind === 'fibre' || c.kind === 'clay' || c.kind === 'cuttings') return;
   if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y, a.z); return; }
   for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y, a.z);
 }
@@ -272,7 +273,7 @@ function runTask(a){
     const [nx, ny, nz] = t.path[0];
     if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + 40; failTask(a); return; }
     a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer') checkPitfall(a);
+    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
     return;
   }
   const r = t.arrive(a, t);

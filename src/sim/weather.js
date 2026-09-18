@@ -3,7 +3,7 @@ function ignite(t){ if (t.fire > 0) return false; const f = tileFuel(t); if (f <
 function burnOut(t){
   t.fire = 0;
   if (t.feature === 'tree' || t.feature === 'hollow'){ const g = groves.find(g => g.sector === sectorOfTile(t)); if (g) g.anger = Math.min(100, g.anger + (t.feature === 'hollow' ? 60 : 3)); if (t.feature === 'hollow'){ log('A hollow pine burns. Whatever lived in it screams once and is silent.', [], 'bad'); const k = groves.indexOf(g); if (k >= 0) groves.splice(k, 1); } }
-  if (t.feature && MATERIALS[matOf(t)].flam > 0){ t.feature = null; t.berries = 0; }
+  if (t.feature && MATERIALS[matOf(t)].flam > 0){ t.feature = null; t.berries = 0; t.garden = null; }
   if (!t.feature && t.ground === 'grass') t.ground = 'ash';
   if (t.struct && t.struct.type === 'snare'){ const sn = t.struct.snare, k = sn.camp.snares.indexOf(sn); if (k >= 0) sn.camp.snares.splice(k, 1); t.struct = null; }
   if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)){ const c = t.struct.camp, k = t.struct.type; if (c){ if (k === 'rack') c.rack = null; else if (k === 'leanto') c.shelter = null; else if (k === 'storehouse') c.storehouse = null; else if (k === 'workshop') c.workshop = null; else c.huts = c.huts.filter(h => h[0] !== t.x || h[1] !== t.y); log(`The ${k === 'leanto' ? 'lean-to' : k === 'rack' ? 'drying rack' : k} burns down.`, [], 'bad'); } t.struct = null; }

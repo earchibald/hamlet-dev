@@ -46,6 +46,10 @@ function countEvents(api, events){
     deerSpeared: ev('brings down a deer'), deerByWolves: ev('was caught by a wolf'), deer: alive('deer'), wolves: alive('wolf'), rabbits: alive('rabbit'),
     spoiled: ev('gone off'), caught: ev('caught in a snare'), fished: api.camps.reduce((n, c) => n + (c.fished || 0), 0), froze: ev('froze'),
     pitted: ev('falls into the pit'),
+    workshops: api.camps.filter(c => c.workshop).length, kilns: api.camps.filter(c => c.kiln).length, gardens: api.camps.filter(c => c.garden).length,
+    baskets: api.camps.filter(c => c.tools.basket).length, rods: api.camps.filter(c => c.tools.rod).length,
+    clothed: api.beings.filter(b => b.alive && b.species === 'human' && b.clothes).length,
+    pots: api.camps.reduce((n, c) => n + (c.stash.pot || 0), 0), quarried: ev('quarries two rocks'),
     deaths: byCause, alive: hs.filter(h => h.alive).length, humans: hs.length, camps: api.camps.length,
   };
 }
