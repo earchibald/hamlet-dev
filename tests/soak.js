@@ -45,10 +45,26 @@ for (const seed of SEEDS){
     t.diagnostic(`${seed}: ${Date.now() - t0} ms, ${events.length} chronicle lines`);
     t.diagnostic(api.camps.map(c => campLine(api, c)).join(' | '));
     t.diagnostic(JSON.stringify(counts));
+    /* The creation, and the counters the countries swallowed. The dens, caves and burrows now sit in their own
+       countries, and a camp may never reach them in 70 days. Printed, not asserted: see the plan-3 report. */
+    t.diagnostic(`${seed}: creation ages ${api.creation.ages}, discards ${api.creation.discards}, made ${Object.keys(api.creation.made).sort().join(',')}`);
+    t.diagnostic(`${seed}: far country reach: densCleared ${counts.densCleared}, searched ${counts.searched}, finds ${counts.finds}, borrowed ${counts.borrowed}, repaid ${counts.repaid}, benches ${counts.benches}`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
       const c = api.camps[0];
       assert.ok(c.site, 'no site chosen'); assert.ok(c.pit, 'no fire pit built'); assert.ok(c.everLit, 'the pit was never lit');
+    });
+    await t.test('the creation ended on its own, and the valley holds a life', () => {
+      const c = api.creation;
+      assert.ok(c.settled && !c.failed, 'the creation did not settle');
+      assert.equal(c.backstops, 0, 'the backstop fired');
+      assert.ok(c.ages <= api.options.ageLimit, `${c.ages} ages`);
+      assert.equal(c.gate.ok, true);
+      for (const g of api.gods()) assert.ok(g.status === 'asleep' || g.status === 'dead', `${g.name} is ${g.status}`);
+      for (const h of api.hills) assert.ok(h.mark && api.beingById(h.mark.by), 'a hill with no god behind it');
+      for (const cv of api.caves.filter(cv => cv.kind === 'water')) assert.ok(cv.mark, 'a cave with no mark');
+      for (const sc of api.sectors) assert.ok(api.regionById(sc.country), 'a sector with no country');
+      assert.equal(events.filter(e => e.age !== undefined && /walks alone/.test(e.text)).length, 0, 'the first day line was stamped in the ages');
     });
     await t.test('someone is alive at the end', () => {
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
@@ -97,6 +113,7 @@ test('a seed and its log replay the same story', () => {
   const b = runDays(a.api.replay.seed, 2, null, replayGod(a.api.replay), a.api.replay.options);
   assert.deepEqual(b.api.doorLog, a.api.doorLog);
   assert.deepEqual(b.events.map(e => e.text), a.events.map(e => e.text));
+  assert.deepEqual(b.api.legends.map(e => e.text), a.api.legends.map(e => e.text));
   assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
 });
 

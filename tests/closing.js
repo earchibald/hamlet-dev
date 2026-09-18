@@ -40,8 +40,16 @@ function doOffer(api, a, label, ticks = 2000){
    at the fire and the party is not sent running before it sets out. */
 function campByCave(api, c, a, cave, gap = 2){
   const e = cave.exit;
-  const spot = [[gap, 0], [-gap, 0], [0, gap], [0, -gap]].map(([dx, dy]) => [e.x + dx, e.y + dy])
-    .find(([x, y]) => api.passable(x, y) && x > 2 && y > 2 && x < api.W - 3 && y < api.H - 3);
+  /* Any open tile about `gap` off the mouth will do. A cave near the map edge or in a thicket has no room in the
+     four compass directions, so the eight around it, out to two tiles further, are tried in order of how near
+     they sit to the gap asked for. */
+  const cands = [];
+  for (let dx = -gap - 2; dx <= gap + 2; dx++) for (let dy = -gap - 2; dy <= gap + 2; dy++){
+    const d = Math.hypot(dx, dy); if (d < gap || d > gap + 2) continue;
+    cands.push([e.x + dx, e.y + dy, Math.abs(d - gap)]);
+  }
+  cands.sort((p, q) => p[2] - q[2]);
+  const spot = cands.find(([x, y]) => api.hasTile(x, y, 0) && api.passable(x, y) && x > 2 && y > 2 && x < api.W - 3 && y < api.H - 3);
   assert.ok(spot, `no room for a camp ${gap} tiles off the cave mouth at ${e.x},${e.y}`);
   api.setSite(spot[0], spot[1]); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
   for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]){ const q = api.tileAt(t.x + dx, t.y + dy); if (q.mouth) continue; q.ground = 'soil'; q.feature = null; q.struct = null; }

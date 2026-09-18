@@ -147,16 +147,26 @@ Until it passes, rest cannot be satisfied. The checker's failure names the lack,
 
 Settle is `generate()` taken apart into painters, one per mark kind, in a fixed order. Each painter reads marks and writes tiles. No painter reads a god. Everything a painter makes keeps a reference to its mark.
 
-| Step | Reads | Keeps from today |
+| Step | Reads | What the painter writes |
 |---|---|---|
-| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet god's live boundaries; fords where flow cut them; lakes from pool; marsh is the wetland biome's own texture |
-| 2. Height | height marks | `uplift`, `hillShape`, `hillClimbable`, `raiseHill`, `cutSlopes`, with storeys from the mark; a snow line where cold is marked on high ground |
-| 3. Depth | depth marks, flow and pool below ground | `cutWaterCaves`, with levels from the mark; underground streams and lakes as water tiles on lower levels with a bank to walk; hollows and dens as today |
-| 4. Scars | scar marks | burned: ash that greens over seasons. cut: a chasm, a line of rock with a slope at each end. drowned: standing water with dead pines in it. broken: a boulder field. hallowed: nothing painted, the tile marked. |
-| 5. Rockfall, finds, groves | as today | groves go where dark and cold mingle, not to the three thickest forests |
-| 6. Creatures | making marks | each species placed in its region; the people last, one person, in the start region |
+| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture. Every live boundary a wet god drew is river: the boundary tiles and their far-side neighbours are water, the next ring is sand, and every forty-seventh tile along the line is a ford of sand. A pool mark paints a lake in the country's middle, a blob of about a seventh of its area. Marsh is the wetland biome's own texture. A meadow, a forest and a marsh all carry berry bushes and loose stones, because the gods may put the first camp in any of them. |
+| 2. The first person | the gate's start country | one person, before the scars and the heights, because `hillFits` and `rimExits` ask whether a hill opens onto the ground the first person can walk. The person takes the country's widest walkable pocket, then its tile nearest the country's middle. The start sector is not forced to meadow. |
+| 3. Scars | scar marks | burned: the country's ground is ash and it has no features. cut: a chasm of rock along the country's longer axis, with a gap of stone floor in the middle so the world stays joined. drowned: three water blobs with dead pines around them. broken: boulders on a third of the tiles. hallowed: nothing painted, the tile keeps the mark. |
+| 4. Height | height marks | a height mark of value n paints one to three hills in the country by its area, storeys `min(n, ZMAX)`. A country whose god made a species that dens gets one low hill if no god raised it, since a den mouth needs rock. |
+| 5. Depth | depth marks, flow and pool below ground | a depth mark of value n cuts caves under that country's hills, levels `min(n, -ZMIN)`, and raises one low hill first if the country has none, since a cave mouth needs rock. Underground streams and lakes where water flowed or pooled below. |
+| 6. Rockfall, finds | as today | rockfall is the last step that can take a tile out of the walkable world, so the start region is walked again after it |
+| 7. Creatures | making marks | each species stands in the country where its god made it. A hunter gets a den first; only what the den cannot hold goes on the open ground. Sprites take a grove of their country, gnomes their burrows. `creation.made` is the roll of what a painter spawned, and nothing off that roll wanders in later. |
+| 8. Bodies | rest marks | the sleeping gods, after the tile check passes |
 
-**The guarantee.** The gate checks regions every age, which is cheap. Settle checks tiles, which is the real test: from the start tile, by a real path search, water, ground to camp on, fuel, and food are reachable. If the tile check fails, settle is discarded, the last sleeper wakes with the thought "The world would not hold," and the ages go on. The failure names the lack, and the lack strains a contrast.
+**The guarantee.** The gate checks regions every age, which is cheap. Settle checks tiles, which is the real test. From where the first person stands, by a real path search over the whole map, five things must hold, in this order:
+
+1. `water`: a water tile beside some tile in reach.
+2. `ground`: a passable tile with no feature, not sand, within 12 tiles.
+3. `fuel`: a tree, a bush, or a loose stick in reach.
+4. `food`: a berry bush with berries, or a prey being, in reach.
+5. `room`: the person can walk at least half the passable tiles of the country the gate chose. The gate reads marks, so it cannot see that a lake or a chasm has shattered the ground under its start country. A pocket is not a home.
+
+If the tile check fails, the settle is discarded: `levels`, `world`, `raised`, `hills`, `caves`, `groves`, `items`, `itemGrid` and `sectors` are reset, every being that is not a god is removed, and the god who lay down last stands up with rest 60 and the thought "The world would not hold." Its rest mark is struck, so its country can be marked again. The era stays `gods`, so the ages go on. `creation.discards` counts. The people's stream stays where the failed paint left it, so the next paint differs; that is deterministic and acceptable.
 
 As a backstop only: past an age limit (a start option, default 200), the eldest awake god performs the missing act itself, and the chronicle says "Wearied, she did what had to be done." The tests assert the backstop fired on none of the six seeds.
 
@@ -168,7 +178,7 @@ Settle sets `era = 'days'`, `tick` to today's start hour, and writes today's fir
 
 The day-era tick runs unchanged, in the same order. One step is added at the end of `updateWorld()`, `godsTick()`, so nothing before it shifts. Gods draw from their own stream.
 
-- **Bodies.** A sleeping god's body is a hill, lake, cave, or river record with a rest mark. The record knows its god.
+- **Bodies.** A sleeping god's body is a hill, a cave, or a country record. The god holds `g.body`, and the record holds `body.god`, the god's id. Above sleeps on its country's tallest hill at its top storey, below at a cave's deep tile, wet on a river tile, still on a lake tile, and any other at the anchor of its rest mark. One body holds one god: a god whose own country is already taken lies down in the nearest free country by its rest anchor, and when no country is free it lies down in no body at all. Tiles never carry a god. Dead gods stay in `beings`.
 - **Tempo.** A sleeping god steps once a day. Rest is full. Calm falls from facts the rules already know, passed as thoughts: a rock face quarried on its hill, an axe in its dark country, fire on a hallowed tree, a lake drunk down. Calm below 20 wakes it.
 - **Acts with omens.** A waking god's act is the same operator, run as a multi-day task with two phases. The omen phase is first and visible: the river rises a tile a day; the hill shakes and the chronicle says so; the sky is dark at noon. People get thoughts. Then the act lands on a bounded region, never the whole field. A god that acts spends rest and sleeps when it has none.
 - **Deaths.** The soak gains one allowed cause: an act of god, allowed only when the chronicle shows an omen for it in the days before. A drowning with no omen is a bug.

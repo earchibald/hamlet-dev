@@ -175,6 +175,12 @@ test('every made species has a living member in its country, and nothing unmade 
   }
   for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')){
     if (m.value === 'human') continue;
+    /* Sprites stand at their grove's door, which is a tile just off the hill and may fall over the country's
+       line. For them the grove is the proof, not the tile a sprite stands on. */
+    if (api.SPAWN[m.value] && api.SPAWN[m.value].grove){
+      assert.ok(api.groves.some(g => api.regionAt(g.x, g.y) === r), `the ${api.SPECIES[m.value].plural} made in country ${r.id} have no grove`);
+      continue;
+    }
     const here = api.beings.filter(b => b.alive && b.species === m.value && b.z === 0 && api.regionAt(b.x, b.y) === r);
     const denned = api.beings.filter(b => b.alive && b.species === m.value && b.z !== 0);
     assert.ok(here.length + denned.length >= 1, `the ${api.SPECIES[m.value].plural} made in country ${r.id} are not there`);

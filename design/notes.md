@@ -12,7 +12,9 @@ The game is played by a god-player. The player does not tag tiles or give orders
 
 ## 2. Scale
 
-- The world is 10 by 6 sectors. Each sector is 28 by 20 tiles and has a biome and a name: open meadow, pine forest, stony ground, reedy marsh. A sector is a mix. Forests still have a few bushes and rocks.
+Every world begins with its creation, not with noise. A field of countries is split and marked by the primal gods, age by age, and a mark is a record on a country: a pole, a height, a depth, a scar, a making, a rest. A god may sleep only when the rest gate passes on the marks: a dry level start country, water beside it, a forest within two neighbours, the people made, a hill, a cave, and each kind of life. When the last god sleeps, settle paints the valley from the marks, painter by painter, in a fixed order. Settle then checks tiles, which the gate cannot: from where the first person stands, by a real path search, water, ground, fuel, food, and room to walk the start country. A valley that fails is discarded, the last sleeper wakes, and the ages go on. The spec is `design/specs/2026-09-17-mythos-design.md`, sections 3 and 4.
+
+- The world is 10 by 6 sectors. Each sector is 28 by 20 tiles and takes its biome from the country that covers most of it: open meadow, pine forest, stony ground, reedy marsh, riverside, burnt ground. A sector is a mix. A meadow, a forest and a marsh all carry berry bushes and loose stones, because the gods may put the first camp in any of them; before the mythos the camp always stood in a meadow, and a camp in a forest starved and never knapped its axe.
 - The tile grid is continuous. Sectors are units of identity and viewing, not of simulation. A person walks out of one sector into the next.
 - A river winds across the world. Fords every 47 tiles keep the sides connected.
 - The world has five levels, −2 to +2. Level 0 is the surface. A level is an array like the surface, mostly empty: open air above, solid earth below. Six to ten hills stand on rocky and forest ground: rock at level 0 with a floor of stone or grass above it, and a second storey on the tall ones. A hill is only raised where it can be climbed: its first-storey floor is one piece, and some walkable tile beside it can hold a slope. Each storey has one or two slopes on its rim. Everything else is cliff.
@@ -184,13 +186,14 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 
 The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
+- The creation ended on its own, and the valley holds a life: it settled and did not fail, no backstop fired, the ages are within the limit, the gate is open, every god is asleep or dead, every hill carries a mark and a god behind it, every water cave carries a mark, every sector has a country, and the first day-era line was not stamped with an age. The soak also prints the creation's ages, discards, and roll of makings.
 - Someone is alive at the end.
 - The camps grow: at least 8 people alive at day 70, and at least one birth. Across all six seeds together, at least 180 people counted ever and 15 births, so a regression like the fishing bug that halved every seed still goes red. (The old per-seed floor of 20 people ever was too noisy: `humans` is a roughly 2x random variable across unrelated commits, with 20 inside its tail.)
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - At most one person a seed dies in a den, and it is reported.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it, and so must every den, water cave, and burrow exit still in use (a search from the first camp's stash), so a mid-game dig that seals a pocket is caught too, not only a person in one. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
-- The same seed tells the same story twice, and a seed, its options, and its log replay the same story. A moved log tells a different one.
+- The same seed tells the same story twice, and a seed, its options, and its log replay the same story, legends and all. A moved log tells a different one.
 
 `tests/terrain.js` checks the levels: the surface is level 0, a slope joins two floors and a cliff does not, rabbits never climb and deer do, a wolf a level up is not a threat, fire burns on a hilltop, and every hill on every seed is rock with reachable floors, off the water, and out of the start sector, every tall hill has a water cave whose floors can be reached from its exit unless rock blocks it, every den has one mouth and its owners start in it, a grove on a forest hill is in a hollow under it, every deep chamber holds one find, and no rain or work reaches the dark.
 
@@ -213,6 +216,7 @@ Known weak spots:
 - A person whose task fails in the dark drops what they carry there, where nobody will fetch it.
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
 - A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
+- The dens, caves and burrows now sit in their own countries, and a camp may never reach them in 70 days. `densCleared`, `searched`, `finds`, `borrowed`, `repaid` and `benches` are 0 on most seeds. The soak prints them per seed so the loss is visible. Nothing asserts them yet.
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
 - The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
 - Fixed. The soak's cave cutoff check (see section 14) caught a real one: on seed r a burrow's own exit at 2,22,0 went unreachable from the first camp's stash from around day 56 on. The dig itself was not the cause: it was never relocated. A sapling could still take root on a cave's own mouth tile, and twelve days later it matured into a solid tree there, sealing the one doorway a den or burrow has. `growPlants` in `src/sim/world.js` now refuses to plant a sapling on any tile with `t.mouth` set. `digGnomeBurrow` also now checks a live `reachable()` region, not the generation-time `startRegion`, when it digs mid-game (a village driving a burrow off), and keeps a new exit at least 2 tiles from the map edge, so a relocation dig cannot repeat the same mistake by a different route.
@@ -228,4 +232,5 @@ The acts the door knows: light, poke, priority (a goal set off, on, or high), an
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.
 - Names for events and long grudges in the chronicle, so the Legends-mode feel grows.
-- A save format, and a scenario runner so "cut trees in a grove on purpose" is a script.
+- A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
+- Plan 4: watching the creation. The ages in the interface, the field view, the legends drawer, and hover on a mark to read the god and the reason behind a hill, a cave, a scar, or a country.

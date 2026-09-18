@@ -172,7 +172,11 @@ test('a gnome does not borrow again for six days after repaying', () => {
 
 test('a village within thirty tiles is too loud: the gnomes dig a new hole farther away within three days', () => {
   const api = load(); api.startWorld('r');
-  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c;
+  /* The on-demand dig can fail on a crowded map (design/notes.md, Known weak spots), so take the first burrow
+     whose gnomes are still at home. */
+  const burrows = api.caves.filter(c => c.kind === 'burrow');
+  const burrow = burrows.find(b => api.beings.some(g => g.species === 'gnome' && g.den === b)) || burrows[0];
+  const c = api.camps[0]; api.camp = c;
   api.setSite(burrow.exit.x + 4, burrow.exit.y); c.village = true;
   const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
   api.tick = 5 * 1000;

@@ -187,7 +187,13 @@ function rockfall(){
     const passage = c.tiles.filter(t => t.z === -1 && t !== c.mouth && !t.slope && !keepsPaths(t));
     if (passage.length < 4) continue;
     const t = passage[1 + rint(passage.length - 3)];
-    t.ground = 'rock'; c.blocked = t; c.story.push('Fallen rock blocks the way.');
+    const was = t.ground;
+    t.ground = 'rock';
+    /* A fall that the walk goes round is no fall at all. A passage branches, so the one rock may leave the deep
+       chamber open; then the rock is taken back and the cave stays clear. Nothing here draws from the stream. */
+    const d = c.deep;
+    if (d && bfs(c.exit.x, c.exit.y, 0, (x, y, z) => x === d.x && y === d.y && z === d.z, NZ * W * H)){ t.ground = was; continue; }
+    c.blocked = t; c.story.push('Fallen rock blocks the way.');
   }
 }
 /* Foxes and wolves dug into the hillsides over generations. A den is a pocket of 2 to 6 tiles at level 0 inside the
@@ -326,18 +332,26 @@ function forestBeside(s){
    drew; left out, a mid-game move picks one meadow sector itself and tries only it, so a burrow that
    cannot find room this call is free to try a different sector next time it is called. */
 function digGnomeBurrow(start, avoid, sector){
-  const s = sector || shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
-    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))))[0];
+  /* A mid-game move tries every meadow sector that has a forest beside it or a hill in it, not only the first.
+     Since the mythos the meadows lie where the gods put them, and the first sector drawn is often in a country
+     the gnomes cannot reach, or too near the burrow they are leaving. */
+  const list = sector ? [sector] : shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
   /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
      out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
      generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
      pit (or the first person, if no camp has a site yet) and require the new exit to sit in that region today. */
   const region = sector ? startRegion : (() => {
     const c = camps.find(k => k.site && (k.stashTile || k.pit));
-    const a = firstPerson(); const from = c ? (c.stashTile || c.pit) : (a ? [a.x, a.y] : null);
+    const a = firstPerson();
+    /* Walk from somewhere that can be walked. A stash tile can be blocked -- a pit stands on it, a sapling grew
+       on it -- and a walk from a blocked tile reaches one tile, which would refuse every hole in the world. */
+    const tries = [c && c.stashTile, c && c.pit, a && [a.x, a.y]].filter(Boolean);
+    let from = tries.find(([x, y]) => passable(x, y, 0));
+    if (!from) for (const [x, y] of tries){ const t = nearFind(x, y, q => passable(q.x, q.y, 0), RING); if (t){ from = [t.x, t.y]; break; } }
     return from ? reachable(from[0], from[1], 0, NZ * W * H) : startRegion;
   })();
-  if (s){
+  for (const s of list){
     for (let tries = 0; tries < 40; tries++){
       const x = s.sx * LW + 2 + rint(LW - 4), y = s.sy * LH + 2 + rint(LH - 4);
       const t = tileAt(x, y);
