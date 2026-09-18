@@ -71,6 +71,7 @@ A god is a being. `makeBeing('god', ...)` with the same fields. Extra fields: `p
 - When a god splits a region, the far pole has nobody, and the counterpart comes into being to hold it.
 - When the rest gate names what the world cannot hold, the contrast that answers it strains, and a god of that pole comes into being.
 - When the people are lacking and every awake god is of one contrast, a new contrast strains, since one difference cannot make a people. A mingling needs two.
+- Every god comes into being holding a country. The counterpart holds the far side of the split. A god born of a lack takes the largest level country, or the largest there is, and sets its pole there.
 
 So gods are made of what the world lacks. Five contrasts, ten poles, ten gods at most. A seed may have no still god.
 
@@ -100,8 +101,8 @@ An act is an operator: a name, the pole that may use it, a target region, the ma
 | Act | Pole | Ages | Writes | The painter makes |
 |---|---|---|---|---|
 | split | any | 1 | pole marks on two children, a boundary | the river when the splitter is wet and moving |
-| raise | above | 1 per storey | height on the region | a hill, a mountain when many |
-| dig | below | 1 per level | depth on the region | caves, chambers, a deep |
+| raise | above | 1 per storey | height on the region | a hill, a mountain when many. Not on a level country while fewer than three remain, so nobody raises the formless whole. |
+| dig | below | 1 per level | depth on the region | caves, chambers, a deep. Not in a level country while fewer than three remain. |
 | flow | wet, moving | 1 | wet along a path across regions, above or below ground | streams, fords, underground rivers |
 | pool | wet, still | 1 | wet on a region, above or below ground | marsh, a lake, an underground lake |
 | burn | hot | 1 | a burned scar | ash, firestones in the deep |
