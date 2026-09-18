@@ -11,7 +11,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runDays, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine } = require('./lib/run');
+const { runDays, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod } = require('./lib/run');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -72,6 +72,22 @@ test('the same seed tells the same story twice', () => {
   const a = runDays('r', 2), b = runDays('r', 2);
   assert.deepEqual(b.events.map(e => e.text), a.events.map(e => e.text));
   assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
+});
+
+test('a seed and its log replay the same story', () => {
+  const a = runDays('r', 2);
+  assert.ok(a.api.log.length >= 1, 'the script god never lit a pit in two days');
+  const b = runDays('r', 2, null, logGod(a.api.log));
+  assert.deepEqual(b.api.log, a.api.log);
+  assert.deepEqual(b.events.map(e => e.text), a.events.map(e => e.text));
+  assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
+});
+
+test('a different log tells a different story', () => {
+  const a = runDays('r', 2);
+  const late = a.api.log.map(e => ({ ...e, tick: e.tick + 300 }));
+  const b = runDays('r', 2, null, logGod(late));
+  assert.notDeepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
 });
 
 test('write the golden record', { skip: !isDefault && 'not the default run' }, () => {

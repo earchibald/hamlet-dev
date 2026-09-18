@@ -19,7 +19,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Rules read data tables (materials, species, goals). Rules do not check names.
 - Every new behaviour must be visible to the player: a chronicle line, a thought, a goal state, or a tooltip row.
 - Any death in a 70-day soak that is not old age is a bug until proven otherwise. Trace it with `tests/trace-deaths.js`.
-- The simulation must stay deterministic for a seed until the player acts.
+- The engine step is pure. Every outside act enters by `inject()` in `src/sim/door.js` and is logged. A seed plus its log replays the same story.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
