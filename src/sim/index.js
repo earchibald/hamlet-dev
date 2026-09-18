@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main'];
+const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -19,7 +19,7 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
-  startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS, LIFE,
+  startWorld, step, inject, DOOR_ACTS, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS, LIFE,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startFish, startGather, startBuild, addItem, removeItem, stashAdd,
   runTask, updateBeing, dropCarried, makeBeing, checkPitfall, denTick, adoptDen, spawnWildlife,
@@ -35,6 +35,7 @@ const API = `return {
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
   get goalPriority(){ return goalPriority; },
+  get log(){ return doorLog; },
 };`;
 
 function load(){

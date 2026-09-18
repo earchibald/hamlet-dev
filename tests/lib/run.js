@@ -4,21 +4,27 @@ const { load } = require('../../src/sim');
 const DAY = 1000;
 
 /* The script god lights each camp's pit once, the first time it stands laid
-   and cold. A founding party carries coals, so its pit is lit on its own; the
-   god steps in only after the coals value (a tick) has passed. The loop index
-   is compared, as the first soak did, so old numbers still line up. */
+   and cold, through the door, so the run leaves a log. A founding party carries
+   coals, so its pit is lit on its own; the god steps in only after the coals
+   value (a tick) has passed. The loop index is compared, as the first soak did,
+   so old numbers still line up. */
 function scriptGod(api, i){
-  for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.lightTile(...c.pit);
+  for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 });
+}
+/* A god that replays a log: every event with this tick goes through the door, in order, and nothing else happens. */
+function logGod(log){
+  let k = 0;
+  return api => { while (k < log.length && log[k].tick === api.tick){ const { tick, ...e } = log[k++]; api.inject(e); } };
 }
 
 /* Run one seed. Returns the api and the full list of chronicle events in order. */
-function runDays(seed, days, onTick){
+function runDays(seed, days, onTick, god = scriptGod){
   const api = load(); api.startWorld(seed);
   const events = []; const seen = new WeakSet();
   const drain = () => { const ch = api.chronicle; let n = 0; while (n < ch.length && !seen.has(ch[n])) n++; for (let j = n - 1; j >= 0; j--){ seen.add(ch[j]); events.push(ch[j]); } };
   drain();
   for (let i = 0; i < days * DAY; i++){
-    api.step(); scriptGod(api, i); drain();
+    api.step(); god(api, i); drain();
     if (onTick) onTick(api, i, events);
   }
   return { api, events };
@@ -83,4 +89,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, scriptGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, runDays, scriptGod, logGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, cutOff, campLine, OLD_AGE };

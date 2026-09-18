@@ -337,13 +337,13 @@ function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').va
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(lightTile(c.x, c.y, c.z)); camp = viewCamp; break;
+    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'camp': {
       if (camp.pit){ say('The fire pit is already built. The camp stays where it is.'); break; }
       if (c.z !== 0){ say('The camp must be on the valley floor.'); break; }
       const t = tileAt(c.x, c.y); if (!passable(c.x, c.y) || t.feature){ say('The camp site must be open ground you can stand on.'); break; }
       camp = viewCamp; setSite(c.x, c.y); camp.siteReason = 'you chose it'; log('The camp site moves. Someone felt it was right.', humans()); say('Camp site set. The fire pit will go here.'); break; }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? poke(a) : 'Nobody is there to poke.'); break; }
+    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to poke.'); break; }
   }
   renderUI(true);
 }

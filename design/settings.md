@@ -12,5 +12,5 @@ One line per start option and per future setting. Add a line the day the hook is
 | Zoom: which tier runs | G, time and tiers | idea | Tick, day, season. Realtime is the tick tier at speed 1. |
 | Breakpoints: a watch list | G, time and tiers | idea | Beings, camps, kinds of event. A coarse tier zooms in before a watched event instead of sampling it. |
 | Inhabit modes | E, later gods | idea | Become: the player is the mob. Possess: the mob stays itself and is possessed, knowing or not. Vessel: possession that grants powers or damages the host. Manifestation: a god born or reborn out of the mob, destroying it. |
-| Sources at the door | mythos, section 0 | idea | player now; chance, llm, human later. |
+| Sources at the door | mythos, section 0 | hook | player built: light and poke. chance, llm, human reserved in DOOR_SOURCES. The log is api.log. |
 | Save and load | notes, Next | idea | Needs tasks as data. Shared with G and inhabiting. |

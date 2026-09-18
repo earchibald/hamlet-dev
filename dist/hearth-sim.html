@@ -2451,6 +2451,7 @@ function startWorld(seed, opts = {}){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: 1500 + rint(2000) };
   goalPriority = {};
+  doorLog = [];
   generate();
   const a = beings[0];
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
@@ -2474,8 +2475,8 @@ function lightTile(x, y, z = 0){
 }
 function poke(a){
   if (!a.alive) return 'Nothing stirs.';
-  if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + 400; addThought(a, 'poked', 'Felt a nudge from above', 2, 400); chooseTask(a); return `${a.name} looks up, then gets to it.`; }
-  failTask(a); a.asleep = false; a.task = null; START.flee(a) || START.wander(a); return `The ${SPECIES[a.species].label} startles.`;
+  if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + 400; addThought(a, 'poked', 'Felt a nudge from above', 2, 400); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then gets to it.`; }
+  failTask(a); a.asleep = false; a.task = null; START.flee(a) || START.wander(a); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
 
 /* One tick of the world, in this order. The order fixes the random number stream, so do not reorder it. */
@@ -2491,6 +2492,34 @@ function updateWorld(){
   spawnWildlife();
 }
 function step(){ tick++; updateWorld(); camp = camps[0]; for (const a of beings) if (a.alive) updateBeing(a); if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human'); }
+
+/* ---------- the door ----------
+   Every act from outside the engine enters here: the player now, and later chance, an LLM, or a
+   human inhabiting a mob. The engine step is pure. The door is the one place the outside touches
+   the state, and it keeps a log, so a seed plus its log replays the same story. An act that does
+   nothing is not logged. Each act returns a message for whoever asked. */
+const DOOR_SOURCES = ['player', 'chance', 'llm', 'human'];
+let doorLog = [];
+/* Acts by name. Each takes the event and returns { ok, msg }. ok is false when the world did not change. */
+const DOOR_ACTS = {
+  light(e){
+    /* lightTile answers with a message. Two of its answers mean the world changed. */
+    const msg = lightTile(e.x, e.y, e.z || 0);
+    return { ok: msg === 'The fire pit is lit.' || msg === 'The ground is burning. This fire is not contained.', msg };
+  },
+  poke(e){
+    const a = beingById(e.id);
+    if (!a || !a.alive) return { ok: false, msg: 'Nobody is there to poke.' };
+    return { ok: true, msg: poke(a) };
+  },
+};
+function inject(event){
+  const act = DOOR_ACTS[event.act];
+  if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
+  const { ok, msg } = act(event);
+  if (ok) doorLog.push({ tick, ...event });
+  return msg;
+}
 
 /* ============================================================
    INTERFACE. Reads the simulation state and draws it.
@@ -2831,13 +2860,13 @@ function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').va
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(lightTile(c.x, c.y, c.z)); camp = viewCamp; break;
+    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'camp': {
       if (camp.pit){ say('The fire pit is already built. The camp stays where it is.'); break; }
       if (c.z !== 0){ say('The camp must be on the valley floor.'); break; }
       const t = tileAt(c.x, c.y); if (!passable(c.x, c.y) || t.feature){ say('The camp site must be open ground you can stand on.'); break; }
       camp = viewCamp; setSite(c.x, c.y); camp.siteReason = 'you chose it'; log('The camp site moves. Someone felt it was right.', humans()); say('Camp site set. The fire pit will go here.'); break; }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? poke(a) : 'Nobody is there to poke.'); break; }
+    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to poke.'); break; }
   }
   renderUI(true);
 }
