@@ -122,3 +122,43 @@ test('scars paint what the winner\'s pole leaves', () => {
     }
   }
 });
+
+/* No soak seed carries a scar, so the scar painters would go untested. Mark four countries away from the start by
+   hand and run the painters on them. */
+test('the scar painters mark a country, and a chasm never cuts the world in two', () => {
+  const api = settled();
+  const W = api.W, start = api.creation.gate.start;
+  const beside = new Set(api.neighboursOf(start).map(r => r.id)); beside.add(start.id);
+  const away = api.liveRegions().filter(r => !beside.has(r.id) && r.area > 40).sort((p, q) => q.area - p.area).slice(0, 4);
+  assert.equal(away.length, 4, 'seed r has fewer than four countries away from the start');
+  const a = api.beings.find(b => b.species === 'human');
+  const was = api.reachable(a.x, a.y, 0, api.NZ * W * api.H);
+  const held = start.tiles.filter(i => was.has(api.idx3(i % W, (i - i % W) / W, 0)));
+  const values = ['burned', 'cut', 'drowned', 'broken'];
+  away.forEach((r, k) => api.mark(r, 'scar', values[k], api.gods()[0], 'test'));
+  api.paintScars();
+  away.forEach((r, k) => {
+    const tiles = r.tiles.map(i => api.world[i]);
+    if (values[k] === 'burned') assert.ok(tiles.every(t => ['ash', 'water', 'sand', 'rock', 'stone'].includes(t.ground)), 'a burned country with living ground');
+    if (values[k] === 'drowned') assert.ok(tiles.some(t => t.feature === 'deadpine') && tiles.some(t => t.ground === 'water'), 'a drowned country with no dead pines in water');
+    if (values[k] === 'broken') assert.ok(tiles.filter(t => t.feature === 'boulder').length >= 1, 'a broken country with no boulders');
+    if (values[k] === 'cut') assert.ok(tiles.filter(t => t.ground === 'rock' && !t.hill).length >= 8, 'a cut country with no chasm');
+  });
+  const now = api.reachable(a.x, a.y, 0, api.NZ * W * api.H);
+  for (const i of held) assert.ok(now.has(api.idx3(i % W, (i - i % W) / W, 0)), 'a scar cut a start tile out of the walkable world');
+});
+
+/* A founding party walks to a sector where the pit can be built. The rule counts the sector and its four
+   neighbours; this test counts the same reach from the items themselves. */
+for (const seed of SOAK_SEEDS) test(`seed ${seed}: every founding site has the pit's rocks and sticks in reach`, () => {
+  const api = load(); api.startWorld(seed);
+  const need = api.GOALS.find(g => g.id === 'firepit').need;
+  const sites = api.foundingSites();
+  for (const s of sites){
+    const inReach = (x, y) => { const q = api.secOf(x, y); return Math.abs(q.sx - s.sx) + Math.abs(q.sy - s.sy) <= 1; };
+    const loose = k => api.items.filter(i => i.kind === k && i.z === 0 && inReach(i.x, i.y)).length;
+    assert.ok(loose('rock') >= need.rock, `a founding site with ${loose('rock')} rocks in reach`);
+    assert.ok(loose('stick') >= need.stick, `a founding site with ${loose('stick')} sticks in reach`);
+    assert.ok(api.GROWS[s.biome], `a founding site in a ${s.biome}`);
+  }
+});
