@@ -214,7 +214,7 @@ The field on the world map, in the order it is drawn:
 | A scar | The country is hatched, one tile in four, in the scar colour. |
 | A god | A gold star with its name, in the middle of the country it stands in. A sleeping god is faded. Gods that share a country stand side by side. |
 
-Hover gives the region card. It names the country by its poles and by the god of its newest pole mark. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the god of that country.
+Hover gives the region card. It names the country by its poles and by the reason on its newest pole mark. The reason names the god. The far side of a line takes the other pole, so a god's epithet beside the country's poles would read as a mistake. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the god of that country.
 
 After settle, hover reads the marks. A hill says who raised it and why, a cave says who dug it, a scar says who fought over the ground, and a country row names the country on every surface tile. A card also says which god sleeps in that hill, cave, or country. A hill raised for a den says it was raised for the creatures, not by the act its mark tells of. The sector summary on the world map names the country too, and `C` shows the country lines over the world map.
 
