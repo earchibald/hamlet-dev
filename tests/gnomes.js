@@ -97,3 +97,39 @@ test('gnomes copy a workshop, borrow a pot at night, and bring it back with a gi
   assert.ok(c.stash.cord + c.stash.clay + c.stash.pot >= 2, 'a gift beside it');
   assert.ok(api.chronicle.some(e => e.text.includes('Neighbours, then')));
 });
+
+test('two gnomes of the same burrow cannot both borrow the same night', () => {
+  const api = load(); api.startWorld('r');
+  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c;
+  api.setSite(burrow.exit.x + 3, burrow.exit.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
+  c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.stash.cord = 1; c.everLit = true;
+  burrow.bench = 1; burrow.lastRepaid = 0;
+  const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
+  assert.ok(kin.length >= 2, 'need two gnomes in the burrow to test the race');
+  for (const g of kin){ g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90; }
+  api.tick = 22 * 1000;
+  const potBefore = c.stash.pot, cordBefore = c.stash.cord, basketBefore = c.tools.basket;
+  for (const g of kin) assert.ok(api.START.borrow(g), 'each borrow should be able to start');
+  for (let k = 0; k < 300 && kin.some(g => g.task); k++){ for (const g of kin) if (g.task) api.runTask(g); api.tick = api.tick + 1; }
+  const taken = (potBefore - c.stash.pot) + (cordBefore - c.stash.cord) + (basketBefore - c.tools.basket);
+  assert.equal(taken, 1, `expected exactly one thing gone from the stash, stash pot=${c.stash.pot} cord=${c.stash.cord} basket=${c.tools.basket}`);
+  assert.ok(burrow.holding, 'the burrow should record the one thing it took');
+});
+
+test('a gnome does not borrow again for six days after repaying', () => {
+  const api = load(); api.startWorld('r');
+  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c;
+  api.setSite(burrow.exit.x + 3, burrow.exit.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
+  c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.everLit = true;
+  burrow.bench = 1;
+  const g = api.beings.find(b => b.species === 'gnome' && b.den === burrow); g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90;
+  api.tick = 22 * 1000; assert.ok(api.START.borrow(g), 'the borrow should start');
+  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  api.tick = api.tick + 2 * 1000 + 10; g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
+  assert.ok(api.START.repay(g), 'the repayment should start');
+  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  assert.equal(burrow.holding, null);
+  g.task = null; assert.equal(api.START.borrow(g), false, 'right after repaying, no new borrow yet');
+  api.tick = api.tick + 6 * 1000; g.task = null;
+  assert.ok(api.START.borrow(g), 'six days later, a new borrow can start');
+});

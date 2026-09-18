@@ -126,13 +126,16 @@ Object.assign(START, {
   /* At night, a gnome with a bench borrows one made thing from a camp stash within 40 tiles. Never from a warded camp. */
   borrow(a){
     const c = a.den; if (!c || !c.bench || c.holding || !isNight()) return false;
+    if (c.lastRepaid && tick - c.lastRepaid < 6 * DAY) return false;
     const k = camps.find(k => k.stashTile && !k.ward && dist(k.stashTile[0], k.stashTile[1], c.exit.x, c.exit.y) <= 40 && (k.stash.pot > 0 || k.stash.cord > 0 || k.tools.basket)); if (!k) return false;
     const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'borrow', label: 'Slipping over to the camp for something useful', path: p, fast: true,
       arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (c.holding) return 'fail';
         const kind = k.stash.pot > 0 ? 'pot' : k.stash.cord > 0 ? 'cord' : k.tools.basket ? 'basket' : null; if (!kind) return 'fail';
-        camp = k; if (kind === 'basket') k.tools.basket = 0; else stashTake(kind, 1);
-        c.holding = { kind, camp: k, since: tick }; addThought(a, 'borrowed', 'Borrowed a clever thing', 6, 1500);
+        camp = k; c.holding = { kind, camp: k, since: tick };
+        if (kind === 'basket') k.tools.basket = 0; else stashTake(kind, 1);
+        addThought(a, 'borrowed', 'Borrowed a clever thing', 6, 1500);
         log(`${kind === 'basket' ? 'The basket' : `A ${ITEMS[kind].name}`} is gone from the stash. Small footprints lead toward the meadow.`, campHumans(), 'bad');
         if (!k.gnomes.known){ k.gnomes.known = true; }
         return 'done'; } };
@@ -146,7 +149,7 @@ Object.assign(START, {
     a.task = { type: 'repay', label: 'Carrying the thing back, with a gift', path: p,
       arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const h = c.holding; if (!h) return 'fail'; camp = k; if (h.kind === 'basket') k.tools.basket = 1; else stashAdd(h.kind, 1);
-        const gift = ['cord', 'clay', 'pot'][rint(3)]; stashAdd(gift, 1); c.holding = null;
+        const gift = ['cord', 'clay', 'pot'][rint(3)]; stashAdd(gift, 1); c.holding = null; c.lastRepaid = tick;
         addThought(a, 'repaid', 'Paid a debt', 5, 1500); for (const o of campHumans()) addThought(o, 'gnomegift', 'The neighbours brought something back, and more', 5, 1200);
         log(`The ${h.kind === 'basket' ? 'basket' : ITEMS[h.kind].name} is back in the stash, and a ${ITEMS[gift].name} beside it. Neighbours, then.`, campHumans(), 'good');
         return 'done'; } };
@@ -219,6 +222,6 @@ function gnomeTick(){
   if (tick % 500 !== 0) return;
   for (const c of caves){
     if (c.kind !== 'burrow' || c.owner !== 'gnome') continue;
-    if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
+    if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; c.lastRepaid = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
   }
 }
