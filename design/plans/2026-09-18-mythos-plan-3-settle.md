@@ -550,7 +550,7 @@ const SCAR_PAINTERS = { burned: scarBurned, cut: scarCut, drowned: scarDrowned, 
 function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r, 'scar')){ const p = SCAR_PAINTERS[m.value]; if (p) p(r); } }
 ```
 
-Order in `settle()`: `paintSectors(); paintGround(); paintRivers(); paintLakes(); paintScars(); paintHeights(); paintDepths(); rockfall();` then `placeFirstPerson()` and the remainder of `generateRest` without its `uplift`/`cutWaterCaves`/`rockfall` calls. Scars go before hills so a chasm never cuts through a hill; `keepsPaths` in `scarCut` and `scarBroken` keeps the map joined as the tile check will demand.
+Order in `settle()`: `paintSectors(); paintGround(); paintRivers(); paintLakes(); placeFirstPerson(); startRegion = ...; paintScars(); paintHeights(); paintDepths(); rockfall();` then the remainder of `generateRest` without its `uplift`/`cutWaterCaves`/`rockfall` calls. The person is placed first because `hillFits` and `rimExits` read `startRegion`; `uplift` never uses the start country, so the person's tile is safe. (Task 3 found this and reordered; the plan text is corrected here.) Scars go before hills so a chasm never cuts through a hill; `keepsPaths` in `scarCut` and `scarBroken` keeps the map joined as the tile check will demand.
 
 The `startRegion` recomputations that `generateRest` did around uplift move to just after `placeFirstPerson()` (one computation) and after `rockfall()` is no longer needed since rockfall now precedes the person. Keep one `startRegion = reachable(best.x, best.y, 0, NZ * W * H);` right after the person is placed, before dens.
 
@@ -579,6 +579,10 @@ Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn"
 
 **Interfaces:**
 - Produces: `paintCreatures()`: for each making mark, spawns its species in its country by a `SPAWN` table keyed by species: `{ rabbit: { n: 6, dens: false }, deer: { n: 3, herd: true }, fox: { n: 1, dens: true }, wolf: { n: 2, dens: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null }`. `digDens(within, owner)` digs one den for `owner` in a hill inside `within`, or returns null. `digGnomeBurrows(within)` digs two or three burrows under `within`'s meadow tiles. `placeGrove(within)`: a hollow pine, or a hollow under a hill of the country, with three sprites. `spawnAnimal(sp, within, n, avoid)`. `placeBodies()`. `godsTick()`. `SPECIES.god.perTick` keeps gods out of `updateBeing`; the beings filter keeps them.
+
+- [ ] **Step 0a: A deterministic test for the scar painters**
+
+No soak seed carries a scar, so the scar painters have no coverage. Add to `tests/settle.js` a test that starts a creation on seed r, runs the ages, then before settle would run: no. Instead, take a settled world, pick four live countries away from the start (not `creation.gate.start` and not its neighbours), `mark` each with one scar value (`burned`, `cut`, `drowned`, `broken`) through `api.mark(r, 'scar', value, api.gods()[0], 'test')`, call `api.paintScars()` directly, and assert what the existing scar test asserts per value, plus that the first person's reachable region still holds every start-country passable tile it held before (`scarCut` keeps the world joined). Export `paintScars` if it is not already.
 
 - [ ] **Step 0: Founding parties read the new world**
 
