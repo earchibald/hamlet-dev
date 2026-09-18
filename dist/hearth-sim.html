@@ -192,7 +192,7 @@ const GROUND = {
   sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true, clay: true },
   ash:   { name: 'ash',         fuel: 0, flam: 0,   walk: true },
   water: { name: 'water',       fuel: 0, flam: 0,   walk: false },
-  rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false },
+  rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false, quarry: true },
   stone: { name: 'stone floor', fuel: 0, flam: 0,   walk: true },
 };
 const FEATURES = {
@@ -1815,6 +1815,28 @@ function startHaulPit(a, p){
   return startBuild(a, [p.x, p.y], 12, 'Hauling the deer out of the pit', a => { if (!p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good'); });
 }
 
+/* Quarry rocks from a rock face: a walkable tile beside ground that can be quarried, within thirty tiles of the site. */
+function startQuarry(a){
+  if (a.carrying && a.carrying.kind !== 'rock') return startDeliver(a);
+  const [sx, sy] = camp.site; let face = null;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => { if (dist(x, y, sx, sy) > 30) return false; for (const [dx, dy] of DIRS){ const q = hasTile(x + dx, y + dy, z) ? tileAt(x + dx, y + dy, z) : null; if (q && GROUND[q.ground].quarry){ face = q; return true; } } return false; }, 3500, a);
+  if (!p) return false;
+  a.task = { type: 'work', label: 'Walking to the rock face', path: p, progress: 0,
+    arrive(a, t){
+      if (!face || !GROUND[face.ground].quarry) return 'fail';
+      t.label = 'Quarrying rocks'; t.progress += workSpeed(a, 'build');
+      if (t.progress < 25) return 'continue';
+      a.carrying = { kind: 'rock', count: 2 }; gainXp(a, 'build');
+      face.quarried = true;
+      /* The first quarry to strike a hollowed hill pays favour, once per face, however often it is opened before or after. */
+      if (!face.hollowPaid){ const hollow = face.hill && caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
+        if (hollow){ face.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, 900); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
+      log(`${a.name} quarries two rocks from the face.`, [a]);
+      return chain(a, t, startDeliver(a)) || 'done';
+    } };
+  return true;
+}
+
 function deerNear(){ if (!camp.site) return null; return beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, ...camp.site) <= 34).sort((p, q) => nearAt(p, ...camp.site) - nearAt(q, ...camp.site))[0] || null; }
 function startHuntDeer(a, d){
   a.carrying = { kind: 'spear', count: 1 };
@@ -2125,6 +2147,8 @@ const RECIPES = [
   { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2 && !!deerNear(), score: 38,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
     blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in eight. Up to two pits.' },
+  { id: 'quarry', title: 'Quarry stone', after: 'axe', tools: ['axe'], place: 'face', gather: a => startQuarry(a), standing: { stash: 'rock', n: 6 }, score: 41, offerLabel: 'quarry rocks',
+    blurb: 'Rocks from a rock face within thirty tiles. Two a go. The loose-rock hunt is over.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -2150,6 +2174,7 @@ const PLACES = {
   kiln: { spot: () => camp.kiln },
   garden: { spot: () => camp.garden ? null : gardenSpot() },
   pitfall: { spot: () => pitfallSite() },
+  face: {},
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
 const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && camp.garden));
@@ -2529,6 +2554,7 @@ function inspectTile(x, y, z = 0){
   }
   if (t.feature) rows.push(['Feature', FEATURES[t.feature].name + (t.feature === 'bush' ? `, ${t.berries} berries` : '')]);
   if (t.hill) rows.push(['Hill', `${t.hill.storeys === 2 ? 'A tall hill' : 'A low hill'} of old stone, ${t.hill.storeys === 2 ? 'two storeys' : 'one storey'} high. Cliffs all round but for the slopes.`]);
+  if (GROUND[t.ground].quarry) rows.push(['Rock face', t.quarried ? 'quarried. Rocks come from here.' : 'rocks can be quarried here with the axe.']);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
   if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
   if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : 'Foxes'} live here.` : ''}`]);

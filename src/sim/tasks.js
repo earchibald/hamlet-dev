@@ -224,6 +224,28 @@ function startHaulPit(a, p){
   return startBuild(a, [p.x, p.y], 12, 'Hauling the deer out of the pit', a => { if (!p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good'); });
 }
 
+/* Quarry rocks from a rock face: a walkable tile beside ground that can be quarried, within thirty tiles of the site. */
+function startQuarry(a){
+  if (a.carrying && a.carrying.kind !== 'rock') return startDeliver(a);
+  const [sx, sy] = camp.site; let face = null;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => { if (dist(x, y, sx, sy) > 30) return false; for (const [dx, dy] of DIRS){ const q = hasTile(x + dx, y + dy, z) ? tileAt(x + dx, y + dy, z) : null; if (q && GROUND[q.ground].quarry){ face = q; return true; } } return false; }, 3500, a);
+  if (!p) return false;
+  a.task = { type: 'work', label: 'Walking to the rock face', path: p, progress: 0,
+    arrive(a, t){
+      if (!face || !GROUND[face.ground].quarry) return 'fail';
+      t.label = 'Quarrying rocks'; t.progress += workSpeed(a, 'build');
+      if (t.progress < 25) return 'continue';
+      a.carrying = { kind: 'rock', count: 2 }; gainXp(a, 'build');
+      face.quarried = true;
+      /* The first quarry to strike a hollowed hill pays favour, once per face, however often it is opened before or after. */
+      if (!face.hollowPaid){ const hollow = face.hill && caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
+        if (hollow){ face.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, 900); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
+      log(`${a.name} quarries two rocks from the face.`, [a]);
+      return chain(a, t, startDeliver(a)) || 'done';
+    } };
+  return true;
+}
+
 function deerNear(){ if (!camp.site) return null; return beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, ...camp.site) <= 34).sort((p, q) => nearAt(p, ...camp.site) - nearAt(q, ...camp.site))[0] || null; }
 function startHuntDeer(a, d){
   a.carrying = { kind: 'spear', count: 1 };

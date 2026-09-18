@@ -34,6 +34,8 @@ const RECIPES = [
   { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2 && !!deerNear(), score: 38,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
     blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in eight. Up to two pits.' },
+  { id: 'quarry', title: 'Quarry stone', after: 'axe', tools: ['axe'], place: 'face', gather: a => startQuarry(a), standing: { stash: 'rock', n: 6 }, score: 41, offerLabel: 'quarry rocks',
+    blurb: 'Rocks from a rock face within thirty tiles. Two a go. The loose-rock hunt is over.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -59,6 +61,7 @@ const PLACES = {
   kiln: { spot: () => camp.kiln },
   garden: { spot: () => camp.garden ? null : gardenSpot() },
   pitfall: { spot: () => pitfallSite() },
+  face: {},
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
 const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && camp.garden));

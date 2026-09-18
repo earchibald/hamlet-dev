@@ -193,3 +193,23 @@ test('a pot holds water at camp and keeps berries longer', () => {
   api.stashAdd('berries', 1); const without = c.rot.berries[0] - api.tick;
   assert.equal(withPot, without * 2);
 });
+
+test('with the axe, rocks are quarried from a rock face within thirty tiles', () => {
+  const { api, a, c } = readyCamp();
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const t = api.tileAt(c.site[0] + 6 + dx, c.site[1] + dy); if (!t.struct){ t.feature = null; t.ground = 'grass'; } }
+  const face = api.tileAt(c.site[0] + 6, c.site[1]); face.ground = 'rock'; face.hill = { x: face.x, y: face.y, r: 1, storeys: 1, tiles: [api.idx(face.x, face.y)] };
+  c.stash.rock = 0;
+  assert.equal(api.goalState(goal(api, 'quarry')).s, 'active');
+  doOffer(api, a, 'quarry rocks');
+  assert.equal(c.stash.rock, 2);
+  assert.ok(api.chronicle.some(e => e.text.includes('quarries')));
+  c.stash.rock = 6;
+  assert.equal(api.goalState(goal(api, 'quarry')).s, 'idle');
+  /* A face on a hill that hides a hollow costs favour, once. */
+  c.fae.known = true; c.fae.favor = 0; c.stash.rock = 0;
+  const cave = api.makeCave('hollow', face.hill); cave.owner = 'sprite';
+  doOffer(api, a, 'quarry rocks');
+  assert.equal(c.fae.favor, -10);
+  doOffer(api, a, 'quarry rocks');
+  assert.equal(c.fae.favor, -10, 'the same face is not paid for twice');
+});

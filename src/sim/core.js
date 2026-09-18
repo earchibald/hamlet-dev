@@ -32,7 +32,7 @@ const GROUND = {
   sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true, clay: true },
   ash:   { name: 'ash',         fuel: 0, flam: 0,   walk: true },
   water: { name: 'water',       fuel: 0, flam: 0,   walk: false },
-  rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false },
+  rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false, quarry: true },
   stone: { name: 'stone floor', fuel: 0, flam: 0,   walk: true },
 };
 const FEATURES = {
