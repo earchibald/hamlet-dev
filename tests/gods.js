@@ -195,3 +195,41 @@ test('a god whose pole is unmade from the whole field dies, and leaves a scar', 
   assert.ok(api.legends.some(e => e.text.includes(`${b.name} is no more`)));
   assert.ok(api.liveRegions().some(q => api.marksOf(q, 'scar').some(m => m.by === b.id)), 'no scar for the dead god');
 });
+
+test('a country with a height pole but nothing raised or dug can be a start', () => {
+  const api = load(); api.startCreation('r');
+  const above = api.withGodRng(() => api.makeGod('above', api.field.root, 'Test.'));
+  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, 'Test.'));
+  const r = api.field.root;
+  api.setPole(r, 'above', above, ''); api.setPole(r, 'dry', dry, '');
+  assert.notEqual(api.restGate().lack, 'start', 'highland that nobody raised should be a start');
+  api.mark(r, 'height', 1, above, '');
+  assert.equal(api.restGate().lack, 'start', 'a raised country is not level');
+});
+
+test('when every god is of one contrast, a lack of people strains a new one', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const before = api.gods().length;
+  const contrasts = new Set(api.awakeGods().map(g => g.contrast));
+  assert.equal(contrasts.size, 1);
+  api.withGodRng(() => api.strain('people'));
+  assert.equal(api.gods().length, before + 1);
+  assert.equal(new Set(api.awakeGods().map(g => g.contrast)).size, 2);
+  api.withGodRng(() => api.strain('people'));
+  assert.equal(api.gods().length, before + 1, 'a second contrast is enough; no third god');
+});
+
+test('the gods leave the last plains alone', () => {
+  const api = load(); api.startCreation('r');
+  const above = api.withGodRng(() => api.makeGod('above', api.field.root, 'Test.'));
+  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, 'Test.'));
+  const cut = api.withGodRng(() => api.splitRegion(api.field.root, dry));
+  for (const r of [cut.a, cut.b]){ api.setPole(r, 'dry', dry, ''); api.setPole(r, 'above', above, ''); }
+  assert.equal(api.startCandidates().length, 2);
+  assert.deepEqual(api.GOD_ACTS.raise.targets(above), [], 'two plains left, and one is offered for raising');
+  const more = api.withGodRng(() => api.splitRegion(cut.a, dry));
+  for (const r of [more.a, more.b]) { api.setPole(r, 'dry', dry, ''); api.setPole(r, 'above', above, ''); }
+  assert.equal(api.startCandidates().length, 3);
+  assert.equal(api.GOD_ACTS.raise.targets(above).length, 3, 'three plains left, and none is offered');
+});

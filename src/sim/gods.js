@@ -125,13 +125,15 @@ const GOD_ACTS = {
   },
   raise: {
     poles: ['above'],
-    targets: g => liveRegions().filter(r => hasPole(r, 'above')),
+    /* The gods leave the last plains alone: a level dry country is not raised while fewer than three remain. */
+    targets: g => { const few = startCandidates().length < 3; return liveRegions().filter(r => hasPole(r, 'above') && !(few && isStart(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'height').length ? -10 : 10) + rng() * 8,
     ...spendAges('height', 'raise the land', (g, n) => n >= 3 ? `${g.name} has raised a mountain, ${n} storeys of stone.` : `${g.name} has raised a hill of ${n} ${n === 1 ? 'storey' : 'storeys'}.`),
   },
   dig: {
     poles: ['below'],
-    targets: g => liveRegions().filter(r => hasPole(r, 'below')),
+    /* The gods leave the last plains alone: a level dry country is not dug while fewer than three remain. */
+    targets: g => { const few = startCandidates().length < 3; return liveRegions().filter(r => hasPole(r, 'below') && !(few && isStart(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'depth').length ? -10 : 10) + rng() * 8,
     ...spendAges('depth', 'dig into the dark', (g, n) => n >= 3 ? `${g.name} has dug a deep, ${n} levels down.` : `${g.name} has dug a cave of ${n} ${n === 1 ? 'level' : 'levels'}.`),
   },
@@ -264,11 +266,14 @@ function decideGod(g){
 /* ---------- the rest gate ---------- */
 function ring(r, d){ const set = new Set([r]); for (let k = 0; k < d; k++) for (const q of [...set]) for (const n of neighboursOf(q)) set.add(n); return [...set]; }
 function touchesWet(r){ return boundaries.some(b => b.pole === 'wet' && b.tiles.some(i => regionOf[i] === r.id)); }
-/* A god may sleep only when the world can hold a life: a start region that is dry, level, unscarred,
+/* A start candidate: dry, level (nothing raised, nothing dug), unscarred, a sector or more. */
+const isStart = r => hasPole(r, 'dry') && !marksOf(r, 'height').length && !marksOf(r, 'depth').length && !hasMark(r, 'scar', 'burned') && !hasMark(r, 'scar', 'drowned') && r.area >= SECTOR_AREA;
+const startCandidates = () => liveRegions().filter(isStart);
+/* A god may sleep only when the world can hold a life: a start region that is dry, level (nothing raised, nothing dug), unscarred,
    and a sector or more; water beside it; fuel and food within two neighbours; and the people made. */
 function restGate(){
   const live = liveRegions();
-  const starts = live.filter(r => hasPole(r, 'dry') && !poleOf(r, 'height') && !hasMark(r, 'scar', 'burned') && !hasMark(r, 'scar', 'drowned') && r.area >= SECTOR_AREA);
+  const starts = startCandidates();
   if (!starts.length) return { ok: false, lack: 'start' };
   const people = live.some(r => hasMark(r, 'making', 'human'));
   let lack = null;
@@ -285,7 +290,16 @@ function restGate(){
 /* The lack strains a contrast. A missing god comes into being to hold the pole; a present one is
    pressed to act. A lack of people draws every god toward every other. */
 function strain(lack){
-  if (lack === 'people'){ const gs = awakeGods(); for (const g of gs) for (const o of gs) if (o !== g){ g.opinions[o.id] = clamp((g.opinions[o.id] || 0) + 5, -100, 100); setRelation(g, o); } return; }
+  if (lack === 'people'){
+    const gs = awakeGods();
+    for (const g of gs) for (const o of gs) if (o !== g){ g.opinions[o.id] = clamp((g.opinions[o.id] || 0) + 5, -100, 100); setRelation(g, o); }
+    /* One difference cannot make a people. When every awake god is of one contrast, the lack strains a new one. */
+    if (gs.length && gs.every(g => g.contrast === gs[0].contrast)){
+      const c = Object.keys(CONTRASTS).find(c => !gods().some(g => g.contrast === c));
+      if (c) makeGod(CONTRASTS[c][0], null, 'One difference is not enough to make a people.');
+    }
+    return;
+  }
   const pole = STRAIN[lack].find(p => !godOf(p)) || STRAIN[lack][0];
   const g = godOf(pole);
   if (!g) makeGod(pole, null, `The world cannot yet hold a life: it lacks ${lack}.`);
@@ -317,7 +331,7 @@ function backstop(){
   creation.backstops++;
   log(`Wearied, ${g.name} does what has to be done. The world lacks ${gate.lack}.`, [g], 'major');
   const live = liveRegions();
-  if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar'); setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
+  if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar' && m.kind !== 'height' && m.kind !== 'depth'); setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
   else if (gate.lack === 'water'){ const n = neighboursOf(gate.start)[0] || gate.start; setPole(n, 'wet', g, 'Made wet so the world could hold a life.'); }
   else if (gate.lack === 'fuel'){ setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
   else if (gate.lack === 'food'){ mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
