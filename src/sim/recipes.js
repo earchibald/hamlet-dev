@@ -120,6 +120,7 @@ function recipeGoal(r){
       if (r.gather) return [{ label: r.offerLabel || r.title.toLowerCase(), score: r.score || 35, start: r.gather }];
       const out = [];
       for (const [k, n] of Object.entries(r.needs || {})) if ((camp.stash[k] || 0) < n){ const g = gatherOffer(k); if (g) out.push({ label: `${ITEMS[k].gather || 'gather'} ${ITEMS[k].plural}`, score: (r.score || 40) - 5, start: g }); }
+      if (r.makes && r.makes.item && looseCount(r.makes.item)(sectors[secIdx(...Object.values(secOf(...camp.site)))]) > 0) out.push({ label: `gather ${ITEMS[r.makes.item].plural} left for us`, score: (r.score || 40) + 5, start: a => startGather(a, r.makes.item) });
       if (out.length) return out;
       if (!stashHas(r.needs) || (r.tools || []).some(t => !camp.tools[t])) return [];
       const at = placeFor(r); if (!at) return [];

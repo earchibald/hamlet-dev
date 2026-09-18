@@ -64,3 +64,34 @@ test('a person who walks into a wolf den is attacked, brand or no brand, by day'
   assert.ok(h.thoughts.some(t => t.key === 'denbite'));
   assert.ok(api.chronicle.some(e => e.text.includes('in its den')));
 });
+
+test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', () => {
+  const api = load(); api.startWorld('r');
+  const c = api.camps[0]; api.camp = c; const a = api.beings[0];
+  api.setSite(a.x, a.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y]; c.everLit = true;
+  c.fae.known = true; c.fae.favor = -30; c.stash.pot = 1; c.stash.berries = 5; c.fae.lastPrank = 0;
+  const sp = api.beings.find(b => b.species === 'sprite');
+  sp.x = c.stashTile[0]; sp.y = c.stashTile[1]; sp.z = 0; sp.task = null;
+  api.tick = 22 * 1000; api.rngNext = null;
+  let stolen = false;
+  for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.START.prank(sp); sp.task.arrive(sp, sp.task); stolen = c.stash.pot === 0; }
+  assert.ok(stolen, 'the pot was never taken in forty pranks');
+  assert.ok(api.chronicle.some(e => e.text.includes('pot is gone')));
+  c.fae.favor = 50; c.stone = [c.pit[0] + 3, c.pit[1]]; api.tileAt(...c.stone).struct = { type: 'stone', camp: c, offering: 0 };
+  let cord = false;
+  for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.START.watch(sp); sp.task.progress = 119; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; sp.task.arrive(sp, sp.task); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
+  assert.ok(cord, 'no cord on the stone in forty nights');
+  assert.ok(api.chronicle.some(e => e.text.includes('coil of cord lies')));
+});
+
+test('a wolf raid takes fish as it takes meat', () => {
+  const api = load(); api.startWorld('r');
+  const c = api.camps[0]; api.camp = c; const a = api.beings[0];
+  api.setSite(a.x, a.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
+  c.stash.fish = 2; c.stash.carcass = 0; c.stash.cooked = 0; c.stash.smoked = 0;
+  const w = api.beings.find(b => b.species === 'wolf'); w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
+  api.tick = 22 * 1000;
+  assert.ok(api.START.raid(w), 'the raid should start with fish in the stash');
+  w.task.arrive(w, w.task);
+  assert.equal(c.stash.fish, 1);
+});

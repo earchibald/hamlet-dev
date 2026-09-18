@@ -47,13 +47,13 @@ Object.assign(START, {
   },
   raid(a){
     const c = campNear(a, 45); if (!c || !c.pit || c.storehouse || tileAt(...c.pit).struct.lit || (a.cooldown.raid || 0) > tick) return false;
-    if (c.stash.carcass + c.stash.cooked + c.stash.smoked <= 0) return false;
+    if (c.stash.carcass + c.stash.fish + c.stash.cooked + c.stash.smoked <= 0) return false;
     const [sx, sy] = c.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'raid', label: 'Slinking toward the dark camp', path: p, fast: true,
       arrive(a, t){
         if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const prev = camp; camp = c;
-        const k = c.stash.carcass > 0 ? 'carcass' : c.stash.cooked > 0 ? 'cooked' : c.stash.smoked > 0 ? 'smoked' : null;
+        const k = c.stash.carcass > 0 ? 'carcass' : c.stash.fish > 0 ? 'fish' : c.stash.cooked > 0 ? 'cooked' : c.stash.smoked > 0 ? 'smoked' : null;
         if (k){ stashTake(k); a.needs.food = 100; a.cooldown.raid = tick + 1200; if (tick - c.wolfLogged > 300){ c.wolfLogged = tick; log(`A wolf slips into the dark camp and takes the ${ITEMS[k].name} from the stash.`, campHumans(), 'bad'); } for (const h of campHumans()) addThought(h, 'wolf', 'A wolf came into camp in the night', -12, 1200); }
         camp = prev; return 'done';
       } };

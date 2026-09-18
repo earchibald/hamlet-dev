@@ -41,6 +41,7 @@ function countEvents(api, events){
     wolfRaids: ev('wolf slips'), mauled: ev('mauls'), drivenOff: ev('chases the wolf'),
     seen: api.camps.filter(c => c.fae.known).length, favor: api.camps.map(c => c.fae.favor), gifts: ev('are gone by morning'),
     moss: ev('glowing moss lies') + ev('blows. The fire'), pranks: ev('tiny footprints') + ev('pinch marks') + ev('pinched out'),
+    stolen: ev('is gone from the stash'), cordGifts: ev('coil of cord lies'),
     fights: ev('spears a sprite') + ev('flees') + ev('turns and fights'), sprites: alive('sprite'), stones: api.camps.filter(c => c.stone).length,
     wards: api.camps.filter(c => c.ward).length, groveAnger: api.groves.map(g => g.anger),
     born: ev(' is born to '), oldAge: ev('old age') + ev('old and warm'), taught: ev('learned '),
