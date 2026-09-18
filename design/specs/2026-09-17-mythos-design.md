@@ -70,6 +70,7 @@ A god is a being. `makeBeing('god', ...)` with the same fields. Extra fields: `p
 
 - When a god splits a region, the far pole has nobody, and the counterpart comes into being to hold it.
 - When the rest gate names what the world cannot hold, the contrast that answers it strains, and a god of that pole comes into being.
+- When the people are lacking and every awake god is of one contrast, a new contrast strains, since one difference cannot make a people. A mingling needs two.
 
 So gods are made of what the world lacks. Five contrasts, ten poles, ten gods at most. A seed may have no still god.
 
@@ -125,7 +126,7 @@ Rules of the ages:
 
 **The rest gate.** A god may sleep only when the checker passes. The checker, on regions:
 
-1. A start region exists: dry, not above, not below, not drowned or burned, of at least a sector.
+1. A start region exists: dry, level, not drowned or burned, of at least a sector. Level means nothing raised and nothing dug: the gate reads the height and depth marks, not the height pole. The height pole alone is highland or lowland, still walkable ground.
 2. A wet region or boundary touches it or its neighbour.
 3. A region within two neighbours has a mark that grows fuel: forest, meadow, or marsh.
 4. A making mark for something eaten or that eats berries lies within two neighbours.
