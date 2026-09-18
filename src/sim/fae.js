@@ -85,6 +85,9 @@ function faeTick(){
   if (camp.fae.favor > 0) camp.fae.favor = Math.max(0, camp.fae.favor - 1); else if (camp.fae.favor < 0 && camp.fae.blightUntil < tick) camp.fae.favor = Math.min(0, camp.fae.favor + 1);
   if (camp.fae.known && camp.stash.moss > 0 && isNight()) for (const h of campHumans()) addThought(h, 'mosslight', 'The glowing moss shines softly in the stash', 2, 400);
   for (const g of groves) if (camp.snares.some(sn => secOf(sn.x, sn.y).sx === g.sector.sx && secOf(sn.x, sn.y).sy === g.sector.sy)){ g.anger = Math.min(100, g.anger + 2); camp.fae.favor = Math.max(-100, camp.fae.favor - 2); }
+  for (const g of groves) if (g.cave) for (const h of campHumans()){ const t = tileAt(h.x, h.y, h.z); if (!t || t.cave !== g.cave) continue;
+    camp.fae.favor = Math.max(-100, camp.fae.favor - 5); addThought(h, 'inhollow', 'Stood in the sprites\' hollow. It felt watched', -3, 600);
+    for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'intruder', `${h.name} came into our hollow`, -8, 1500); }
 }
 /* Groves calm down over time and bear a new sprite in a quiet spring. */
 function groveTick(){

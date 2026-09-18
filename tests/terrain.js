@@ -243,3 +243,34 @@ for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with on
     for (const b of homed) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
   }
 });
+
+for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in a hollow under it`, () => {
+  const api = load(); api.startWorld(seed);
+  let under = 0;
+  for (const g of api.groves){
+    const hill = api.hills.find(h => api.secOf(h.x, h.y).sx === g.sector.sx && api.secOf(h.x, h.y).sy === g.sector.sy);
+    if (!hill){ assert.equal(g.cave, null); assert.equal(api.tileAt(g.x, g.y).feature, 'hollow'); continue; }
+    under++;
+    assert.ok(g.cave && g.cave.kind === 'hollow' && g.cave.owner === 'sprite', 'the grove has a hollow cave');
+    const hollowTile = api.tileAt(g.x, g.y);
+    assert.equal(hollowTile.feature, 'hollow'); assert.equal(hollowTile.cave, g.cave);
+    assert.ok(g.cave.tiles.filter(t => api.passable(t.x, t.y, t.z)).length >= 2, 'room to dance');
+    assert.ok(g.cave.exit && g.cave.exit.mouth === g.cave);
+    for (const sp of api.beings.filter(b => b.species === 'sprite' && b.grove === g)) assert.ok(g.cave.tiles.some(t => t.x === sp.x && t.y === sp.y && t.z === sp.z), `${sp.name} is not in the hollow`);
+    assert.ok(g.cave.story.some(s => s.includes('oldest hollow')));
+  }
+});
+
+test('standing in a hollow costs the camp favour and the sprites notice', () => {
+  /* Use the first test seed whose groves include one under a hill. */
+  let A = null, g = null;
+  for (const s of SEEDS){ const api = load(); api.startWorld(s); g = api.groves.find(g => g.cave); if (g){ A = api; break; } }
+  assert.ok(g, 'no grove under a hill on any test seed');
+  const person = A.beings[0]; const floor = g.cave.tiles.find(t => A.passable(t.x, t.y, t.z));
+  person.x = floor.x; person.y = floor.y; person.z = floor.z; person.camp.fae.known = true;
+  const before = person.camp.fae.favor;
+  A.camp = person.camp; A.faeTick();
+  assert.equal(person.camp.fae.favor, before - 5);
+  assert.ok(person.thoughts.some(t => t.key === 'inhollow'));
+  assert.ok(A.beings.some(b => b.species === 'sprite' && b.grove === g && b.thoughts.some(t => t.key === 'intruder')));
+});

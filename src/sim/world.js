@@ -227,6 +227,46 @@ function spawnInDens(species, n){
   }
   return placed;
 }
+/* A forest sector with a hill keeps its grove under the hill: a pocket of 3 to 5 tiles at level 0, the hollow on the innermost tile. */
+function hollowUnderHill(sc, h){
+  const set = new Set(h.tiles);
+  let rim = shuffle(rimExits(h, set));
+  /* On a hill deep in thick forest, dens and rockfall can claim every clear approach before the grove gets a turn.
+     As a last resort the sprites keep their own door clear of a tree, the way carve() clears one to make cave floor. */
+  if (!rim.length){
+    const treed = [];
+    for (const i of h.tiles){ const x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (t.feature === 'tree' && !t.slope && !t.mouth) treed.push([t, i]); } }
+    rim = shuffle(treed);
+  }
+  for (const [exit, under] of rim){
+    const ux = under % W, uy = (under - ux) / W;
+    if (tileAt(ux, uy).cave) continue;
+    /* The door has to open onto more than a one-tile pocket boxed in by trees, or the grove -- and anything
+       dropped at it -- is cut off from the rest of the map. */
+    const opensOut = DIRS.some(([dx, dy]) => { const nx = exit.x + dx, ny = exit.y + dy; return inb(nx, ny) && !set.has(idx(nx, ny)) && passable(nx, ny); });
+    if (!opensOut) continue;
+    const c = makeCave('hollow', h); c.owner = 'sprite';
+    const mouth = carve(c, ux, uy, 0);
+    if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; }
+    c.mouth = mouth; c.exit = exit; exit.mouth = c;
+    let x = ux, y = uy; const size = 3 + rint(3);
+    for (let k = 1; k < size; k++){
+      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && set.has(idx(nx, ny)) && erodedBy(idx(nx, ny), set, 1) && !tileAt(nx, ny).cave);
+      if (!opts.length) break;
+      [x, y] = opts[0]; carve(c, x, y, 0);
+    }
+    if (c.tiles.length < 3){ for (const t of c.tiles){ t.cave = null; t.ground = 'rock'; } exit.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
+    if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
+    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - 300 * DAY;
+    c.story.push('The oldest hollow in the valley.');
+    const g = { x: inner.x, y: inner.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick, cave: c }; groves.push(g);
+    for (const t of c.tiles){ if (t === inner || !passable(t.x, t.y, 0) || beings.some(b => b.x === t.x && b.y === t.y && b.z === 0)) continue; if (beings.filter(b => b.species === 'sprite' && b.grove === g).length >= 3) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }
+    while (beings.filter(b => b.species === 'sprite' && b.grove === g).length < 3){ const t = c.tiles.find(t => t !== inner && passable(t.x, t.y, 0)); if (!t) break; const sp = makeBeing('sprite', t.x, t.y, null, 0); sp.grove = g; beings.push(sp); }
+    return g;
+  }
+  return null;
+}
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
    level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
@@ -391,11 +431,13 @@ function generate(){
   groves = [];
   const forests = sectors.filter(sc => sc.biome === 'forest').map(sc => ({ sc, n: sectorCount(sc, 'trees', t => t.feature === 'tree') })).sort((p, q) => q.n - p.n).slice(0, 3);
   for (const { sc } of forests){
+    const hill = hills.find(h => secOf(h.x, h.y).sx === sc.sx && secOf(h.x, h.y).sy === sc.sy);
+    if (hill && hollowUnderHill(sc, hill)) continue;
     for (let tries = 0; tries < 300; tries++){
       const t = tileAt(sc.sx * LW + 2 + rint(LW - 4), sc.sy * LH + 2 + rint(LH - 4));
       if (t.feature === 'tree' && nearFind(t.x, t.y, q => passable(q.x, q.y), DIRS)){
         t.feature = 'hollow'; t.planted = tick - 300 * DAY;
-        const g = { x: t.x, y: t.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick }; groves.push(g);
+        const g = { x: t.x, y: t.y, sector: sc, anger: 0, swarmUntil: 0, lastBirth: tick, cave: null }; groves.push(g);
         for (let k = 0; k < 3; k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.grove = g; beings.push(sp); } }
         break;
       }
