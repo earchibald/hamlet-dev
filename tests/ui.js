@@ -509,4 +509,32 @@ test('C shows and hides the countries from any focus', () => {
   assert.equal(api.ui.overlay, false);
 });
 
+test('a hill says who raised it, a cave says who dug it, and every surface tile names its country', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'godLine']);
+  api.startWorld('alpha');
+  const names = api.gods().map(g => g.name);
+  const hillTile = api.world.find(t => t.hill);
+  const hr = api.markRows(hillTile.x, hillTile.y, 0);
+  const raised = hr.find(r => r[0] === 'Raised by');
+  assert.ok(raised && names.some(n => raised[1].includes(n)), JSON.stringify(hr));
+  assert.match(raised[1], /Age \d+|Before time/i);
+  assert.ok(hr.some(r => r[0] === 'Country'));
+  const cave = api.caves.find(c => c.mark && c.deep);
+  const cr = api.markRows(cave.deep.x, cave.deep.y, cave.deep.z);
+  assert.ok(cr.some(r => r[0] === 'Dug by' && names.some(n => r[1].includes(n))), JSON.stringify(cr));
+  assert.deepEqual(api.markRows(-1, -1, 0), []);
+});
+
+test('a scarred country says who fought over it', () => {
+  /* None of the six soak seeds has a scar, so the test writes one. A mark is data, and markRows reads data. */
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows']);
+  api.startWorld('alpha');
+  const r = api.liveRegions()[0], g = api.gods()[0];
+  r.marks.push({ kind: 'scar', value: 'cut', by: g.id, age: api.pulseAge + 3, why: `${g.name} beat another god here.`, at: null });
+  const i = r.tiles[0], x = i % api.W, y = (i - x) / api.W;
+  const scar = api.markRows(x, y, 0).find(row => row[0] === 'Scar');
+  assert.ok(scar, 'a scarred country has a scar row');
+  assert.ok(scar[1].includes('A cut in the earth') && scar[1].includes(g.name) && scar[1].includes('in age 4'), scar[1]);
+});
+
 module.exports = { loadUI };

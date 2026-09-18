@@ -102,6 +102,7 @@ function sectorSummary(s){
   if (theGods.length) parts.push(theGods.map(g => `${g.name} ${g.epithet}, ${g.status}`).join('; '));
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
+  if (s.country != null && regionById(s.country)) parts.push(countryLine(regionById(s.country)));
   return `${s.name}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
 }
 

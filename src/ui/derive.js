@@ -46,6 +46,29 @@ function fieldColor(r, pal){
   return cs.length ? mixHex(cs) : pal['field-none'];
 }
 
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
+const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
+const markLine = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}. ${m.why}`;
+function markRows(x, y, z){
+  if (!field || inAges() || !hasTile(x, y, z)) return [];
+  const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
+  if (t.hill && t.hill.mark) rows.push(['Raised by', markLine(t.hill.mark)]);
+  if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
+  const c = t.cave || t.mouth;
+  if (c && c.mark) rows.push(['Dug by', markLine(c.mark)]);
+  if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
+  if (!r) return rows;
+  if (z === 0){
+    const seen = new Set();
+    for (const m of marksOf(r, 'scar')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Scar', `${SCAR_WORD[m.value] || m.value}. ${markLine(m)}`]); }
+    for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Made here', m.why]); }
+  }
+  rows.push(['Country', countryLine(r)]);
+  if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
+  return rows;
+}
+
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
