@@ -2387,6 +2387,12 @@ let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = nu
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 const $ = id => document.getElementById(id);
 
+/* View model. Pure functions from sim state to what the strip and drawers show. No DOM. */
+
+/* The key map and the dispatcher. No DOM. */
+
+/* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
+
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['sprite','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
@@ -2542,6 +2548,8 @@ function drawLoc(){
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
+/* Inspection: hover and pinned detail on a being or a tile. */
+
 /* ---- inspection ---- */
 function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${color}"></i></span>`; }
 const needColor = v => v < 25 ? 'var(--bad)' : v < 50 ? 'var(--warn)' : 'var(--good)';
@@ -2641,6 +2649,10 @@ function tipForCell(c, e){
   tipAnchor = { x: e.clientX, y: e.clientY, left: false }; renderTip();
 }
 
+/* The strip: clock, camp, gauges, chips. */
+
+/* The side panels: clock, camps, goals, people, chronicle. */
+
 /* ---- panels ---- */
 function renderUI(force){
   if (!viewCamp || !camps.includes(viewCamp)) viewCamp = camps[0];
@@ -2675,6 +2687,11 @@ function renderUI(force){
   const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick + chronicle[0].text : '');
   if (force || key !== chronKey){ chronKey = key; $('chronicle').innerHTML = chronicle.map(e => `<li class="k-${e.kind}"><span class="when">${e.when}</span> ${e.text}</li>`).join(''); }
 }
+
+/* Start and help dialogs. */
+
+/* God actions: tools, view changes, movement, and world control. */
+
 function say(msg){ $('hint').textContent = msg; }
 function setTool(id){ tool = id; document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); say(TOOLS.find(t => t.id === id).hint); if (tipPinned) hideTip(); }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); }
@@ -2712,6 +2729,9 @@ function applyTool(c, e){
   }
   renderUI(true);
 }
+
+/* The frame loop and page wiring: initUI() sets up canvases and events, frame() drives the loop. */
+
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }

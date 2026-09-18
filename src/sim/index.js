@@ -39,4 +39,4 @@ function load(){
   return new Function(source() + '\n' + API)();
 }
 
-module.exports = { FILES, source, load };
+module.exports = { FILES, source, load, API };

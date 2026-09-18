@@ -1,0 +1,1 @@
+/* View model. Pure functions from sim state to what the strip and drawers show. No DOM. */
