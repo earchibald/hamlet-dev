@@ -1,7 +1,12 @@
 /* God actions: tools, view changes, movement, and world control. */
 
 function say(msg){ $('foot').innerHTML = `<span>${msg}</span>`; }
-function setTool(id){ tool = id; document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); if (tipPinned) hideTip(); }
+function setTool(id){
+  tool = id;
+  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if (id === 'camp' && viewCamp && viewCamp.pit) say('The fire pit is built. The camp stays where it is.');
+  if (tipPinned) hideTip();
+}
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -20,17 +25,23 @@ function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern'
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
-function newWorld(seed){ startWorld(seed); viewCamp = camps[0]; followId = null; lvl = 0; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
+/* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
+function newWorld(seed){
+  startWorld(seed, {});
+  wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  ocv.width = W * WS; ocv.height = H * WS;
+  viewCamp = camps[0]; followId = null; lvl = 0; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
+}
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(lightTile(c.x, c.y, c.z)); camp = viewCamp; break;
+    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'camp': {
-      if (camp.pit){ say('The fire pit is already built. The camp stays where it is.'); break; }
-      if (c.z !== 0){ say('The camp must be on the valley floor.'); break; }
-      const t = tileAt(c.x, c.y); if (!passable(c.x, c.y) || t.feature){ say('The camp site must be open ground you can stand on.'); break; }
-      camp = viewCamp; setSite(c.x, c.y); camp.siteReason = 'you chose it'; log('The camp site moves. Someone felt it was right.', humans()); say('Camp site set. The fire pit will go here.'); break; }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? poke(a) : 'Nobody is there to poke.'); break; }
+      camp = viewCamp;
+      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z, camp: viewCamp.id }));
+      break;
+    }
+    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   renderUI(true);
 }
@@ -48,10 +59,10 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ const a = beingById(r.id); const el = document.querySelector(`#drawers [data-being="${r.id}"]`); const rect = el ? el.getBoundingClientRect() : { left: 400, top: 200 }; tipTarget = { being: a.id }; tipAnchor = { x: rect.left, y: rect.top, left: true }; tipPinned = true; renderTip(); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
-  else if (r.kind === 'goal'){ goalPriority[r.id] = ((goalPriority[r.id] ?? 1) + 1) % 3; renderUI(true); }
+  else if (r.kind === 'goal'){ say(inject({ source: 'player', act: 'priority', id: r.id, pri: ((goalPriority[r.id] ?? 1) + 1) % 3 })); renderUI(true); }
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
 }
-function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; goalPriority[r.id] = clamp((goalPriority[r.id] ?? 1) + d, 0, 2); renderUI(true); }
+function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
 function focusStep(d){
   const ring = ['map', ...ui.open.map(id => `drawer:${id}`)];
   const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length;
@@ -61,8 +72,8 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
   hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
-  slower(){ setSpeed(speed === 16 ? 4 : 1); setPaused(false); },
-  faster(){ setSpeed(speed === 1 ? 4 : 16); setPaused(false); },
+  slower(){ setSpeed(speed === 64 ? 16 : speed === 16 ? 4 : 1); setPaused(false); },
+  faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
   speed(s){ setSpeed(s); setPaused(false); },
   tool(id){ setTool(id); },
   view(){ cycleView(); },

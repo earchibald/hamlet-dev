@@ -71,7 +71,7 @@ Days: rabbit 3 adult, 14 old, 20 life. Deer 8, 36, 50. Fox 5, 26, 36. Wolf 6, 32
 
 Young do half the work and are kept from hunting, guarding, felling, and founding. Old work at 70 percent and teach well. Past the span, each day is a gamble weighted by hardiness. A person who dies by a lit fire "dies in their sleep, old and warm."
 
-Births: spring or summer, a roof, the stock food goal met, two adults who like each other at 35 or more, and 16 days since either last had a child. The child blends both parents' traits. Rabbits breed when two adults are within 10 tiles in a warm season. Fawns come in spring. Foxes and wolves wander in from the world edges.
+Births: spring or summer, a roof, the stock food goal met, two adults who like each other at 35 or more, and 16 days since either last had a child. The child blends both parents' traits. Rabbits breed when two adults are within 10 tiles in a warm season. Fawns come in spring. Foxes and wolves wander in from the world edges. An arriving wolf or fox joins the nearest den of its own kind that still has room for a breeding pair. Wolves and foxes bear one young in their den each spring when two grown owners live there. Arrivals from the world's edge are half as frequent.
 
 Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed adjacent grass in spring and autumn at 1.2 percent per sample, and never next to another bush. Pines start as saplings, become trees after 12 days, and old pines fall in storms. A sapling becomes a solid tree only if the open tiles beside it still touch each other around it once it is solid. A sapling also does not become a tree under a standing being. Before this rule, saplings sealed one-tile gaps in dense forest. Two woodcutters were shut in pockets by the river and the world's edge, and one starved and one died of thirst, each two tiles from the tree that closed the way. The tile card says when a sapling is held back. Generation spreads bush ages over 60 days. A first draft gave them all similar ages and every bush died in the same week, which starved four camps.
 
@@ -81,7 +81,7 @@ A camp is a list entry: site, pit, stash tile, stash counts, tools, structures, 
 
 The chain, in the order camps reach it:
 
-1. Make camp. The first person scores a site on water, fire safety, berries, bare ground, and distance from sector edges. The site must be reachable from where they stand. The chronicle says why.
+1. Make camp. The first person scores a site on water, fire safety, berries, bare ground, distance from sector edges, stone within 12 tiles, and distance from an un-cleared wolf den within 20. Stone close by scores +8. A wolf den too near scores −15. The site must be reachable from where they stand. The chronicle says why.
 2. Build a fire pit. 6 loose rocks, 8 loose sticks. Builder clears the grass around it, so the pit is contained.
 3. Keep the fire burning (ongoing). Fuel 400, burns 0.25 per tick, a stick is 50, a log 140. Feeds logs first. Relights from: the player, a carried ember from a nearby blaze (420 tick life), glowing moss, or firestones.
 4. Keep the hearth three days without a break. Opens tools.
@@ -99,12 +99,14 @@ The chain, in the order camps reach it:
 16. Sew a waterskin. 2 hides. Then keep water at camp.
 17. Become a village. Storehouse, two huts, eight people.
 18. Found a second camp. Roof, five people, eight days old, spring or summer, at most six camps. Two people leave with coals that last six days.
+19. Search the caves, water caves only; a den must be cleared, not searched, so that row is the `dens` goal below. A brave adult with hp 60 or more, the spear, and a lit pit takes a brand and walks to the deep chamber. Fallen rock is cleared with the axe first. A cave is claimed the moment its search begins, so a second person gets no offer on it while the first is still in the dark, and the claim clears if the searcher is interrupted or dies. It counts as searched only once the find, or empty hands, reaches the stash, not when the deep chamber is reached: an interrupted search leaves nothing found and the offer open again. The find comes home: firestones become the camp's tool, moss goes to the stash, bones give a chronicle line and a thought. The brand lasts 420 ticks; the dark rule is the danger, not death. In the soak, searches fired on three of six seeds, with no death.
+20. Clear a den. Two brave adults with hp 60 or more, brands, and the spear drive the owners out. The leader may take one bite at the mouth. Owners dig a new den on another hill within three days. They come back to the old den when the camp's fire has been out a whole day, homeless or not. An arriving wolf never joins a den the camp holds. The sprites' hollow is not a den. Each den's offer carries the den in its label, so a den that fails to clear does not cool down every other den too.
 
-Crafts after the village are data. A recipe in src/sim/recipes.js names what it needs, where it is made, and what it makes, and one builder turns it into a goal. The panel shows recipes after the hand-written ladder: gather fibre, twist cord, build the workshop, weave a basket, make a fishing rod, fish the river, sew hide clothes. Work at the workshop goes 1.3 times as fast. A basket carries three more. A fish cooks to two meals or smokes to two strips. Hide clothes cut the wearer's warmth loss to 0.6. Then: dig clay from the bank, build the kiln, fire pots (each pot holds six more drinks at camp, and with a pot berries keep twice as long), plant a garden of four bushes from cuttings, dig up to two deer pits (a pit is dug only where a deer is within ten tiles of a bush at dig time and within thirty tiles of the camp, and it catches one deer in eight that steps in, and the camp hauls it home), and quarry stone from a rock face within thirty tiles. The first face opened on a hill with a hollow costs ten favour, paid once per rock face.
+Crafts after the village are data. A recipe in src/sim/recipes.js names what it needs, where it is made, and what it makes, and one builder turns it into a goal. The panel shows recipes after the hand-written ladder: gather fibre, twist cord, build the workshop, weave a basket, make a fishing rod, fish the river, sew hide clothes. Work at the workshop goes 1.3 times as fast. A basket carries three more. A fish cooks to two meals or smokes to two strips. Hide clothes cut the wearer's warmth loss to 0.6. Then: dig clay from the bank, build the kiln, fire pots (each pot holds six more drinks at camp, and with a pot berries keep twice as long), plant a garden of four bushes from cuttings, dig up to two deer pits (a pit is dug only where a deer is within ten tiles of a bush at dig time and within thirty tiles of the camp, and it catches one deer in eight that steps in, and the camp hauls it home), and quarry stone from a rock face within thirty tiles. The first face opened on a hill with a hollow costs ten favour, paid once per hill.
 
 A recipe carries an `offerLabel` for the goal panel and a `status()` for its own progress text. Places to work are a `PLACES` table, each with a spot finder and a work speed. Makers are a `MAKERS` map keyed by what the recipe makes, one function per finished thing. A recipe's maker runs before its inputs are consumed, so a maker that cannot act consumes nothing. A recipe short of an input that another recipe makes is blocked until that recipe runs; short of a raw input, it offers to gather instead. Gathering logs fells a tree when no loose logs remain on the ground.
 
-Fishing stops once the food goal is met, and a raw fish counts as two meals toward that goal, the same as a cooked one. The chronicle notes fish milestones, not every catch, so the log does not fill with one line per fish. Fishing once halved every camp's population because raw fish did not count as food: people kept fishing past the point of plenty and the food goal never read as met, though the camp was fed. The soak now asserts the camps grow, so this kind of regression stays red instead of green.
+Fishing stops once the food goal is met. A raw fish counts as two meals toward the fishing goal only; the stock food goal, births, and newcomers count cooked and smoked food and berries. The chronicle notes fish milestones, not every catch, so the log does not fill with one line per fish. Fishing once halved every camp's population because raw fish did not count as food: people kept fishing past the point of plenty and the food goal never read as met, though the camp was fed. The soak now asserts the camps grow, so this kind of regression stays red instead of green.
 
 A camp takes a newcomer or bears a child only while the stock food goal is met. Beds alone let a village grow to twenty mouths, and winter, when the bushes are bare and nothing can be gathered, then starved them together.
 
@@ -114,11 +116,17 @@ Spoilage: cooked meat 1800 ticks, berries 3500, doubled in winter and doubled by
 
 Fire is the thing the player is for at the start, and the thing that people learn to make for themselves. The order of independence: the player, then lightning and embers, then the sprites' moss, then firestones. Do not remove the early dependence. It is the reason the player pays attention.
 
+The player's tool is Lightning. On the pit, it lights the fire. Anywhere else, it strikes like the sky's own lightning: a pine smoulders, its fire at least 240, long enough to fetch an ember; grass burns; bare ground does nothing.
+
 ## 10. Danger
 
-- Wolves hunt rabbits, and deer in winter. At night a hungry wolf raids a camp whose fire is out and takes meat. A lit fire keeps wolves at eight tiles. A brave person with a firebrand chases a wolf off, and it avoids that camp for a while.
+- Wolves hunt rabbits, and deer in winter, carrying a rabbit kill home to eat in the den when the floor can be reached, and eating it where it fell when it cannot. At night a hungry wolf raids a camp whose fire is out and takes meat. A lit fire keeps wolves at eight tiles. A brave person with a firebrand chases a wolf off, and it avoids that camp for a while.
 - A wolf will attack a person who is alone, at night, away from a lit fire, not holding fire. All four together. It has happened twice in 420 camp-days and nobody has died of it.
+- A wolf or fox in its own den bites any person on the den's floor, by day or night, with or without a brand. This is the one exception to the four conditions above. The bite is one a den every 150 ticks, shared by every owner in it, not one an animal: two grown owners standing together cannot both bite the same person in the same tick. The soak allows one such death a seed and reports it. Clearing a den sends people onto its floor on purpose; it has not yet fired as a death in any soak seed.
+- A den-bite death cause expires 600 ticks after the bite. An old bite is never blamed for a later, unrelated death.
+- A camp can clear a den with brands and the spear. The party keeps both brands lit until it is home at the stash; the den mouth is often a level down, and letting go there once left the whole party in the dark. The owners it drives out dig a fresh den elsewhere within three days if they can, waiting 500 ticks to try again after a hill refuses them; those without a den flee, or, where nothing threatens them enough to flee from, walk off to open ground well clear of the mouth. If the camp's fire goes out for a whole day, the den reverts: it takes back owners who already redug and owners still without a den, whichever the fire failure catches. An arriving wolf or fox never joins a den the camp holds. The guard goal never chases an owner it just displaced back into the den it was driven from while that owner's raid cooldown runs; chasing it there was a livelock, not a fight.
 - Cold. Warmth falls at night and in winter, faster in rain, slower under a roof and for the hardy. Below 30, a person drops work and goes to the fire. Below 20 they take damage.
+- A camp whose fire is out and holds no blaze, moss, or firestones sends its people for firestones before firewood. A lone camper once froze to death over six days at a dead pit, because every warmth rule needed a lit pit and nothing raised the priority of getting a source.
 - Sprites. See below.
 
 ## 11. The sprites
@@ -127,16 +135,33 @@ Three groves. Each is a hollow pine in a deep forest with three sprites. Sprites
 
 A grove on a forest hill lives in a hollow under the hill instead of a pine: a pocket in the rock with the hollow on its innermost tile and a mouth at the foot. A person who stands in the hollow costs the camp 5 favour every 300 ticks, and the sprites remember who came in.
 
-- Produce: glowing moss, near the hollow, and on the offering stone of a favoured camp.
+- Produce: glowing moss, near the hollow, and on the offering stone of a favoured camp; cord on the offering stone at favour 40 or more.
 - Want: berries left on an offering stone. Old pines standing.
 - Hate: axes in the grove sector (-15 favour, +25 grudge on the person), snares in the grove sector (-2 a day), wards (-10), being struck.
-- Favour is per camp, -100 to 100, drifts toward 0. Above 30: bushes near camp get extra berries, snares catch 10 percent more, the pit burns 15 percent slower. Below -20: pranks. Below -60 or a grove out for revenge: the fire gets pinched out.
+- Favour is per camp, -100 to 100, drifts toward 0. Above 30: bushes near camp get extra berries, snares catch 10 percent more, the pit burns 15 percent slower. Below -20: pranks; a pot, cord, or the basket goes missing. Below -60 or a grove out for revenge: the fire gets pinched out.
+- Theft of a made thing happens only when favour is below -20, as pranks are, and is then gated at one chance in two behind the ordinary prank roll. In the soak, seed x lost nine made things in 70 days while the other seeds lost none or one.
 - A killed sprite: grove anger +60, five days of blight on the bushes near the nearest camp, and the grove comes back in a group.
 - Fight or run: a struck sprite with bravery above 0.6 and health left bites. Otherwise it flees, marks the camp, and returns with kin a day later.
 - A grove bears a new sprite in spring if calm and surrounded by 25 old pines.
 - First sight: a person awake near a watching sprite, or someone walking into the dance at night, or footprints in the ash after a prank on a camp that never met them.
 
 Protection: the offering stone (2 rocks) and ward posts (6 charred sticks, sprites keep 9 tiles from the fire, costs favour, blocks gifts as well as pranks). People build wards only after favour has gone bad.
+
+## 11a. The gnomes
+
+Gnomes are a second people, hidden from the player until seen. They never attack.
+
+- **Home.** Two or three burrows a world, dug like fox dens under meadow edges beside a forest or a hill, at least 25 tiles from the start sector. Two or three gnomes to a burrow. A burrow sits at level −1 with a slope at its mouth, and a mushroom patch of 4 or more tiles covers the soil around the mouth. Gnomes start aged 20 to 35 days, live 110 days, and have no births: a burrow's line of gnomes only shrinks.
+- **Hours.** Asleep in the burrow from 06:00 to 19:00. Out from dusk to dawn. They tend the patch every night, not only when hungry.
+- **Needs and food.** Food, rest, and company. Mushrooms on their own patch regrow at a chance of 0.3 a sample and give 35 food each. Gnomes also eat wild berries. They never eat meat, and never take from a camp's stash.
+- **Company.** A gnome near its kin huddles with them, the way sprites do.
+- **Copying.** A camp workshop within 40 tiles gives an unbenched burrow a bench of its own within a few days: a one-in-three chance every 500 ticks. Chronicle: "Small tools clink under the meadow at night."
+- **Borrowing.** With a bench, at night, a gnome takes one made thing at a time from an unwarded camp stash within 40 tiles: a pot, then a coil of cord, then the basket. It returns two days later with a gift beside the taken thing: cord, clay, or a pot. A burrow does not borrow again for six days after a repayment. The cave's `holding` field stops two gnomes of the same burrow from both borrowing the same night, a race a soak run once caught.
+- **Leaving.** A village within 30 tiles, or two disturbances, is too loud. Three days later the gnomes dig a new hole 50 or more tiles from every village and move in, carrying their bench, debt, and repayment timer with them. The old hole stands empty and abandoned, and a player can still inspect it. The on-demand dig tries one sector a call and retries every three days if it finds no room.
+- **Neutral.** Gnomes never attack. They flee a brand within 5 tiles and a wolf within 6. They ignore sprites, and sprites ignore them. A gnome at home never bites: the den defence rule reads a `bite` row from the species table, and gnomes have none.
+- **Seeing them.** Glyph `g`, mushrooms `ɸ`. Tooltips on the being, the burrow, and the patch. A person awake near a gnome in gnome hours writes the first-sight chronicle line. A camp can also come to know of gnomes from footprints left after a borrow. The goal card "The hidden neighbours" tracks what a camp knows, counting only the burrows within 60 tiles of the camp's site.
+- **Repay after a ward.** A repay still returns the thing to a camp warded after the borrow: the debt is never stranded there.
+- **What the soak counts.** Gnomes alive at day 70, gnome deaths (must be zero), `campsThatSawGnomes`, benches, borrowed, repaid, and `gnomesLeft`.
 
 ## 12. Founding and travel
 
@@ -150,6 +175,9 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 - Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
 - The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
 - Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
+- Tools: Inspect, Lightning (key L), Camp site, Poke. Every tool act goes through the door, `inject()`. Speeds run 1, 4, 16, 64.
+- The camp-site tool refuses ground nobody can walk to from where they stand, and it disables itself once the pit is built. The guards live in the door's `site` act, not the interface.
+- Poke's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
 - Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
 - Every button prints its key, and `tests/ui.js` fails on one that does not. Movement keys are provisional.
 - The hover card and the pinned card are as before. Floating windows, the tile cursor, one-shot tools, and the command palette are plan B.
@@ -161,27 +189,45 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
 - Someone is alive at the end.
-- The camps grow: at least 20 people counted ever, and at least one birth. A floor under the population, so a regression like the fishing bug that halved every seed does not stay green.
+- The camps grow: at least 8 people alive at day 70, and at least one birth. Across all six seeds together, at least 180 people counted ever and 15 births, so a regression like the fishing bug that halved every seed still goes red. (The old per-seed floor of 20 people ever was too noisy: `humans` is a roughly 2x random variable across unrelated commits, with 20 inside its tail.)
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
-- Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
+- At most one person a seed dies in a den, and it is reported.
+- Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it, and so must every den, water cave, and burrow exit still in use (a search from the first camp's stash), so a mid-game dig that seals a pocket is caught too, not only a person in one. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
-- The same seed tells the same story twice.
+- The same seed tells the same story twice, and a seed, its options, and its log replay the same story. A moved log tells a different one.
 
 `tests/terrain.js` checks the levels: the surface is level 0, a slope joins two floors and a cliff does not, rabbits never climb and deer do, a wolf a level up is not a threat, fire burns on a hilltop, and every hill on every seed is rock with reachable floors, off the water, and out of the start sector, every tall hill has a water cave whose floors can be reached from its exit unless rock blocks it, every den has one mouth and its owners start in it, a grove on a forest hill is in a hollow under it, every deep chamber holds one find, and no rain or work reaches the dark.
 
 `tests/crafts.js` runs each recipe through the real goal offers on a hand-built camp: the offer appears, the person does the work, the thing exists, and the goal moves from blocked to active to done or idle.
 
+`tests/gnomes.js` checks the gnomes: burrows exist and are reachable, gnomes sleep by day and wake at dusk to tend the patch, mushrooms regrow, a burrow copies a nearby workshop, a borrow returns with a repayment and cannot be doubled up or repeated inside six days, a loud village sends a burrow to a new hole 50 or more tiles away, and first sight is written down once.
+
+`tests/closing.js` checks the closing phase on hand-built camps: a brave person takes a brand and brings a find home from the deep chamber, fallen rock is cleared with the axe first, two brave people clear a wolf den and the owners redig then come home when the fire fails, a den still reverts to owners who never redug, `withBrand` leaves no live ember when its chain does not start, a camp site favours stone close by and marks down a wolf den too near, and lightning smoulders a tree, does nothing to open ground, and lights the pit.
+
+`tests/door.js` and `tests/options.js`, from the mythos merge, check the door and the start options: every act enters by `inject()` and is logged whether it lands or not, a replayed event must arrive at its own tick, and a start option's world size and level range are honoured or refused with a sentence. The soak's `strikes` counter, from `tests/lib/run.js`, counts weather strikes only: `Lightning strikes the pit` shares its opening words with a strike on open ground, so it is subtracted back out, leaving the player's own pit-strike uncounted alongside it.
+
+`spreadFire` returns at once on a tick with nothing burning, before touching the world or raised arrays: no tile is ever on fire without `fireCount` saying so, so the early return draws no rng and changes no outcome, only the cost of a fire-free tick. It roughly halved the soak's slowest seed.
+
 Known weak spots:
 - Snare catches are low, 1 to 5 per world in 70 days, since rabbits became a real population.
 - Deer pits rarely catch, since deer range far from camps.
 - Wolves rarely catch deer.
-- Runs take about 15 seconds per seed. Profile before adding more per-tick work.
 - Some readers still see only the surface: plants grow on the surface, sector resource counts read the surface, lightning strikes surface tiles, and ash on a hill floor never returns to grass.
-- Dens exist but nobody uses them yet. Sleeping in a den, carrying prey home, births, and defence are phase 3 of topography. Finds lie in the deep until phase 4 gives people a reason to go.
 - The sprite-birth rule counts old pines on the sector's surface only; the pines on the hill above a hollow do not count yet.
-- A person whose task fails in the dark drops what they carry there, where nobody will fetch it. Phase 4 should send them out with their load.
+- A person whose task fails in the dark drops what they carry there, where nobody will fetch it.
+- Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
+- A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
+- Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
+- The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
+- Fixed. The soak's cave cutoff check (see section 14) caught a real one: on seed r a burrow's own exit at 2,22,0 went unreachable from the first camp's stash from around day 56 on. The dig itself was not the cause: it was never relocated. A sapling could still take root on a cave's own mouth tile, and twelve days later it matured into a solid tree there, sealing the one doorway a den or burrow has. `growPlants` in `src/sim/world.js` now refuses to plant a sapling on any tile with `t.mouth` set. `digGnomeBurrow` also now checks a live `reachable()` region, not the generation-time `startRegion`, when it digs mid-game (a village driving a burrow off), and keeps a new exit at least 2 tiles from the map edge, so a relocation dig cannot repeat the same mistake by a different route.
 
-## 15. Next
+## 15. The door
+
+The determinism contract, since the mythos spec. The engine step is pure. Given a state, the next state is fixed. Every act from outside enters by one door, `inject(event)` in `src/sim/door.js`, which logs every lawful event with its tick, applied or not, before applying it. The player's light and poke go through it; chance, an LLM, and a human inhabiting a mob are reserved sources. A perturbation is checked against the state's invariants, never against what the engine would have done. Every perturbation is visible in the chronicle in the game's voice. An event stamped with tick N was applied after step N and before step N+1. `startWorld(seed, options)` takes the world size in sectors and the level range; `design/settings.md` is the register of start options and future settings.
+
+The acts the door knows: light, poke, priority (a goal set off, on, or high), and site (the camp site before the pit is built). The site event carries its camp's id, and the act resolves the camp from that id, not from the global `camp`: on replay `camp` defaults to `camps[0]`, so a site chosen for a second camp still lands on that camp, not the first, when the log runs again. Reachability, once a guard in the interface, is now a guard inside the act itself, checked against the target camp's own first living person. A replayed event carries its tick and must arrive at it; the door answers "Not now." otherwise. The test runner`s replay god throws if it falls behind. Nothing in the interface writes sim state except through the door.
+
+## 16. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.

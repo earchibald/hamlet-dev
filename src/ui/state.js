@@ -7,7 +7,7 @@ const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',   hint: 'Point at a person, an animal, or a tile. Click to pin the details open.' },
-  { id: 'light',   key: 'f', label: 'Light',     hint: 'Click the fire pit to light it. Click anything else, and you start a wildfire. The hover card shows what will burn.' },
+  { id: 'light',   key: 'l', label: 'Lightning', hint: 'Click the fire pit to strike it alight. Click anything else, and lightning strikes there: a pine smoulders long enough to fetch an ember, grass burns. The hover card shows what will burn.' },
   { id: 'camp',    key: 'c', label: 'Camp site', hint: 'Click open ground to move the camp site. Only until the pit is built.' },
   { id: 'poke',    key: 'p', label: 'Poke',      hint: 'Click a person to make them drop what they are doing and think again. Click an animal to startle it.' },
 ];
@@ -47,6 +47,6 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
-    if ([1, 4, 16].includes(s.speed)) ui.savedSpeed = s.speed;
+    if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
   } catch (e) { /* no storage, or bad data */ }
 }

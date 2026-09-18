@@ -10,14 +10,25 @@
    tables, the seeded random numbers, the shared state, time,
    and the chronicle. Every other file reads these.
    ============================================================ */
-const SW = 10, SH = 6, LW = 28, LH = 20, W = SW * LW, H = SH * LH, DAY = 1000, TPS = 12;
+const LW = 28, LH = 20, DAY = 1000, TPS = 12;
+/* World size in sectors and the level range are start options. startWorld sets them before anything is allocated. */
+let SW = 10, SH = 6, W = SW * LW, H = SH * LH;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const RING = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 const NEAR = [[0,0], ...DIRS];
 /* The eight neighbours in order around the ring, so a walk along it stays on adjacent tiles. */
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
-const ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
+let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2 };
+let options;
+function setOptions(o){
+  options = { ...DEFAULT_OPTIONS, ...o };
+  if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
+  if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
+  SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
+  ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
+}
 
 /* Data tables. Rules read properties. Rules do not check names. */
 const MATERIALS = {
@@ -42,6 +53,7 @@ const FEATURES = {
   reeds:   { name: 'reeds',      solid: false, mat: 'plant', fuel: 8 },
   sapling: { name: 'pine sapling', solid: false, mat: 'plant', fuel: 5 },
   hollow:  { name: 'hollow pine, older than any camp', solid: true, mat: 'wood', fuel: 90 },
+  mushrooms: { name: 'mushroom patch', solid: false, mat: 'plant', fuel: 4 },
 };
 const ITEMS = {
   stick:   { name: 'stick',          plural: 'sticks',    mat: 'wood',  fuel: 12 },
@@ -57,14 +69,15 @@ const ITEMS = {
   venison: { name: 'deer carcass',   plural: 'deer carcasses', mat: 'flesh', fuel: 0 },
   spear:   { name: 'spear',          plural: 'spears',    mat: 'wood',  fuel: 0 },
   moss:    { name: 'tuft of glowing moss', plural: 'glowing moss', mat: 'plant', fuel: 0 },
-  firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0 },
-  bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0 },
+  firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0, find: 'Strikes a spark without a live ember.' },
+  bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0, find: 'Someone else came this way, long ago.' },
   fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
   cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
   fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
   clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
   pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
   cuttings: { name: 'bundle of cuttings', plural: 'cuttings', mat: 'plant', fuel: 3, gather: 'take' },
+  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 }, // nothing gathers this yet; reserved for a later phase
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },

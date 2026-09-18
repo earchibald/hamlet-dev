@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main'];
+const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -19,12 +19,14 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
-  startWorld, step, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, START, SPECIES, GROUND, ITEMS,
+  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, START, SPECIES, GROUND, ITEMS, LIFE,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startFish, startGather, startBuild, addItem, stashAdd,
-  runTask, updateBeing, dropCarried, makeBeing, checkPitfall,
-  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt,
-  near, nearAt, dist, ZMIN, ZMAX, ZOFF, NZ, W, H,
+  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startPickFibre, startFish, startGather, startBuild, startClearDen, startDeliver, addItem, removeItem, stashAdd,
+  runTask, updateBeing, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask,
+  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
+  near, nearAt, dist,
+  get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
+  get options(){ return options; },
   campHumans, humans, stashFood,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
@@ -33,6 +35,7 @@ const API = `return {
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
   get goalPriority(){ return goalPriority; },
+  get doorLog(){ return doorLog; }, get replay(){ return { ...replayHead, log: doorLog }; },
 };`;
 
 function load(){

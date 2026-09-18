@@ -2,10 +2,10 @@
 
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ['sprite','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
+  for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
 }
-const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : P.fox;
+const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
 function hash(x, y){ let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function darkness(){ const h = hourOf(); if (h >= 7 && h < 19) return 0; if (h >= 19 && h < 21) return (h - 19) / 2 * 0.45; if (h >= 5 && h < 7) return (7 - h) / 2 * 0.45; return 0.45; }
 function tileColor(t){
@@ -99,6 +99,7 @@ function drawLoc(){
     if (t.mouth && t.z === 0){ g = '◠'; fg = P['hill-fg']; }
     if (t.feature === 'tree'){ g = '♣'; fg = P.tree; } else if (t.feature === 'sapling'){ g = 'ʌ'; fg = P.tree; } else if (t.feature === 'hollow'){ g = '♠'; fg = P.sprite; } else if (t.feature === 'bush'){ g = '*'; fg = t.berries > 0 ? P.berry : P.bush; }
     else if (t.feature === 'boulder'){ bg = P.boulder; g = '#'; fg = P['boulder-fg']; } else if (t.feature === 'reeds'){ g = '"'; fg = P.reeds; }
+    else if (t.feature === 'mushrooms'){ g = 'ɸ'; fg = t.shrooms > 0 ? P.gnome : P['ash-fg']; }
     const it = itemAt(x, y, t.z);
     if (it && !t.feature){ g = it.kind === 'stick' ? '/' : it.kind === 'rock' ? 'o' : it.kind === 'log' ? '=' : '%'; fg = it.kind === 'stick' || it.kind === 'log' ? P.stick : it.kind === 'rock' ? P.rock : P.carcass; }
     if (t.struct){

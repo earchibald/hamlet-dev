@@ -13,9 +13,9 @@ function frame(now){
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
-  wcv = $('wmap'); wctx = wcv.getContext('2d'); wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  wcv = $('wmap'); wctx = wcv.getContext('2d');
   mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
-  ocv = document.createElement('canvas'); ocv.width = W * WS; ocv.height = H * WS; octx = ocv.getContext('2d');
+  ocv = document.createElement('canvas'); octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -40,7 +40,7 @@ function initUI(){
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
-    const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ goalPriority[pri.dataset.goal] = Number(pri.dataset.pri); renderUI(true); return; }
+    const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
     const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;

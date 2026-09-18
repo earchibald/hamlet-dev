@@ -3,7 +3,7 @@
 A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds the design, the rules that were tuned by testing, and the bugs already found and fixed. Do not re-derive them.
 
 ## Layout
-- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), world, path, camps, beings, species, fae, tasks, goals, weather, main.
+- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), world, path, camps, beings, species, fae, tasks, goals, weather, main, door. `door.js` is the one way in from outside: `inject(event)`.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/ui/`: the canvas interface. Reads state, draws, handles tools. Never changes the rules. Plain scripts in one scope like `src/sim/`, joined by `src/ui/index.js`. `derive.js` and `keys.js` have no DOM and are tested in `tests/ui.js`. `actions.js` is the only file that changes view state.
@@ -14,13 +14,17 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
 - `tests/crafts.js`: each recipe through the real offers. Fast.
 - `tests/ui.js`: the view model, the stages, the key map, every button has a key. Run it after every change to `src/ui/`.
+- `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
+- `tests/closing.js`: the cave goals, den contention, site scoring, and lightning. Fast.
+- `tests/door.js`: every act through `inject()`, logged whether it lands or not. Fast.
+- `tests/options.js`: world size and the level range at start. Fast.
 
 ## Rules of work
 - Write in plain English in the game's text. One idea per sentence.
 - Rules read data tables (materials, species, goals). Rules do not check names.
 - Every new behaviour must be visible to the player: a chronicle line, a thought, a goal state, or a tooltip row.
 - Any death in a 70-day soak that is not old age is a bug until proven otherwise. Trace it with `tests/trace-deaths.js`.
-- The simulation must stay deterministic for a seed until the player acts.
+- The engine step is pure. Every outside act enters by `inject()` in `src/sim/door.js` and is logged. A seed, its options, and its log replay the same story.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.

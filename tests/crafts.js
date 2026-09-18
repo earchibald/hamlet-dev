@@ -116,6 +116,9 @@ test('hide clothes go to the coldest person and keep them warmer', () => {
   c.workshop = [c.pit[0] + 2, c.pit[1]]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c };
   c.stash.hide = 3; c.stash.cord = 1; a.needs.warmth = 40;
   assert.equal(api.goalState(goal(api, 'clothes')).s, 'active');
+  c.stash.hide = 0;
+  assert.equal(api.goalState(goal(api, 'clothes')).s, 'active', 'short of hides it stays active, not blocked on itself');
+  c.stash.hide = 3;
   doOffer(api, a, 'sew hide clothes');
   assert.equal(a.clothes, true); assert.equal(c.stash.hide, 0);
   assert.equal(api.goalState(goal(api, 'clothes')).s, 'idle', 'everyone is clothed');
@@ -168,7 +171,10 @@ test('a deer pit catches a deer that steps in, and the camp hauls it home', () =
   c.stash.log = 4; c.stash.cord = 2;
   for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++){ const t = api.tileAt(c.site[0] + dx, c.site[1] + dy); if (!t.struct && t.ground !== 'water'){ t.feature = null; if (Math.abs(dx) + Math.abs(dy) > 3) t.ground = 'grass'; } }
   const bush = api.tileAt(c.site[0] + 11, c.site[1]); bush.feature = 'bush'; bush.berries = 0;
-  const d = api.beings.find(b => b.species === 'deer'); d.alive = true; d.x = c.site[0] + 12; d.y = c.site[1]; d.z = 0;
+  const d = api.beings.find(b => b.species === 'deer'); d.alive = true;
+  /* Deer traffic, not a deer standing about, sites the pit: walk deer feet over the intended tile and its ring. */
+  const spot = api.tileAt(c.site[0] + 12, c.site[1]);
+  for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]]) api.tileAt(spot.x + dx, spot.y + dy).deer = 6;
   assert.equal(api.goalState(goal(api, 'pitfall')).s, 'active');
   doOffer(api, a, 'dig a deer pit');
   assert.equal(c.pitfalls.length, 1); const p = c.pitfalls[0]; assert.equal(api.tileAt(p.x, p.y).struct.type, 'pitfall');
@@ -212,4 +218,25 @@ test('with the axe, rocks are quarried from a rock face within thirty tiles', ()
   assert.equal(c.fae.favor, -10);
   doOffer(api, a, 'quarry rocks');
   assert.equal(c.fae.favor, -10, 'the same face is not paid for twice');
+});
+
+test('a dead pit with no ignition source sends a brave adult for firestones before firewood', () => {
+  const { api, a, c } = readyCamp();
+  a.traits.bravery = 0.8;
+  c.stash.log = 0; c.stash.rock = 0;
+  /* A tree nearby so "cut a tree for logs" is on offer too, not just "haul". */
+  const tree = api.tileAt(c.site[0] + 4, c.site[1]); tree.ground = 'grass'; tree.feature = 'tree'; tree.struct = null;
+  const t = api.tileAt(...c.pit); t.struct.lit = false;
+  const byGoal = id => id === 'firewood' || id === 'firestones';
+  const topOf = id => api.offersFor(a).filter(o => o.goal.id === id).reduce((b, o) => !b || o.score > b.score ? o : b, null);
+
+  assert.equal(api.goalState(goal(api, 'firestones')).text.includes('cold'), true, 'the card says the camp puts fire first');
+  let stones = topOf('firestones'), wood = topOf('firewood');
+  assert.ok(stones, 'no firestones offer with a cold pit'); assert.ok(wood, 'no firewood offer to compare against');
+  assert.ok(stones.score > wood.score, `cold pit: firestones (${stones.score}) should outscore firewood (${wood.score})`);
+
+  t.struct.lit = true;
+  stones = topOf('firestones'); wood = topOf('firewood');
+  assert.ok(stones && wood, 'both offers should still be on the table with the pit lit');
+  assert.ok(wood.score > stones.score, `lit pit: firewood (${wood.score}) should outrank firestones (${stones.score}), as before`);
 });

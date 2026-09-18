@@ -85,7 +85,7 @@ test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', () 
   api.log('Someone saw the smoke. Test comes over the hills.', [], 'major'); api.notePulses();
   assert.equal(api.alerts().filter(x => x.type === 'event').length, before + 1);
   api.tick = api.tick + 1600; api.notePulses();
-  assert.equal(api.alerts().filter(x => x.type === 'event').length, before, 'pulse gone');
+  assert.ok(!api.alerts().some(x => x.type === 'event' && x.text.includes('Test comes over the hills')), 'pulse gone');
 });
 
 test('stages: only reached stages show, done goals fold, and a blocked goal shows only after its prerequisite', () => {

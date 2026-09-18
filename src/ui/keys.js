@@ -42,7 +42,7 @@ const KEYMAP = [
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
 ];
 for (const t of TOOLS) KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
-for (const s of [1, 4, 16]) KEYMAP.push({ key: '-', focus: 'speedrow', action: 'speed', arg: s, label: `${s}×`, button: `speed${s}` });
+for (const s of [1, 4, 16, 64]) KEYMAP.push({ key: '-', focus: 'speedrow', action: 'speed', arg: s, label: `${s}×`, button: `speed${s}` });
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 

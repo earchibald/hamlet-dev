@@ -11,7 +11,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runDays, countEvents, fingerprint, oddDeaths, cutOff, campLine } = require('./lib/run');
+const { runDays, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod, replayGod } = require('./lib/run');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -24,6 +24,17 @@ let goldenDirty = false;
 /* Deaths that are not old age, seen in the soak and not yet traced, by seed. Each is a bug until
    proven otherwise. Trace with tests/trace-deaths.js <seed>. Remove an entry when the bug is fixed. */
 const KNOWN_DEATHS = {};
+
+/* `humans` (everyone ever) is a roughly 2x random variable across commits that never touch
+   camp rules: a single seed has moved 34 -> 69, 57 -> 41 on unrelated changes, with 20 inside
+   its tail. A per-seed floor on it goes red on good changes and stays green on bad ones. Watch
+   `alive` per seed instead (a seed that actually collapses), and the sum of `humans` and `born`
+   across all six seeds together, so a change that halves every population (as fishing once did)
+   still fails. */
+const sums = { humans: 0, born: 0 };
+
+/* gamma's camp is capped by beds until one snare catch brings the hide for a hut (design/notes.md, Known weak spots); its floor is lower so an unrelated stream shift does not go red. */
+const ALIVE_FLOOR = { gamma: 6 };
 
 for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
@@ -43,10 +54,15 @@ for (const seed of SEEDS){
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
     });
     await t.test('the camps grow', () => {
-      assert.ok(counts.humans >= 20 && counts.born >= 1, `only ${counts.humans} people ever, ${counts.born} born`);
+      sums.humans += counts.humans; sums.born += counts.born;
+      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day 70, ${counts.born} born`);
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
+    });
+    await t.test('at most one person a seed dies in a den', () => {
+      const d = denDeaths(events); if (d.length) t.diagnostic(`${seed}: den deaths: ${d.join('; ')}`);
+      assert.ok(d.length <= 1, `den deaths: ${d.join('; ')}`);
     });
     await t.test('nobody is cut off from their camp', () => {
       assert.deepEqual(stranded, [], 'a person who cannot walk home is trapped, and a trap is a bug');
@@ -64,10 +80,32 @@ for (const seed of SEEDS){
   });
 }
 
+test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
+  t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
+  assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
+});
+
 test('the same seed tells the same story twice', () => {
   const a = runDays('r', 2), b = runDays('r', 2);
   assert.deepEqual(b.events.map(e => e.text), a.events.map(e => e.text));
   assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
+});
+
+test('a seed and its log replay the same story', () => {
+  const a = runDays('r', 2);
+  assert.ok(a.api.doorLog.length >= 1, 'the script god never lit a pit in two days');
+  const b = runDays(a.api.replay.seed, 2, null, replayGod(a.api.replay), a.api.replay.options);
+  assert.deepEqual(b.api.doorLog, a.api.doorLog);
+  assert.deepEqual(b.events.map(e => e.text), a.events.map(e => e.text));
+  assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
+});
+
+test('a different log tells a different story', () => {
+  const a = runDays('r', 2);
+  const late = a.api.doorLog.map(e => ({ ...e, tick: e.tick + 300 }));
+  const b = runDays('r', 2, null, logGod(late));
+  assert.equal(b.api.doorLog.length, a.api.doorLog.length, 'the moved lighting was dropped, so the test proves nothing');
+  assert.notDeepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
 });
 
 test('write the golden record', { skip: !isDefault && 'not the default run' }, () => {

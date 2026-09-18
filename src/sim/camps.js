@@ -2,8 +2,8 @@
 function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
-    fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
@@ -46,7 +46,9 @@ function chooseSite(a){
     if (water <= 8){ sc += 20 - water; why.push('water close by'); } else sc -= 10;
     if (trees === 0){ sc += 10; why.push('no trees to catch fire'); } else sc -= trees * 6;
     if (bushes){ sc += Math.min(8, bushes * 2); why.push('berries nearby'); }
+    let faces = 0, dens = 0; for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++){ if (!inb(x + dx, y + dy)) continue; const q = tileAt(x + dx, y + dy); if (GROUND[q.ground].quarry && Math.abs(dx) + Math.abs(dy) <= 12) faces++; } for (const k of caves) if (k.kind === 'den' && k.owner === 'wolf' && !k.cleared && dist(k.exit.x, k.exit.y, x, y) <= 20) dens++;
     if (t.ground === 'soil' || t.ground === 'sand'){ sc += 5; why.push('bare ground'); }
+    if (faces){ sc += 8; why.push('stone close by'); } if (dens){ sc -= 15; why.push('a wolf den too near'); }
     sc -= dist(x, y, a.x, a.y) * 0.15;
     const edge = Math.min(x - s.sx * LW, (s.sx + 1) * LW - 1 - x, y - s.sy * LH, (s.sy + 1) * LH - 1 - y); if (edge < 4) sc -= (4 - edge) * 3;
     if (!best || sc > best.sc) best = { x, y, sc, why };
@@ -128,8 +130,11 @@ function updateCamps(){
     camp = c;
     const pt = pitTile();
     if (pt && pt.struct.lit){
+      camp.outSince = 0;
       const p = pt.struct; p.fuel -= PIT_BURN * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
-      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
+      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
+    } else if (pt && !pt.struct.lit && !camp.outSince){
+      camp.outSince = tick;
     }
     if (tick % 100 === 0) spoilFood();
     if (tick % 300 === 0) faeTick();

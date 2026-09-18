@@ -9,6 +9,8 @@ function renderUI(force){
   const s = sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = view === 'world' ? 'World map' : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('tools').hidden = view !== 'loc';
+  const campBtn = document.querySelector('#tools [data-tool="camp"]');
+  if (campBtn){ campBtn.disabled = !!(viewCamp && viewCamp.pit); campBtn.title = campBtn.disabled ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === 'camp').hint; }
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
