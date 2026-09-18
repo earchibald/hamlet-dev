@@ -21,7 +21,11 @@ function countryLine(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${m.why.replace(/\.$/, '')}`;
+  /* A backstop reason names no god. Then the god of the mark is named after the reason. */
+  const g = m.by === null || m.by === undefined ? null : beingById(m.by);
+  const why = m.why.replace(/\.$/, '');
+  const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
+  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
 }
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
@@ -52,15 +56,17 @@ const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned:
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
 const markLine = m => `${markWhen(m)} ${m.why}`;
+/* A stock reason begins with the marking god's name and says the label twice. It is left out. Any other reason is kept. */
+const markSaid = m => { const g = m.by === null || m.by === undefined ? null : beingById(m.by); return !m.why || (g && m.why.startsWith(g.name)) ? markWhen(m) : markLine(m); };
 function markRows(x, y, z){
   if (!field || inAges() || !hasTile(x, y, z)) return [];
   const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
   /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
      hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
-  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markWhen(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markSaid(t.hill.mark)] :['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
   if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
   const c = t.cave || t.mouth;
-  if (c && c.mark) rows.push(['Dug by', markWhen(c.mark)]);
+  if (c && c.mark) rows.push(['Dug by', markSaid(c.mark)]);
   if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
   if (!r) return rows;
   if (z === 0){

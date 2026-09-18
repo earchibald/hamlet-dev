@@ -110,7 +110,8 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  const body = tipTarget.region != null ? inspectRegion(regionById(tipTarget.region))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
+  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);

@@ -31,9 +31,11 @@ function drawWorldCache(){
   }
 }
 /* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
+/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+const BOUNDARY_INK = { wet: 'water-fg' };
 function drawBoundaries(g, alpha){
   for (const b of liveBoundaries()){
-    g.fillStyle = b.pole === 'wet' ? P['water-fg'] : P['field-line']; g.globalAlpha = b.pole === 'wet' ? 1 : alpha;
+    g.fillStyle = P[BOUNDARY_INK[b.pole] || 'field-line']; g.globalAlpha = BOUNDARY_INK[b.pole] ? 1 : alpha;
     for (const i of b.tiles){ const x = i % W, y = (i - x) / W; g.fillRect(x * WS, y * WS, WS, WS); }
   }
   g.globalAlpha = 1;

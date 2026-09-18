@@ -5,9 +5,11 @@ const fs = require('fs');
 const sim = require('../src/sim');
 const ui = require('../src/ui');
 
-/* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into. */
-function loadUI(files, names){
-  const api = sim.API.replace('return {', 'return { ' + names.join(', ') + ',');
+/* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into.
+   `extra` maps a key to an expression, so a test can read a `let` variable through a small reader function. */
+function loadUI(files, names, extra = {}){
+  const more = Object.entries(extra).map(([k, v]) => `${k}: ${v}`).join(', ');
+  const api = sim.API.replace('return {', 'return { ' + names.join(', ') + ',' + (more ? ' ' + more + ',' : ''));
   return new Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 
@@ -601,6 +603,111 @@ test('a scarred country says who fought over it', () => {
   const scar = api.markRows(x, y, 0).find(row => row[0] === 'Scar');
   assert.ok(scar, 'a scarred country has a scar row');
   assert.ok(scar[1].includes('A cut in the earth') && scar[1].includes(g.name) && scar[1].includes('in age 4'), scar[1]);
+});
+
+/* The final fix wave. */
+const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'fieldColor', 'ui'])];
+
+test('the view model answers at every age of a creation that throws its valley back', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], WATCH);
+  api.startCreation('gamma', {}); api.camp = api.camps[0];
+  let n = 0;
+  while (api.era === 'gods' && n++ < 1000){
+    api.step();
+    if (api.era !== 'gods') break;
+    assert.doesNotThrow(() => {
+      api.viewKey(); api.cursorPhrase(); api.seasonLine(); api.gauges(); api.alerts(); api.paletteRows(); api.notePulses();
+      for (const id of ['people', 'goals', 'chronicle', 'camp', 'legends']) api.drawerRows(id);
+      for (const g of api.gods()) api.inspectGod(g);
+      for (const r of api.liveRegions()){ api.inspectRegion(r); api.fieldColor(r, PAL); }
+    }, `age ${api.age}`);
+  }
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+  assert.ok(api.creation.discards >= 1, `seed gamma threw back ${api.creation.discards} valleys`);
+});
+
+/* One fake element answers every DOM call the render functions make. It is small on purpose: the test is about
+   the actions, not about the DOM. Every stub is put on globalThis and taken off again in the finally. */
+function domStub(){
+  const el = {
+    innerHTML: '', textContent: '', hidden: false, disabled: false, value: '', title: '',
+    style: {}, dataset: {}, children: [], scrollTop: 0, offsetWidth: 220, offsetHeight: 140, className: '',
+    classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
+    setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
+    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){},
+    showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
+    getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
+  };
+  el.querySelector = () => el; el.querySelectorAll = () => []; el.closest = () => el;
+  const doc = {
+    documentElement: el, body: el,
+    getElementById: () => el, querySelector: () => el, querySelectorAll: () => [],
+    createElement: () => el, addEventListener(){}, removeEventListener(){},
+  };
+  const store = {};
+  return { el, doc, storage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } } };
+}
+
+test('every action holds in the ages: the view stays on the world, nothing follows, and the creation runs on', () => {
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'performance', 'innerWidth', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc;
+    globalThis.localStorage = storage;
+    globalThis.performance = { now: () => 0 };
+    globalThis.innerWidth = 1200;
+    globalThis.window = { innerWidth: 1200, innerHeight: 900, devicePixelRatio: 1, addEventListener(){}, matchMedia: () => ({ addEventListener(){} }) };
+    const files = ui.FILES.filter(f => f !== 'main');
+    const api = loadUI(files, ['ACTIONS', 'ui', 'inAges'], { __view: '() => view', __follow: '() => followId' });
+    api.startCreation('alpha', {}); api.camp = api.camps[0];
+    for (let i = 0; i < 6; i++) api.step();
+    assert.equal(api.era, 'gods', 'the probe must start in the ages');
+    const god = api.gods()[0].id;
+    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 4, drawer: 'legends', campN: 1,
+      cursor: [1, 0, 1], nav: [1, 0], stage: 'fire', goalPri: { id: 'firepit', pri: 1 }, gotoSector: { sx: 0, sy: 0 },
+      jumpChip: 1, muteMenu: 1, muteChoice: 1, rowPick: 1, palettePick: 1, paletteMove: 1, unmute: 'x' };
+    /* `hurry` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it. */
+    const SKIP = new Set(['hurry']);
+    let ran = 0;
+    for (const name of Object.keys(api.ACTIONS)){
+      if (SKIP.has(name)) continue;
+      assert.doesNotThrow(() => api.ACTIONS[name](ARG[name]), `${name} threw`);
+      ran++;
+      assert.equal(api.__view(), 'world', `${name} left the world map`);
+      assert.equal(api.__follow(), null, `${name} started a follow in the ages`);
+      assert.equal(api.era, 'gods', `${name} ended the ages`);
+    }
+    assert.ok(ran >= 40, `only ${ran} actions ran`);
+    assert.equal(typeof el.innerHTML, 'string');
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
+});
+
+test('a mark keeps a reason that is not the stock one, and a country names the god its reason leaves out', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'countryLine']);
+  api.startWorld('alpha');
+  const hillTile = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind === 'height');
+  const g = api.beingById(hillTile.hill.mark.by) || api.gods()[0];
+  const raisedBy = () => api.markRows(hillTile.x, hillTile.y, 0).find(r => r[0] === 'Raised by');
+  /* The backstop writes a real reason. It is not the stock one, so the row keeps it. */
+  hillTile.hill.mark = { ...hillTile.hill.mark, by: g.id, why: 'Raised so the world could hold a life.' };
+  const kept = raisedBy();
+  assert.ok(kept[1].includes('Raised so the world could hold a life.'), kept[1]);
+  assert.ok(kept[1].includes(g.name), kept[1]);
+  /* The stock reason begins with the god's name and would say the label twice, so it is left out. */
+  hillTile.hill.mark = { ...hillTile.hill.mark, why: `${g.name} raised it.` };
+  const stock = raisedBy();
+  assert.ok(!/raised it/i.test(stock[1]), stock[1]);
+  assert.ok(stock[1].includes(g.name), stock[1]);
+  /* countryLine: a backstop pole reason names no god, so the god of the mark is added after it. */
+  const r = api.liveRegions().find(q => q.marks.some(m => m.kind === 'pole'));
+  const pole = r.marks.filter(m => m.kind === 'pole').sort((p, q) => q.age - p.age)[0];
+  pole.by = g.id; pole.why = 'Made dry so the world could hold a life';
+  assert.ok(api.countryLine(r).includes(`by ${g.name} ${g.epithet}`), api.countryLine(r));
+  pole.why = `${g.name} made it dry.`;
+  assert.ok(!api.countryLine(r).includes(`by ${g.name} ${g.epithet}`), 'a reason that names the god is not doubled');
+  assert.ok(api.countryLine(r).includes(g.name));
 });
 
 module.exports = { loadUI };
