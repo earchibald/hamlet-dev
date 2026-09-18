@@ -63,7 +63,7 @@ test('a lack of people draws the gods together, and a lack of water calls the we
   const before = a.opinions[b.id] || 0;
   api.withGodRng(() => api.strain('people'));
   assert.equal(a.opinions[b.id], before + 5);
-  if (!api.godOf('wet')){ api.withGodRng(() => api.strain('water')); assert.ok(api.godOf('wet'), 'no wet god after the strain'); assert.equal(api.godOf('wet').region, null); }
+  if (!api.godOf('wet')){ api.withGodRng(() => api.strain('water')); assert.ok(api.godOf('wet'), 'no wet god after the strain'); const w = api.godOf('wet'); const home = api.regionById(w.region); assert.ok(home && !home.children && api.hasPole(home, 'wet'), 'a god born of a lack holds a country'); }
 });
 
 test('everything the gods do draws from their own stream', () => {

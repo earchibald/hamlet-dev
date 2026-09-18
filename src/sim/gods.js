@@ -27,11 +27,14 @@ function makeGod(pole, region, why){
   if (!godNamePool.length) godNamePool = shuffle(GOD_NAMES);
   const g = makeBeing('god', 0, 0, null, 0);
   g.name = godNamePool.pop(); g.pole = pole; g.contrast = POLES[pole].contrast; g.epithet = EPITHET[pole];
-  g.region = region ? region.id : null; g.status = 'awake'; g.born = age; g.acted = 0;
+  g.status = 'awake'; g.born = age; g.acted = 0;
   g.needs = { expression: 60, company: 60, rest: 90, calm: 80 };
   g.skills = {}; for (const k in GOD_ACTS) g.skills[k] = 0;
   beings.push(g);
   log(`${why} ${g.name} comes into being, ${g.epithet}.`, [g], 'major');
+  /* Every god comes into being holding a country. A god born of a lack takes the largest level one, or the largest there is, and makes it its own. */
+  if (!region){ const live = liveRegions(); region = live.filter(isLevel).sort((p, q) => q.area - p.area)[0] || live.slice().sort((p, q) => q.area - p.area)[0]; if (region) setPole(region, pole, g, `${g.name} came into being here.`); }
+  g.region = region ? region.id : null;
   return g;
 }
 /* A god stands in a live region. If its region was split, it stands in the child that carries its pole. */
@@ -125,15 +128,15 @@ const GOD_ACTS = {
   },
   raise: {
     poles: ['above'],
-    /* The gods leave the last plains alone: a level dry country is not raised while fewer than three remain. */
-    targets: g => { const few = startCandidates().length < 3; return liveRegions().filter(r => hasPole(r, 'above') && !(few && isStart(r))); },
+    /* The gods leave the last level countries alone: nothing is raised on one while fewer than three remain. Nobody raises the formless whole. */
+    targets: g => { const few = liveRegions().filter(isLevel).length < 3; return liveRegions().filter(r => hasPole(r, 'above') && !(few && isLevel(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'height').length ? -10 : 10) + rng() * 8,
     ...spendAges('height', 'raise the land', (g, n) => n >= 3 ? `${g.name} has raised a mountain, ${n} storeys of stone.` : `${g.name} has raised a hill of ${n} ${n === 1 ? 'storey' : 'storeys'}.`),
   },
   dig: {
     poles: ['below'],
-    /* The gods leave the last plains alone: a level dry country is not dug while fewer than three remain. */
-    targets: g => { const few = startCandidates().length < 3; return liveRegions().filter(r => hasPole(r, 'below') && !(few && isStart(r))); },
+    /* The gods leave the last level countries alone: nothing is dug in one while fewer than three remain. */
+    targets: g => { const few = liveRegions().filter(isLevel).length < 3; return liveRegions().filter(r => hasPole(r, 'below') && !(few && isLevel(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'depth').length ? -10 : 10) + rng() * 8,
     ...spendAges('depth', 'dig into the dark', (g, n) => n >= 3 ? `${g.name} has dug a deep, ${n} levels down.` : `${g.name} has dug a cave of ${n} ${n === 1 ? 'level' : 'levels'}.`),
   },
@@ -267,7 +270,9 @@ function decideGod(g){
 function ring(r, d){ const set = new Set([r]); for (let k = 0; k < d; k++) for (const q of [...set]) for (const n of neighboursOf(q)) set.add(n); return [...set]; }
 function touchesWet(r){ return boundaries.some(b => b.pole === 'wet' && b.tiles.some(i => regionOf[i] === r.id)); }
 /* A start candidate: dry, level (nothing raised, nothing dug), unscarred, a sector or more. */
-const isStart = r => hasPole(r, 'dry') && !marksOf(r, 'height').length && !marksOf(r, 'depth').length && !hasMark(r, 'scar', 'burned') && !hasMark(r, 'scar', 'drowned') && r.area >= SECTOR_AREA;
+/* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */
+const isLevel = r => !marksOf(r, 'height').length && !marksOf(r, 'depth').length;
+const isStart = r => hasPole(r, 'dry') && isLevel(r) && !hasMark(r, 'scar', 'burned') && !hasMark(r, 'scar', 'drowned') && r.area >= SECTOR_AREA;
 const startCandidates = () => liveRegions().filter(isStart);
 /* A god may sleep only when the world can hold a life: a start region that is dry, level (nothing raised, nothing dug), unscarred,
    and a sector or more; water beside it; fuel and food within two neighbours; and the people made. */
