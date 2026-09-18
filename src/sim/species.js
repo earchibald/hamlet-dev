@@ -192,8 +192,7 @@ function adoptDen(a){
 
 /* Each den with two grown owners bears one young in spring, once a year. Edge arrivals are the floor, not the source. */
 function denTick(){
-  if (tick % 500 !== 0 || seasonOf() !== 'spring') return;
-  for (const c of caves){
+  if (tick % 500 === 0 && seasonOf() === 'spring') for (const c of caves){
     if (c.kind !== 'den' || !c.owner || c.owner === 'sprite') continue;
     if (c.lastBirth && tick - c.lastBirth < 20 * DAY) continue;
     const grown = beings.filter(b => b.alive && b.species === c.owner && b.den === c && stage(b) !== 'young');
@@ -201,6 +200,22 @@ function denTick(){
     const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) continue;
     const y = makeBeing(c.owner, 0, 0, null, 0); const t = floor[y.id % floor.length]; y.x = t.x; y.y = t.y; y.z = t.z; y.born = tick; y.den = c; beings.push(y); c.lastBirth = tick;
     log(c.owner === 'wolf' ? 'A wolf pup is born in the den under the hill.' : 'Fox kits are born in the den under the hill.', []);
+  }
+  /* Displaced owners dig a new den within three days, on a hill with no den of theirs. */
+  for (const w of beings){ if (!w.alive || !w.oldDen || w.den || tick - w.oldDen.clearedAt < 3 * DAY) continue;
+    const oldDen = w.oldDen, owner = w.species;
+    const others = hills.filter(h => h !== oldDen.hill && !caves.some(c => c.kind === 'den' && c.hill === h && c.owner === owner && !c.cleared));
+    let fresh = null; for (const h of shuffle(others)){ fresh = digDen(h, owner); if (fresh) break; }
+    if (fresh){ fresh.from = oldDen; for (const o of beings) if (o.alive && o.oldDen === oldDen && !o.den){ o.den = fresh; o.oldDen = null; } fresh.story.push('Dug after the old den was taken.'); log(owner === 'wolf' ? 'The wolves have dug a new den under another hill.' : 'The foxes have dug a new den under another hill.', []); }
+  }
+  /* A cleared den goes back to its owners when the camp's fire has been out a whole day. */
+  for (const c of caves){ if (c.kind !== 'den' || !c.cleared) continue; const k = c.cleared;
+    const out = k.pit && !tileAt(...k.pit).struct.lit && k.outSince && tick - k.outSince >= DAY;
+    if (out){ const fresh = caves.find(fc => fc.kind === 'den' && fc.owner === c.owner && fc.from === c);
+      const kin = beings.filter(b => b.alive && b.species === c.owner && b.den && b.den === fresh);
+      for (const b of kin) b.den = c;
+      if (fresh){ fresh.owner = null; fresh.abandoned = true; }
+      c.cleared = null; c.story.push('Taken back when the fire failed.'); camp = k; log(`With the fire out a day, the ${c.owner === 'wolf' ? 'wolves are' : 'foxes are'} back in the den under the hill.`, campHumans(), 'bad'); }
   }
 }
 

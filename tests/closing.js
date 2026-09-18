@@ -56,3 +56,36 @@ test('fallen rock is cleared with the axe before the search', () => {
   doOffer(api, a, 'clear the fallen rock', 3000);
   assert.equal(cave.blocked, null); assert.ok(cave.story.some(s => s.includes('cleared')));
 });
+
+test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', () => {
+  const { api, a, c } = readyCamp();
+  const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
+  campByCave(api, c, a, den);
+  const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
+  const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
+  for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
+  api.tick = 9 * 1000;
+  assert.equal(api.goalState(api.GOALS.find(g => g.id === 'dens')).s, 'active');
+  doOffer(api, a, 'clear the den with brands', 3000);
+  assert.equal(den.cleared, c);
+  for (const w of wolves) assert.equal(w.den, null);
+  assert.ok(api.chronicle.some(e => e.text.includes('drive the wolves')));
+  /* Three days on, the wolves have a new den on another hill. */
+  api.tick = api.tick + 3 * 1000 + 10; for (let k = 0; k < 4; k++){ api.tick = api.tick + 500; api.denTick(); }
+  const fresh = wolves[0].den; assert.ok(fresh && fresh !== den && fresh.hill !== den.hill, 'a new den on another hill');
+  /* The fire goes out for a day: the old den goes back to wolves. */
+  api.tileAt(...c.pit).struct.lit = false; c.outSince = api.tick - 1000 - 1;
+  for (let k = 0; k < 2; k++){ api.tick = api.tick + 500; api.denTick(); }
+  assert.equal(den.cleared, null);
+  assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
+});
+
+test('withBrand ends with no live ember when the chain does not start', () => {
+  const { api, a, c } = readyCamp();
+  api.tick = 9 * 1000;
+  assert.ok(api.withBrand(a, 'Testing', () => false));
+  for (let k = 0; k < 20 && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
+  assert.equal(a.task, null);
+  assert.equal(a.carrying, null);
+  assert.equal(c.stash.ember || 0, 0);
+});

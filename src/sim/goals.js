@@ -224,6 +224,21 @@ const GOALS = [
       }
       return out;
     } },
+  { id: 'dens', title: 'Clear a den',
+    state(){
+      if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
+      const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      if (!near.length) return { s: 'blocked', text: 'No den within forty tiles.' };
+      const held = near.filter(c => c.cleared === camp), wild = near.filter(c => !c.cleared);
+      if (!wild.length) return { s: 'done', text: `${held.length} den${held.length > 1 ? 's' : ''} cleared. It goes back to the beasts if the fire is out for a day.` };
+      const party = campHumans().filter(h => h.traits.bravery >= 0.5 && stage(h) !== 'young').length;
+      return { s: camp.tools.spear && pitLit() && party >= 2 ? 'active' : 'blocked', text: `${wild.length} den${wild.length > 1 ? 's' : ''} near: ${wild.map(c => c.owner === 'wolf' ? 'wolves' : 'foxes').join(', ')}. Two brave people with brands and the spear drive the beasts out. They dig a new den elsewhere, and come back if the fire fails for a day.` };
+    },
+    offers(a){
+      if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
+      const wild = caves.filter(c => c.kind === 'den' && c.owner && !c.cleared && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      return wild.map(c => ({ label: 'clear the den with brands', score: c.owner === 'wolf' ? 44 : 30, start: a => startClearDen(a, c) }));
+    } },
 ];
 function goalState(g){ if (g.locked) return { s: 'locked', text: g.locked }; return g.state(); }
 function offersFor(a){
