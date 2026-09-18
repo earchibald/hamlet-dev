@@ -50,7 +50,6 @@ function renderDrawers(){
     ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
-  document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){
   const rows = drawerRows('people');

@@ -73,8 +73,8 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel)}
-.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-.mapbox.drawers-open .views{right:392px}
+/* The map is pinned left, so it holds still when a drawer opens or shuts. */
+.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -155,7 +155,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   .strip .ctl{margin-left:0;flex:1 1 100%}
 }
 /* Below 800 px a drawer is a full-height overlay, and only one is open. */
-@media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
+@media (max-width:800px){#drawers{left:10px;width:auto}}
 #palette{padding:10px}
 #paletteInput{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:15px}
 #paletteList{list-style:none;margin:8px 0 0;padding:0;max-height:50vh;overflow:auto}

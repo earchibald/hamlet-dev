@@ -33,11 +33,12 @@ const KEYMAP = [
   { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
   { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
   { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
-  /* Not Ctrl: macOS takes Ctrl with an arrow for Mission Control, and the page never sees it. */
-  { key: 'ArrowLeft',  alt: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
-  { key: 'ArrowRight', alt: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
-  { key: 'ArrowUp',    alt: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
-  { key: 'ArrowDown',  alt: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  /* Not Ctrl: macOS takes Ctrl with an arrow for Mission Control, and the page never sees it.
+     The key goes to the sector's edge first. The buttons these rows name step a whole sector, through ACTIONS.nav. */
+  { key: 'ArrowLeft',  alt: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'edge'], label: 'West edge, then a sector west', button: 'nW' },
+  { key: 'ArrowRight', alt: true, focus: 'map', action: 'cursor', arg: [1, 0, 'edge'], label: 'East edge, then a sector east', button: 'nE' },
+  { key: 'ArrowUp',  alt: true, focus: 'map', action: 'cursor', arg: [0, -1, 'edge'], label: 'North edge, then a sector north', button: 'nN' },
+  { key: 'ArrowDown', alt: true, focus: 'map', action: 'cursor', arg: [0, 1, 'edge'], label: 'South edge, then a sector south', button: 'nS' },
   { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
   { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
   { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },

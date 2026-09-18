@@ -34,6 +34,6 @@ function paletteRun(i = palSel){
 /* The stage chord: `g` opens this with one lettered button per reached stage. Built at run time, so its ids are not in the template. */
 function openChord(){
   closeDialogs();
-  $('chordButtons').innerHTML = STAGES.filter(s => stageReached(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
+  $('chordButtons').innerHTML = STAGES.filter(s => stagesShown().includes(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
   ui.focus = 'dialog:chord'; $('chord').showModal();
 }
