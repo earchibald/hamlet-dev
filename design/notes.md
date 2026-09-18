@@ -215,7 +215,7 @@ Known weak spots:
 - A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
 - The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
-- The soak's cave cutoff check (new, see section 14) caught a real one: on seed r a gnome burrow dug after a loud village drove it off ended up at 2,22,0, unreachable from the first camp's stash from around day 56 to the end of the run at day 70. The relocation dig (`digGnomeBurrow` in `src/sim/world.js`, called from `gnomeTick`) does not check that its new hole is reachable before committing to it. Not yet fixed; the golden record is not blessed while this stands.
+- Fixed. The soak's cave cutoff check (see section 14) caught a real one: on seed r a burrow's own exit at 2,22,0 went unreachable from the first camp's stash from around day 56 on. The dig itself was not the cause: it was never relocated. A sapling could still take root on a cave's own mouth tile, and twelve days later it matured into a solid tree there, sealing the one doorway a den or burrow has. `growPlants` in `src/sim/world.js` now refuses to plant a sapling on any tile with `t.mouth` set. `digGnomeBurrow` also now checks a live `reachable()` region, not the generation-time `startRegion`, when it digs mid-game (a village driving a burrow off), and keeps a new exit at least 2 tiles from the map edge, so a relocation dig cannot repeat the same mistake by a different route.
 
 ## 15. The door
 

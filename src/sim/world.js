@@ -305,11 +305,21 @@ function forestBeside(s){
 function digGnomeBurrow(start, avoid, sector){
   const s = sector || shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))))[0];
+  /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
+     out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
+     generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
+     pit (or beings[0], if no camp has a site yet) and require the new exit to sit in that region today. */
+  const region = sector ? startRegion : (() => {
+    const c = camps.find(k => k.site && (k.stashTile || k.pit));
+    const from = c ? (c.stashTile || c.pit) : (beings[0] ? [beings[0].x, beings[0].y] : null);
+    return from ? reachable(from[0], from[1], 0, NZ * W * H) : startRegion;
+  })();
   if (s){
     for (let tries = 0; tries < 40; tries++){
       const x = s.sx * LW + 2 + rint(LW - 4), y = s.sy * LH + 2 + rint(LH - 4);
       const t = tileAt(x, y);
-      if (!passable(x, y) || t.feature || t.struct || t.mouth || t.cave || t.hill || dist(x, y, ...start) < 25 || !startRegion.has(idx3(x, y, 0))) continue;
+      if (!passable(x, y) || t.feature || t.struct || t.mouth || t.cave || t.hill || dist(x, y, ...start) < 25 ||
+          x < 2 || y < 2 || x >= W - 2 || y >= H - 2 || !region.has(idx3(x, y, 0))) continue;
       if (avoid.some(([vx, vy]) => dist(x, y, vx, vy) < 50)) continue;
       if (caves.some(c => c.kind === 'burrow' && dist(c.exit.x, c.exit.y, x, y) < 30)) continue;
       /* The mouth is under a neighbour of the exit, so the slope climbs onto the exit. */
@@ -578,7 +588,7 @@ function growPlants(){
       if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
     else if (!t.feature){
       if (t.ground === 'ash' && rng() < 0.05) t.ground = 'grass';
-      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < 0.004 && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
+      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < 0.004 && !t.mouth && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
     }
   }
 }

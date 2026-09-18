@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const { runDays, cutOff } = require('./lib/run');
 const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
 
 for (const seed of SEEDS) test(`seed ${seed}: two or three gnome burrows under the meadow edges, with mushrooms and gnomes at home`, () => {
@@ -170,4 +171,15 @@ test('a village within thirty tiles is too loud: the gnomes dig a new hole farth
   assert.ok(api.dist(fresh.exit.x, fresh.exit.y, ...c.site) >= 50, 'the new hole is far from the village');
   for (const g of kin) assert.equal(g.den, fresh);
   assert.ok(api.chronicle.some(e => e.text.includes('holes are empty')));
+});
+
+/* Direct check, seed r for 70 days (about 15s): a burrow dug mid-game, when the gnomes move because
+   the village grew loud, must open onto ground the camp can reach today, not the ground of the first
+   day. Before the fix, digGnomeBurrow still checked startRegion, the snapshot taken at generation, so
+   a relocated burrow could open behind a sapling or structure that grew up since. cutOff walks the
+   live map from the first camp's stash every day of the run, the same way the soak does. */
+test('seed r: a burrow dug mid-game opens onto ground the first camp can reach, 70 days', () => {
+  const { api } = runDays('r', 70, (api) => { if (api.tick % 1000 === 0) { const bad = cutOff(api).filter(m => m.includes('burrow cave')); assert.deepEqual(bad, []); } });
+  const bad = cutOff(api).filter(m => m.includes('burrow cave'));
+  assert.deepEqual(bad, []);
 });
