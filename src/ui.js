@@ -38,6 +38,7 @@ function drawWorldCache(){
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const i = idx(x, y), t = world[i]; let c = tileColor(t);
     if (t.ground === 'rock'){ const up = levels[ZOFF + 1][i]; c = up && up.ground === 'rock' ? P['hill-fg'] : P.hill; }
+    if (t.mouth) c = P['hill-fg'];
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
@@ -60,9 +61,10 @@ function sectorSummary(s){
   const bushes = sectorCount(s, 'bushes', t => t.feature === 'bush');
   const water = sectorCount(s, 'water', t => t.ground === 'water');
   const hs = hills.filter(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy);
+  const cs = caves.filter(c => c.exit && secOf(c.exit.x, c.exit.y).sx === s.sx && secOf(c.exit.x, c.exit.y).sy === s.sy);
   const people = beings.filter(b => b.alive && b.species === 'human' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
   const animals = beings.filter(b => b.alive && b.species !== 'human' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
-  const parts = [`${sticks} sticks`, `${rocks} rocks`, `${bushes} berry bushes`, water ? 'water' : 'no water', hs.length ? `${hs.length} hill${hs.length > 1 ? 's' : ''}` : ''];
+  const parts = [`${sticks} sticks`, `${rocks} rocks`, `${bushes} berry bushes`, water ? 'water' : 'no water', hs.length ? `${hs.length} hill${hs.length > 1 ? 's' : ''}` : '', cs.length ? `${cs.length} cave mouth${cs.length > 1 ? 's' : ''}` : ''];
   if (animals.length) parts.push(animals.map(a => SPECIES[a.species].label).sort().join(', '));
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
@@ -86,6 +88,7 @@ function drawLoc(){
     if (t.ground === 'water'){ g = (h + Math.floor(tick / 25)) % 4 === 0 ? '≈' : '~'; fg = P['water-fg']; }
     if (t.ground === 'rock'){ bg = P.hill; if (h % 3 === 0){ g = '▒'; fg = P['hill-fg']; } }
     if (t.ground === 'stone'){ bg = P.stone; if (h % 5 === 0){ g = '·'; fg = P['stone-fg']; } }
+    if (t.mouth && t.z === 0){ g = '◠'; fg = P['hill-fg']; }
     if (t.feature === 'tree'){ g = '♣'; fg = P.tree; } else if (t.feature === 'sapling'){ g = 'ʌ'; fg = P.tree; } else if (t.feature === 'hollow'){ g = '♠'; fg = P.sprite; } else if (t.feature === 'bush'){ g = '*'; fg = t.berries > 0 ? P.berry : P.bush; }
     else if (t.feature === 'boulder'){ bg = P.boulder; g = '#'; fg = P['boulder-fg']; } else if (t.feature === 'reeds'){ g = '"'; fg = P.reeds; }
     const it = itemAt(x, y, t.z);
@@ -156,11 +159,11 @@ function inspectBeing(a){
   let extra = '';
   if (a.species === 'human'){
     const rels = beings.filter(o => o !== a && a.rel[o.id]).map(o => `${o.name} (${a.rel[o.id]}, ${a.opinions[o.id] > 0 ? '+' : ''}${a.opinions[o.id]})`).join(', ') || 'No friends or rivals yet.';
-    extra = `<h3>Personality</h3><div class="chips">${Object.entries(a.traits).map(([k, v]) => `<span class="chip" title="${k} ${v}">${traitWord(k, v)}</span>`).join('')}</div><h3>Skills</h3><div class="chips">${Object.entries(a.skills).filter(([k, v]) => v > 0).map(([k, v]) => `<span class="chip">${k} ${v}</span>`).join('') || '<span class="muted">Nothing yet. Skills come from work, and from elders by the fire.</span>'}</div><h3>Relationships</h3><div>${rels}</div>`;
+    extra = `${a.inDark ? '<div class="muted">In the dark without a brand.</div>' : ''}<h3>Personality</h3><div class="chips">${Object.entries(a.traits).map(([k, v]) => `<span class="chip" title="${k} ${v}">${traitWord(k, v)}</span>`).join('')}</div><h3>Skills</h3><div class="chips">${Object.entries(a.skills).filter(([k, v]) => v > 0).map(([k, v]) => `<span class="chip">${k} ${v}</span>`).join('') || '<span class="muted">Nothing yet. Skills come from work, and from elders by the fire.</span>'}</div><h3>Relationships</h3><div>${rels}</div>`;
   } else {
     const habit = { rabbit: 'eats at dawn and dusk', deer: 'grazes at dawn and dusk, keeps to the herd', fox: 'hunts rabbits by night', wolf: 'hunts by night, raids dark camps', sprite: 'sleeps in a hollow pine by day, dances and meddles by night' }[a.species];
     const learned = [a.skills.wary ? `wary ${a.skills.wary}` : '', a.skills.hunt ? `hunter ${a.skills.hunt}` : ''].filter(Boolean);
-    extra = `<h3>Nature and learning</h3><div class="chips"><span class="chip">${traitWord('bravery', a.traits.bravery)}</span>${a.species === 'deer' ? `<span class="chip">${traitWord('sociability', a.traits.sociability)}</span>` : ''}<span class="chip">${habit}</span>${learned.map(l => `<span class="chip">${l}</span>`).join('')}${drowsy(a) ? '<span class="chip">resting hours</span>' : ''}${a.grove ? `<span class="chip">grove in ${a.grove.sector.name.toLowerCase()} ${a.grove.sector.sx},${a.grove.sector.sy}, anger ${a.grove.anger}</span>` : ''}</div>`;
+    extra = `<h3>Nature and learning</h3><div class="chips"><span class="chip">${traitWord('bravery', a.traits.bravery)}</span>${a.species === 'deer' ? `<span class="chip">${traitWord('sociability', a.traits.sociability)}</span>` : ''}<span class="chip">${habit}</span>${learned.map(l => `<span class="chip">${l}</span>`).join('')}${drowsy(a) ? '<span class="chip">resting hours</span>' : ''}${a.grove ? `<span class="chip">grove in ${a.grove.sector.name.toLowerCase()} ${a.grove.sector.sx},${a.grove.sector.sy}, anger ${a.grove.anger}</span>` : ''}${a.den ? `<span class="chip">den under the hill at ${a.den.hill.x},${a.den.hill.y}</span>` : ''}</div>`;
   }
   const follow = tipPinned && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}">${a.name}</strong><span>${moodWord(a, m)} (${m})</span></div>
@@ -183,6 +186,10 @@ function inspectTile(x, y, z = 0){
   if (t.feature) rows.push(['Feature', FEATURES[t.feature].name + (t.feature === 'bush' ? `, ${t.berries} berries` : '')]);
   if (t.hill) rows.push(['Hill', `${t.hill.storeys === 2 ? 'A tall hill' : 'A low hill'} of old stone, ${t.hill.storeys === 2 ? 'two storeys' : 'one storey'} high. Cliffs all round but for the slopes.`]);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
+  if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.kind === 'den' && t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
+  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : 'Foxes'} live here.` : ''}`]);
+  if (t.cave && t.cave.blocked === t) rows.push(['Fallen rock', 'blocks the way. Tools could clear it.']);
+  if (z < 0) rows.push(['Dark', 'People need a burning ember down here.']);
   const here = items.filter(i => i.x === x && i.y === y && i.z === z); if (here.length) rows.push(['Loose', here.map(i => ITEMS[i.kind].name).join(', ')]);
   if (t.struct && t.struct.type === 'firepit') rows.push(['Camp', `The hearth. ${camp.siteReason === 'you chose it' ? 'You chose the site' : 'Site chosen because ' + (camp.siteReason || 'you set it')}.`], ['Fire pit', t.struct.lit ? `burning, fuel ${Math.round(t.struct.fuel / PIT_MAX * 100)}%` : t.struct.fuel > 0 ? 'laid, waiting for fire' : 'cold and empty']);
   if (t.struct && t.struct.type === 'leanto') rows.push(['Lean-to', 'a roof of logs and sticks. People sleep here.']);
