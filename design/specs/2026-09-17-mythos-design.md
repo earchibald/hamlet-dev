@@ -88,6 +88,8 @@ So gods are made of what the world lacks. Five contrasts, ten poles, ten gods at
 
 **Skills.** One per act kind, with experience, as people have gather and build.
 
+**Offence.** Marking over a god's pole offends that god alone: a split or a claim offends the holder of the contrast it replaces, and a burn offends every god that marked the country. Calm recovers five points an age. A country is scarred once; rivals do not fight over it again, and the last start candidates are neither burned nor fought over while fewer than three remain.
+
 **Relations.** Opinions move by acts. Marking over a god's region lowers its opinion of the marker. Marking a region together raises both. Above 40 they are lovers and mingle opens. Below −40 they are rivals and battle opens over any region both want. Chronicle lines name both, as for friends and rivals today.
 
 **Life.** Primal gods enter the life table with a death mode: `killable`. A god whose pole is unmade from the whole field dies, and its death is a scar. A god withdraws by sleeping in a region, which becomes its body: the above god a hill, the wet still god a lake, the dark god a cave, the wet moving god the river. Death modes in the table, for E later: `mortal | killable | immortal | transmigrate | manifest`.
@@ -103,14 +105,15 @@ An act is an operator: a name, the pole that may use it, a target region, the ma
 | split | any | 1 | pole marks on two children, a boundary | the river when the splitter is the wet god |
 | raise | above | 1 per storey | height on the region | a hill, a mountain when many. Not on a level country while fewer than three remain, so nobody raises the formless whole. |
 | dig | below | 1 per level | depth on the region | caves, chambers, a deep. Not in a level country while fewer than three remain. |
-| flow | wet, moving | 1 | wet along a path across regions, above or below ground | streams, fords, underground rivers |
-| pool | wet, still | 1 | wet on a region, above or below ground | marsh, a lake, an underground lake |
+| flow | wet, moving | 1 | a flow mark along a path across regions, above or below ground; the gate reads it as water | streams, fords, underground rivers |
+| pool | wet, still | 1 | a pool mark on a region, above or below ground; the gate reads it as water | a lake, an underground lake |
 | burn | hot | 1 | a burned scar | ash, firestones in the deep |
 | freeze | cold | 1 | a cold mark | snow line on high ground, winter's length |
 | hide | dark | 1 | a dark mark | hollows, glowing moss, what sees in the dark |
 | show | light | 1 | a light mark | open ground, long sight |
 | mingle | two lovers | 1 | both poles on one region | forest, meadow, the mixed countries |
 | battle | two rivals | 1 | the winner's pole; the loser's mark becomes a scar | chasms, drowned forests, split hills, burned countries |
+| claim | any | 1 | its pole on a country beside its home; offends the god whose pole it replaced | the country changes nature |
 | make | any | 1 | a making mark with a species record | a creature, placed at settle |
 | twist | any, on a scar | 1 | a twist on a making | a variant that breaks one rule of its archetype |
 | sleep | any | 1 | a rest mark | the god's body |
@@ -122,6 +125,8 @@ Rules of the ages:
 - Multi-age acts are tasks. A god mid-raise keeps raising unless a need interrupts it.
 - The chronicle line for every act is written in the game's voice with the god's name and the reason from the scoring. Ages are numbered from the Pulse. Before the Pulse the chronicle says "then," not "when."
 - Rockfall is not an act. It runs at settle as the last thing that happened before people.
+
+**Kinds of life.** A world that can hold a life holds each kind of it: something eaten, something that hunts, something fae, and a second people. The species table flags them: `prey` on rabbit and deer, `hunter` on fox and wolf, `fae` on sprite, `folk` on gnome. The gate wants one making of each kind somewhere; a lack of a kind strains the poles whose makings include one, and draws the making itself rather than the pole's expression. Species vary by seed within a kind: a valley with foxes and no wolves is a gentler valley.
 
 **Making, in this spec.** Species are the six that exist: rabbit, deer, fox, wolf, sprite, human. A making mark names one and a region. The gate needs only the people and one thing to eat. The other species are made because making restores expression, and a pole with an unmade species scores making high, so in practice every seed makes them all. `tests/ages.js` prints which species each seed made, so the scoring can be tuned if a seed comes up short. The rule for who makes what reads poles: wet makes deer, dark makes sprites and foxes, cold makes wolves, hot and dry make rabbits, and a mingling makes the people. Made species with variants and twists are D, later. The mark shape is fixed now so D needs no change to it.
 

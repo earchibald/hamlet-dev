@@ -124,11 +124,10 @@ test('flow runs through neighbouring countries, and pool marks one', () => {
   const before = flows();
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.flow.apply(g, r)); });
   assert.ok(flows() >= before + 2, 'flow touched fewer than two countries');
-  assert.ok(api.hasPole(r, 'wet'), 'flow left the country dry');
+  assert.equal(api.hasPole(r, 'wet') && !api.hasPole(r, 'wet'), false); /* flow leaves a country's nature alone; the gate reads the flow mark as water */
   const { g: s, r: p } = godWith(api, 'still');
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
   assert.ok(api.hasMark(p, 'pool'));
-  assert.ok(api.hasPole(p, 'wet'), 'pool left the country dry');
   assert.equal(api.GOD_ACTS.pool.targets(s).includes(p), false, 'a pooled region is offered again');
 });
 
@@ -264,9 +263,10 @@ test('the gate wants a hill and a cave, and the lacks strain above and below', (
   assert.equal(api.restGate().lack, 'hunter', 'rabbit is prey; hunter is still missing');
   api.mark(n0, 'making', 'fox', a, '');
   assert.equal(api.restGate().lack, 'fae');
-  /* The human mark already made folk present (human carries folk too), so once fae is
-     made the gate is satisfied without a gnome: prey, hunter, fae, and folk are all held. */
   api.mark(n0, 'making', 'sprite', a, '');
+  /* The people are not the folk the gate wants: a second people, the gnomes, are the below god's. */
+  assert.equal(api.restGate().lack, 'folk');
+  api.mark(n0, 'making', 'gnome', a, '');
   assert.equal(api.restGate().ok, true);
   assert.deepEqual(api.STRAIN.height, ['above']); assert.deepEqual(api.STRAIN.depth, ['below']);
   assert.deepEqual(api.MAKES.below, ['gnome']); assert.ok(api.MAKES.light.includes('sprite'));

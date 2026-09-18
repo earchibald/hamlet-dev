@@ -27,9 +27,9 @@ const BIOME_OF = [
   { needs: ['wet', 'moving'], biome: 'river' },
   { needs: ['wet', 'still'], biome: 'wetland' },
   { needs: ['wet'], biome: 'wetland' },
-  { needs: ['dry', 'above'], biome: 'rocky' },
   { needs: ['dry', 'cold'], biome: 'forest' },
   { needs: ['dry', 'hot'], biome: 'meadow' },
+  { needs: ['dry', 'above'], biome: 'rocky' },
   { needs: [], biome: 'meadow' },
 ];
 function biomeOf(r){

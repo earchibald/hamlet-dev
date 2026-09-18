@@ -96,7 +96,9 @@ test('biomes come from the mark table', () => {
   api.setPole(r, 'still', patient, ''); assert.equal(api.biomeOf(r), 'wetland');
   api.setPole(r, 'dry', patient, ''); api.setPole(r, 'cold', patient, ''); assert.equal(api.biomeOf(r), 'forest');
   api.setPole(r, 'hot', patient, ''); assert.equal(api.biomeOf(r), 'meadow');
-  api.setPole(r, 'above', patient, ''); assert.equal(api.biomeOf(r), 'rocky');
+  /* Highland that is hot or cold still grows; stony ground is the bare highland. */
+  api.setPole(r, 'above', patient, ''); assert.equal(api.biomeOf(r), 'meadow');
+  r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'hot')); assert.equal(api.biomeOf(r), 'rocky');
   api.mark(r, 'scar', 'burned', patient, ''); assert.equal(api.biomeOf(r), 'ash');
   assert.equal(api.GROWS.forest, true); assert.equal(api.GROWS.ash, false);
 });

@@ -42,7 +42,9 @@ for (const seed of SEEDS){
     if (SOAK_SEEDS.includes(seed)) assert.equal(c.backstops, 0, 'the backstop fired on a soak seed');
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'height').length), 'nothing raised');
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'depth').length), 'nothing dug');
-    if (SOAK_SEEDS.includes(seed)) for (const sp of ['rabbit', 'deer', 'fox', 'wolf', 'sprite', 'gnome', 'human']) assert.ok(species.includes(sp), `soak seed ${seed} never made the ${api.SPECIES[sp].plural}`);
+    /* Every kind of life, not every species: a valley with foxes and no wolves is a gentler valley, not a broken one. */
+    for (const kind of api.KINDS) assert.ok(species.some(sp => api.SPECIES[sp][kind]), `seed ${seed} never made a ${kind}`);
+    assert.ok(species.includes('human'), 'no people');
   });
 }
 
