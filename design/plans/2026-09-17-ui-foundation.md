@@ -540,7 +540,7 @@ function notePulses(){
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
-    if (e.kind === 'major' || e.kind === 'death') ui.pulses.push({ text: e.text, until: e.tick + 1500 });
+    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500 });
   }
   ui.seenTick = chronicle.length ? chronicle[0].tick : ui.seenTick;
   for (const g of GOALS){
@@ -638,6 +638,8 @@ function viewKey(){
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold)].join('#');
 }
 ```
+
+A line older than 1500 ticks never becomes a pulse, so a cold start deep in a run shows nothing stale.
 
 `camp.founded` is the founding tick the notes name. If `makeCamp` calls the field something else, read that name. `b.diedAt` does not exist yet: the sim does not stamp deaths, so a dead member leaves the list at once. The naming work adds the stamp.
 

@@ -19,3 +19,18 @@ let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', vie
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 const $ = id => document.getElementById(id);
+
+/* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
+const ui = {
+  pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */
+  mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
+  seenTick: -1,        /* the newest chronicle tick notePulses has read */
+  lastStates: {},      /* goal id to state, to see a goal leave blocked */
+  open: ['people', 'goals'], /* drawers open, in order */
+  focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  showAll: false,      /* goals: the whole ladder */
+  unfold: {},          /* stage id to true when the player unfolded it */
+  chronFilter: 'all',  /* 'all' or 'major' */
+  savedSpeed: 0,       /* from storage, applied by newWorld */
+};
