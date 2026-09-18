@@ -2222,7 +2222,7 @@ function startClearDen(a, c){
           w.den = null; w.oldDen = c; w.cooldown.raid = tick + 3000; w.shyOf = camp; failTask(w);
           addThought(w, 'driven', 'Driven from the den by fire', -20, 3000);
           if (!START.flee(w)){
-            const away = (x, y, z) => z === 0 && passable(x, y, 0) && dist(x, y, c.exit.x, c.exit.y) >= 20;
+            const away = (x, y, z) => z === 0 && passable(x, y, 0) && dist(x, y, c.exit.x, c.exit.y) >= 20 && !tileAt(x, y, 0).cave && !tileAt(x, y, 0).mouth;
             const sp = bfs(w.x, w.y, w.z, away, 2000, w);
             if (sp) w.task = { type: 'wander', label: 'Slinking off', path: sp, arrive: () => 'done' };
           }

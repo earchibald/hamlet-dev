@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const { runDays, scriptGod, replayGod, fingerprint } = require('./lib/run');
 
 test('an unknown act or source is refused and not logged', () => {
   const api = load(); api.startWorld('r');
@@ -99,26 +100,53 @@ test('a site on an unreachable tile is refused through inject', () => {
   assert.equal(api.camps[0].site, null);
 });
 
-test('the site act carries its camp: a second camp\'s site is not carried onto the first on replay', () => {
-  const api = load(); api.startWorld('r');
-  const c1 = api.camps[0]; const c2 = api.makeCamp('Second camp');
-  let open1 = null, open2 = null;
-  for (const t of api.world){ if (t.ground === 'grass' && !t.feature && !t.struct){ if (!open1) open1 = t; else if (!open2 && api.dist(t.x, t.y, open1.x, open1.y) > 6){ open2 = t; break; } } }
-  assert.ok(open1 && open2, 'two distinct open tiles');
-  api.camp = c2;
-  const msg = api.inject({ source: 'player', act: 'site', x: open2.x, y: open2.y, z: 0, camp: c2.id });
-  assert.equal(msg, 'Camp site set. The fire pit will go here.');
-  assert.deepEqual(c2.site, [open2.x, open2.y]);
-  assert.equal(c1.site, null, 'the first camp is unchanged');
-  const replay = api.replay;
+test('the site act carries its camp: a second camp\'s site replays deterministically across days through the harness', () => {
+  const DAY = 1000;
+  const DAYS = 3;
+  const SITE_TICK = DAY + 100;       // day 2, after day 1
+  const POKE_TICK = DAY * 2 + 250;   // day 3, a different tick, a different act
 
-  /* Replay the log onto a fresh world exactly as the test runner does: camp defaults to camps[0]. */
-  const api2 = load(); api2.startWorld(replay.seed, replay.options);
-  const c1b = api2.camps[0]; const c2b = api2.makeCamp('Second camp');
-  api2.camp = c1b;
-  for (const e of replay.log) api2.inject(e);
-  assert.deepEqual(c2b.site, [open2.x, open2.y], 'the second camp got its site back');
-  assert.equal(c1b.site, null, 'the first camp did not inherit the second camp\'s site');
+  const findTwoOpenTiles = api => {
+    let open1 = null, open2 = null;
+    for (const t of api.world){
+      if (t.ground !== 'grass' || t.feature || t.struct) continue;
+      if (!open1) open1 = t;
+      else if (!open2 && api.dist(t.x, t.y, open1.x, open1.y) > 6){ open2 = t; break; }
+    }
+    return [open1, open2];
+  };
+
+  /* Force a second camp into being at the very first tick. This is setup, not a logged act, so it
+     runs the same way, at the same tick, whether we are recording or replaying: it belongs to the
+     run's options, not to the log. */
+  const withSecondCamp = (state, god) => (api, i) => {
+    if (i === 0){ state.c2 = api.makeCamp('Second camp'); [state.o1, state.o2] = findTwoOpenTiles(api); }
+    god(api, i);
+  };
+
+  const recState = {};
+  const recordGod = (api, i) => {
+    scriptGod(api, i);
+    if (api.tick === SITE_TICK){
+      api.camp = recState.c2;
+      api.inject({ source: 'player', act: 'site', x: recState.o2.x, y: recState.o2.y, z: 0, camp: recState.c2.id });
+    }
+    if (api.tick === POKE_TICK) api.inject({ source: 'player', act: 'poke', id: api.beings[0].id });
+  };
+  const a = runDays('r', DAYS, null, withSecondCamp(recState, recordGod));
+  assert.ok(a.api.doorLog.some(e => e.act === 'site' && e.camp === recState.c2.id), 'the site act on the second camp was not logged');
+  assert.deepEqual(recState.c2.site, [recState.o2.x, recState.o2.y]);
+
+  /* Replay: the same forced second camp, at the same tick, then only the log — no script god. */
+  const replay = a.api.replay;
+  const repState = {};
+  const rg = replayGod(replay);
+  const b = runDays(replay.seed, DAYS, null, withSecondCamp(repState, api => rg(api)), replay.options);
+
+  assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events), 'the two runs diverged');
+  assert.deepEqual(b.api.doorLog, a.api.doorLog);
+  assert.deepEqual(b.api.camps[1].site, [recState.o2.x, recState.o2.y], 'the second camp did not get its site back on replay');
+  assert.deepEqual(b.api.camps[0].site, a.api.camps[0].site, 'the first camp\'s own site differed between record and replay');
 });
 
 test('an event that carries a tick must arrive at that tick', () => {
