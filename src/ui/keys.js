@@ -9,6 +9,8 @@ const DRAWERS = [
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4' },
 ];
+/* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
+const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
 const KEYMAP = [
   { key: 'Escape',     focus: 'any',    action: 'back',        label: 'Back' },
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
@@ -56,8 +58,16 @@ const KEYMAP = [
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
   { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
+  { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
+  { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
+  { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
+  { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
+  { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
+/* Stage letters are checked before the tool keys below, since those rows fire on any focus and would shadow them. */
+for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
@@ -69,6 +79,8 @@ for (let n = 1; n <= 9; n++){
   KEYMAP.push({ key: String(n), alt: true, shift: true, focus: 'any', action: 'muteMenu', arg: n, label: `Mute alert ${n}` });
 }
 for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute', action: 'muteChoice', arg: k, label: ['Mute this alert', 'Mute this kind here', 'Mute this kind everywhere'][k - 1], button: `mute${k}` });
+/* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
+for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
 function keyAction(e, focus){
@@ -84,4 +96,10 @@ function keyAction(e, focus){
     return { action: k.action, arg: k.arg };
   }
   return null;
+}
+
+/* One printable string for a key map row's chord, for the help table, the buttons, and the palette. */
+function keyName(k){
+  const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
+  return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
 }

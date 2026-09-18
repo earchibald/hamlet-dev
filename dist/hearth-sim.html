@@ -155,6 +155,12 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 }
 /* Below 800 px a drawer is a full-height overlay, and only one is open. */
 @media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
+#palette{padding:10px}
+#paletteInput{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:15px}
+#paletteList{list-style:none;margin:8px 0 0;padding:0;max-height:50vh;overflow:auto}
+#paletteList li{display:flex;justify-content:space-between;gap:12px;padding:5px 8px;border-radius:5px}
+#paletteList li.sel{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+#paletteList li kbd{margin:0}
 [hidden]{display:none !important}
 </style>
 </head>
@@ -168,6 +174,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
+      <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
+      <button class="btn" id="paletteBtn">⌘K<kbd>Ctrl+K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
     </div>
   </header>
@@ -228,6 +236,14 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <h2 id="muteTitle">Mute</h2>
   <p><button class="btn" id="mute1">This alert<kbd>1</kbd></button> <button class="btn" id="mute2">This kind, this camp<kbd>2</kbd></button> <button class="btn" id="mute3">This kind, everywhere<kbd>3</kbd></button></p>
   <p class="muted">Unmute from the command palette or the help dialog.</p>
+</dialog>
+<dialog id="palette">
+  <input id="paletteInput" placeholder="Type a command, a name, a goal, a place" autocomplete="off">
+  <ol id="paletteList"></ol>
+</dialog>
+<dialog id="chord">
+  <h2>Goals by stage</h2>
+  <p id="chordButtons"></p>
 </dialog>
 <script>
 'use strict';
@@ -2974,6 +2990,7 @@ const ui = {
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
+  recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
 };
 const WIN_MAX = 6;
 
@@ -2983,7 +3000,7 @@ let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -2994,6 +3011,7 @@ function restore(){
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
+    if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
 }
 
@@ -3164,6 +3182,38 @@ function focusRing(){
   return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
 }
 
+/* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
+   STAGE_LETTER lives in keys.js, which loads after this file; this function only reads it when called, not at
+   load time, so the order is fine. */
+function paletteRows(){
+  const out = [], seen = new Set();
+  for (const k of KEYMAP){
+    if (k.focus === 'speedrow' || k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
+    if (seen.has(k.label)) continue; seen.add(k.label);
+    out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
+  }
+  for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
+  for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
+  for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
+  camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
+  for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  for (const m of ui.mutes) out.push({ label: `Unmute: ${m}`, key: '', action: 'unmute', arg: m, group: 9 });
+  for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  return out;
+}
+/* Fuzzy match: every word of the query is a substring of the label. Prefix matches first, then shorter labels. Empty query: help, chips, tools and drawers, recent, the rest. */
+function paletteMatch(query, rows){
+  const q = query.trim().toLowerCase();
+  if (!q){
+    const rank = r => r.group < 9 ? r.group : ui.recent.includes(r.label) ? 3 + ui.recent.indexOf(r.label) / 10 : 9;
+    return rows.slice().sort((a, b) => rank(a) - rank(b));
+  }
+  const words = q.split(/\s+/);
+  const hit = rows.filter(r => { const l = r.label.toLowerCase(); return words.every(w => l.includes(w)); });
+  const score = r => (r.label.toLowerCase().startsWith(words[0]) ? 0 : 1) * 1000 + r.label.length;
+  return hit.sort((a, b) => score(a) - score(b));
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -3175,6 +3225,8 @@ const DRAWERS = [
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4' },
 ];
+/* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
+const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
 const KEYMAP = [
   { key: 'Escape',     focus: 'any',    action: 'back',        label: 'Back' },
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
@@ -3222,8 +3274,16 @@ const KEYMAP = [
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
   { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
+  { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
+  { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
+  { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
+  { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
+  { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
+/* Stage letters are checked before the tool keys below, since those rows fire on any focus and would shadow them. */
+for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
@@ -3235,6 +3295,8 @@ for (let n = 1; n <= 9; n++){
   KEYMAP.push({ key: String(n), alt: true, shift: true, focus: 'any', action: 'muteMenu', arg: n, label: `Mute alert ${n}` });
 }
 for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute', action: 'muteChoice', arg: k, label: ['Mute this alert', 'Mute this kind here', 'Mute this kind everywhere'][k - 1], button: `mute${k}` });
+/* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
+for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
 function keyAction(e, focus){
@@ -3250,6 +3312,12 @@ function keyAction(e, focus){
     return { action: k.action, arg: k.arg };
   }
   return null;
+}
+
+/* One printable string for a key map row's chord, for the help table, the buttons, and the palette. */
+function keyName(k){
+  const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
+  return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
 }
 
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
@@ -3708,16 +3776,33 @@ function muteChoice(k){
   if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
-function keyName(k){
-  const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
-  return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
-}
 function openHelp(){
   closeDialogs();
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(m)}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
   ui.focus = 'dialog'; $('help').showModal();
+}
+
+/* The command palette: every action and every named thing, one search box. */
+let palRows = [], palHit = [], palSel = 0;
+function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; ui.focus = 'dialog:palette'; $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
+function renderPalette(){
+  palHit = paletteMatch($('paletteInput').value, palRows).slice(0, 40); palSel = clamp(palSel, 0, Math.max(0, palHit.length - 1));
+  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${r.label}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
+  const sel = $('paletteList').querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+function paletteMove(d){ palSel = clamp(palSel + d, 0, Math.max(0, palHit.length - 1)); renderPalette(); }
+function paletteRun(i = palSel){
+  const r = palHit[i]; if (!r) return;
+  closeDialogs(); ui.recent = [r.label, ...ui.recent.filter(l => l !== r.label)].slice(0, 5); persist();
+  ACTIONS[r.action](r.arg); renderUI(true);
+}
+/* The stage chord: `g` opens this with one lettered button per reached stage. Built at run time, so its ids are not in the template. */
+function openChord(){
+  closeDialogs();
+  $('chordButtons').innerHTML = STAGES.filter(s => stageReached(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
+  ui.focus = 'dialog:chord'; $('chord').showModal();
 }
 
 /* God actions: tools, view changes, movement, and world control. */
@@ -3848,6 +3933,15 @@ const ACTIONS = {
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
+  palette(){ openPalette(); },
+  paletteMove(d){ paletteMove(d); },
+  paletteRun(){ paletteRun(); },
+  palettePick(n){ paletteRun(n - 1); },
+  chord(){ openChord(); },
+  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
+  gotoSector({ sx, sy }){ goto(sx, sy); },
+  unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },
 };
 
 /* The frame loop and page wiring: initUI() sets up canvases and events, frame() drives the loop. */
@@ -3884,6 +3978,10 @@ function initUI(){
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
   $('start').addEventListener('close', () => { ui.focus = 'map'; newWorld($('seed').value.trim() || randomSeed()); });
+  $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
+  $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
+  $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
   $('viewBtn').addEventListener('click', ACTIONS.view);
   $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
   $('lvUp').onclick = ACTIONS.levelUp; $('lvDown').onclick = ACTIONS.levelDown;
@@ -3916,8 +4014,12 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT') return;
-    if (anyDialogOpen()){ if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; } const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return; }
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    if (anyDialogOpen()){
+      if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
+      if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
+      const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
+    }
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });

@@ -164,3 +164,35 @@ function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
   return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
 }
+
+/* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
+   STAGE_LETTER lives in keys.js, which loads after this file; this function only reads it when called, not at
+   load time, so the order is fine. */
+function paletteRows(){
+  const out = [], seen = new Set();
+  for (const k of KEYMAP){
+    if (k.focus === 'speedrow' || k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
+    if (seen.has(k.label)) continue; seen.add(k.label);
+    out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
+  }
+  for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
+  for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
+  for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
+  camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
+  for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  for (const m of ui.mutes) out.push({ label: `Unmute: ${m}`, key: '', action: 'unmute', arg: m, group: 9 });
+  for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  return out;
+}
+/* Fuzzy match: every word of the query is a substring of the label. Prefix matches first, then shorter labels. Empty query: help, chips, tools and drawers, recent, the rest. */
+function paletteMatch(query, rows){
+  const q = query.trim().toLowerCase();
+  if (!q){
+    const rank = r => r.group < 9 ? r.group : ui.recent.includes(r.label) ? 3 + ui.recent.indexOf(r.label) / 10 : 9;
+    return rows.slice().sort((a, b) => rank(a) - rank(b));
+  }
+  const words = q.split(/\s+/);
+  const hit = rows.filter(r => { const l = r.label.toLowerCase(); return words.every(w => l.includes(w)); });
+  const score = r => (r.label.toLowerCase().startsWith(words[0]) ? 0 : 1) * 1000 + r.label.length;
+  return hit.sort((a, b) => score(a) - score(b));
+}

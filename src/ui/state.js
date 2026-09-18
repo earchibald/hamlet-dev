@@ -38,6 +38,7 @@ const ui = {
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
+  recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
 };
 const WIN_MAX = 6;
 
@@ -47,7 +48,7 @@ let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -58,5 +59,6 @@ function restore(){
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
+    if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
 }

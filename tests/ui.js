@@ -151,7 +151,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'showAllBtn'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -267,6 +267,33 @@ test('chip keys: Alt+n jumps, Shift+Alt+n opens the mute menu, and a single chip
   api.mute('cold', api.camp.id, cold.text);
   assert.equal(api.alerts().some(x => x.type === 'cold'), false, 'that one chip is muted');
   const b = { ...a, name: 'Other' }; assert.equal(api.isMuted('cold', api.camp.id, 'Other is cold'), false, 'another cold chip is not');
+});
+
+test('palette rows list every static action once with its key, and the dynamic rows for people, goals, camps, sectors, chips, and mutes', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS, 'paletteRows', 'paletteMatch']);
+  api.startWorld('r'); api.camp = api.camps[0]; api.notePulses();
+  const rows = api.paletteRows();
+  const labels = rows.map(r => r.label);
+  assert.equal(new Set(labels).size, labels.length, 'no label twice');
+  assert.ok(labels.includes('Help'));
+  assert.ok(labels.includes(`Inspect ${api.beings[0].name}`));
+  assert.ok(labels.includes('Stock food: High'));
+  assert.ok(labels.some(l => /^Go to .* \d+,\d+$/.test(l)), 'a sector row');
+  for (const r of rows.filter(r => r.action === 'help')) assert.equal(r.key, '?');
+  for (const r of rows) assert.equal(typeof api.ACTIONS[r.action], 'function', r.label);
+  const empty = api.paletteMatch('', rows); assert.equal(empty[0].label, 'Help');
+  const q = api.paletteMatch('stock high', rows); assert.equal(q[0].label, 'Stock food: High');
+  assert.equal(api.paletteMatch('zzzz', rows).length, 0);
+});
+
+test('palette and chord keys', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(api.keyAction(ev('k', { metaKey: true }), 'map'), { action: 'palette', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('k', { ctrlKey: true }), 'drawer:people'), { action: 'palette', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('g'), 'map'), { action: 'chord', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('f'), 'dialog:chord'), { action: 'stage', arg: 'fire' });
+  assert.deepEqual(api.keyAction(ev('ArrowDown'), 'dialog:palette'), { action: 'paletteMove', arg: 1 });
+  assert.deepEqual(api.keyAction(ev('Enter'), 'dialog:palette'), { action: 'paletteRun', arg: undefined });
 });
 
 module.exports = { loadUI };

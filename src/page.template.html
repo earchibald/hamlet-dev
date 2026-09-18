@@ -155,6 +155,12 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 }
 /* Below 800 px a drawer is a full-height overlay, and only one is open. */
 @media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
+#palette{padding:10px}
+#paletteInput{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:15px}
+#paletteList{list-style:none;margin:8px 0 0;padding:0;max-height:50vh;overflow:auto}
+#paletteList li{display:flex;justify-content:space-between;gap:12px;padding:5px 8px;border-radius:5px}
+#paletteList li.sel{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+#paletteList li kbd{margin:0}
 [hidden]{display:none !important}
 </style>
 </head>
@@ -168,6 +174,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
+      <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
+      <button class="btn" id="paletteBtn">⌘K<kbd>Ctrl+K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
     </div>
   </header>
@@ -228,6 +236,14 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <h2 id="muteTitle">Mute</h2>
   <p><button class="btn" id="mute1">This alert<kbd>1</kbd></button> <button class="btn" id="mute2">This kind, this camp<kbd>2</kbd></button> <button class="btn" id="mute3">This kind, everywhere<kbd>3</kbd></button></p>
   <p class="muted">Unmute from the command palette or the help dialog.</p>
+</dialog>
+<dialog id="palette">
+  <input id="paletteInput" placeholder="Type a command, a name, a goal, a place" autocomplete="off">
+  <ol id="paletteList"></ol>
+</dialog>
+<dialog id="chord">
+  <h2>Goals by stage</h2>
+  <p id="chordButtons"></p>
 </dialog>
 <script>
 __SIM__

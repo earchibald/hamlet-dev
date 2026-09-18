@@ -126,4 +126,13 @@ const ACTIONS = {
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
+  palette(){ openPalette(); },
+  paletteMove(d){ paletteMove(d); },
+  paletteRun(){ paletteRun(); },
+  palettePick(n){ paletteRun(n - 1); },
+  chord(){ openChord(); },
+  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
+  gotoSector({ sx, sy }){ goto(sx, sy); },
+  unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },
 };
