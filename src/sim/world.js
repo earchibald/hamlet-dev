@@ -295,17 +295,22 @@ function forestBeside(s){
 /* ---------- gnome burrows ---------- */
 /* Two or three burrows under the meadow edges, beside a forest sector or a hill, at least 25 tiles from the start.
    A burrow is 2 to 4 tiles on level -1 with a slope mouth, like a fox burrow, and a mushroom patch around the mouth. */
-function digGnomeBurrows(){
-  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
-  const want = 2 + rint(2); let made = 0;
-  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
-    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
-  for (const s of cands){
-    if (made >= want) break;
+/* One burrow, or null if none found: the tries loop digGnomeBurrows used at generation, pulled out so a
+   burrow can be dug on demand when a village grows too loud. It draws no random numbers until it is called.
+   `start` keeps the 25-tile rule (the exit is never beside it); `avoid` is a list of [x, y] village sites
+   the new exit must clear by at least 50 tiles. `sector`, passed only by digGnomeBurrows' own candidate
+   loop at generation, tries just that sector, so the founding dig draws exactly the numbers it always
+   drew; left out, a mid-game move picks one meadow sector itself and tries only it, so a burrow that
+   cannot find room this call is free to try a different sector next time it is called. */
+function digGnomeBurrow(start, avoid, sector){
+  const s = sector || shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))))[0];
+  if (s){
     for (let tries = 0; tries < 40; tries++){
       const x = s.sx * LW + 2 + rint(LW - 4), y = s.sy * LH + 2 + rint(LH - 4);
       const t = tileAt(x, y);
       if (!passable(x, y) || t.feature || t.struct || t.mouth || t.cave || t.hill || dist(x, y, ...start) < 25 || !startRegion.has(idx3(x, y, 0))) continue;
+      if (avoid.some(([vx, vy]) => dist(x, y, vx, vy) < 50)) continue;
       if (caves.some(c => c.kind === 'burrow' && dist(c.exit.x, c.exit.y, x, y) < 30)) continue;
       /* The mouth is under a neighbour of the exit, so the slope climbs onto the exit. */
       const under = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).find(([ux, uy]) => inb(ux, uy) && !tileAt(ux, uy).cave && !tileAt(ux, uy).mouth && clearOfCaves(ux, uy, -1, null) && !hasTile(ux, uy, -1));
@@ -320,10 +325,23 @@ function digGnomeBurrows(){
       for (const [dx, dy] of RING.concat([[2,0],[-2,0],[0,2],[0,-2]])){ const q = hasTile(x + dx, y + dy, 0) ? tileAt(x + dx, y + dy) : null; if (q && passable(q.x, q.y) && !q.feature && !q.struct && !q.mouth && rng() < 0.7){ q.feature = 'mushrooms'; q.shrooms = 1 + rint(3); c.patch.push(q); } }
       if (c.patch.length < 4){ for (const q of c.patch){ q.feature = null; q.shrooms = 0; } c.patch = []; for (const q of c.tiles){ levels[q.z + ZOFF][idx(q.x, q.y)] = null; const k = raised.indexOf(q); if (k >= 0) raised.splice(k, 1); } t.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
       c.story.push('Gnomes dug this hole under the meadow, and farm the patch around it.');
-      const n = 2 + rint(2); const floor = c.tiles.filter(q => passable(q.x, q.y, q.z));
-      for (let k = 0; k < n; k++){ const q = floor[k % floor.length]; const g = makeBeing('gnome', q.x, q.y, null, 0); g.z = q.z; g.den = c; beings.push(g); }
-      made++; break;
+      return c;
     }
+  }
+  return null;
+}
+function digGnomeBurrows(){
+  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
+  const want = 2 + rint(2); let made = 0;
+  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
+  for (const s of cands){
+    if (made >= want) break;
+    const c = digGnomeBurrow(start, [], s);
+    if (!c) continue;
+    const n = 2 + rint(2); const floor = c.tiles.filter(q => passable(q.x, q.y, q.z));
+    for (let k = 0; k < n; k++){ const q = floor[k % floor.length]; const g = makeBeing('gnome', q.x, q.y, null, 0); g.z = q.z; g.den = c; beings.push(g); }
+    made++;
   }
 }
 /* Every deep chamber holds one thing worth the walk: firestones, glowing moss, or old bones. */

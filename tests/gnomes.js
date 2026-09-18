@@ -133,3 +133,22 @@ test('a gnome does not borrow again for six days after repaying', () => {
   api.tick = api.tick + 6 * 1000; g.task = null;
   assert.ok(api.START.borrow(g), 'six days later, a new borrow can start');
 });
+
+test('a village within thirty tiles is too loud: the gnomes dig a new hole farther away within three days', () => {
+  const api = load(); api.startWorld('r');
+  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c;
+  api.setSite(burrow.exit.x + 4, burrow.exit.y); c.village = true;
+  const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
+  api.tick = 5 * 1000;
+  /* One tick is enough to notice the village: the loud check is immediate, so mark leaving before it
+     has any chance to also clear the three-day wait and dig the new hole in the same call. */
+  api.tick = api.tick + 500; api.gnomeTick();
+  assert.ok(burrow.leaving, 'the burrow should be marked as leaving');
+  assert.ok(api.chronicle.some(e => e.text.includes('too loud')));
+  for (let k = 0; k < 40 && !burrow.abandoned; k++){ api.tick = api.tick + 500; api.gnomeTick(); }
+  assert.ok(burrow.abandoned, 'the old hole stands empty');
+  const fresh = kin[0].den; assert.notEqual(fresh, burrow); assert.equal(fresh.kind, 'burrow');
+  assert.ok(api.dist(fresh.exit.x, fresh.exit.y, ...c.site) >= 50, 'the new hole is far from the village');
+  for (const g of kin) assert.equal(g.den, fresh);
+  assert.ok(api.chronicle.some(e => e.text.includes('holes are empty')));
+});

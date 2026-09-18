@@ -322,6 +322,7 @@ function updateBeing(a){
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
     else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
     if (camp && !camp.gnomes.known && !a.asleep){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
+    { const here = tileAt(a.x, a.y, a.z); if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; a.cooldown.disturb = tick + 1000; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, 800); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, 2000); } }
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);

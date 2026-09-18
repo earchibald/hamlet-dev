@@ -568,17 +568,22 @@ function forestBeside(s){
 /* ---------- gnome burrows ---------- */
 /* Two or three burrows under the meadow edges, beside a forest sector or a hill, at least 25 tiles from the start.
    A burrow is 2 to 4 tiles on level -1 with a slope mouth, like a fox burrow, and a mushroom patch around the mouth. */
-function digGnomeBurrows(){
-  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
-  const want = 2 + rint(2); let made = 0;
-  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
-    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
-  for (const s of cands){
-    if (made >= want) break;
+/* One burrow, or null if none found: the tries loop digGnomeBurrows used at generation, pulled out so a
+   burrow can be dug on demand when a village grows too loud. It draws no random numbers until it is called.
+   `start` keeps the 25-tile rule (the exit is never beside it); `avoid` is a list of [x, y] village sites
+   the new exit must clear by at least 50 tiles. `sector`, passed only by digGnomeBurrows' own candidate
+   loop at generation, tries just that sector, so the founding dig draws exactly the numbers it always
+   drew; left out, a mid-game move picks one meadow sector itself and tries only it, so a burrow that
+   cannot find room this call is free to try a different sector next time it is called. */
+function digGnomeBurrow(start, avoid, sector){
+  const s = sector || shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))))[0];
+  if (s){
     for (let tries = 0; tries < 40; tries++){
       const x = s.sx * LW + 2 + rint(LW - 4), y = s.sy * LH + 2 + rint(LH - 4);
       const t = tileAt(x, y);
       if (!passable(x, y) || t.feature || t.struct || t.mouth || t.cave || t.hill || dist(x, y, ...start) < 25 || !startRegion.has(idx3(x, y, 0))) continue;
+      if (avoid.some(([vx, vy]) => dist(x, y, vx, vy) < 50)) continue;
       if (caves.some(c => c.kind === 'burrow' && dist(c.exit.x, c.exit.y, x, y) < 30)) continue;
       /* The mouth is under a neighbour of the exit, so the slope climbs onto the exit. */
       const under = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).find(([ux, uy]) => inb(ux, uy) && !tileAt(ux, uy).cave && !tileAt(ux, uy).mouth && clearOfCaves(ux, uy, -1, null) && !hasTile(ux, uy, -1));
@@ -593,10 +598,23 @@ function digGnomeBurrows(){
       for (const [dx, dy] of RING.concat([[2,0],[-2,0],[0,2],[0,-2]])){ const q = hasTile(x + dx, y + dy, 0) ? tileAt(x + dx, y + dy) : null; if (q && passable(q.x, q.y) && !q.feature && !q.struct && !q.mouth && rng() < 0.7){ q.feature = 'mushrooms'; q.shrooms = 1 + rint(3); c.patch.push(q); } }
       if (c.patch.length < 4){ for (const q of c.patch){ q.feature = null; q.shrooms = 0; } c.patch = []; for (const q of c.tiles){ levels[q.z + ZOFF][idx(q.x, q.y)] = null; const k = raised.indexOf(q); if (k >= 0) raised.splice(k, 1); } t.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
       c.story.push('Gnomes dug this hole under the meadow, and farm the patch around it.');
-      const n = 2 + rint(2); const floor = c.tiles.filter(q => passable(q.x, q.y, q.z));
-      for (let k = 0; k < n; k++){ const q = floor[k % floor.length]; const g = makeBeing('gnome', q.x, q.y, null, 0); g.z = q.z; g.den = c; beings.push(g); }
-      made++; break;
+      return c;
     }
+  }
+  return null;
+}
+function digGnomeBurrows(){
+  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
+  const want = 2 + rint(2); let made = 0;
+  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
+  for (const s of cands){
+    if (made >= want) break;
+    const c = digGnomeBurrow(start, [], s);
+    if (!c) continue;
+    const n = 2 + rint(2); const floor = c.tiles.filter(q => passable(q.x, q.y, q.z));
+    for (let k = 0; k < n; k++){ const q = floor[k % floor.length]; const g = makeBeing('gnome', q.x, q.y, null, 0); g.z = q.z; g.den = c; beings.push(g); }
+    made++;
   }
 }
 /* Every deep chamber holds one thing worth the walk: firestones, glowing moss, or old bones. */
@@ -1392,6 +1410,7 @@ function updateBeing(a){
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
     else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, 300);
     if (camp && !camp.gnomes.known && !a.asleep){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, 900); } }
+    { const here = tileAt(a.x, a.y, a.z); if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; a.cooldown.disturb = tick + 1000; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, 800); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, 2000); } }
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);
@@ -1669,6 +1688,16 @@ function gnomeTick(){
   for (const c of caves){
     if (c.kind !== 'burrow' || c.owner !== 'gnome') continue;
     if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; c.lastRepaid = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
+    const loud = camps.find(k => k.site && k.village && dist(k.site[0], k.site[1], c.exit.x, c.exit.y) <= 30) || (c.disturbed >= 2 ? camps.find(k => k.site) : null);
+    if (loud && !c.leaving){ c.leaving = tick; camp = loud; log('The gnomes under the meadow find the village too loud. Small bundles move about at night.', campHumans(), 'info'); }
+    if (c.leaving && tick - c.leaving >= 3 * DAY){
+      const fresh = digGnomeBurrow([c.exit.x, c.exit.y], camps.filter(k => k.site && k.village).map(k => k.site));
+      if (fresh){ for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === c){ g.den = fresh; const q = fresh.tiles.find(t => passable(t.x, t.y, t.z)); g.x = q.x; g.y = q.y; g.z = q.z; g.task = null; }
+        fresh.bench = c.bench; fresh.holding = c.holding; fresh.lastRepaid = c.lastRepaid;
+        c.owner = null; c.abandoned = true; c.leaving = 0; c.story.push('The gnomes left when the village grew loud.'); for (const q of c.patch){ q.feature = null; q.shrooms = 0; } c.patch = [];
+        camp = loud || camps[0]; log('The gnomes under the meadow have gone. Their holes are empty, and the mushrooms with them.', campHumans(), 'info'); }
+      else c.leaving = tick; /* nowhere quieter yet; wait */
+    }
   }
 }
 
@@ -2776,7 +2805,7 @@ function inspectTile(x, y, z = 0){
   if (GROUND[t.ground].quarry) rows.push(['Rock face', t.quarried ? 'quarried. Rocks come from here.' : 'rocks can be quarried here with the axe.']);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
   if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
-  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}`]);
+  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}${t.cave.abandoned ? ' Abandoned.' : ''}`]);
   if (t.cave && t.cave.blocked === t) rows.push(['Fallen rock', 'blocks the way. Tools could clear it.']);
   if (z < 0) rows.push(['Dark', 'People need a burning ember down here.']);
   const here = items.filter(i => i.x === x && i.y === y && i.z === z); if (here.length) rows.push(['Loose', here.map(i => ITEMS[i.kind].name).join(', ')]);

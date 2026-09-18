@@ -221,7 +221,7 @@ function inspectTile(x, y, z = 0){
   if (GROUND[t.ground].quarry) rows.push(['Rock face', t.quarried ? 'quarried. Rocks come from here.' : 'rocks can be quarried here with the axe.']);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
   if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
-  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}`]);
+  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}${t.cave.abandoned ? ' Abandoned.' : ''}`]);
   if (t.cave && t.cave.blocked === t) rows.push(['Fallen rock', 'blocks the way. Tools could clear it.']);
   if (z < 0) rows.push(['Dark', 'People need a burning ember down here.']);
   const here = items.filter(i => i.x === x && i.y === y && i.z === z); if (here.length) rows.push(['Loose', here.map(i => ITEMS[i.kind].name).join(', ')]);

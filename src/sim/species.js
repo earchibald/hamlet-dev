@@ -223,5 +223,15 @@ function gnomeTick(){
   for (const c of caves){
     if (c.kind !== 'burrow' || c.owner !== 'gnome') continue;
     if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; c.lastRepaid = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
+    const loud = camps.find(k => k.site && k.village && dist(k.site[0], k.site[1], c.exit.x, c.exit.y) <= 30) || (c.disturbed >= 2 ? camps.find(k => k.site) : null);
+    if (loud && !c.leaving){ c.leaving = tick; camp = loud; log('The gnomes under the meadow find the village too loud. Small bundles move about at night.', campHumans(), 'info'); }
+    if (c.leaving && tick - c.leaving >= 3 * DAY){
+      const fresh = digGnomeBurrow([c.exit.x, c.exit.y], camps.filter(k => k.site && k.village).map(k => k.site));
+      if (fresh){ for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === c){ g.den = fresh; const q = fresh.tiles.find(t => passable(t.x, t.y, t.z)); g.x = q.x; g.y = q.y; g.z = q.z; g.task = null; }
+        fresh.bench = c.bench; fresh.holding = c.holding; fresh.lastRepaid = c.lastRepaid;
+        c.owner = null; c.abandoned = true; c.leaving = 0; c.story.push('The gnomes left when the village grew loud.'); for (const q of c.patch){ q.feature = null; q.shrooms = 0; } c.patch = [];
+        camp = loud || camps[0]; log('The gnomes under the meadow have gone. Their holes are empty, and the mushrooms with them.', campHumans(), 'info'); }
+      else c.leaving = tick; /* nowhere quieter yet; wait */
+    }
   }
 }

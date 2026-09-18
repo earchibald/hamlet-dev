@@ -61,6 +61,7 @@ function countEvents(api, events){
     borrowed: ev('Small footprints lead'), repaid: ev('Neighbours, then'),
     benches: api.caves.filter(c => c.kind === 'burrow' && c.bench).length,
     holding: api.caves.filter(c => c.kind === 'burrow' && c.holding).length,
+    gnomesLeft: ev('holes are empty'),
   };
 }
 
