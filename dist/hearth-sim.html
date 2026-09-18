@@ -1671,7 +1671,7 @@ function spawnWildlife(){
 
 /* An edge-arrived wolf or fox joins the nearest den of its own kind that has room for a breeding pair. */
 function adoptDen(a){
-  const open = caves.filter(c => c.kind === 'den' && c.owner === a.species &&
+  const open = caves.filter(c => c.kind === 'den' && c.owner === a.species && !c.cleared &&
     beings.filter(b => b.alive && b.den === c && stage(b) !== 'young').length < 2);
   const c = open.sort((p, q) => dist(a.x, a.y, p.exit.x, p.exit.y) - dist(a.x, a.y, q.exit.x, q.exit.y))[0];
   if (c){ a.den = c; log(`A ${SPECIES[a.species].label} has found the den under the hill and stays.`, []); }
@@ -1695,14 +1695,19 @@ function denTick(){
     let fresh = null; for (const h of shuffle(others)){ fresh = digDen(h, owner); if (fresh) break; }
     if (fresh){ fresh.from = oldDen; for (const o of beings) if (o.alive && o.oldDen === oldDen && !o.den){ o.den = fresh; o.oldDen = null; } fresh.story.push('Dug after the old den was taken.'); log(owner === 'wolf' ? 'The wolves have dug a new den under another hill.' : 'The foxes have dug a new den under another hill.', []); }
   }
-  /* A cleared den goes back to its owners when the camp's fire has been out a whole day. */
+  /* A cleared den goes back to its owners when the camp's fire has been out a whole day. Both owners who
+     redug elsewhere and owners still homeless come home. */
   for (const c of caves){ if (c.kind !== 'den' || !c.cleared) continue; const k = c.cleared;
     const out = k.pit && !tileAt(...k.pit).struct.lit && k.outSince && tick - k.outSince >= DAY;
     if (out){ const fresh = caves.find(fc => fc.kind === 'den' && fc.owner === c.owner && fc.from === c);
-      const kin = beings.filter(b => b.alive && b.species === c.owner && b.den && b.den === fresh);
-      for (const b of kin) b.den = c;
+      const kin = beings.filter(b => b.alive && b.species === c.owner && ((b.oldDen === c && !b.den) || (b.den && b.den.from === c)));
+      for (const b of kin){ b.den = c; b.oldDen = null; }
       if (fresh){ fresh.owner = null; fresh.abandoned = true; }
-      c.cleared = null; c.story.push('Taken back when the fire failed.'); camp = k; log(`With the fire out a day, the ${c.owner === 'wolf' ? 'wolves are' : 'foxes are'} back in the den under the hill.`, campHumans(), 'bad'); }
+      c.cleared = null; c.story.push('Taken back when the fire failed.');
+      const prev = camp; camp = k;
+      if (kin.length) log(`With the fire out a day, the ${c.owner === 'wolf' ? 'wolves are' : 'foxes are'} back in the den under the hill.`, campHumans(), 'bad');
+      else log('The den under the hill stands empty; nothing has come back to it.', campHumans(), 'info');
+      camp = prev; }
   }
 }
 

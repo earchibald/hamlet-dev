@@ -80,6 +80,25 @@ test('two brave people with brands and the spear clear a wolf den; the wolves di
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
 
+test('a den reverts to homeless owners too, when the fire fails before they redig', () => {
+  const { api, a, c } = readyCamp();
+  const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
+  campByCave(api, c, a, den);
+  const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
+  const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
+  for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
+  api.tick = 9 * 1000;
+  doOffer(api, a, 'clear the den with brands', 3000);
+  assert.equal(den.cleared, c);
+  for (const w of wolves) assert.equal(w.den, null);
+  /* The fire goes out for a day, well within the three-day redig window: the homeless owners come home. */
+  api.tileAt(...c.pit).struct.lit = false; c.outSince = api.tick - 1000 - 1;
+  for (let k = 0; k < 2; k++){ api.tick = api.tick + 500; api.denTick(); }
+  assert.equal(den.cleared, null);
+  for (const w of wolves) assert.equal(w.den, den);
+  assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
+});
+
 test('withBrand ends with no live ember when the chain does not start', () => {
   const { api, a, c } = readyCamp();
   api.tick = 9 * 1000;

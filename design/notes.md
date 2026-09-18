@@ -120,6 +120,7 @@ Fire is the thing the player is for at the start, and the thing that people lear
 - A wolf will attack a person who is alone, at night, away from a lit fire, not holding fire. All four together. It has happened twice in 420 camp-days and nobody has died of it.
 - A wolf or fox in its own den bites any person on the den's floor, by day or night, with or without a brand. This is the one exception to the four conditions above. The soak allows one such death a seed and reports it. It has not yet fired in any soak seed, since nothing sends people onto a den's floor until the cave goals of the closing phase.
 - A den-bite death cause expires 600 ticks after the bite. An old bite is never blamed for a later, unrelated death.
+- A camp can clear a den with brands and the spear. The owners it drives out dig a fresh den elsewhere within three days if they can. If the camp's fire goes out for a whole day, the den reverts: it takes back owners who already redug and owners still without a den, whichever the fire failure catches. An arriving wolf or fox never joins a den the camp holds.
 - Cold. Warmth falls at night and in winter, faster in rain, slower under a roof and for the hardy. Below 30, a person drops work and goes to the fire. Below 20 they take damage.
 - A camp whose fire is out and holds no blaze, moss, or firestones sends its people for firestones before firewood. A lone camper once froze to death over six days at a dead pit, because every warmth rule needed a lit pit and nothing raised the priority of getting a source.
 - Sprites. See below.

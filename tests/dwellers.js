@@ -81,6 +81,15 @@ test('an edge-arrived wolf does not join a den already home to a pair', () => {
   assert.notEqual(w.den, den, 'a full den should not take a third owner');
 });
 
+test('an edge-arrived wolf does not join a den the camp holds', () => {
+  const { api, den } = denned('wolf');
+  den.cleared = api.camps[0];
+  const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
+  api.beings.push(w);
+  api.adoptDen(w);
+  assert.equal(w.den, null, 'a cleared den should give the arrival no den');
+});
+
 test('a den with two adults bears one young in spring, once a year', () => {
   const { api, den } = denned('wolf');
   const adults = api.beings.filter(b => b.alive && b.species === 'wolf' && b.den === den);
