@@ -56,8 +56,11 @@ function countEvents(api, events){
     pots: api.camps.reduce((n, c) => n + (c.stash.pot || 0), 0), quarried: ev('quarries two rocks'),
     pups: ev('is born in the den') + ev('kits are born'), dragged: ev('drags its kill'),
     deaths: byCause, alive: hs.filter(h => h.alive).length, humans: hs.length, camps: api.camps.length,
-    gnomesSeen: api.camps.filter(c => c.gnomes.known).length, gnomes: api.beings.filter(b => b.alive && b.species === 'gnome').length,
+    campsThatSawGnomes: api.camps.filter(c => c.gnomes.known).length, gnomes: api.beings.filter(b => b.alive && b.species === 'gnome').length,
     gnomeDeaths: gnomeDeaths(events).length,
+    borrowed: ev('Small footprints lead'), repaid: ev('Neighbours, then'),
+    benches: api.caves.filter(c => c.kind === 'burrow' && c.bench).length,
+    holding: api.caves.filter(c => c.kind === 'burrow' && c.holding).length,
   };
 }
 

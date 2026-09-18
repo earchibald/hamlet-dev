@@ -42,6 +42,7 @@ function updateWorld(){
   rotCarcasses();
   groveTick();
   denTick();
+  gnomeTick();
   spawnWildlife();
 }
 function step(){ tick++; updateWorld(); camp = camps[0]; for (const a of beings) if (a.alive) updateBeing(a); if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human'); }

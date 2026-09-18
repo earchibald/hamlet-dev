@@ -61,7 +61,7 @@ test('a gnome fears a brand and a wolf, and never attacks', () => {
   g.x = h.x + 2; g.y = h.y; g.z = 0; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 };
   assert.ok(api.threatsFor(g).length > 0, 'a brand is a threat');
   h.carrying = null; assert.equal(api.threatsFor(g).length, 0, 'a bare person is not');
-  assert.ok(!api.START.hunt || true); assert.equal(api.SPECIES.gnome.attacks, undefined);
+  assert.equal(api.SPECIES.gnome.attacks, undefined);
 });
 
 test('the first gnome seen at dusk is written down once per camp', () => {
@@ -74,4 +74,26 @@ test('the first gnome seen at dusk is written down once per camp', () => {
   assert.equal(c.gnomes.known, true);
   assert.ok(api.chronicle[0].text.includes('small figure'), api.chronicle[0].text);
   assert.equal(api.goalState(api.GOALS.find(g => g.id === 'gnomes')).s, 'active');
+});
+
+test('gnomes copy a workshop, borrow a pot at night, and bring it back with a gift two days later', () => {
+  const api = load(); api.startWorld('r');
+  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c; const h = api.beings[0];
+  /* Put the camp beside the burrow with a workshop and a pot. */
+  api.setSite(burrow.exit.x + 3, burrow.exit.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
+  c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.everLit = true;
+  api.tick = 5 * 1000; for (let k = 0; k < 40 && !burrow.bench; k++){ api.tick = api.tick + 500; api.gnomeTick(); }
+  assert.ok(burrow.bench, 'no bench after twenty days beside a workshop');
+  assert.ok(api.chronicle.some(e => e.text.includes('clink')));
+  const g = api.beings.find(b => b.species === 'gnome' && b.den === burrow); g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90;
+  api.tick = 22 * 1000; assert.ok(api.START.borrow(g), 'the borrow should start');
+  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  assert.equal(c.stash.pot, 0); assert.ok(burrow.holding && burrow.holding.kind === 'pot');
+  assert.ok(api.chronicle.some(e => e.text.includes('Small footprints')));
+  api.tick = api.tick + 2 * 1000 + 10; g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
+  assert.ok(api.START.repay(g), 'the repayment should start');
+  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  assert.equal(c.stash.pot, 1); assert.equal(burrow.holding, null);
+  assert.ok(c.stash.cord + c.stash.clay + c.stash.pot >= 2, 'a gift beside it');
+  assert.ok(api.chronicle.some(e => e.text.includes('Neighbours, then')));
 });

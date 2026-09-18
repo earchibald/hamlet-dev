@@ -1326,6 +1326,7 @@ function chooseTask(a){
       /* Dusk is a routine, not just a hunger call: a well-fed gnome still goes to tend the patch once it wakes. */
       { type: 'shrooms', score: urg(n.food) * 1.2 + (!drowsy(a) ? 25 : 0) }, { type: 'eat', score: urg(n.food) * 0.6 },
       { type: 'huddle', score: urg(n.social) * 0.8 },
+      { type: 'repay', score: a.den && a.den.holding && tick - a.den.holding.since >= 2 * DAY ? 80 : 0 }, { type: 'borrow', score: !drowsy(a) && a.den && a.den.bench && !a.den.holding && n.food > 40 ? 40 + a.traits.curiosity * 30 : 0 },
       { type: 'wander', score: drowsy(a) ? 2 : 10 }];
   } else if (a.species === 'wolf'){
     const hungry = isWinter() ? 75 : 65;
@@ -1568,6 +1569,35 @@ Object.assign(START, {
     const p = bfs(a.x, a.y, a.z, (x, y, z) => z === kin.z && dist(x, y, kin.x, kin.y) <= 1, 600, a); if (!p) return false;
     a.task = { type: 'socialize', label: 'Going to kin', path: p, arrive: () => 'done' }; return true;
   },
+  /* At night, a gnome with a bench borrows one made thing from a camp stash within 40 tiles. Never from a warded camp. */
+  borrow(a){
+    const c = a.den; if (!c || !c.bench || c.holding || !isNight()) return false;
+    const k = camps.find(k => k.stashTile && !k.ward && dist(k.stashTile[0], k.stashTile[1], c.exit.x, c.exit.y) <= 40 && (k.stash.pot > 0 || k.stash.cord > 0 || k.tools.basket)); if (!k) return false;
+    const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
+    a.task = { type: 'borrow', label: 'Slipping over to the camp for something useful', path: p, fast: true,
+      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        const kind = k.stash.pot > 0 ? 'pot' : k.stash.cord > 0 ? 'cord' : k.tools.basket ? 'basket' : null; if (!kind) return 'fail';
+        camp = k; if (kind === 'basket') k.tools.basket = 0; else stashTake(kind, 1);
+        c.holding = { kind, camp: k, since: tick }; addThought(a, 'borrowed', 'Borrowed a clever thing', 6, 1500);
+        log(`${kind === 'basket' ? 'The basket' : `A ${ITEMS[kind].name}`} is gone from the stash. Small footprints lead toward the meadow.`, campHumans(), 'bad');
+        if (!k.gnomes.known){ k.gnomes.known = true; }
+        return 'done'; } };
+    return true;
+  },
+  /* Two days on, the thing comes back with a gift beside it. */
+  repay(a){
+    const c = a.den; if (!c || !c.holding || tick - c.holding.since < 2 * DAY) return false;
+    const k = c.holding.camp; if (!k.stashTile) return false;
+    const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
+    a.task = { type: 'repay', label: 'Carrying the thing back, with a gift', path: p,
+      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        const h = c.holding; if (!h) return 'fail'; camp = k; if (h.kind === 'basket') k.tools.basket = 1; else stashAdd(h.kind, 1);
+        const gift = ['cord', 'clay', 'pot'][rint(3)]; stashAdd(gift, 1); c.holding = null;
+        addThought(a, 'repaid', 'Paid a debt', 5, 1500); for (const o of campHumans()) addThought(o, 'gnomegift', 'The neighbours brought something back, and more', 5, 1200);
+        log(`The ${h.kind === 'basket' ? 'basket' : ITEMS[h.kind].name} is back in the stash, and a ${ITEMS[gift].name} beside it. Neighbours, then.`, campHumans(), 'good');
+        return 'done'; } };
+    return true;
+  },
 });
 
 /* Wildlife comes and goes: rabbits breed and return, fawns in spring, wolves and foxes wander in from the edges. */
@@ -1628,6 +1658,15 @@ function defendDen(a){
   log(`A ${label} comes at ${h.name} in its den.`, [h], 'bad');
   a.cooldown.defend = tick + 150; addThought(a, 'defend', 'Drove an intruder from the den', 6, 600);
   failTask(h); START.flee(h);
+}
+
+/* Every 500 ticks the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */
+function gnomeTick(){
+  if (tick % 500 !== 0) return;
+  for (const c of caves){
+    if (c.kind !== 'burrow' || c.owner !== 'gnome') continue;
+    if (!c.bench){ const near40 = camps.find(k => k.workshop && dist(k.workshop[0], k.workshop[1], c.exit.x, c.exit.y) <= 40); if (near40 && rng() < 0.3){ c.bench = tick; camp = near40; log('Small tools clink under the meadow at night. The neighbours have a bench of their own now.', campHumans(), 'good'); } }
+  }
 }
 
 /* ---------- the sprites of the groves ---------- */
@@ -2506,6 +2545,7 @@ function updateWorld(){
   rotCarcasses();
   groveTick();
   denTick();
+  gnomeTick();
   spawnWildlife();
 }
 function step(){ tick++; updateWorld(); camp = camps[0]; for (const a of beings) if (a.alive) updateBeing(a); if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human'); }

@@ -256,6 +256,7 @@ function chooseTask(a){
       /* Dusk is a routine, not just a hunger call: a well-fed gnome still goes to tend the patch once it wakes. */
       { type: 'shrooms', score: urg(n.food) * 1.2 + (!drowsy(a) ? 25 : 0) }, { type: 'eat', score: urg(n.food) * 0.6 },
       { type: 'huddle', score: urg(n.social) * 0.8 },
+      { type: 'repay', score: a.den && a.den.holding && tick - a.den.holding.since >= 2 * DAY ? 80 : 0 }, { type: 'borrow', score: !drowsy(a) && a.den && a.den.bench && !a.den.holding && n.food > 40 ? 40 + a.traits.curiosity * 30 : 0 },
       { type: 'wander', score: drowsy(a) ? 2 : 10 }];
   } else if (a.species === 'wolf'){
     const hungry = isWinter() ? 75 : 65;
