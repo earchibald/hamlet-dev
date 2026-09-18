@@ -49,7 +49,7 @@ A region record: `{ id, tiles (a mask over W*H), parent, by (god id), age, marks
 
 A split is an act. A god picks a region and draws a boundary through it. The god's patience sets the line: patient gods draw straight, restless gods draw winding, from noise. The two children each get a pole mark for the god's contrast. The boundary is a place: the wet god's boundary is the river. A region stops splitting at sector size. A region nobody splits stays large and reads as one wide country.
 
-A mark record: `{ kind, value, by (god id), age, why (a sentence) }`. Marks sit on regions, and after settle on tiles, hills, caves, and scars. Rules read marks. Nothing reads a god's name.
+A mark record: `{ kind, value, by (god id), age, why (a sentence), at (an anchor tile) }`. Ground marks (poles, height, depth, scars, flow, pool, freeze, hide, show) pass to both children of a split. Singular marks (a making, a rest, a twist) pass to the child that holds the anchor. A sleeping god's body is never split. Marks sit on regions, and after settle on tiles, hills, caves, and scars. Rules read marks. Nothing reads a god's name.
 
 | Mark kind | Values | Written by | Read by |
 |---|---|---|---|
@@ -100,7 +100,7 @@ An act is an operator: a name, the pole that may use it, a target region, the ma
 
 | Act | Pole | Ages | Writes | The painter makes |
 |---|---|---|---|---|
-| split | any | 1 | pole marks on two children, a boundary | the river when the splitter is wet and moving |
+| split | any | 1 | pole marks on two children, a boundary | the river when the splitter is the wet god |
 | raise | above | 1 per storey | height on the region | a hill, a mountain when many. Not on a level country while fewer than three remain, so nobody raises the formless whole. |
 | dig | below | 1 per level | depth on the region | caves, chambers, a deep. Not in a level country while fewer than three remain. |
 | flow | wet, moving | 1 | wet along a path across regions, above or below ground | streams, fords, underground rivers |
@@ -141,7 +141,7 @@ Settle is `generate()` taken apart into painters, one per mark kind, in a fixed 
 
 | Step | Reads | Keeps from today |
 |---|---|---|
-| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet-moving boundary; fords where flow cut them; lakes and marsh from pool |
+| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet god's live boundaries; fords where flow cut them; lakes and marsh from pool |
 | 2. Height | height marks | `uplift`, `hillShape`, `hillClimbable`, `raiseHill`, `cutSlopes`, with storeys from the mark; a snow line where cold is marked on high ground |
 | 3. Depth | depth marks, flow and pool below ground | `cutWaterCaves`, with levels from the mark; underground streams and lakes as water tiles on lower levels with a bank to walk; hollows and dens as today |
 | 4. Scars | scar marks | burned: ash that greens over seasons. cut: a chasm, a line of rock with a slope at each end. drowned: standing water with dead pines in it. broken: a boulder field. hallowed: nothing painted, the tile marked. |

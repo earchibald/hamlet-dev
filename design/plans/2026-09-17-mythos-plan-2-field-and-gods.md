@@ -1197,3 +1197,11 @@ Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn"
 - Dead gods are filtered out of `beings` every 200 ticks by the day-era `step`. Plan 3 keeps them.
 - A god's thoughts never expire, since nothing ticks them in the ages.
 - A region may lie in two pieces after a winding cut of a ragged parent.
+- Settle is called from inside `withGodRng`, so a painter that draws would draw from the god stream. Plan 3 decides this on purpose before the golden is blessed.
+- Settle does not set `tick`; the spec says it sets today's start hour. Plan 3 owns it.
+- Nobody makes the gnomes. `MAKES` has no entry for them; today `digDens` spawns them at generation.
+- Gods sit at tile 0,0,0 in `beings`. Tile-occupancy queries in `world.js` and the page's drawing and poke do not filter by species. Plan 3 places a sleeping god at its body or keeps gods out of tile space.
+- Marks carry an anchor tile (`at`) since the final fix of plan 2; a painter uses it to place a making or a body.
+- A boundary carries the splitter's pole only. The river is the wet god's live boundary (`liveBoundaries()`); the spec's "wet-moving" wording was corrected.
+- The legends are monotonous in the middle ages, mostly "parts a country" lines. Countries have no names; the naming spec on `ui-rethink` and plan 4 should give them some so a line can say which country was parted.
+- `restGate` is recomputed several times an age; fast at the default size, but it scales with the world size option.
