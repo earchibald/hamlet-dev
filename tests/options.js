@@ -28,6 +28,12 @@ test('a bigger world generates, and the first person can reach water', () => {
   assert.ok(a.alive, 'the first person died on day one');
 });
 
+test('an unlawful range or size is refused with a sentence', () => {
+  const api = load();
+  assert.throws(() => api.startWorld('r', { zmin: -1 }), /level range/);
+  assert.throws(() => api.startWorld('r', { sw: 0 }), /at least one sector/);
+});
+
 test('one engine can start a big world and then a small one', () => {
   const api = load(); api.startWorld('r', { sw: 12, sh: 8 });
   assert.equal(api.W, 336);

@@ -11,15 +11,24 @@ const DAY = 1000;
 function scriptGod(api, i){
   for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 });
 }
-/* A god that replays a log: every event with this tick goes through the door, in order, and nothing else happens. */
+/* A god that replays a log: every event whose tick has passed goes through the door, in order, and
+   nothing else happens. The guard is <= rather than ===, so an event whose exact tick is skipped
+   (the step order does not land on every tick) is still applied at the next opportunity, rather
+   than silently dropped. */
 function logGod(log){
   let k = 0;
-  return api => { while (k < log.length && log[k].tick === api.tick){ const { tick, ...e } = log[k++]; api.inject(e); } };
+  return api => { while (k < log.length && log[k].tick <= api.tick){ const { tick, ...e } = log[k++]; api.inject(e); } };
+}
+/* A god built from a replay record ({ seed, options, log }): replays its log. Meant to be used with
+   runDays(replay.seed, days, onTick, replayGod(replay), replay.options), so a seed, its options,
+   and its log replay the same story. */
+function replayGod(replay){
+  return logGod(replay.log);
 }
 
 /* Run one seed. Returns the api and the full list of chronicle events in order. */
-function runDays(seed, days, onTick, god = scriptGod){
-  const api = load(); api.startWorld(seed);
+function runDays(seed, days, onTick, god = scriptGod, opts = {}){
+  const api = load(); api.startWorld(seed, opts);
   const events = []; const seen = new WeakSet();
   const drain = () => { const ch = api.chronicle; let n = 0; while (n < ch.length && !seen.has(ch[n])) n++; for (let j = n - 1; j >= 0; j--){ seen.add(ch[j]); events.push(ch[j]); } };
   drain();
@@ -89,4 +98,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, scriptGod, logGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, runDays, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, cutOff, campLine, OLD_AGE };
