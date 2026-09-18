@@ -261,6 +261,13 @@ for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in 
   }
 });
 
+for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable world`, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  const b = api.beings[0]; const region = api.reachable(b.x, b.y, 0, full);
+  for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} under hill ${c.hill.x},${c.hill.y} opens onto a sealed pocket`);
+});
+
 test('standing in a hollow costs the camp favour and the sprites notice', () => {
   /* Use the first test seed whose groves include one under a hill. */
   let A = null, g = null;

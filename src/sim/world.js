@@ -95,11 +95,13 @@ function keepsPaths(t){
   for (const step of [1, -1]){ let i = sides[0]; for (let k = 0; k < 7; k++){ i = (i + step + 8) % 8; if (!open[i]) break; joined.add(i); } }
   return sides.every(i => joined.has(i));
 }
+/* The tiles the first person can walk to from the start sector. Every cave exit must lie in it, or nobody could ever get there. */
+let startRegion = null;
 /* Walkable surface tiles just outside a hill, each with the footprint tile it touches. Mouths and slopes are skipped. */
 function rimExits(h, set){
   const out = [];
   for (const i of h.tiles){ const x = i % W, y = (i - x) / W;
-    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (passable(nx, ny) && !t.slope && !t.mouth) out.push([t, i]); } }
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (passable(nx, ny) && !t.slope && !t.mouth && startRegion.has(idx3(nx, ny, 0))) out.push([t, i]); } }
   return out;
 }
 /* ---------- pre-history ---------- */
@@ -232,20 +234,19 @@ function hollowUnderHill(sc, h){
   const set = new Set(h.tiles);
   let rim = shuffle(rimExits(h, set));
   /* On a hill deep in thick forest, dens and rockfall can claim every clear approach before the grove gets a turn.
-     As a last resort the sprites keep their own door clear of a tree, the way carve() clears one to make cave floor. */
+     As a last resort the sprites keep their own door clear of a tree, the way carve() clears one to make cave floor --
+     but only a tree with a neighbour already in the main region, so the door still opens onto the map. */
   if (!rim.length){
     const treed = [];
     for (const i of h.tiles){ const x = i % W, y = (i - x) / W;
-      for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (t.feature === 'tree' && !t.slope && !t.mouth) treed.push([t, i]); } }
+      for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; const t = tileAt(nx, ny); if (t.feature !== 'tree' || t.slope || t.mouth) continue;
+        const opensOut = DIRS.some(([ex, ey]) => { const ox = nx + ex, oy = ny + ey; return inb(ox, oy) && !set.has(idx(ox, oy)) && startRegion.has(idx3(ox, oy, 0)); });
+        if (opensOut) treed.push([t, i]); } }
     rim = shuffle(treed);
   }
   for (const [exit, under] of rim){
     const ux = under % W, uy = (under - ux) / W;
     if (tileAt(ux, uy).cave) continue;
-    /* The door has to open onto more than a one-tile pocket boxed in by trees, or the grove -- and anything
-       dropped at it -- is cut off from the rest of the map. */
-    const opensOut = DIRS.some(([dx, dy]) => { const nx = exit.x + dx, ny = exit.y + dy; return inb(nx, ny) && !set.has(idx(nx, ny)) && passable(nx, ny); });
-    if (!opensOut) continue;
     const c = makeCave('hollow', h); c.owner = 'sprite';
     const mouth = carve(c, ux, uy, 0);
     if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; }
@@ -403,7 +404,20 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  uplift(); cutWaterCaves(); rockfall(); digDens();
+  uplift();
+  const s0start = sectors[secIdx(SW >> 1, SH >> 1)];
+  const [cx0, cy0] = secCenter(s0start);
+  let best0 = null;
+  for (let y = s0start.sy * LH; y < (s0start.sy + 1) * LH; y++) for (let x = s0start.sx * LW; x < (s0start.sx + 1) * LW; x++){
+    if (!passable(x, y)) continue;
+    const d = dist(x, y, cx0, cy0); if (!best0 || d < best0.d) best0 = { x, y, d };
+  }
+  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  cutWaterCaves(); rockfall();
+  /* Rockfall is the only later step that can take a tile back out of the walkable world (a boulder where there was
+     open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just washed out. */
+  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
