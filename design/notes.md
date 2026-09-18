@@ -183,7 +183,7 @@ The soak asserts, per seed:
 - At most one person a seed dies in a den, and it is reported.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
-- The same seed tells the same story twice.
+- The same seed tells the same story twice, and a seed, its options, and its log replay the same story. A moved log tells a different one.
 
 `tests/terrain.js` checks the levels: the surface is level 0, a slope joins two floors and a cliff does not, rabbits never climb and deer do, a wolf a level up is not a threat, fire burns on a hilltop, and every hill on every seed is rock with reachable floors, off the water, and out of the start sector, every tall hill has a water cave whose floors can be reached from its exit unless rock blocks it, every den has one mouth and its owners start in it, a grove on a forest hill is in a hollow under it, every deep chamber holds one find, and no rain or work reaches the dark.
 
@@ -206,7 +206,13 @@ Known weak spots:
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
 - The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
 
-## 15. Next
+## 15. The door
+
+The determinism contract, since the mythos spec. The engine step is pure. Given a state, the next state is fixed. Every act from outside enters by one door, `inject(event)` in `src/sim/door.js`, which logs every lawful event with its tick, applied or not, before applying it. The player's light and poke go through it; chance, an LLM, and a human inhabiting a mob are reserved sources. A perturbation is checked against the state's invariants, never against what the engine would have done. Every perturbation is visible in the chronicle in the game's voice. An event stamped with tick N was applied after step N and before step N+1. `startWorld(seed, options)` takes the world size in sectors and the level range; `design/settings.md` is the register of start options and future settings.
+
+The acts the door knows: light, poke, priority (a goal set off, on, or high), and site (the camp site before the pit is built). A replayed event carries its tick and must arrive at it; the door answers "Not now." otherwise. The test runner`s replay god throws if it falls behind. Nothing in the interface writes sim state except through the door.
+
+## 16. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.

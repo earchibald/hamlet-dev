@@ -3,7 +3,7 @@
 A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds the design, the rules that were tuned by testing, and the bugs already found and fixed. Do not re-derive them.
 
 ## Layout
-- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), world, path, camps, beings, species, fae, tasks, goals, weather, main.
+- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), world, path, camps, beings, species, fae, tasks, goals, weather, main, door. `door.js` is the one way in from outside: `inject(event)`.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/ui.js`: the canvas interface. Reads state, draws, handles tools. Never changes the rules.
@@ -20,7 +20,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Rules read data tables (materials, species, goals). Rules do not check names.
 - Every new behaviour must be visible to the player: a chronicle line, a thought, a goal state, or a tooltip row.
 - Any death in a 70-day soak that is not old age is a bug until proven otherwise. Trace it with `tests/trace-deaths.js`.
-- The simulation must stay deterministic for a seed until the player acts.
+- The engine step is pure. Every outside act enters by `inject()` in `src/sim/door.js` and is logged. A seed, its options, and its log replay the same story.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.

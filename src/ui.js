@@ -333,17 +333,13 @@ function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern'
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
-function newWorld(seed){ startWorld(seed); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
+function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(lightTile(c.x, c.y, c.z)); camp = viewCamp; break;
-    case 'camp': {
-      if (camp.pit){ say('The fire pit is already built. The camp stays where it is.'); break; }
-      if (c.z !== 0){ say('The camp must be on the valley floor.'); break; }
-      const t = tileAt(c.x, c.y); if (!passable(c.x, c.y) || t.feature){ say('The camp site must be open ground you can stand on.'); break; }
-      camp = viewCamp; setSite(c.x, c.y); camp.siteReason = 'you chose it'; log('The camp site moves. Someone felt it was right.', humans()); say('Camp site set. The fire pit will go here.'); break; }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? poke(a) : 'Nobody is there to poke.'); break; }
+    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
+    case 'camp': camp = viewCamp; say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z })); break;
+    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   renderUI(true);
 }
@@ -377,7 +373,7 @@ function initUI(){
   $('nW').onclick = () => move(-1, 0); $('nE').onclick = () => move(1, 0); $('nN').onclick = () => move(0, -1); $('nS').onclick = () => move(0, 1);
   $('lvUp').onclick = () => setLevel(lvl + 1); $('lvDown').onclick = () => setLevel(lvl - 1);
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b){ viewCamp = camps.find(c => c.id === Number(b.dataset.camp)); if (viewCamp.site){ followId = null; setView('loc', secOf(...viewCamp.site)); } renderUI(true); } });
-  $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ goalPriority[b.dataset.goal] = Number(b.dataset.pri); renderUI(true); } });
+  $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ say(inject({ source: 'player', act: 'priority', id: b.dataset.goal, pri: Number(b.dataset.pri) })); renderUI(true); } });
   const tipForRow = (e, pin) => {
     const b = e.target.closest('[data-being]'); if (!b) return; const id = Number(b.dataset.being);
     if (pin && tipPinned && tipTarget && tipTarget.being === id){ hideTip(); return; }

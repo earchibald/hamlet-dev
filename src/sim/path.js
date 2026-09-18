@@ -1,7 +1,9 @@
 /* ---------- path search ---------- */
 /* Search runs over all levels. A tile's index is idx3(x, y, z). Neighbours come from steps(): the four beside,
    up from a slope, down onto one. Visited tiles are marked with a generation counter, never cleared. */
-const bfsPrev = new Int32Array(NZ * W * H), bfsSeen = new Uint32Array(NZ * W * H); let bfsGen = 0; const bfsOut = [];
+let bfsPrev, bfsSeen, bfsGen = 0; const bfsOut = [];
+/* The search buffers cover every level of the world. startWorld sizes them once the options are set. */
+function allocSearch(){ bfsPrev = new Int32Array(NZ * W * H); bfsSeen = new Uint32Array(NZ * W * H); bfsGen = 0; }
 const unpack = i => { const z = ((i / (W * H)) | 0) + ZMIN, r = i - (z - ZMIN) * W * H, x = r % W; return [x, (r - x) / W, z]; };
 function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
   if (goal(sx, sy, sz)) return [];
