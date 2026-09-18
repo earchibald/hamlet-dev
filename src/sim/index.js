@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'door'];
+const FILES = ['core', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -25,6 +25,10 @@ const API = `return {
   runTask, updateBeing, dropCarried, makeBeing, checkPitfall, denTick, adoptDen, spawnWildlife,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
+  initField, splitRegion, regionById, liveRegions, regionAt, canSplit, neighboursOf, SECTOR_AREA,
+  CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
+  get era(){ return era; }, get age(){ return age; }, get pulseAge(){ return pulseAge; }, get legends(){ return legends; }, get creation(){ return creation; },
+  get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
   get options(){ return options; },
   campHumans, humans, stashFood,

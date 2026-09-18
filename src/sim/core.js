@@ -20,12 +20,13 @@ const NEAR = [[0,0], ...DIRS];
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
-const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2 };
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 };
 let options;
 function setOptions(o){
   options = { ...DEFAULT_OPTIONS, ...o };
   if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
   if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
+  if (!Number.isInteger(options.ageLimit) || options.ageLimit < 1) throw new Error(`The age limit must be a whole number of ages, at least 1. Got ${options.ageLimit}.`);
   SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
   ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
 }
@@ -107,6 +108,10 @@ function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; 
 
 /* World state */
 let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+/* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
+   regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
+   of the run. godRng is the gods' own stream. */
+let era = 'days', age = 0, pulseAge = null, godRng = null, legends = [], creation = null, field = null, boundaries = [];
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
@@ -114,9 +119,14 @@ const isWinter = () => seasonOf() === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;
 const dayOf = () => Math.floor(tick / DAY) + 1;
 const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
-function stamp(){ return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`; }
+/* Before the Pulse there is no "when", only "then". After it the ages count. */
+function stamp(){
+  if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
+  return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
+}
 function log(text, who = [], kind = 'info'){
   const e = { tick, when: stamp(), text, kind };
+  if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
   for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
 }
