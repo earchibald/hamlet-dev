@@ -3,11 +3,9 @@
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
-function setTool(id){
-  tool = id;
-  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  if (id === 'camp' && viewCamp && viewCamp.pit) say('The fire pit is built. The camp stays where it is.');
-  if (tipPinned) hideTip();
+function setTool(id, sticky = false){
+  tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
+  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
@@ -54,13 +52,9 @@ function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
     case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
-    case 'camp': {
-      camp = viewCamp;
-      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z, camp: viewCamp.id }));
-      break;
-    }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
+    case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
+  if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');
   renderUI(true);
 }
 
@@ -76,7 +70,7 @@ function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = draw
 function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
 function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
-  if (r.kind === 'person'){ const a = beingById(r.id); const el = document.querySelector(`#drawers [data-being="${r.id}"]`); const rect = el ? el.getBoundingClientRect() : { left: 400, top: 200 }; tipTarget = { being: a.id }; tipAnchor = { x: rect.left, y: rect.top, left: true }; tipPinned = true; renderTip(); }
+  if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
@@ -91,6 +85,9 @@ const ACTIONS = {
   faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
   speed(s){ setSpeed(s); setPaused(false); },
   tool(id){ setTool(id); },
+  toolSticky(id){ setTool(id, true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; cursorTo(a.x, a.y, a.z); renderUI(true); },
+  follow(id){ const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
   levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
   levelDown(){ if (view === 'loc') setLevel(lvl - 1); },

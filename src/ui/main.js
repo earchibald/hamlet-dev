@@ -19,8 +19,8 @@ function initUI(){
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd></button>`).join('');
-  $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) ACTIONS.tool(b.dataset.tool); });
+  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
+  $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
   $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
@@ -33,10 +33,8 @@ function initUI(){
   $('lvUp').onclick = ACTIONS.levelUp; $('lvDown').onclick = ACTIONS.levelDown;
   $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b) ACTIONS.campN(camps.findIndex(c => c.id === Number(b.dataset.camp)) + 1); });
   $('tip').addEventListener('pointerdown', e => {
-    if (e.target.closest('[data-close]')) hideTip();
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderTip(); }
   });
-  document.addEventListener('pointerdown', e => { if (tipPinned && !e.target.closest('#tip, #map, #drawers')) hideTip(); });
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;

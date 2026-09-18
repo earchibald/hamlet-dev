@@ -5,11 +5,11 @@ const T = 26, WS = 3, MS = 9;
 /* The three views, and the order M walks them: sector, nearby, world, sector. */
 const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
-  { id: 'inspect', key: 'i', label: 'Inspect',   hint: 'Point at a person, an animal, or a tile. Click to pin the details open.' },
-  { id: 'light',   key: 'l', label: 'Lightning', hint: 'Click the fire pit to strike it alight. Click anything else, and lightning strikes there: a pine smoulders long enough to fetch an ember, grass burns. The hover card shows what will burn.' },
-  { id: 'camp',    key: 'c', label: 'Camp site', hint: 'Click open ground to move the camp site. Only until the pit is built.' },
-  { id: 'poke',    key: 'p', label: 'Poke',      hint: 'Click a person to make them drop what they are doing and think again. Click an animal to startle it.' },
+  { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
+  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
@@ -37,6 +37,7 @@ const ui = {
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
+  sticky: false,       /* true keeps a one-shot tool selected after it is used */
 };
 const WIN_MAX = 6;
 

@@ -57,7 +57,11 @@ const KEYMAP = [
   { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
 ];
-for (const t of TOOLS) KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
+KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
+for (const t of TOOLS){
+  KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
+  if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
+}
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 

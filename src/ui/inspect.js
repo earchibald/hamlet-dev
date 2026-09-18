@@ -92,9 +92,8 @@ function hideTip(){ tipTarget = null; tipAnchor = null; tipPinned = false; rende
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
-  const same = tipPinned && tipTarget && (t.being ? tipTarget.being === t.being : tipTarget.tile && tipTarget.tile[0] === c.x && tipTarget.tile[1] === c.y && tipTarget.tile[2] === c.z);
-  if (same){ hideTip(); return; }
-  tipTarget = t; tipAnchor = { x: e.clientX, y: e.clientY, left: false }; tipPinned = true; renderTip();
+  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
+  ui.focus = `window:${w.id}`; hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
   if (tipPinned) return;

@@ -246,4 +246,15 @@ test('window keys: O pops out or docks, Esc closes a focused window, Tab walks t
   assert.deepEqual(api.keyAction(ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
 });
 
+test('tools: three, inspect first, light fire and nudge one-shot, no camp site', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['TOOLS', ...KEYS]);
+  assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'nudge']);
+  assert.equal(api.TOOLS[0].oneShot, false); assert.equal(api.TOOLS[1].oneShot, true); assert.equal(api.TOOLS[2].oneShot, true);
+  assert.equal(api.TOOLS[1].label, 'Light fire'); assert.equal(api.TOOLS[2].label, 'Nudge');
+  assert.deepEqual(api.keyAction(ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });
+  assert.deepEqual(api.keyAction(ev('f'), 'window:2'), { action: 'follow', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('f'), 'map'), { action: 'tool', arg: 'light' });
+  assert.equal(api.keyAction(ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
+});
+
 module.exports = { loadUI };
