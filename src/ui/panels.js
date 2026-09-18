@@ -52,7 +52,6 @@ function renderDrawers(){
     DRAWER_RENDER[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
-  document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){
   const rows = drawerRows('people');

@@ -1,7 +1,7 @@
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
 function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
 let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
 function muteChoice(k){
@@ -14,7 +14,7 @@ function openHelp(){
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
-  ui.focus = 'dialog'; $('help').showModal();
+  ui.focus = 'dialog:help'; $('help').showModal();
 }
 
 /* The command palette: every action and every named thing, one search box. */
@@ -34,6 +34,6 @@ function paletteRun(i = palSel){
 /* The stage chord: `g` opens this with one lettered button per reached stage. Built at run time, so its ids are not in the template. */
 function openChord(){
   closeDialogs();
-  $('chordButtons').innerHTML = STAGES.filter(s => stageReached(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
+  $('chordButtons').innerHTML = STAGES.filter(s => stagesShown().includes(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
   ui.focus = 'dialog:chord'; $('chord').showModal();
 }

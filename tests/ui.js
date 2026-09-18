@@ -134,7 +134,7 @@ test('the view key changes when the world does, and holds still when nothing doe
   for (let i = 0; i < 300; i++) api.step(); assert.notEqual(api.viewKey(), k1);
 });
 
-test('stages: an idle recipe folds, an idle standing goal written by hand does not', () => {
+test('stages: every idle goal folds, a recipe or one written by hand, and the stage counts them', () => {
   const api = day21();
   api.camp.tools.rod = true; api.camp.stash.fish = 4;
   const byId = {}; for (const s of api.stages(false)) for (const x of s.goals) byId[x.g.id] = x;
@@ -142,7 +142,9 @@ test('stages: an idle recipe folds, an idle standing goal written by hand does n
   assert.equal(byId.fish.hidden, true, 'an idle recipe folds');
   const hand = byId.water && byId.water.st.s === 'idle' ? byId.water : byId.guard;
   assert.equal(hand.st.s, 'idle');
-  assert.equal(hand.hidden, false, 'an idle standing goal stays on the list');
+  assert.equal(hand.hidden, true, 'an idle standing goal folds too');
+  for (const s of api.stages(false)) assert.equal(s.idle, s.goals.filter(x => x.st.s === 'idle').length, `${s.id} counts its idle goals`);
+  for (const s of api.stages(true)) for (const x of s.goals) assert.equal(x.hidden, false, 'All shows every goal');
 });
 
 const KEYS = ['KEYMAP', 'keyAction', 'keyName', 'ACTIONS'];
@@ -220,13 +222,13 @@ test('keyName prints the modifiers: \u2318K, Ctrl+K, Shift+F, Shift+Alt+1, and n
   assert.equal(api.keyName(named('Help')[0]), '?');
   assert.equal(api.keyName(named('Step one hour')[0]), '>');
   assert.equal(api.keyName(named('New world')[0]), 'Ctrl+N');
-  assert.equal(api.keyName(named('A sector west')[0]), 'Ctrl+\u2190');
+  assert.equal(api.keyName(named('West edge, then a sector west')[0]), 'Alt+\u2190');
   assert.equal(api.keyName(named('Previous panel')[0]), 'Shift+Tab');
 });
 
 test('Esc answers from every focus: the map, a drawer, a window, and each dialog', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  for (const focus of ['map', 'drawer:goals', 'window:3', 'dialog:mute', 'dialog:palette', 'dialog', 'dialog:chord']){
+  for (const focus of ['map', 'drawer:goals', 'window:3', 'dialog:mute', 'dialog:palette', 'dialog:help', 'dialog:start', 'dialog:chord']){
     const hit = api.keyAction(ev('Escape'), focus);
     assert.ok(hit, `Esc from ${focus} finds no row`);
     assert.equal(hit.action, 'back', `Esc from ${focus} runs ${hit.action}`);
@@ -298,7 +300,7 @@ test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter a
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
   assert.deepEqual(keyHit(api, ev('ArrowRight'), 'map'), { action: 'cursor', arg: [1, 0, 1] });
   assert.deepEqual(keyHit(api, ev('ArrowRight', { shiftKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 5] });
-  assert.deepEqual(keyHit(api, ev('ArrowRight', { ctrlKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 'sector'] });
+  assert.deepEqual(keyHit(api, ev('ArrowRight', { altKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 'edge'] });
   assert.deepEqual(keyHit(api, ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
   assert.deepEqual(keyHit(api, ev('Home'), 'map'), { action: 'home', arg: undefined });
   assert.deepEqual(keyHit(api, ev('w'), 'map'), { action: 'worldHere', arg: undefined });
@@ -389,7 +391,7 @@ test('palette and chord keys', () => {
 /* The feedback pass. */
 test('a focused row wins over an any row, whatever the order in the table', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  assert.equal(api.keyAction(ev('Escape'), 'dialog').focus, 'dialog', 'the dialog row answers, not the any row above it');
+  assert.equal(api.keyAction(ev('Escape'), 'dialog:help').focus, 'dialog:help', 'the dialog row answers, not the any row above it');
   assert.equal(api.keyAction(ev('Escape'), 'map').focus, 'any');
   assert.deepEqual(keyHit(api, ev('f'), 'window:2'), { action: 'follow', arg: undefined });
   assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'window:2'), { action: 'follow', arg: undefined }, 'Shift+F in a window does not stick Light fire');
@@ -442,6 +444,52 @@ test('opening a sector keeps a cursor that is already in it, and carries the off
   const mid = { x: 2 * LW + (LW >> 1), y: 1 * LH + (LH >> 1), z: 0 };
   assert.deepEqual(api.cursorInSector(mid, 2, 1), mid, 'the hovered centre stays');
   assert.deepEqual(api.cursorInSector({ x: 3, y: 4, z: 0 }, 2, 1), { x: 2 * LW + 3, y: 1 * LH + 4, z: 0 }, 'the offset is carried');
+});
+
+test('no row asks for Ctrl with an arrow: macOS takes those for Mission Control', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  for (const k of api.KEYMAP) assert.ok(!(k.ctrl && k.key.startsWith('Arrow')), `${k.label} uses Ctrl with an arrow`);
+});
+
+test('Enter makes the world only in Start, and does nothing of its own in help', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(keyHit(api, ev('Enter'), 'dialog:start'), { action: 'makeWorld', arg: undefined });
+  assert.equal(api.keyAction(ev('Enter'), 'dialog:help'), null, 'Enter in help is the browser\u2019s: it presses the focused Close button');
+  assert.equal(typeof api.ACTIONS.makeWorld, 'function');
+});
+
+test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a time along that edge', () => {
+  const api = loadUI(['state', 'derive'], CURSOR); api.startWorld('r');
+  const { LW, LH, W, H } = api, at = (x, y) => ({ x, y, z: 0 });
+  const c = at(2 * LW + 7, 1 * LH + 4);
+  const w1 = api.cursorAfter(c, -1, 0, 'edge', 'loc'); assert.deepEqual(w1, at(2 * LW, 1 * LH + 4), 'first press: the leftmost column, same row');
+  const w2 = api.cursorAfter(w1, -1, 0, 'edge', 'loc'); assert.deepEqual(w2, at(1 * LW, 1 * LH + 4), 'second press: the next sector over, its leftmost column');
+  const w3 = api.cursorAfter(w2, -1, 0, 'edge', 'loc'); assert.deepEqual(w3, at(0, 1 * LH + 4));
+  assert.deepEqual(api.cursorAfter(w3, -1, 0, 'edge', 'loc'), w3, 'the world\u2019s edge holds');
+  const e1 = api.cursorAfter(c, 1, 0, 'edge', 'loc'); assert.deepEqual(e1, at(3 * LW - 1, 1 * LH + 4), 'east: the rightmost column');
+  assert.deepEqual(api.cursorAfter(e1, 1, 0, 'edge', 'loc'), at(4 * LW - 1, 1 * LH + 4), 'then the next sector\u2019s rightmost column');
+  const n1 = api.cursorAfter(c, 0, -1, 'edge', 'loc'); assert.deepEqual(n1, at(2 * LW + 7, 1 * LH), 'north: the top row, same column');
+  assert.deepEqual(api.cursorAfter(n1, 0, -1, 'edge', 'loc'), at(2 * LW + 7, 0));
+  const s1 = api.cursorAfter(c, 0, 1, 'edge', 'loc'); assert.deepEqual(s1, at(2 * LW + 7, 2 * LH - 1), 'south: the bottom row');
+  assert.deepEqual(api.cursorAfter(s1, 0, 1, 'edge', 'loc'), at(2 * LW + 7, 3 * LH - 1));
+  assert.deepEqual(api.cursorAfter(at(W - 1, H - 1), 1, 0, 'edge', 'loc'), at(W - 1, H - 1));
+  assert.deepEqual(api.cursorAfter(c, -1, 0, 'edge', 'world'), at(1 * LW + 7, 1 * LH + 4), 'in the nearby and world views it is a plain sector step');
+});
+
+test('a reached stage shows when it has a row to show or a goal done, not when its only news is a folded idle goal', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'stagesShown', 'stageReached']);
+  api.startWorld('r');
+  let lit = false;
+  for (let i = 0; i < 3 * 1000; i++){ api.step(); if (!lit && api.camps[0].pit){ api.camp = api.camps[0]; api.lightTile(...api.camps[0].pit); lit = true; } }
+  api.camp = api.camps[0];
+  const guard = api.GOALS.find(g => g.id === 'guard');
+  assert.ok(api.camp.pit, 'seed r has a pit by day 3'); assert.equal(api.goalState(guard).s, 'idle', 'and no wolf is near');
+  assert.equal(api.stageReached('settlement'), true, 'the sim calls it reached, since guard is not blocked');
+  assert.ok(!api.stages(false).some(s => s.id === 'settlement'), 'the drawer does not show a stage that holds only a folded idle goal');
+  assert.ok(!api.stagesShown().includes('settlement'), 'and the chord and the palette agree');
+  assert.ok(api.stages(true).some(s => s.id === 'settlement'), 'All shows every stage');
+  for (const s of api.stages(false)) assert.ok(s.done > 0 || s.goals.some(x => !x.hidden), `${s.id} shows with nothing to show`);
+  assert.deepEqual(api.stagesShown(), api.stages(false).map(s => s.id));
 });
 
 test('the legends drawer lists every line of the creation, oldest first', () => {

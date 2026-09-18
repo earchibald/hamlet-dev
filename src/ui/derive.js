@@ -180,19 +180,21 @@ function alerts(){
   return out;
 }
 
-/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle recipes fold. */
+/* Goals by stage. A stage shows when the sim calls it reached and it has a row to show or a goal done. A folded idle goal alone does not open it. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle goals fold to a count too. */
 function stages(showAll){
   const byId = Object.fromEntries(GOALS.map(g => [g.id, g]));
-  return STAGES.filter(s => showAll || stageReached(s.id)).map(s => {
+  return STAGES.map(s => {
     const goals = GOALS.filter(g => g.stage === s.id).map(g => {
       const st = goalState(g), pr = goalPriority[g.id] ?? 1;
       const preq = g.after && byId[g.after];
-      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      const hidden = !showAll && (st.s === 'done' || st.s === 'idle' || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
     return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
-  });
+  }).filter(s => showAll || (stageReached(s.id) && (s.done > 0 || s.goals.some(x => !x.hidden))));
 }
+/* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
+const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
 /* People of the current camp, trouble first. The dead leave the list at once until a death stamp exists. */
 function peopleRows(){
@@ -243,8 +245,17 @@ function viewKey(){
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
-/* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
+/* Where the cursor lands after a move. mult is a number of tiles, 'sector', or 'edge'. In the nearby and world views every step is a sector.
+   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there. */
 function cursorAfter(c, dx, dy, mult, view){
+  if (mult === 'edge' && view === 'loc'){
+    const s = secOf(c.x, c.y);
+    const ex = dx < 0 ? s.sx * LW : dx > 0 ? (s.sx + 1) * LW - 1 : c.x, ey = dy < 0 ? s.sy * LH : dy > 0 ? (s.sy + 1) * LH - 1 : c.y;
+    if (ex !== c.x || ey !== c.y) return { x: ex, y: ey, z: c.z };
+    const nx = c.x + dx * LW, ny = c.y + dy * LH;
+    return nx < 0 || ny < 0 || nx >= W || ny >= H ? { x: c.x, y: c.y, z: c.z } : { x: nx, y: ny, z: c.z };
+  }
+  if (mult === 'edge') mult = 'sector';
   const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
@@ -308,7 +319,7 @@ function paletteRows(){
   if (!inAges()) camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
   if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
   for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
-  if (!inAges()) for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  if (!inAges()) for (const s of STAGES) if (stagesShown().includes(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
   for (const g of gods()) out.push({ label: `Inspect ${g.name} ${g.epithet}`, key: '', action: 'inspect', arg: g.id, group: 9 });
   return out;
 }

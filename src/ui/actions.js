@@ -154,7 +154,8 @@ const ACTIONS = {
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
-  start(){ openStart(); },
+  /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
+  makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
