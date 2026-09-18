@@ -12,6 +12,6 @@
     "bless": "UPDATE_GOLDEN=1 node tests/soak.js",
     "trace": "node tests/trace-deaths.js",
     "ages": "node --test tests/ages.js",
-    "fast": "node --test tests/field.js tests/gods.js tests/ages.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js"
+    "fast": "node --test tests/field.js tests/gods.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js tests/ui.js"
   }
 }

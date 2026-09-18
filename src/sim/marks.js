@@ -27,13 +27,18 @@ const BIOME_OF = [
   { needs: ['wet', 'moving'], biome: 'river' },
   { needs: ['wet', 'still'], biome: 'wetland' },
   { needs: ['wet'], biome: 'wetland' },
-  { needs: ['dry', 'above'], biome: 'rocky' },
   { needs: ['dry', 'cold'], biome: 'forest' },
+  { needs: ['dry', 'dark'], biome: 'forest' },
   { needs: ['dry', 'hot'], biome: 'meadow' },
+  { needs: ['dry', 'light'], biome: 'meadow' },
+  { needs: ['dry', 'above'], biome: 'rocky' },
   { needs: [], biome: 'meadow' },
 ];
 function biomeOf(r){
   if (hasMark(r, 'scar', 'burned')) return 'ash';
+  /* A hide mark is the dark pole for this purpose. Trees grow where a god hid something, as much as where
+     it is cold, so long as no heat or sight pole already speaks for the ground. */
+  if (hasPole(r, 'dry') && !poleOf(r, 'heat') && !poleOf(r, 'sight') && hasMark(r, 'hide')) return 'forest';
   for (const row of BIOME_OF) if (row.needs.every(p => hasPole(r, p))) return row.biome;
   return 'meadow';
 }

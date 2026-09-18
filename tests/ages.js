@@ -40,6 +40,10 @@ for (const seed of SEEDS){
     assert.ok(api.legends.length >= 5);
     assert.ok(ms < 3000, `${ms} ms is too slow for a creation`);
     if (SOAK_SEEDS.includes(seed)) assert.equal(c.backstops, 0, 'the backstop fired on a soak seed');
+    assert.ok(api.liveRegions().some(r => api.marksOf(r, 'height').length), 'nothing raised');
+    assert.ok(api.liveRegions().some(r => api.marksOf(r, 'depth').length), 'nothing dug');
+    /* Every kind of life, not every species: a valley with foxes and no wolves is a gentler valley, not a broken one. */
+    for (const kind of api.KINDS) assert.ok(species.some(sp => api.SPECIES[sp][kind]), `seed ${seed} never made a ${kind}`);
   });
 }
 

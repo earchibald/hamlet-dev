@@ -24,6 +24,8 @@ function makeBeing(species, x, y, name, hue){
 }
 const beingById = id => beings.find(b => b.id === id);
 const humans = () => beings.filter(b => b.species === 'human' && b.alive);
+/* The first person of the world. The gods come into being before the people, so beings[0] is a god. */
+const firstPerson = () => beings.find(b => b.species === 'human');
 function addThought(a, key, text, value, dur){
   const t = a.thoughts.find(t => t.key === key);
   if (t){ t.left = dur; t.value = value; t.text = text; } else a.thoughts.push({ key, text, value, left: dur });

@@ -36,6 +36,10 @@ function notePulses(){
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
+    /* A legend of the ages carries its age and stands at tick 0. It is the story of the creation, not something
+       that just happened to the camp, so it never becomes a chip. Without this the first day opens with a
+       chipful of mingles and makings, several of them word for word the same line. */
+    if (e.age !== undefined) continue;
     if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500, being: pulseWho(e.text) });
   }
   ui.seenTick = chronicle.length ? chronicle[0].tick : ui.seenTick;
@@ -144,7 +148,7 @@ function cursorAfter(c, dx, dy, mult, view){
 /* One phrase for what is under the cursor. A being first, then the tile. */
 function cursorPhrase(){
   const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
-  if (a) return `${a.name}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
+  if (a) return `${a.name}${a.species === 'god' ? ' ' + a.epithet : ''}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
   if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
   const t = tileAt(cursor.x, cursor.y, cursor.z), parts = [];
   if (t.struct) parts.push(t.struct.type === 'firepit' ? (t.struct.lit ? 'the hearth, burning' : 'the fire pit, cold') : t.struct.type);

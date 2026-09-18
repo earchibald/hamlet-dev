@@ -6,7 +6,7 @@ const { load } = require('../src/sim');
 /* A camp that has come far enough to craft: site, lit pit, three-day hearth, the axe, and a person standing by the stash. */
 function readyCamp(seed = 'r'){
   const api = load(); api.startWorld(seed);
-  const a = api.beings[0]; const c = api.camps[0]; api.camp = c;
+  const a = api.firstPerson(); const c = api.camps[0]; api.camp = c;
   api.setSite(a.x, a.y);
   const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
   c.everLit = true; c.bestStreak = 4000; c.tools.axe = 1;

@@ -5,24 +5,37 @@ const { load } = require('../src/sim');
 const { runDays, cutOff } = require('./lib/run');
 const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
 
-for (const seed of SEEDS) test(`seed ${seed}: two or three gnome burrows under the meadow edges, with mushrooms and gnomes at home`, () => {
+/* A burrow is dug in the country where a god made gnomes, and the burrows of one country stand thirty tiles
+   apart, so a small country holds one where a wide one holds three. A country with no room holds none, and then
+   that country's gnomes were never made into the world; `some test seed digs burrows` keeps that honest. */
+for (const seed of SEEDS) test(`seed ${seed}: the gnome burrows stand in a made country, with mushrooms and gnomes at home`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const burrows = api.caves.filter(c => c.kind === 'burrow');
-  assert.ok(burrows.length >= 2 && burrows.length <= 3, `${burrows.length} burrows`);
-  const start = api.beings[0]; const region = api.reachable(start.x, start.y, 0, full);
+  const made = api.liveRegions().some(r => api.marksOf(r, 'making').some(m => m.value === 'gnome'));
+  if (!made){ assert.equal(burrows.length, 0, 'burrows where no god made gnomes'); return; }
+  assert.ok(burrows.length <= 3, `${burrows.length} burrows`);
+  const start = api.firstPerson(); const region = api.reachable(start.x, start.y, 0, full);
   for (const c of burrows){
     assert.equal(c.owner, 'gnome');
     assert.ok(c.mouth.slope && c.mouth.z === -1 && c.exit && c.exit.mouth === c);
     assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), 'the burrow opens onto the walkable world');
     assert.ok(api.dist(c.exit.x, c.exit.y, start.x, start.y) >= 25, 'not beside the start');
-    assert.equal(api.sectorOfTile(c.exit).biome, 'meadow');
+    assert.ok(api.GROWS[api.sectorOfTile(c.exit).biome], 'a burrow where nothing grows');
     assert.ok(c.patch.length >= 4 && c.patch.every(t => t.feature === 'mushrooms' && api.dist(t.x, t.y, c.exit.x, c.exit.y) <= 3), 'a mushroom patch by the mouth');
     const kin = api.beings.filter(b => b.species === 'gnome' && b.den === c);
     assert.ok(kin.length >= 2 && kin.length <= 3, `${kin.length} gnomes`);
     for (const g of kin) assert.ok(c.tiles.some(t => t.x === g.x && t.y === g.y && t.z === g.z), 'each gnome starts in its burrow');
   }
   assert.ok(api.LIFE.gnome && api.SPECIES.gnome && api.SPECIES.gnome.glyph === 'g');
+});
+
+test('every test seed whose gods made gnomes digs them a burrow', () => {
+  for (const seed of SEEDS){
+    const api = load(); api.startWorld(seed);
+    if (!api.liveRegions().some(r => api.marksOf(r, 'making').some(m => m.value === 'gnome'))) continue;
+    assert.ok(api.caves.some(c => c.kind === 'burrow'), `seed ${seed} made gnomes and dug no burrow`);
+  }
 });
 
 test('gnomes start young: every gnome on seed r is between 20 and 35 days old at the start', () => {
@@ -70,7 +83,7 @@ test('gnomes sleep in the burrow by day and come out to the patch at dusk', () =
 
 test('a gnome fears a brand and a wolf, and never attacks', () => {
   const api = load(); api.startWorld('r');
-  const g = api.beings.find(b => b.species === 'gnome'); const h = api.beings[0];
+  const g = api.beings.find(b => b.species === 'gnome'); const h = api.firstPerson();
   g.x = h.x + 2; g.y = h.y; g.z = 0; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 };
   assert.ok(api.threatsFor(g).length > 0, 'a brand is a threat');
   h.carrying = null; assert.equal(api.threatsFor(g).length, 0, 'a bare person is not');
@@ -85,20 +98,22 @@ test('a gnome fears a brand and a wolf, and never attacks', () => {
 });
 
 test('the first gnome seen at dusk is written down once per camp', () => {
-  const api = load(); api.startWorld('r'); const c = api.camps[0]; const h = api.beings[0];
+  const api = load(); api.startWorld('r'); const c = api.camps[0]; const h = api.firstPerson();
   const g = api.beings.find(b => b.species === 'gnome'); g.x = h.x + 3; g.y = h.y; g.z = 0; g.asleep = false;
+  /* A pine between the two of them hides the gnome, so the three tiles east of the person are cleared by hand. */
+  for (let k = 1; k <= 3; k++){ const t = api.tileAt(h.x + k, h.y); t.feature = null; t.struct = null; if (!api.GROUND[t.ground].walk) t.ground = 'grass'; }
   /* Hour 20 of day 20, and one tick past it so (tick + h.id) is even: Hal's stride of 2
-     must land on this tick, or the single updateBeing call below never reaches chooseTask
-     at all, and a bystanding "picks a spot for the camp" log would otherwise beat the sighting to chronicle[0]. */
+     must land on this tick, or the single updateBeing call below never reaches chooseTask at all. */
   api.tick = 20 * 1000 + Math.round(20 / 24 * 1000) + 1; api.camp = c; api.updateBeing(h);
   assert.equal(c.gnomes.known, true);
-  assert.ok(api.chronicle[0].text.includes('small figure'), api.chronicle[0].text);
+  /* The person may pick a camp site on the same tick, so the sighting is looked for in the chronicle, not at its head. */
+  assert.equal(api.chronicle.filter(e => e.text.includes('small figure')).length, 1, api.chronicle.map(e => e.text).join(' | '));
   assert.equal(api.goalState(api.GOALS.find(g => g.id === 'gnomes')).s, 'active');
 });
 
 test('gnomes copy a workshop, borrow a pot at night, and bring it back with a gift two days later', () => {
   const api = load(); api.startWorld('r');
-  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c; const h = api.beings[0];
+  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c; const h = api.firstPerson();
   /* Put the camp beside the burrow with a workshop and a pot. */
   api.setSite(burrow.exit.x + 3, burrow.exit.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
   c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.everLit = true;
@@ -113,7 +128,8 @@ test('gnomes copy a workshop, borrow a pot at night, and bring it back with a gi
   api.tick = api.tick + 2 * 1000 + 10; g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
   assert.ok(api.START.repay(g), 'the repayment should start');
   for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
-  assert.equal(c.stash.pot, 1); assert.equal(burrow.holding, null);
+  /* The pot comes home, and the gift beside it may be another pot. */
+  assert.ok(c.stash.pot >= 1, 'the pot never came back'); assert.equal(burrow.holding, null);
   assert.ok(c.stash.cord + c.stash.clay + c.stash.pot >= 2, 'a gift beside it');
   assert.ok(api.chronicle.some(e => e.text.includes('Neighbours, then')));
 });
@@ -156,7 +172,11 @@ test('a gnome does not borrow again for six days after repaying', () => {
 
 test('a village within thirty tiles is too loud: the gnomes dig a new hole farther away within three days', () => {
   const api = load(); api.startWorld('r');
-  const burrow = api.caves.find(c => c.kind === 'burrow'); const c = api.camps[0]; api.camp = c;
+  /* The on-demand dig can fail on a crowded map (design/notes.md, Known weak spots), so take the first burrow
+     whose gnomes are still at home. */
+  const burrows = api.caves.filter(c => c.kind === 'burrow');
+  const burrow = burrows.find(b => api.beings.some(g => g.species === 'gnome' && g.den === b)) || burrows[0];
+  const c = api.camps[0]; api.camp = c;
   api.setSite(burrow.exit.x + 4, burrow.exit.y); c.village = true;
   const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
   api.tick = 5 * 1000;

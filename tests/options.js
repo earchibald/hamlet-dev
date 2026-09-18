@@ -21,7 +21,7 @@ test('a wider level range makes more levels, and the surface is still level 0', 
 test('a bigger world generates, and the first person can reach water', () => {
   const api = load(); api.startWorld('r', { sw: 12, sh: 8 });
   assert.equal(api.W, 336); assert.equal(api.H, 160); assert.equal(api.sectors.length, 96);
-  const a = api.beings[0]; assert.equal(a.species, 'human');
+  const a = api.beings.find(b => b.species === 'human');
   const wet = (x, y, z) => z === 0 && api.passable(x, y, 0) && [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => api.hasTile(x + dx, y + dy, 0) && api.tileAt(x + dx, y + dy).ground === 'water');
   assert.ok(api.bfs(a.x, a.y, 0, wet, api.NZ * api.W * api.H), 'no path from the first person to water');
   for (let i = 0; i < 1000; i++) api.step();
@@ -39,7 +39,7 @@ test('one engine can start a big world and then a small one', () => {
   assert.equal(api.W, 336);
   api.startWorld('r');
   assert.equal(api.W, 280); assert.equal(api.world.length, 280 * 120);
-  const a = api.beings[0];
+  const a = api.beings.find(b => b.species === 'human');
   const region = api.reachable(a.x, a.y, 0, api.NZ * api.W * api.H);
   assert.ok(region.size > 1000, 'the search buffers were not re-sized for the smaller world');
 });

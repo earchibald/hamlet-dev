@@ -5,7 +5,7 @@ One line per start option and per future setting. Add a line the day the hook is
 | Setting | Owner spec | State | Notes |
 |---|---|---|---|
 | `sw`, `sh` (world size in sectors) | mythos, section 7 | hook | Defaults 10 and 6. startWorld(seed, { sw, sh }). The UI passes {}. The canvases are sized at page load, so an options control must resize them. |
-| `zmin`, `zmax` (level range) | mythos, section 7 | hook | Defaults −2 and 2. startWorld(seed, { zmin, zmax }). Generation still cuts caves to −2 and raises two storeys, so setOptions refuses a range narrower than the default with a sentence. tests/terrain.js still hardcodes the default range and width; it reads the options in plan 2. |
+| `zmin`, `zmax` (level range) | mythos, section 7 | hook | Defaults −2 and 2. startWorld(seed, { zmin, zmax }). The painters cap storeys and levels by the range: a height mark of value n raises `min(n, ZMAX)` storeys, and a depth mark of value n cuts `min(n, -ZMIN)` levels. setOptions refuses a range narrower than the default with a sentence, because the day era's caves and hills still want it. tests/terrain.js reads the range. |
 | `ageLimit` | mythos, section 4 | hook | Default 200. startWorld and startCreation take it. Past it the backstop acts once an age; at twice it the creation is marked failed. |
 | Pace of the ages, hurry to settle | mythos, section 6 | hook | runAges(max) runs to settle in Node; the page steps ages in plan 4. |
 | Speeds in the day era | topography, god interface | built | 1, 4, 16, 64. |

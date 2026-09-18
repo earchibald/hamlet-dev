@@ -11,11 +11,11 @@ function resetState(seed, opts){
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
+/* Every world begins with its creation. The ages run to settle, and settle paints the valley and opens the days. */
 function startWorld(seed, opts = {}){
   resetState(seed, opts);
-  generate();
-  const a = beings[0];
-  log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+  beginCreation();
+  runAges();
 }
 
 /* ---------- god actions ---------- */
@@ -39,6 +39,9 @@ function lightTile(x, y, z = 0){
 }
 function poke(a){
   if (!a.alive) return 'Nothing stirs.';
+  /* A sleeping god is a being in the list like any other, and a nudge would startle it awake and set it wandering.
+     What wakes a god is its own rule, and it is not built yet (the spec's section 5). Until then the door refuses. */
+  if (a.species === 'god') return `${a.name} sleeps on, ${a.epithet}. A nudge from above does not wake a god.`;
   if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + 400; addThought(a, 'poked', 'Felt a nudge from above', 2, 400); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
   failTask(a); a.asleep = false; a.task = null; START.flee(a) || START.wander(a); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
@@ -55,6 +58,7 @@ function updateWorld(){
   denTick();
   gnomeTick();
   spawnWildlife();
+  godsTick();
 }
 /* In the gods era a step is an age. In the days era it is a tick. A species with perTick false is not
    stepped by the tick: the gods keep their own clock. */
@@ -62,5 +66,5 @@ function step(){
   if (era === 'gods') return ageStep();
   tick++; updateWorld(); camp = camps[0];
   for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
-  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human');
+  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }

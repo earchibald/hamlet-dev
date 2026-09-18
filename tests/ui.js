@@ -93,6 +93,20 @@ test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', () 
   assert.ok(!api.alerts().some(x => x.type === 'event' && x.text.includes('Test comes over the hills')), 'pulse gone');
 });
 
+/* The creation writes a chronicle full of major lines, all of them at tick 0 and all carrying an age. They are
+   the story of the world, not news from the camp, and several read word for word the same. */
+test('a legend of the ages is never a chip', () => {
+  const api = loadUI(['state', 'derive', 'keys'], DERIVE);
+  api.startWorld('r'); api.camp = api.camps[0]; api.notePulses();
+  const said = new Set(api.legends.map(e => e.text));
+  assert.ok(said.size > 5, 'no legends to test with');
+  assert.deepEqual(api.ui.pulses.filter(p => said.has(p.text)), [], 'a legend of the ages became a chip');
+  /* The one day-era line written at tick 0 is the person walking in, and that one is news. */
+  assert.deepEqual(api.ui.pulses.map(p => p.text).filter(t => !/walks alone into the/.test(t)), []);
+  const labels = api.alerts().filter(x => x.type === 'event').map(x => x.text);
+  assert.equal(new Set(labels).size, labels.length, 'the same chip twice');
+});
+
 test('stages: only reached stages show, done goals fold, and a blocked goal shows only after its prerequisite', () => {
   const api = day21(); const st = api.stages(false);
   assert.ok(st.length >= 4 && st.length <= 7);
@@ -333,7 +347,7 @@ test('chip keys: Alt+n jumps, Shift+Alt+n opens the mute menu, and a single chip
   assert.deepEqual(keyHit(api, ev('3', { altKey: true }), 'map'), { action: 'jumpChip', arg: 3 });
   assert.deepEqual(keyHit(api, ev('3', { altKey: true, shiftKey: true }), 'drawer:goals'), { action: 'muteMenu', arg: 3 });
   assert.deepEqual(keyHit(api, ev('2'), 'dialog:mute'), { action: 'muteChoice', arg: 2 });
-  api.startWorld('r'); api.camp = api.camps[0]; const a = api.beings[0]; a.needs.warmth = 10; api.notePulses();
+  api.startWorld('r'); api.camp = api.camps[0]; const a = api.firstPerson(); a.needs.warmth = 10; api.notePulses();
   const cold = api.alerts().find(x => x.type === 'cold'); assert.ok(cold);
   api.mute('cold', api.camp.id, cold.text);
   assert.equal(api.alerts().some(x => x.type === 'cold'), false, 'that one chip is muted');
@@ -347,7 +361,7 @@ test('palette rows list every static action once with its key, and the dynamic r
   const labels = rows.map(r => r.label);
   assert.equal(new Set(labels).size, labels.length, 'no label twice');
   assert.ok(labels.includes('Help'));
-  assert.ok(labels.includes(`Inspect ${api.beings[0].name}`));
+  assert.ok(labels.includes(`Inspect ${api.firstPerson().name}`));
   assert.ok(labels.includes('Stock food: High'));
   assert.ok(labels.some(l => /^Go to .* \d+,\d+$/.test(l)), 'a sector row');
   for (const r of rows.filter(r => r.action === 'help')) assert.equal(r.key, '?');
