@@ -107,8 +107,21 @@ test('people rows put trouble first, and the camp summary lists the stash as pai
   const c = api.campSummary(); assert.ok(Array.isArray(c.stash)); assert.ok(c.stash.every(p => p.length === 2 && p[1] > 0)); assert.ok(c.tools.includes('axe'));
 });
 
-test('the view key changes when the world does', () => {
-  const api = day21(); const k1 = api.viewKey(); for (let i = 0; i < 300; i++) api.step(); assert.notEqual(api.viewKey(), k1);
+test('the view key changes when the world does, and holds still when nothing does', () => {
+  const api = day21(); const k1 = api.viewKey();
+  assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');
+  for (let i = 0; i < 300; i++) api.step(); assert.notEqual(api.viewKey(), k1);
+});
+
+test('stages: an idle recipe folds, an idle standing goal written by hand does not', () => {
+  const api = day21();
+  api.camp.tools.rod = true; api.camp.stash.fish = 4;
+  const byId = {}; for (const s of api.stages(false)) for (const x of s.goals) byId[x.g.id] = x;
+  assert.equal(byId.fish.st.s, 'idle', 'the rod and four fish make fishing idle');
+  assert.equal(byId.fish.hidden, true, 'an idle recipe folds');
+  const hand = byId.water && byId.water.st.s === 'idle' ? byId.water : byId.guard;
+  assert.equal(hand.st.s, 'idle');
+  assert.equal(hand.hidden, false, 'an idle standing goal stays on the list');
 });
 
 const KEYS = ['KEYMAP', 'keyAction', 'ACTIONS'];
@@ -137,12 +150,23 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
   assert.equal(api.keyAction(ev('q'), 'map'), null);
 });
 
-test('every template button has a key in the key map', () => {
+/* Buttons rendered by the interface, not by the template. */
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'showAllBtn'];
+
+test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
   const html = fs.readFileSync('src/page.template.html', 'utf8');
-  const ids = [...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]);
-  const keyed = new Set(api.KEYMAP.map(k => k.button).filter(Boolean));
-  for (const id of ids) assert.ok(keyed.has(id), `button #${id} has no key`);
+  for (const m of html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)){
+    const id = (m[0].match(/\bid="([^"]+)"/) || [, m[0]])[1];
+    assert.match(m[1], /<kbd>/, `button #${id} prints no key`);
+  }
+  const ids = new Set([...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
+  for (const k of api.KEYMAP) if (k.button && !RUNTIME.includes(k.button)) assert.ok(ids.has(k.button), `key map names button #${k.button}, which is not in the template`);
+});
+
+test('every key map row has a focus the dispatcher knows', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'dialog'].includes(k.focus), `${k.key} has focus ${k.focus}`);
 });
 
 test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {

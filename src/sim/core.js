@@ -116,7 +116,7 @@ const STAGES = [
   { id: 'tools',      label: 'Tools' },
   { id: 'shelter',    label: 'Shelter' },
   { id: 'crafts',     label: 'Crafts' },
-  { id: 'sprites',    label: 'Sprites' },
+  { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];

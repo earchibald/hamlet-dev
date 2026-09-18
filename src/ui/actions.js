@@ -1,6 +1,8 @@
 /* God actions: tools, view changes, movement, and world control. */
 
-function say(msg){ $('foot').innerHTML = `<span>${msg}</span>`; }
+/* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
+const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
+function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id){
   tool = id;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
@@ -49,7 +51,8 @@ function applyTool(c, e){
 /* The action table. Every key and every click ends here. The only place view state changes. */
 function openDrawer(id, on){
   const has = ui.open.includes(id), want = on === undefined ? !has : on;
-  if (want && !has) ui.open.push(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
+  const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
+  if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : null;
@@ -59,7 +62,7 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ const a = beingById(r.id); const el = document.querySelector(`#drawers [data-being="${r.id}"]`); const rect = el ? el.getBoundingClientRect() : { left: 400, top: 200 }; tipTarget = { being: a.id }; tipAnchor = { x: rect.left, y: rect.top, left: true }; tipPinned = true; renderTip(); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
-  else if (r.kind === 'goal'){ say(inject({ source: 'player', act: 'priority', id: r.id, pri: ((goalPriority[r.id] ?? 1) + 1) % 3 })); renderUI(true); }
+  /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }

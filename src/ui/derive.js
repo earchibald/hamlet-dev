@@ -76,7 +76,7 @@ function stages(showAll){
     const goals = GOALS.filter(g => g.stage === s.id).map(g => {
       const st = goalState(g), pr = goalPriority[g.id] ?? 1;
       const preq = g.after && byId[g.after];
-      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && g.stage === 'crafts') || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
     return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
@@ -123,6 +123,6 @@ function drawerRows(id){
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
   const g = gauges();
-  return [tick >> 4, camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
+  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold)].join('#');
 }

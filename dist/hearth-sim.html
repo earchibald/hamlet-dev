@@ -144,7 +144,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   #chips{flex:1 1 100%;flex-wrap:wrap;overflow:visible}
   .strip .ctl{margin-left:0;flex:1 1 100%}
 }
-@media (max-width:800px){#drawers{width:min(92vw,330px)}}
+/* Below 800 px a drawer is a full-height overlay, and only one is open. */
+@media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
 [hidden]{display:none !important}
 </style>
 </head>
@@ -170,7 +171,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
-      <span id="nav"><button class="btn small" id="nW">◀</button><button class="btn small" id="nN">▲</button><button class="btn small" id="nS">▼</button><button class="btn small" id="nE">▶</button></span>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>←</kbd></button><button class="btn small" id="nN">▲<kbd>↑</kbd></button><button class="btn small" id="nS">▼<kbd>↓</kbd></button><button class="btn small" id="nE">▶<kbd>→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
@@ -330,7 +331,7 @@ const STAGES = [
   { id: 'tools',      label: 'Tools' },
   { id: 'shelter',    label: 'Shelter' },
   { id: 'crafts',     label: 'Crafts' },
-  { id: 'sprites',    label: 'Sprites' },
+  { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
@@ -2542,7 +2543,7 @@ const GOALS = [
       return { s: ready ? 'active' : 'blocked', text: `${campHumans().length}/5 people, camp ${Math.floor((tick - camp.founded) / DAY)}/8 days old. Parties leave in spring or summer. Two go with coals and food.` };
     },
     offers(a){ if (!camp.shelter || camp.sentParty || camps.length >= 6 || campHumans().length < 5 || tick - camp.founded <= 8 * DAY || !(seasonOf() === 'spring' || seasonOf() === 'summer') || a.traits.bravery < 0.5) return []; return [{ label: 'lead a party to a new valley', score: 40, start: a => startFoundCamp(a) }]; } },
-  { id: 'caves', title: 'Search the caves', stage: 'settlement',
+  { id: 'caves', title: 'Search the caves', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
@@ -2561,7 +2562,7 @@ const GOALS = [
       }
       return out;
     } },
-  { id: 'dens', title: 'Clear a den', stage: 'settlement',
+  { id: 'dens', title: 'Clear a den', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
@@ -2950,6 +2951,7 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
 };
 
@@ -3047,7 +3049,7 @@ function stages(showAll){
     const goals = GOALS.filter(g => g.stage === s.id).map(g => {
       const st = goalState(g), pr = goalPriority[g.id] ?? 1;
       const preq = g.after && byId[g.after];
-      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && g.stage === 'crafts') || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
     return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
@@ -3094,14 +3096,14 @@ function drawerRows(id){
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
   const g = gauges();
-  return [tick >> 4, camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
+  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold)].join('#');
 }
 
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog. 'speedrow' never fires; it exists so the speed buttons print a key.
+   'dialog' only inside a dialog.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
 const DRAWERS = [
   { id: 'people',    label: 'People',    key: '1' },
@@ -3142,7 +3144,6 @@ const KEYMAP = [
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
 ];
 for (const t of TOOLS) KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
-for (const s of [1, 4, 16, 64]) KEYMAP.push({ key: '-', focus: 'speedrow', action: 'speed', arg: s, label: `${s}×`, button: `speed${s}` });
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 
@@ -3151,7 +3152,6 @@ function keyAction(e, focus){
   const kind = focus.startsWith('drawer:') ? 'drawer' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   for (const k of KEYMAP){
-    if (k.focus === 'speedrow') continue;
     if (k.focus !== 'any' && k.focus !== kind) continue;
     if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
     if (k.key.length > 1 && !!k.shift !== e.shiftKey) continue;
@@ -3428,15 +3428,20 @@ function gaugeHTML(id, g){
   if (!g) return '';
   return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
 }
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function chipHTML(a){
   const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.text.replace(/"/g, '&quot;')}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
 }
-function renderStrip(){
+/* The clock runs on every gate tick, not on the view key, so the time never freezes. */
+function renderClock(){
   $('clock').textContent = stamp();
   $('season').textContent = seasonLine();
   const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
+}
+function renderStrip(){
+  renderClock();
   $('campName').textContent = camp.name + (camp.village ? ', a village' : '');
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
@@ -3450,6 +3455,8 @@ function renderStrip(){
 function renderUI(force){
   if (!viewCamp || !camps.includes(viewCamp)) viewCamp = camps[0];
   camp = viewCamp;
+  /* The clock and the foot run every tick. The view key does not know the wall clock. */
+  renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   const s = sectors[secIdx(cur.sx, cur.sy)];
@@ -3466,16 +3473,34 @@ function renderUI(force){
   }
   renderTip();
   renderDrawers();
-  renderFoot();
 }
 const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
 const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
+/* The header and the filter row of a drawer. Built once, then kept. */
+function drawerHTML(d){
+  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button></div>`
+    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
+  return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
+}
+/* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
   $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
-  const html = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2><span>${d.label}<span class="muted" id="count-${id}"></span></span><span class="k">${d.key} · ↑↓ · ⏎</span></h2>${id === 'chronicle' ? `<div class="filter"><button class="btn small ${ui.chronFilter === 'all' ? 'on' : ''}" data-filter="all">All</button><button class="btn small ${ui.chronFilter === 'major' ? 'on' : ''}" data-filter="major">Major</button></div>` : ''}${id === 'goals' ? `<div class="filter"><button class="btn small ${ui.showAll ? 'on' : ''}" id="showAllBtn">All<kbd>A</kbd></button></div>` : ''}<div class="body" id="body-${id}"></div></section>`; }).join('');
-  const keep = {}; for (const b of document.querySelectorAll('#drawers .body')) keep[b.id] = b.scrollTop;
-  $('drawers').innerHTML = html;
-  for (const id of ui.open){ const el = $(`body-${id}`); ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el); if (keep[el.id] != null) el.scrollTop = keep[el.id]; }
+  const host = $('drawers');
+  for (const sec of [...host.children]) if (!ui.open.includes(sec.dataset.drawer)) sec.remove();
+  ui.open.forEach((id, n) => {
+    const d = DRAWERS.find(d => d.id === id);
+    let sec = host.querySelector(`section[data-drawer="${id}"]`);
+    if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
+    if (host.children[n] !== sec) host.insertBefore(sec, host.children[n] || null);
+    sec.classList.toggle('focus', ui.focus === 'drawer:' + id);
+    for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
+    const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
+  });
+  for (const id of ui.open){
+    const el = $(`body-${id}`), keep = el.scrollTop;
+    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    if (el.scrollTop !== keep) el.scrollTop = keep;
+  }
   const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
   document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
 }
@@ -3495,10 +3520,15 @@ function renderGoals(el){
     return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
   }).join('');
 }
+/* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
+const CHRON_ROWS = 300;
 function renderChronicle(el){
+  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (ui.focus === 'drawer:chronicle' ? ui.row.chronicle : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
   const rows = drawerRows('chronicle');
   $('count-chronicle').textContent = ` · ${rows.length}`;
-  el.innerHTML = `<ol id="chronicle">${rows.map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
+  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
   const c = campSummary();
@@ -3506,7 +3536,11 @@ function renderCamp(el){
   $('count-camp').textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* A note wins the foot for four seconds. Then the newest chronicle line comes back. */
+const NOTE_MS = 4000;
 function renderFoot(){
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `<span>${ui.note.text}</span>`; return; }
+  ui.note = null;
   const e = chronicle[0];
   $('foot').innerHTML = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
 }
@@ -3522,13 +3556,15 @@ function keyName(k){
 function openHelp(){
   closeDialogs();
   const seen = new Set();
-  $('helpKeys').innerHTML = KEYMAP.filter(k => k.focus !== 'speedrow').map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
+  $('helpKeys').innerHTML = KEYMAP.map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   ui.focus = 'dialog'; $('help').showModal();
 }
 
 /* God actions: tools, view changes, movement, and world control. */
 
-function say(msg){ $('foot').innerHTML = `<span>${msg}</span>`; }
+/* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
+const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
+function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id){
   tool = id;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
@@ -3577,7 +3613,8 @@ function applyTool(c, e){
 /* The action table. Every key and every click ends here. The only place view state changes. */
 function openDrawer(id, on){
   const has = ui.open.includes(id), want = on === undefined ? !has : on;
-  if (want && !has) ui.open.push(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
+  const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
+  if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : null;
@@ -3587,7 +3624,7 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ const a = beingById(r.id); const el = document.querySelector(`#drawers [data-being="${r.id}"]`); const rect = el ? el.getBoundingClientRect() : { left: 400, top: 200 }; tipTarget = { being: a.id }; tipAnchor = { x: rect.left, y: rect.top, left: true }; tipPinned = true; renderTip(); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
-  else if (r.kind === 'goal'){ say(inject({ source: 'player', act: 'priority', id: r.id, pri: ((goalPriority[r.id] ?? 1) + 1) % 3 })); renderUI(true); }
+  /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
   /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
@@ -3631,9 +3668,9 @@ function frame(now){
   if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
   if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  notePulses();
   draw();
-  if (now - lastUi > 250){ renderUI(false); lastUi = now; }
+  /* Pulses read every goal's state. Once a render, not once a frame. */
+  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
   requestAnimationFrame(frame);
 }
 function initUI(){

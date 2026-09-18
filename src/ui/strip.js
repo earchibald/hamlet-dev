@@ -4,15 +4,20 @@ function gaugeHTML(id, g){
   if (!g) return '';
   return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
 }
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function chipHTML(a){
   const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${a.text.replace(/"/g, '&quot;')}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
 }
-function renderStrip(){
+/* The clock runs on every gate tick, not on the view key, so the time never freezes. */
+function renderClock(){
   $('clock').textContent = stamp();
   $('season').textContent = seasonLine();
   const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
+}
+function renderStrip(){
+  renderClock();
   $('campName').textContent = camp.name + (camp.village ? ', a village' : '');
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();

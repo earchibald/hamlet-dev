@@ -144,7 +144,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   #chips{flex:1 1 100%;flex-wrap:wrap;overflow:visible}
   .strip .ctl{margin-left:0;flex:1 1 100%}
 }
-@media (max-width:800px){#drawers{width:min(92vw,330px)}}
+/* Below 800 px a drawer is a full-height overlay, and only one is open. */
+@media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
 [hidden]{display:none !important}
 </style>
 </head>
@@ -170,7 +171,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
-      <span id="nav"><button class="btn small" id="nW">◀</button><button class="btn small" id="nN">▲</button><button class="btn small" id="nS">▼</button><button class="btn small" id="nE">▶</button></span>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>←</kbd></button><button class="btn small" id="nN">▲<kbd>↑</kbd></button><button class="btn small" id="nS">▼<kbd>↓</kbd></button><button class="btn small" id="nE">▶<kbd>→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>

@@ -205,7 +205,7 @@ const GOALS = [
       return { s: ready ? 'active' : 'blocked', text: `${campHumans().length}/5 people, camp ${Math.floor((tick - camp.founded) / DAY)}/8 days old. Parties leave in spring or summer. Two go with coals and food.` };
     },
     offers(a){ if (!camp.shelter || camp.sentParty || camps.length >= 6 || campHumans().length < 5 || tick - camp.founded <= 8 * DAY || !(seasonOf() === 'spring' || seasonOf() === 'summer') || a.traits.bravery < 0.5) return []; return [{ label: 'lead a party to a new valley', score: 40, start: a => startFoundCamp(a) }]; } },
-  { id: 'caves', title: 'Search the caves', stage: 'settlement',
+  { id: 'caves', title: 'Search the caves', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
@@ -224,7 +224,7 @@ const GOALS = [
       }
       return out;
     } },
-  { id: 'dens', title: 'Clear a den', stage: 'settlement',
+  { id: 'dens', title: 'Clear a den', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);

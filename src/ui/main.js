@@ -5,9 +5,9 @@ function frame(now){
   if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
   if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  notePulses();
   draw();
-  if (now - lastUi > 250){ renderUI(false); lastUi = now; }
+  /* Pulses read every goal's state. Once a render, not once a frame. */
+  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
   requestAnimationFrame(frame);
 }
 function initUI(){

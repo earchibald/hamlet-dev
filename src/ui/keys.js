@@ -1,7 +1,7 @@
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog. 'speedrow' never fires; it exists so the speed buttons print a key.
+   'dialog' only inside a dialog.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
 const DRAWERS = [
   { id: 'people',    label: 'People',    key: '1' },
@@ -42,7 +42,6 @@ const KEYMAP = [
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
 ];
 for (const t of TOOLS) KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
-for (const s of [1, 4, 16, 64]) KEYMAP.push({ key: '-', focus: 'speedrow', action: 'speed', arg: s, label: `${s}×`, button: `speed${s}` });
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 
@@ -51,7 +50,6 @@ function keyAction(e, focus){
   const kind = focus.startsWith('drawer:') ? 'drawer' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   for (const k of KEYMAP){
-    if (k.focus === 'speedrow') continue;
     if (k.focus !== 'any' && k.focus !== kind) continue;
     if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
     if (k.key.length > 1 && !!k.shift !== e.shiftKey) continue;
