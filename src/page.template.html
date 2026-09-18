@@ -59,7 +59,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items
 @media (max-width:980px){main{grid-template-columns:1fr}}
 .map-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
 canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
-#map{min-width:560px}
+#map,#mmap{min-width:560px}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 2px 18px;color:var(--muted);font-size:13px}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 section.panel,details.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
@@ -116,7 +116,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
   </header>
   <div class="toolbar">
     <div class="group">
-      <button class="btn" id="worldBtn">World map<kbd>M</kbd></button>
+      <button class="btn" id="viewBtn" title="Sector, nearby, world map">World map<kbd>M</kbd></button>
       <span id="where"></span>
       <span class="group" id="nav"><button class="btn" id="nW">◀</button><button class="btn" id="nN">▲</button><button class="btn" id="nS">▼</button><button class="btn" id="nE">▶</button></span>
       <span class="group" id="levels"><button class="btn" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
@@ -128,6 +128,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
   <main>
     <div>
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
+      <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
       <div class="legend">
         <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
@@ -144,7 +145,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
         <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
         <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
         <li>Use Poke on someone who is sitting by the fire when the woodpile is empty.</li>
-        <li>Open the world map and point at sectors. People go where the resources are.</li>
+        <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view of nine sectors, and the world map. Arrow keys step between sectors.</li>
         <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
         <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
         <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
