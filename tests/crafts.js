@@ -146,6 +146,23 @@ test('clay is dug from the riverbank, the kiln is raised, and pots are fired in 
   assert.equal(api.goalState(goal(api, 'pot')).s, 'blocked', 'aim is three pots');
 });
 
+test('cuttings from wild bushes make a garden of four near the fire', () => {
+  const { api, a, c } = readyCamp();
+  const wild = api.tileAt(c.stashTile[0] + 3, c.stashTile[1] + 1); wild.ground = 'grass'; wild.feature = 'bush'; wild.berries = 3; wild.struct = null;
+  for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++){ const t = api.tileAt(c.pit[0] + dx, c.pit[1] + dy); if (t !== wild && !t.struct && t.ground !== 'water'){ t.feature = null; t.ground = Math.abs(dx) + Math.abs(dy) > 2 ? 'soil' : t.ground; } }
+  assert.equal(api.goalState(goal(api, 'garden')).s, 'active');
+  doOffer(api, a, 'take cuttings');
+  assert.ok(c.stash.cuttings >= 2, `cuttings ${c.stash.cuttings}`);
+  c.stash.cuttings = 4;
+  doOffer(api, a, 'plant a garden');
+  assert.ok(c.garden, 'no garden'); assert.equal(c.stash.cuttings, 0);
+  const planted = api.world.filter(t => t.feature === 'bush' && t.garden === c);
+  assert.equal(planted.length, 4);
+  for (const t of planted) assert.ok(api.dist(t.x, t.y, ...c.pit) <= 8);
+  assert.equal(api.goalState(goal(api, 'garden')).s, 'done');
+  assert.ok(api.chronicle.some(e => e.text.includes('plants a garden')));
+});
+
 test('a pot holds water at camp and keeps berries longer', () => {
   const { api, a, c } = readyCamp();
   c.tools.waterskin = 1; c.stash.water = 8;

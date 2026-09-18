@@ -24,7 +24,7 @@ const API = `return {
   RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startFish, startGather, startBuild, addItem, stashAdd,
   runTask, updateBeing, dropCarried, makeBeing,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt,
-  near, nearAt, ZMIN, ZMAX, ZOFF, NZ, W, H,
+  near, nearAt, dist, ZMIN, ZMAX, ZOFF, NZ, W, H,
   campHumans, humans, stashFood,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },

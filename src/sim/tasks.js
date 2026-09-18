@@ -148,6 +148,34 @@ function startDigClay(a){
     } };
   return true;
 }
+/* Cuttings come from wild bushes. The bush keeps growing. */
+function startTakeCuttings(a){
+  if (a.carrying && a.carrying.kind !== 'cuttings') return startDeliver(a);
+  const wild = t => t.feature === 'bush' && !t.garden;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, wild, NEAR, z), 2500, a);
+  if (!p){ if (a.carrying) return startDeliver(a); return false; }
+  a.task = { type: 'gather', label: 'Going to a bush for cuttings', path: p, progress: 0,
+    arrive(a, t){
+      if (!nearFind(a.x, a.y, wild, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+      t.label = 'Taking cuttings';
+      if (++t.progress % 6 === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'cuttings', count: 1 }; }
+      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      return 'continue';
+    } };
+  return true;
+}
+/* A garden goes on open soil or grass within eight of the pit, with room for four bushes around it. */
+function gardenSpot(){
+  if (!camp.pit) return null; const [px, py] = camp.pit; let best = null;
+  for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++){
+    const x = px + dx, y = py + dy, d = Math.abs(dx) + Math.abs(dy); if (d < 3 || d > 7 || !inb(x, y)) continue;
+    const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct) continue;
+    const room = DIRS.filter(([ex, ey]) => { const q = hasTile(x + ex, y + ey, 0) ? tileAt(x + ex, y + ey) : null; return q && passable(q.x, q.y) && !q.feature && !q.struct && !camps.some(c => c.stashTile && c.stashTile[0] === q.x && c.stashTile[1] === q.y); }).length;
+    if (room < 4) continue;
+    const sc = -d + (t.ground === 'soil' ? 2 : 0) + rng(); if (!best || sc > best.sc) best = { x, y, sc };
+  }
+  return best ? [best.x, best.y] : null;
+}
 function startSetSnare(a){
   const c = camp.site; let best = null;
   const s = secOf(c[0], c[1]);

@@ -64,6 +64,7 @@ const ITEMS = {
   fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
   clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
   pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
+  cuttings: { name: 'bundle of cuttings', plural: 'cuttings', mat: 'plant', fuel: 3, gather: 'take' },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },

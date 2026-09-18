@@ -200,6 +200,7 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'workshop') rows.push(['Workshop', 'a roofed bench. Cord, baskets, rods, and clothes are made here, faster than by the fire.']);
   if (t.struct && t.struct.type === 'kiln') rows.push(['Kiln', `a dome of rock and clay. ${t.struct.fired || 0} pots fired here.`]);
   if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
+  if (t.garden) rows.push(['Garden', `planted by ${t.garden.name}. Rabbits like it too.`]);
   if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);
   if (t.struct && t.struct.type === 'ward') rows.push(['Ward post', 'charred wood. Sprites will not come within nine tiles of the fire.']);

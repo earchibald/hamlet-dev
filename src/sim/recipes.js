@@ -29,6 +29,8 @@ const RECIPES = [
     verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
   { id: 'pot', title: 'Fire pots', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: 50, makes: { item: 'pot', n: 1 }, standing: { stash: 'pot', n: 3 }, score: 42,
     verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
+  { id: 'garden', title: 'Plant a garden', after: 'axe', needs: { cuttings: 4 }, tools: ['axe'], place: 'garden', skill: 'gather', work: 80, makes: { garden: true }, score: 40,
+    verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -52,9 +54,10 @@ const PLACES = {
   water: {},
   bank: {},
   kiln: { spot: () => camp.kiln },
+  garden: { spot: () => camp.garden ? null : gardenSpot() },
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
-const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]));
+const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && camp.garden));
 /* What the offer of a missing input is: the existing gatherers for loose things, the axe for logs
    (loose logs run out; a tree makes more), or nothing for things another recipe makes. */
 function gatherOffer(kind){
@@ -62,6 +65,7 @@ function gatherOffer(kind){
   if (['stick', 'rock', 'moss'].includes(kind)) return a => startGather(a, kind);
   if (kind === 'fibre') return a => startPickFibre(a);
   if (kind === 'clay') return a => startDigClay(a);
+  if (kind === 'cuttings') return a => startTakeCuttings(a);
   return null;
 }
 /* What making the thing does to the world, by the one key in r.makes. A struct maker returns false
@@ -71,6 +75,15 @@ const MAKERS = {
   tool(r, a, at){ camp.tools[r.makes.tool] = 1; },
   struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp, fired: 0 }; camp[r.makes.struct] = at; },
   wear(r, a, at){ const who = campHumans().filter(h => !h[r.makes.wear]).sort((p, q) => p.needs.warmth - q.needs.warmth)[0] || a; who[r.makes.wear] = true; addThought(who, 'clothes', 'Warm in new hide clothes', 5, 1500); log(`${a.name} sews hide clothes, and ${who === a ? 'wears them' : `${who.name} wears them`}.`, [a, who], 'good'); return 'logged'; },
+  garden(r, a, at){
+    const spots = DIRS.map(([dx, dy]) => tileAt(at[0] + dx, at[1] + dy)).filter(q => passable(q.x, q.y) && !q.feature && !q.struct).slice(0, 4);
+    if (spots.length < 4) return false;
+    for (const q of spots){ q.feature = 'bush'; q.berries = 0; q.planted = tick; q.garden = camp; }
+    camp.garden = at;
+    log(`${a.name} plants a garden of four bushes by the fire.`, campHumans(), 'good');
+    addThought(a, 'garden', 'Planted a garden', 5, 1500);
+    return 'logged';
+  },
 };
 function recipeGoal(r){
   return { id: r.id, title: r.title, standing: !!r.standing, recipe: r,
@@ -105,8 +118,9 @@ function recipeGoal(r){
         const key = Object.keys(r.makes)[0];
         if (key === 'struct' && tileAt(...at).struct) return;
         if (!stashHas(r.needs)) return;
-        takeNeeds(r.needs);
         const result = MAKERS[key](r, a, at);
+        if (result === false) return;
+        takeNeeds(r.needs);
         if (r.skill) gainXp(a, r.skill);
         if (result !== 'logged')
           log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${ITEMS[r.makes.item].plural}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
