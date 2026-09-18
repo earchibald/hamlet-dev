@@ -580,6 +580,10 @@ Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn"
 **Interfaces:**
 - Produces: `paintCreatures()`: for each making mark, spawns its species in its country by a `SPAWN` table keyed by species: `{ rabbit: { n: 6, dens: false }, deer: { n: 3, herd: true }, fox: { n: 1, dens: true }, wolf: { n: 2, dens: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null }`. `digDens(within, owner)` digs one den for `owner` in a hill inside `within`, or returns null. `digGnomeBurrows(within)` digs two or three burrows under `within`'s meadow tiles. `placeGrove(within)`: a hollow pine, or a hollow under a hill of the country, with three sprites. `spawnAnimal(sp, within, n, avoid)`. `placeBodies()`. `godsTick()`. `SPECIES.god.perTick` keeps gods out of `updateBeing`; the beings filter keeps them.
 
+- [ ] **Step 0: Founding parties read the new world**
+
+Task 3's soak found founding parties freezing: their meadow sector had no loose rocks in reach, so the pit was never built. In `src/sim/camps.js`, the founding candidates (the `sectors.filter(s => s.biome === 'meadow' && ...)` at about line 90) become sectors whose biome grows (`GROWS[s.biome]`) and which hold, counting the sector and its four neighbours with `sectorCount`, at least 6 loose rocks and 8 loose sticks (the fire pit's cost, read from `GOALS`'s firepit `need` rather than written as numbers), and water within the same reach (`sectorCount(s, 'water', t => t.ground === 'water') > 0` on the sector or a neighbour). Comment: "A party founds where a pit can be built: rocks, sticks, and water within reach. A mark-painted meadow can be wide and bare." The chronicle line for a party leaving stays. Add to `tests/settle.js`: on every soak seed, every founding candidate sector the rule returns (expose the candidate function as `foundingSites()` and export it) has the pit's rocks and sticks within its reach. Then re-run the soak: the freezes on beta, gamma, and delta must be gone before this task's bless; a death that remains is traced, not blessed.
+
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/settle.js`:
