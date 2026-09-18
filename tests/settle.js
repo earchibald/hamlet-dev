@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const { runDays } = require('./lib/run');
 
 test('every world begins with its creation, and the first person stands in the start country', () => {
   const api = load(); api.startWorld('r');
@@ -156,7 +157,8 @@ for (const seed of SOAK_SEEDS) test(`seed ${seed}: every founding site has the p
   const sites = api.foundingSites();
   for (const s of sites){
     const inReach = (x, y) => { const q = api.secOf(x, y); return Math.abs(q.sx - s.sx) + Math.abs(q.sy - s.sy) <= 1; };
-    const loose = k => api.items.filter(i => i.kind === k && i.z === 0 && inReach(i.x, i.y)).length;
+    /* The rule counts the item the tile shows and passes over anything already reserved, so the test counts the same. */
+    const loose = k => api.items.filter(i => i.kind === k && i.z === 0 && !i.reservedBy && api.itemAt(i.x, i.y, 0) === i && inReach(i.x, i.y)).length;
     assert.ok(loose('rock') >= need.rock, `a founding site with ${loose('rock')} rocks in reach`);
     assert.ok(loose('stick') >= need.stick, `a founding site with ${loose('stick')} sticks in reach`);
     assert.ok(api.GROWS[s.biome], `a founding site in a ${s.biome}`);
@@ -179,6 +181,20 @@ test('every made species has a living member in its country, and nothing unmade 
   }
 });
 
+/* Nothing the gods did not make wanders in. The day era refills the wild with rabbits, deer, foxes and wolves,
+   but only with the species the making marks name. Seed r's gods made no wolf; seed alpha's did. */
+test('a species the gods never made never wanders in, and one they made may', () => {
+  const bare = settled('r');
+  assert.ok(!bare.creation.made.wolf, 'seed r made wolves after all; pick another seed');
+  const { api } = runDays('r', 25);
+  assert.equal(api.beings.filter(b => b.species === 'wolf').length, 0, 'a wolf walked into a world with no wolf making');
+
+  const full = settled('alpha');
+  assert.ok(full.creation.made.wolf, 'seed alpha made no wolves; pick another seed');
+  const made = runDays('alpha', 25).api;
+  assert.ok(made.beings.some(b => b.species === 'wolf'), 'the wolves were made and none is in the world');
+});
+
 test('sprites live in a grove of their country, foxes and wolves in dens, gnomes in burrows', () => {
   const api = settled();
   for (const g of api.groves) assert.ok(g.mark && g.mark.kind === 'making' && g.mark.value === 'sprite');
@@ -194,7 +210,10 @@ test('a sleeping god stands at its body, and stays in the world through the days
     assert.ok(api.hasTile(g.x, g.y, g.z), `${g.name} stands off the map`);
     const body = g.body; assert.ok(body, `${g.name} has no body`);
     assert.equal(body.god, g.id);
+    /* A body is a record -- a hill, a cave, or a country -- and never a bare tile. */
+    assert.ok(Array.isArray(body.tiles), `${g.name} sleeps in a tile, not a hill, a cave, or a country`);
   }
+  for (const t of api.world) assert.equal(t.god, undefined, `a tile at ${t.x},${t.y} carries a god`);
   for (let i = 0; i < 400; i++) api.step();
   assert.equal(api.gods().length, api.beings.filter(b => b.species === 'god').length);
   for (const g of api.gods()) assert.ok(g.status !== 'awake');

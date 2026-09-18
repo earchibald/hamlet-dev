@@ -174,9 +174,12 @@ function rockfall(){
     const set = new Set(h.tiles);
     const rim = shuffle(rimExits(h, set)); let want = 2 + rint(3);
     for (const [t] of rim){ if (!want) break; if (t.feature || t.struct || t.mouth) continue; if (!keepsPaths(t)) continue;
+      /* The boulder buries what lay loose on the tile. A boulder taken back gives the loose item back with it, so
+         the valley keeps its rocks and sticks. */
+      const was = t.loose;
       t.feature = 'boulder'; t.loose = null;
       const now = joined && openMouths();
-      if (joined && [...joined].some(c => !now.has(c))){ t.feature = null; continue; }
+      if (joined && [...joined].some(c => !now.has(c))){ t.feature = null; t.loose = was; continue; }
       joined = now || joined; want--; }
   }
   for (const c of caves){
@@ -643,14 +646,20 @@ function placeGrove(within, mark){
   if (!best) for (const i of tiles) take(i, t => open(t) && !t.feature && passable(t.x, t.y) && keepsPaths(t));
   if (!best) return null;
   const t = best.t;
+  /* The hollow is solid, so it stands before the ring is vetted. A pine judged beside an open centre can wall off
+     a tile that the hollow then seals in. */
+  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
+  /* The ways around the hollow as they stand. A pine may not make them worse, but dense old forest that was
+     already tight is not the grove's doing. */
+  const openAround = keepsPaths(t);
   if (trees.length < 8) for (const [dx, dy] of RING){
     const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
     if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
     q.feature = 'tree'; q.planted = tick - 60 * DAY;
-    /* The hollow keeps two open sides, so the sprites have a door and a way back to it. */
-    if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2){ q.feature = null; delete q.planted; }
+    /* The hollow keeps two open sides, so the sprites have a door and a way back to it. The ways around the hollow
+       must still meet once the pine stands, or the pine and the hollow together seal a pocket. */
+    if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2 || (openAround && !keepsPaths(t))){ q.feature = null; delete q.planted; }
   }
-  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
   const g = { x: t.x, y: t.y, sector: sectorOfTile(t), anger: 0, swarmUntil: 0, lastBirth: tick, cave: null, mark }; groves.push(g);
   for (let k = 0; k < 3; k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.grove = g; beings.push(sp); } }
   return g;

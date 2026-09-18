@@ -9,7 +9,7 @@ test('a creation opens the gods era with one formless region and no god', () => 
   assert.equal(api.liveRegions().length, 1);
   assert.equal(api.gods().length, 0);
   assert.deepEqual(api.legends, []);
-  assert.deepEqual(api.creation, { ages: 0, backstops: 0, settled: false, failed: false, gate: null });
+  assert.deepEqual(api.creation, { ages: 0, backstops: 0, settled: false, failed: false, gate: null, made: {} });
   assert.ok(api.godRng);
 });
 

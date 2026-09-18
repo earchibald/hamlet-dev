@@ -413,7 +413,7 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null };
+  creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null, made: {} };
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){

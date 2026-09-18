@@ -588,9 +588,12 @@ function rockfall(){
     const set = new Set(h.tiles);
     const rim = shuffle(rimExits(h, set)); let want = 2 + rint(3);
     for (const [t] of rim){ if (!want) break; if (t.feature || t.struct || t.mouth) continue; if (!keepsPaths(t)) continue;
+      /* The boulder buries what lay loose on the tile. A boulder taken back gives the loose item back with it, so
+         the valley keeps its rocks and sticks. */
+      const was = t.loose;
       t.feature = 'boulder'; t.loose = null;
       const now = joined && openMouths();
-      if (joined && [...joined].some(c => !now.has(c))){ t.feature = null; continue; }
+      if (joined && [...joined].some(c => !now.has(c))){ t.feature = null; t.loose = was; continue; }
       joined = now || joined; want--; }
   }
   for (const c of caves){
@@ -1057,14 +1060,20 @@ function placeGrove(within, mark){
   if (!best) for (const i of tiles) take(i, t => open(t) && !t.feature && passable(t.x, t.y) && keepsPaths(t));
   if (!best) return null;
   const t = best.t;
+  /* The hollow is solid, so it stands before the ring is vetted. A pine judged beside an open centre can wall off
+     a tile that the hollow then seals in. */
+  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
+  /* The ways around the hollow as they stand. A pine may not make them worse, but dense old forest that was
+     already tight is not the grove's doing. */
+  const openAround = keepsPaths(t);
   if (trees.length < 8) for (const [dx, dy] of RING){
     const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
     if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
     q.feature = 'tree'; q.planted = tick - 60 * DAY;
-    /* The hollow keeps two open sides, so the sprites have a door and a way back to it. */
-    if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2){ q.feature = null; delete q.planted; }
+    /* The hollow keeps two open sides, so the sprites have a door and a way back to it. The ways around the hollow
+       must still meet once the pine stands, or the pine and the hollow together seal a pocket. */
+    if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2 || (openAround && !keepsPaths(t))){ q.feature = null; delete q.planted; }
   }
-  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
   const g = { x: t.x, y: t.y, sector: sectorOfTile(t), anger: 0, swarmUntil: 0, lastBirth: tick, cave: null, mark }; groves.push(g);
   for (let k = 0; k < 3; k++){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !beings.some(b => b.x === q.x && b.y === q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.grove = g; beings.push(sp); } }
   return g;
@@ -1902,18 +1911,18 @@ function spawnWildlife(){
     if (rs.length < cap){ const p = rs.find(r => stage(r) === 'adult' && rs.some(o => o !== r && stage(o) === 'adult' && near(o, r) <= 10));
       if (p && rng() < 0.8){ const q = nearFind(p.x, p.y, q => passable(q.x, q.y) && !beings.some(b => b.alive && b.x === q.x && b.y === q.y), RING); if (q){ const k = makeBeing('rabbit', q.x, q.y, null, 0); k.born = tick; beings.push(k); } } }
   }
-  /* Rabbits return to the meadows. */
-  if (tick % 300 === 0 && beings.filter(b => b.alive && b.species === 'rabbit').length < (isWinter() ? 6 : 10)){
+  /* Rabbits return to the meadows, if the gods made rabbits. */
+  if (tick % 300 === 0 && wasMade('rabbit') && beings.filter(b => b.alive && b.species === 'rabbit').length < (isWinter() ? 6 : 10)){
     for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'meadow' || s.biome === 'wetland') && passable(t.x, t.y) && nearFind(t.x, t.y, q => q.feature === 'bush', RING) && !humans().some(h => nearAt(h, t.x, t.y) < 8)){ beings.push(makeBeing('rabbit', t.x, t.y, null, 0)); break; } }
   }
   if (tick % 2000 === 1000 && seasonOf() === 'spring' && beings.filter(b => b.alive && b.species === 'deer').length < 9){
     const doe = beings.find(b => b.alive && b.species === 'deer'); if (doe){ const q = nearFind(doe.x, doe.y, q => passable(q.x, q.y) && !beings.some(b => b.alive && b.x === q.x && b.y === q.y), RING); if (q){ const f = makeBeing('deer', q.x, q.y, null, 0); f.born = tick; beings.push(f); log('A fawn is on its feet in the meadow.', []); } }
-    else for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (sectorOfTile(t).biome === 'meadow' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 20)){ beings.push(makeBeing('deer', t.x, t.y, null, 0)); beings.push(makeBeing('deer', t.x, t.y, null, 0)); break; } }
+    else if (wasMade('deer')) for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (sectorOfTile(t).biome === 'meadow' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 20)){ beings.push(makeBeing('deer', t.x, t.y, null, 0)); beings.push(makeBeing('deer', t.x, t.y, null, 0)); break; } }
   }
-  if (tick % 10000 === 2500 && beings.filter(b => b.alive && b.species === 'wolf').length < 2){
+  if (tick % 10000 === 2500 && wasMade('wolf') && beings.filter(b => b.alive && b.species === 'wolf').length < 2){
     for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const st = sectorOfTile(t); if (st.biome === 'forest' && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 25)){ const w = makeBeing('wolf', t.x, t.y, null, 0); beings.push(w); adoptDen(w); break; } }
   }
-  if (tick % 6000 === 0 && beings.filter(b => b.alive && b.species === 'fox').length < 2){
+  if (tick % 6000 === 0 && wasMade('fox') && beings.filter(b => b.alive && b.species === 'fox').length < 2){
     for (let k = 0; k < 40; k++){ const t = world[rint(W * H)]; const s = sectorOfTile(t); if ((s.biome === 'forest' || s.biome === 'rocky') && passable(t.x, t.y) && !humans().some(h => nearAt(h, t.x, t.y) < 15)){ const f = makeBeing('fox', t.x, t.y, null, 0); beings.push(f); adoptDen(f); break; } }
   }
 }
@@ -3391,7 +3400,7 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null };
+  creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null, made: {} };
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){
@@ -3496,11 +3505,15 @@ function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r,
 /* ---------- the creatures of the makings, and the gods' bodies ---------- */
 /* Who is spawned for a making, and how. Read by paintCreatures. */
 const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true }, wolf: { n: 2, den: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
+/* What the makings named. `creation.made` is written at settle from the same marks the painters read, and it is
+   the whole roll of what may live in this world. Nothing the gods did not make wanders in later. */
+function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]); }
 /* Every creature stands in the country where its god made it. A hunter gets a den first, and only what the den
    could not hold is put out on the open ground. */
 function paintCreatures(first){
   groves = [];
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
+    if (m.value in SPAWN) creation.made[m.value] = true;
     const how = SPAWN[m.value]; if (!how) continue;
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
@@ -3525,11 +3538,24 @@ function placeBodies(){
     else if (g.pole === 'below' && caves_.length && caves_[0].deep){ body = caves_[0]; at = [body.deep.x, body.deep.y, body.deep.z]; }
     else if (g.pole === 'wet' && free){ const riv = world.find(t => t.river); if (riv){ body = r; at = [riv.x, riv.y, 0]; } }
     else if (g.pole === 'still' && free){ const lake = world.find(t => t.lake === (r && r.id)); if (lake){ body = r; at = [lake.x, lake.y, 0]; } }
+    /* The last body is a country. A god whose own country is already taken lies down in the nearest country still
+       free, because one body holds one god. The god stands where its rest mark says, if that ground can still be
+       walked and lies in the country; if not, on the nearest walkable tile of the country. Tiles carry no god. */
     if (!at){
       const m = r && (marksOf(r, 'rest').find(m => m.value === g.id) || r.marks.find(m => m.kind === 'rest'));
-      let i = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
-      if (world[i].god !== undefined && r){ const spare = r.tiles.find(j => world[j].god === undefined); if (spare !== undefined) i = spare; }
-      body = world[i]; at = [i % W, Math.floor(i / W), 0];
+      const anchor = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
+      const home = r && !r.god ? r : (liveRegions().find(q => !q.god) || r);
+      if (home){
+        const held = new Set(home.tiles);
+        const ax = anchor % W, ay = (anchor - ax) / W;
+        const walk = j => passable(j % W, (j - j % W) / W, 0);
+        let i = held.has(anchor) && walk(anchor) ? anchor : null;
+        if (i === null){ const t = nearFind(ax, ay, q => held.has(idx(q.x, q.y)) && passable(q.x, q.y, 0), RING); if (t) i = idx(t.x, t.y); }
+        /* Still nothing beside the mark: the nearest walkable tile of the country, by straight-line distance. */
+        if (i === null) for (const j of home.tiles){ if (!walk(j)) continue; if (i === null || dist(j % W, (j - j % W) / W, ax, ay) < dist(i % W, (i - i % W) / W, ax, ay)) i = j; }
+        if (i === null) i = home.tiles[0];
+        body = home; at = [i % W, (i - i % W) / W, 0];
+      } else { at = [anchor % W, (anchor - anchor % W) / W, 0]; }
     }
     g.x = at[0]; g.y = at[1]; g.z = at[2]; g.body = body; if (body) body.god = g.id;
   }

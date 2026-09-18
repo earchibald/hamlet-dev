@@ -90,11 +90,15 @@ function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r,
 /* ---------- the creatures of the makings, and the gods' bodies ---------- */
 /* Who is spawned for a making, and how. Read by paintCreatures. */
 const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true }, wolf: { n: 2, den: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
+/* What the makings named. `creation.made` is written at settle from the same marks the painters read, and it is
+   the whole roll of what may live in this world. Nothing the gods did not make wanders in later. */
+function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]); }
 /* Every creature stands in the country where its god made it. A hunter gets a den first, and only what the den
    could not hold is put out on the open ground. */
 function paintCreatures(first){
   groves = [];
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
+    if (m.value in SPAWN) creation.made[m.value] = true;
     const how = SPAWN[m.value]; if (!how) continue;
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
@@ -119,11 +123,24 @@ function placeBodies(){
     else if (g.pole === 'below' && caves_.length && caves_[0].deep){ body = caves_[0]; at = [body.deep.x, body.deep.y, body.deep.z]; }
     else if (g.pole === 'wet' && free){ const riv = world.find(t => t.river); if (riv){ body = r; at = [riv.x, riv.y, 0]; } }
     else if (g.pole === 'still' && free){ const lake = world.find(t => t.lake === (r && r.id)); if (lake){ body = r; at = [lake.x, lake.y, 0]; } }
+    /* The last body is a country. A god whose own country is already taken lies down in the nearest country still
+       free, because one body holds one god. The god stands where its rest mark says, if that ground can still be
+       walked and lies in the country; if not, on the nearest walkable tile of the country. Tiles carry no god. */
     if (!at){
       const m = r && (marksOf(r, 'rest').find(m => m.value === g.id) || r.marks.find(m => m.kind === 'rest'));
-      let i = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
-      if (world[i].god !== undefined && r){ const spare = r.tiles.find(j => world[j].god === undefined); if (spare !== undefined) i = spare; }
-      body = world[i]; at = [i % W, Math.floor(i / W), 0];
+      const anchor = m && m.at !== null && m.at !== undefined ? m.at : (r ? r.tiles[0] : 0);
+      const home = r && !r.god ? r : (liveRegions().find(q => !q.god) || r);
+      if (home){
+        const held = new Set(home.tiles);
+        const ax = anchor % W, ay = (anchor - ax) / W;
+        const walk = j => passable(j % W, (j - j % W) / W, 0);
+        let i = held.has(anchor) && walk(anchor) ? anchor : null;
+        if (i === null){ const t = nearFind(ax, ay, q => held.has(idx(q.x, q.y)) && passable(q.x, q.y, 0), RING); if (t) i = idx(t.x, t.y); }
+        /* Still nothing beside the mark: the nearest walkable tile of the country, by straight-line distance. */
+        if (i === null) for (const j of home.tiles){ if (!walk(j)) continue; if (i === null || dist(j % W, (j - j % W) / W, ax, ay) < dist(i % W, (i - i % W) / W, ax, ay)) i = j; }
+        if (i === null) i = home.tiles[0];
+        body = home; at = [i % W, (i - i % W) / W, 0];
+      } else { at = [anchor % W, (anchor - anchor % W) / W, 0]; }
     }
     g.x = at[0]; g.y = at[1]; g.z = at[2]; g.body = body; if (body) body.god = g.id;
   }

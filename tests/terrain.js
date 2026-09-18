@@ -233,6 +233,33 @@ for (const seed of SEEDS) test(`seed ${seed}: rock fell at the hill feet and blo
   }
 });
 
+/* A boulder that would shut a cave mouth off is taken back. The tile must come back whole: the loose rock or stick
+   that lay there before the boulder fell belongs to the valley, not to the boulder. Every rim tile is given a loose
+   rock and a mouth of its own, so every boulder rockfall tries is rolled back. The control run shows the same tiles
+   take boulders when no mouth stands on them. */
+test('a boulder taken back leaves the loose rock where it lay', () => {
+  const rimTiles = api => {
+    const out = [];
+    for (const h of api.hills){ const set = new Set(h.tiles);
+      for (const [t] of api.rimExits(h, set)) if (!t.feature && !t.struct && !t.mouth && api.keepsPaths(t)) out.push(t); }
+    return out;
+  };
+  const control = load(); control.startWorld('r');
+  const before = rimTiles(control);
+  control.rockfall();
+  assert.ok(before.some(t => t.feature === 'boulder'), 'no boulder fell on a rim tile at all');
+
+  const api = load(); api.startWorld('r');
+  const rim = rimTiles(api);
+  assert.ok(rim.length, 'no rim tile to test');
+  for (const t of rim){ t.loose = 'rock'; api.caves.push({ kind: 'test', exit: t, tiles: [], story: [] }); }
+  api.rockfall();
+  for (const t of rim){
+    assert.notEqual(t.feature, 'boulder', `a boulder stood on a cave mouth at ${t.x},${t.y}`);
+    assert.equal(t.loose, 'rock', `the loose rock at ${t.x},${t.y} was lost with the boulder`);
+  }
+});
+
 /* A den is dug in the country where a god made foxes or wolves, and only if that country holds a hill, so a seed
    can have none of one kind. `some seed digs a den for each hunter` below keeps the rule honest. */
 for (const seed of SEEDS) test(`seed ${seed}: every den has one mouth, stands in its owners' country, and holds them`, () => {
