@@ -64,11 +64,12 @@ Expected: a conflict in `src/ui.js`, which `dev` edits and this branch deleted. 
 
 - [ ] **Step 3: What the door changed under the interface**
 
-Three follow-ups from the review of PR 1 (`.superpowers/sdd/pr1-review.md` has the full text). Do each only if PR 1 as merged makes it true:
+Three follow-ups from the review of PR 1 (`.superpowers/sdd/pr1-review.md` has the full text). The door's acts are `light { x, y, z }`, `poke { id }`, `priority { id, pri }`, and `site { x, y, z }`:
 
 - `W` and `H` are variables set by `startWorld` now. The world canvas sizing in `initUI` (`wcv.width = W * WS * dpr` and its height, and the offscreen `ocv`) moves into `newWorld`, after `startWorld`, so a world of another size draws right. The sector canvases keep their sizing in `initUI`, since `LW` and `LH` are fixed.
-- If `src/sim/door.js` has a `priority` act, every write of `goalPriority[...]` under `src/ui/` (in `rowOpen`, `setPriority`, the drawer pointerdown, and `ACTIONS.goalPri`) becomes `inject({ source: 'player', act: 'priority', id, pri })`. If the door has no such act, leave the writes and say so in the report; the mythos branch owns that decision.
-- If the door has a `site` act, nothing to do here: Camp site is out of the interface from task 3 on, and `setSite` is not called under `src/ui/`.
+- The door has a `priority` act. Every write of `goalPriority[...]` under `src/ui/` (in `rowOpen`, `setPriority`, the drawer pointerdown, and later `ACTIONS.goalPri`) becomes `inject({ source: 'player', act: 'priority', id, pri })`, with `pri` 0 for off, 1 for on, 2 for high.
+- The door has a `site` act, and `dev`'s `src/ui.js` routes the Camp site tool through it. Carry that case into `applyTool` as `inject({ source: 'player', act: 'site', x, y, z })` for now; task 3 of this plan removes the tool from the interface and the act stays in the sim for scripts.
+- Every event carries `source: 'player'`. The door logs `{ ...event, tick }`. An event that arrives with its own `tick` must arrive at that tick or the door answers `Not now.`; the interface never sets `tick` on an event.
 
 - [ ] **Step 4: Rebuild and run everything**
 
