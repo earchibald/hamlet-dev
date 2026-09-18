@@ -21,6 +21,7 @@ function renderUI(force){
   renderFoot();
 }
 const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
+const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
 function renderDrawers(){
   $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
   const html = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2><span>${d.label}<span class="muted" id="count-${id}"></span></span><span class="k">${d.key} · ↑↓ · ⏎</span></h2>${id === 'chronicle' ? `<div class="filter"><button class="btn small ${ui.chronFilter === 'all' ? 'on' : ''}" data-filter="all">All</button><button class="btn small ${ui.chronFilter === 'major' ? 'on' : ''}" data-filter="major">Major</button></div>` : ''}${id === 'goals' ? `<div class="filter"><button class="btn small ${ui.showAll ? 'on' : ''}" id="showAllBtn">All<kbd>A</kbd></button></div>` : ''}<div class="body" id="body-${id}"></div></section>`; }).join('');
@@ -34,16 +35,16 @@ function renderPeople(el){
   const rows = drawerRows('people');
   $('count-people').textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
   $('count-goals').textContent = '';
   el.innerHTML = rows.map((r, i) => {
-    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span>${s.label}</span><span>${fold}</span></div>`; }
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
     const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
-    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
+    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
   }).join('');
 }
 function renderChronicle(el){
