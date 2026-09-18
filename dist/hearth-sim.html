@@ -47,7 +47,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .btn.on kbd{opacity:.85}
 .app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
 /* The strip: world half, a divider, camp half, controls at the right. */
-.strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px}
+.strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
 .strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .strip .world{flex:none}
 .strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0;flex-wrap:nowrap}
@@ -137,7 +137,13 @@ dialog p{margin:6px 0;color:var(--muted);max-width:66ch}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 table.keys{border-collapse:collapse;font-size:13px;width:100%} table.keys td{padding:2px 6px;border-bottom:1px solid var(--line)} table.keys td:first-child{font-family:"JetBrains Mono",monospace;white-space:nowrap;width:30%}
 dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
-@media (max-width:1100px){.strip{flex-wrap:wrap} .strip .ctl{margin-left:0;width:100%}}
+@media (max-width:1100px){
+  .strip{flex-wrap:wrap}
+  .strip .world{flex:1 1 auto}
+  .strip .camp{flex:1 1 100%;flex-wrap:wrap;min-width:0;padding-left:0;border-left:0}
+  #chips{flex:1 1 100%;flex-wrap:wrap;overflow:visible}
+  .strip .ctl{margin-left:0;flex:1 1 100%}
+}
 @media (max-width:800px){#drawers{width:min(92vw,330px)}}
 [hidden]{display:none !important}
 </style>
