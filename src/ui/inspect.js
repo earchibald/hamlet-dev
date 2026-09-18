@@ -1,11 +1,12 @@
-/* Inspection: hover and pinned detail on a being or a tile. */
+/* Inspection: the hover card and the window card for a being or a tile. */
 
 /* ---- inspection ---- */
 function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${color}"></i></span>`; }
 const needColor = v => v < 25 ? 'var(--bad)' : v < 50 ? 'var(--warn)' : 'var(--good)';
 function moodWord(a, m){ if (!a.alive) return 'Dead'; return m >= 65 ? 'Happy' : m >= 45 ? 'Content' : m >= 30 ? 'Uneasy' : m >= 15 ? 'Unhappy' : 'Miserable'; }
 function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 0.7 ? w[2] : w[1]; }
-function inspectBeing(a, full = tipPinned){
+/* full is the window's card: the long history and the Follow button. The hover tip shows the short one. */
+function inspectBeing(a, full = false){
   const m = mood(a), sp = SPECIES[a.species];
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   const thoughts = a.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
@@ -74,13 +75,12 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
   const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
-  tip.innerHTML = close + body;
+  tip.innerHTML = body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
-  tip.classList.toggle('pinned', tipPinned); tip.setAttribute('role', tipPinned ? 'dialog' : 'tooltip'); tip.hidden = false;
+  tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight, gap = 14, vw = window.innerWidth, vh = window.innerHeight;
   let { x, y, left } = tipAnchor;
   let px = left ? x - w - gap : x + gap;
@@ -88,7 +88,7 @@ function renderTip(){
   const py = clamp(left ? y : y + gap, 8, Math.max(8, vh - h - 8));
   tip.style.left = Math.max(8, px) + 'px'; tip.style.top = py + 'px';
 }
-function hideTip(){ tipTarget = null; tipAnchor = null; tipPinned = false; renderTip(); }
+function hideTip(){ tipTarget = null; tipAnchor = null; renderTip(); }
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
@@ -96,7 +96,6 @@ function pinCell(c, e){
   ui.focus = `window:${w.id}`; hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
-  if (tipPinned) return;
   const same = tipTarget && tipTarget.cell && tipTarget.cell[0] === c.x && tipTarget.cell[1] === c.y && tipTarget.cell[2] === c.z;
   if (!same) tipTarget = targetForCell(c);
   tipAnchor = { x: e.clientX, y: e.clientY, left: false }; renderTip();

@@ -39,7 +39,7 @@ function renderDrawers(){
   docked.forEach((id, n) => {
     const d = DRAWERS.find(d => d.id === id);
     let sec = host.querySelector(`section[data-drawer="${id}"]`);
-    if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
+    if (!sec){ sec = document.createElement('section'); sec.className = d.fit ? 'drawer fit' : 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
     if (host.children[n] !== sec) host.insertBefore(sec, host.children[n] || null);
     sec.classList.toggle('focus', ui.focus === 'drawer:' + id);
     for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
@@ -56,7 +56,7 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
 }
 function renderGoals(el){
   const rows = drawerRows('goals');

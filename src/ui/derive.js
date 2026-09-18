@@ -23,11 +23,29 @@ function gauges(){
 const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`) || (text != null && ui.mutes.has(`${type}:${campId}:${text}`));
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+/* A mute key as the player reads it. The chip's text may hold a colon, so only the first two are split on. */
+const ALERT_LABEL = { fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
+function muteLabel(m){
+  const i = m.indexOf(':'), j = i < 0 ? -1 : m.indexOf(':', i + 1);
+  const type = i < 0 ? m : m.slice(0, i), kind = `${ALERT_LABEL[type] || type} alerts`;
+  if (i < 0) return `${kind}, everywhere`;
+  const c = camps.find(c => String(c.id) === (j < 0 ? m.slice(i + 1) : m.slice(i + 1, j))), at = c ? c.name : 'a camp that is gone';
+  return j < 0 ? `${kind} at ${at}` : `${m.slice(j + 1)}, at ${at}`;
+}
+
+/* True when the text names this one. Whole words only: 'Ann' is not in 'Anna is cold'. */
+function namesIn(text, name){
+  for (let i = text.indexOf(name); i >= 0; i = text.indexOf(name, i + 1)){
+    const before = text[i - 1], after = text[i + name.length];
+    if (!(before && /\p{L}/u.test(before)) && !(after && /\p{L}/u.test(after))) return true;
+  }
+  return false;
+}
 
 /* The first living person a line names, so the chip can jump to them. The camp's own people come first. */
 function pulseWho(text){
-  const who = campHumans().find(b => text.includes(b.name))
-    || beings.find(b => b.alive && b.species === 'human' && text.includes(b.name));
+  const who = campHumans().find(b => namesIn(text, b.name))
+    || beings.find(b => b.alive && b.species === 'human' && namesIn(text, b.name));
   return who ? who.id : undefined;
 }
 
@@ -141,6 +159,11 @@ function cursorAfter(c, dx, dy, mult, view){
   const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
+/* The cursor when a sector opens. A cursor already in that sector stays, so a hovered centre is kept. Any other keeps its place in its own sector. */
+function cursorInSector(c, sx, sy){
+  const s = secOf(c.x, c.y);
+  return { x: c.x - s.sx * LW + sx * LW, y: c.y - s.sy * LH + sy * LH, z: c.z };
+}
 /* One phrase for what is under the cursor. A being first, then the tile. */
 function cursorPhrase(){
   const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
@@ -158,13 +181,14 @@ function cursorPhrase(){
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
-/* Inspectors share one saved rect, so each new one steps 24 px down and across from the count already open.
+/* Inspectors share one saved rect, so each new one steps 24 px down and across, into the first slot no open inspector holds.
    A drawer window keeps one rect per drawer id and opens where it was left. */
 const WIN_STEP = 24;
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;
   const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
-  const n = kind === 'inspect' ? ui.windows.filter(w => w.kind === 'inspect').length : 0;
+  const held = (n) => ui.windows.some(w => w.kind === 'inspect' && w.x === saved.x + WIN_STEP * n && w.y === saved.y + WIN_STEP * n);
+  let n = 0; if (kind === 'inspect') while (held(n)) n++;
   const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
@@ -193,7 +217,7 @@ function paletteRows(){
   for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
   camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
   for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
-  for (const m of ui.mutes) out.push({ label: `Unmute: ${m}`, key: '', action: 'unmute', arg: m, group: 9 });
+  for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
   for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
   return out;
 }

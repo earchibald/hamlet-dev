@@ -86,6 +86,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
 #drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.drawer.fit{flex:0 1 auto;max-height:40%}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
@@ -105,6 +106,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .pbtn:last-child{border-right:0} .pbtn.on{background:var(--accent);color:var(--accent-ink)}
 .g-done .gt{color:var(--good)} .g-blocked .gt{color:var(--muted)}
 .bar{display:block;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden} .bar i{display:block;height:100%}
+.bar.mood{display:inline-block;width:70px;margin-left:8px;vertical-align:middle}
 #chronicle{list-style:none;margin:0;padding:0}
 #chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
 #chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -120,10 +122,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
-/* The hover and pinned card, as before. */
+/* The hover card. */
 .tip{position:fixed;z-index:10;width:310px;max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;font-size:13px}
-.tip[hidden]{display:none} .tip.pinned{pointer-events:auto;border-color:var(--accent)}
-.tip .close{float:right;margin:-4px -6px 0 8px;padding:0 7px;border:1px solid var(--line);border-radius:5px;background:none;cursor:pointer;line-height:1.5}
+.tip[hidden]{display:none}
 .tip .hist{max-height:150px;overflow:auto}
 .ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
 .ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}

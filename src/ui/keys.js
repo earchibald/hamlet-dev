@@ -1,13 +1,15 @@
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog.
+   'dialog' only inside a dialog. A focused row wins over an 'any' row on the same key.
+   A quiet row works but stays out of the help table.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
+/* A drawer with `fit` is as tall as its rows, up to a cap. The others share the height that is left. */
 const DRAWERS = [
-  { id: 'people',    label: 'People',    key: '1' },
+  { id: 'people',    label: 'People',    key: '1', fit: true },
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
-  { id: 'camp',      label: 'Camp',      key: '4' },
+  { id: 'camp',      label: 'Camp',      key: '4', fit: true },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
@@ -67,7 +69,8 @@ const KEYMAP = [
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
-/* Stage letters are checked before the tool keys below, since those rows fire on any focus and would shadow them. */
+/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick Light fire. */
+KEYMAP.push({ key: 'f',          shift: true, focus: 'window', action: 'follow', label: 'Follow this person', quiet: true });
 for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){
   KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
@@ -89,8 +92,9 @@ function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
-  for (const k of KEYMAP){
-    if (k.focus !== 'any' && k.focus !== kind) continue;
+  /* The focused rows answer first, then the 'any' rows. The order of the table does not decide it. */
+  for (const want of [kind, 'any']) for (const k of KEYMAP){
+    if (k.focus !== want) continue;
     const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
     if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
