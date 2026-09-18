@@ -180,7 +180,13 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 - Poke's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
 - Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
 - Every button prints its key, and `tests/ui.js` fails on one that does not. Movement keys are provisional.
-- The hover card and the pinned card are as before. Floating windows, the tile cursor, one-shot tools, and the command palette are plan B.
+- The hover card and the pinned card are as before.
+- A tile cursor lives on the map. Arrows move it, Shift by five, Ctrl by a sector. Enter applies the tool. Home goes to the hearth, W to the world map at the camp. The mouse moves it too. The foot names what is under it.
+- Tools: Inspect is the default. Light fire and Nudge are one-shot and return to Inspect. Shift with the key or the click keeps them. Camp site left the interface; `setSite` stays in the sim for tests.
+- Floating windows: any drawer pops out with O and docks back with O. Enter or a click on a being or tile opens an inspector window; up to six stand at once, each live, F follows. Positions persist.
+- Alert chips: Alt+number jumps to the cause, Shift+Alt+number opens the mute menu: this chip, this kind here, this kind everywhere. Muted chips are listed in help and in the palette as Unmute rows.
+- Cmd-K or Ctrl-K opens the command palette: every action with its key, and rows for people, goals, camps, sectors, chips, and mutes. G opens the stage chord.
+- Every clickable thing has a key, printed on it. `tests/ui.js` fails on a button without one. Movement keys are provisional; change them in `KEYMAP` only.
 
 ## 14. Testing
 
