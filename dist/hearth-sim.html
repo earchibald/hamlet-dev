@@ -936,10 +936,15 @@ function paintSectors(){
 function paintTile(t, biome, e, f){
   let loose = null;
   switch (biome){
+    /* Before the mythos the first camp always stood in a meadow, and only a meadow carried berries and loose
+       stones. Now the gods can put the camp in a forest or a reed marsh, and a camp there starved and never
+       knapped its axe. So berries grow in the clearings between the pines, nearly as thick as in a meadow, and
+       stones lie under the pine needles and in the reed beds as thick as in the grass. */
     case 'forest':
       if (f > 0.4 && rng() < 0.55) t.feature = 'tree';
       else if (rng() < 0.12) loose = 'stick';
-      else if (rng() < 0.02){ t.feature = 'bush'; t.berries = rint(3); }
+      else if (rng() < 0.06){ t.feature = 'bush'; t.berries = 1 + rint(3); }
+      else if (rng() < 0.015) loose = 'rock';
       break;
     case 'meadow': case 'river':
       if (f > 0.7 && rng() < 0.3) t.feature = 'tree';
@@ -961,6 +966,7 @@ function paintTile(t, biome, e, f){
       else if (rng() < 0.03){ t.feature = 'bush'; t.berries = 1 + rint(3); }
       else if (rng() < 0.03) loose = 'stick';
       else if (rng() < 0.04) t.feature = 'tree';
+      else if (rng() < 0.015) loose = 'rock';
       break;
     case 'ash':
       t.ground = 'ash';
