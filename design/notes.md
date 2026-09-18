@@ -144,12 +144,15 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 
 ## 13. Interface
 
-- World map: whole world at 3 pixels per tile, sector grid, camp markers, sector summary on hover.
-- Nearby view: the sector and its eight neighbours at 9 pixels per tile, drawn from the world map cache. Beings are glyphs. Hover shows the sector summary; a click opens the sector. M cycles sector, nearby, world map. Arrow keys step between sectors in the sector and nearby views.
-- Location view: one sector at 26 pixels per tile. Tools: Inspect (hover shows, click pins, Follow button), Light, Camp site, Poke. Hover cards work with every tool.
-- Goals panel with camp selector, People panel for the selected camp, Chronicle.
-- Rain and winter overlays, firelight glow at night.
-- Every rule change needs a visible trace: a chronicle line, a thought, a goal state, or a tooltip row. The player has to be able to see cause.
+The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. `actions.js` is the only place view state changes; keys and clicks both end there. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+
+- The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
+- Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
+- The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
+- Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
+- Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
+- Every button prints its key, and `tests/ui.js` fails on one that does not. Movement keys are provisional.
+- The hover card and the pinned card are as before. Floating windows, the tile cursor, one-shot tools, and the command palette are plan B.
 
 ## 14. Testing
 
