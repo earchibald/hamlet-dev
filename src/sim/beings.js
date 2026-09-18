@@ -17,6 +17,7 @@ function makeBeing(species, x, y, name, hue){
   if (species === 'human') b.needs.warmth = 80 + rint(20);
   if (species !== 'human') b.name = `${sp.label[0].toUpperCase()}${sp.label.slice(1)} ${b.id}`;
   if (species === 'sprite'){ b.hp = 30; b.grove = null; b.returnAt = 0; b.target = null; }
+  if (species === 'fox' || species === 'wolf') b.den = null;
   return b;
 }
 const beingById = id => beings.find(b => b.id === id);
@@ -312,10 +313,12 @@ function updateBeing(a){
   if (a.species !== 'human' && a.task && a.task.type !== 'flee' && a.task.type !== 'hunt' && a.task.type !== 'stalk' && threatsFor(a).length){ failTask(a); }
   if (a.task && a.task.type !== 'flee'){
     if (a.species === 'human'){
-      const busy = ['drink', 'eat', 'sit', 'sleep'].includes(a.task.type);
+      /* Sitting warms and soothes but never feeds or waters, so it must not block the force below: someone left
+         sitting by the fire while their food or water runs out needs to be pulled off it, not left to starve there. */
+      const busy = ['drink', 'eat', 'sleep'].includes(a.task.type);
       const force = busy ? null : (n.water < 15 && !(a.cooldown.drink > tick)) ? 'drink'
         : (n.food < 15 && !(a.cooldown.eat > tick)) ? 'eat'
-        : (n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
+        : (a.task.type !== 'sit' && n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
       if (force){ failTask(a); if (START[force](a)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + 120; }
     }
     if (a.task && tick - (a.task.started || tick) > 1500) failTask(a);

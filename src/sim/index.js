@@ -22,7 +22,7 @@ const API = `return {
   startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   runTask, dropCarried,
-  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, sectorOfTile, passable, nearestFire, itemAt,
+  legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, sectorOfTile, passable, nearestFire, itemAt,
   near, nearAt, ZMIN, ZMAX, ZOFF, NZ, W, H,
   campHumans, humans, stashFood,
   get camp(){ return camp; }, set camp(c){ camp = c; },

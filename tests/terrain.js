@@ -110,7 +110,8 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
     assert.ok(floors.some(t => t.z === h.storeys), `hill at ${h.x},${h.y} should reach level ${h.storeys}`);
     for (const i of h.tiles){
       const t = api.world[i];
-      assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
+      /* A den pocket at level 0 turns its footprint tiles to cave floor; every other footprint tile stays rock. */
+      if (!t.cave) assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
       const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
       for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
         const qx = Math.min(api.W - 1, Math.max(0, t.x + dx)), qy = Math.min(api.H - 1, Math.max(0, t.y + dy));
@@ -215,5 +216,30 @@ for (const seed of SEEDS) test(`seed ${seed}: rock fell at the hill feet and blo
     } else {
       assert.ok(region.has(api.idx3(c.deep.x, c.deep.y, -2)), 'an open cave reaches its deep chamber');
     }
+  }
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with one mouth, and start in them`, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  const dens = api.caves.filter(c => c.kind === 'den');
+  assert.ok(dens.length >= 1 && dens.length <= 4, `${dens.length} dens`);
+  assert.equal(dens.filter(c => c.owner === 'wolf').length, 1, 'one wolf den');
+  for (const c of dens){
+    const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
+    assert.ok(floors.length >= 2 && floors.length <= 6, `den of ${floors.length} tiles`);
+    const tileSet = new Set(c.tiles);
+    let mouths = 0; for (const t of floors) if (stepList(api, t).some(([x, y, z]) => !tileSet.has(api.tileAt(x, y, z)))) mouths++;
+    assert.equal(mouths, 1, `den at ${c.mouth.x},${c.mouth.y},${c.mouth.z} has ${mouths} tiles touching the outside`);
+    assert.ok(c.exit && c.exit.mouth === c && api.passable(c.exit.x, c.exit.y));
+    const region = api.reachable(c.exit.x, c.exit.y, 0, full);
+    for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `den floor ${t.x},${t.y},${t.z} cannot be reached`);
+    assert.ok(c.story.some(s => s.includes('Dug by foxes')));
+    if (c.owner === 'wolf') assert.ok(c.story.some(s => s.includes('Widened by wolves')));
+  }
+  for (const sp of ['wolf', 'fox']){
+    const homed = api.beings.filter(b => b.species === sp && b.den);
+    assert.ok(homed.length >= 1, `no ${sp} starts in a den`);
+    for (const b of homed) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
   }
 });

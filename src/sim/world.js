@@ -167,6 +167,66 @@ function rockfall(){
     t.ground = 'rock'; c.blocked = t; c.story.push('Fallen rock blocks the way.');
   }
 }
+/* Foxes and wolves dug into the hillsides over generations. A den is a pocket of 2 to 6 tiles at level 0 inside the
+   rock, or a burrow of 2 to 4 tiles on level -1 under a slope. One mouth. The wolf den is on a forest hill when there is one. */
+function digDens(){
+  const forest = hills.filter(h => sectorOfTile(world[h.tiles[0]]).biome === 'forest');
+  const order = shuffle(forest).concat(shuffle(hills.filter(h => !forest.includes(h))));
+  const wants = ['wolf', 'fox', 'fox', 'fox'];
+  for (const owner of wants){
+    for (const h of order){
+      if (digDen(h, owner)) break;
+    }
+  }
+}
+function digDen(h, owner){
+  const set = new Set(h.tiles);
+  const rim = shuffle(rimExits(h, set));
+  /* A burrow's mouth is a slope, which also links up to whatever sits at level 0 in its own and each neighbouring
+     column. So no den, at any level, may take a column already used (or bordered) by another den on this hill. */
+  const usedCols = new Set();
+  for (const other of caves) if (other.hill === h && other.kind === 'den') for (const t of other.tiles) usedCols.add(idx(t.x, t.y));
+  const barred = new Set(usedCols);
+  for (const i of usedCols){ const x = i % W, y = (i - x) / W; for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (inb(nx, ny)) barred.add(idx(nx, ny)); } }
+  for (const [exit, under] of rim){
+    if (barred.has(under)) continue;
+    const ux = under % W, uy = (under - ux) / W;
+    const burrow = rng() < 0.5, z = burrow ? -1 : 0;
+    /* A pocket must stay off the rim except at its mouth, so its other tiles sit one tile inside the footprint. */
+    const inside = i => set.has(i) && !barred.has(i) && (z === -1 || erodedBy(i, set, 1));
+    if (z === 0 && tileAt(ux, uy).cave) continue;
+    const c = makeCave('den', h); c.owner = owner;
+    const mouth = carve(c, ux, uy, z);
+    if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; }
+    if (burrow) mouth.slope = true; c.mouth = mouth; c.exit = exit; exit.mouth = c;
+    const size = burrow ? 2 + rint(3) : 2 + rint(5);
+    let x = ux, y = uy;
+    for (let k = 1; k < size; k++){
+      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && inside(idx(nx, ny)) && !(hasTile(nx, ny, z) && tileAt(nx, ny, z).cave));
+      if (!opts.length) break;
+      [x, y] = opts[0]; carve(c, x, y, z);
+    }
+    if (c.tiles.length < 2){ /* too cramped here: give the tiles back and try another spot */
+      for (const t of c.tiles){ t.cave = null; if (t.z === 0) t.ground = 'rock'; else { levels[t.z + ZOFF][idx(t.x, t.y)] = null; const k = raised.indexOf(t); if (k >= 0) raised.splice(k, 1); } }
+      exit.mouth = null; caves.splice(caves.indexOf(c), 1); continue;
+    }
+    c.story.push('Dug by foxes long before anyone came.');
+    if (owner === 'wolf') c.story.push('Widened by wolves.');
+    return c;
+  }
+  return null;
+}
+/* Put n animals of a species in its dens, two to a wolf den and one to a fox den. Returns how many were placed. */
+function spawnInDens(species, n){
+  let placed = 0;
+  for (const c of caves){
+    if (c.kind !== 'den' || c.owner !== species) continue;
+    const floors = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floors.length) continue;
+    const per = species === 'wolf' ? 2 : 1;
+    for (let j = 0; j < per && placed < n; j++, placed++){ const t = floors[j % floors.length]; const b = makeBeing(species, t.x, t.y, null, 0); b.z = t.z; b.den = c; beings.push(b); }
+  }
+  return placed;
+}
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
    level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
@@ -303,7 +363,7 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  uplift(); cutWaterCaves(); rockfall();
+  uplift(); cutWaterCaves(); rockfall(); digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   /* First person: the centre sector, on open ground near the river if possible. */
@@ -325,8 +385,8 @@ function generate(){
     }
   };
   spawnAnimal('rabbit', ['meadow', 'wetland'], 14);
-  spawnAnimal('fox', ['forest', 'rocky'], 3);
-  spawnAnimal('wolf', ['forest'], 2);
+  spawnAnimal('fox', ['forest', 'rocky'], 3 - spawnInDens('fox', 3));
+  spawnAnimal('wolf', ['forest'], 2 - spawnInDens('wolf', 2));
   /* Groves. The oldest pines in the deepest forests are hollow, and something lives in them. */
   groves = [];
   const forests = sectors.filter(sc => sc.biome === 'forest').map(sc => ({ sc, n: sectorCount(sc, 'trees', t => t.feature === 'tree') })).sort((p, q) => q.n - p.n).slice(0, 3);
