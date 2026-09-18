@@ -175,14 +175,12 @@ The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.j
 - Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
 - The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
 - Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
-- Tools: Inspect, Lightning (key L), Camp site, Poke. Every tool act goes through the door, `inject()`. Speeds run 1, 4, 16, 64.
-- The camp-site tool refuses ground nobody can walk to from where they stand, and it disables itself once the pit is built. The guards live in the door's `site` act, not the interface.
-- Poke's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
 - Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
-- Every button prints its key, and `tests/ui.js` fails on one that does not. Movement keys are provisional.
 - The hover card and the pinned card are as before.
 - A tile cursor lives on the map. Arrows move it, Shift by five, Ctrl by a sector. Enter applies the tool. Home goes to the hearth, W to the world map at the camp. The mouse moves it too. The foot names what is under it.
 - Tools: Inspect is the default. Light fire and Nudge are one-shot and return to Inspect. Shift with the key or the click keeps them. Camp site left the interface; `setSite` stays in the sim for tests.
+- Every act the player makes goes through the door, `inject()`: the `light` act and the `poke` act behind Nudge, and the `priority` act behind a goal row. Speeds run 1, 4, 16, 64.
+- Nudge's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
 - Floating windows: any drawer pops out with O and docks back with O. Enter or a click on a being or tile opens an inspector window; up to six stand at once, each live, F follows. Positions persist.
 - Alert chips: Alt+number jumps to the cause, Shift+Alt+number opens the mute menu: this chip, this kind here, this kind everywhere. Muted chips are listed in help and in the palette as Unmute rows.
 - Cmd-K or Ctrl-K opens the command palette: every action with its key, and rows for people, goals, camps, sectors, chips, and mutes. G opens the stage chord.

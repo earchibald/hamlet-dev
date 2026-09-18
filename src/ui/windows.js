@@ -19,6 +19,7 @@ function renderWindows(){
     el.classList.toggle('focus', ui.focus === `window:${w.id}`);
     el.querySelector('.title').innerHTML = winTitle(w);
     const body = el.querySelector('.body'), keep = body.scrollTop;
+    body.classList.toggle('ins', w.kind === 'inspect');
     if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
     else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
     body.scrollTop = keep;

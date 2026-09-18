@@ -56,7 +56,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #clock{font-weight:700}
 #season,#weather{color:var(--muted)}
 #weather.on{color:var(--warn)}
-#campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em}
+#campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em;white-space:nowrap}
 #camps{display:flex;gap:4px}
 #gauges{display:inline-flex;gap:12px;align-items:center}
 .gauge{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -146,7 +146,7 @@ dialog p{margin:6px 0;color:var(--muted);max-width:66ch}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 table.keys{border-collapse:collapse;font-size:13px;width:100%} table.keys td{padding:2px 6px;border-bottom:1px solid var(--line)} table.keys td:first-child{font-family:"JetBrains Mono",monospace;white-space:nowrap;width:30%}
 dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
-@media (max-width:1100px){
+@media (max-width:1400px){
   .strip{flex-wrap:wrap}
   .strip .world{flex:1 1 auto}
   .strip .camp{flex:1 1 100%;flex-wrap:wrap;min-width:0;padding-left:0;border-left:0}
@@ -175,7 +175,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
-      <button class="btn" id="paletteBtn">⌘K<kbd>Ctrl+K</kbd></button>
+      <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
     </div>
   </header>
@@ -188,7 +188,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
-      <span id="nav"><button class="btn small" id="nW">◀<kbd>←</kbd></button><button class="btn small" id="nN">▲<kbd>↑</kbd></button><button class="btn small" id="nS">▼<kbd>↓</kbd></button><button class="btn small" id="nE">▶<kbd>→</kbd></button></span>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
@@ -202,7 +202,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld">Make world<kbd>Enter</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
 </dialog>
 <dialog id="help">
   <h2>Keys</h2>

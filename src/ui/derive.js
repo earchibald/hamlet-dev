@@ -24,12 +24,19 @@ const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${ty
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 
+/* The first living person a line names, so the chip can jump to them. The camp's own people come first. */
+function pulseWho(text){
+  const who = campHumans().find(b => text.includes(b.name))
+    || beings.find(b => b.alive && b.species === 'human' && text.includes(b.name));
+  return who ? who.id : undefined;
+}
+
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
-    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500 });
+    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500, being: pulseWho(e.text) });
   }
   ui.seenTick = chronicle.length ? chronicle[0].tick : ui.seenTick;
   for (const g of GOALS){
@@ -63,8 +70,9 @@ function alerts(){
   if (g.food && (seasonOf() === 'autumn' || isWinter()) && g.food.level !== 'good') add('food', `Food is short: ${g.food.text}`, 'warn', { tile: camp.stashTile });
   if (g.water && camp.stash.water === 0) add('water', 'No water at camp', 'warn', { tile: camp.stashTile });
   if (camp.pit) for (const b of beings) if (b.alive && b.species === 'wolf' && nearAt(b, ...camp.pit) <= 12){ add('threat', 'A wolf near the camp', 'bad', { being: b.id }); break; }
-  if (camp.fae.known && camp.fae.favor < -20) add('sprites', `Sprite favour is ${camp.fae.favor}`, 'warn', {});
-  if (groves.some(gr => gr.swarmUntil > tick)) add('sprites', 'A grove is out for revenge', 'bad', {});
+  if (camp.fae.known && camp.fae.favor < -20) add('sprites', `Sprite favour is ${camp.fae.favor}`, 'warn', { tile: camp.stone || camp.pit });
+  const swarm = groves.find(gr => gr.swarmUntil > tick);
+  if (swarm) add('sprites', 'A grove is out for revenge', 'bad', { tile: [swarm.x, swarm.y] });
   for (const pu of ui.pulses) add('event', pu.text, 'info', { being: pu.being, tile: pu.tile });
   return out;
 }
@@ -150,9 +158,14 @@ function cursorPhrase(){
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
+/* Inspectors share one saved rect, so each new one steps 24 px down and across from the count already open.
+   A drawer window keeps one rect per drawer id and opens where it was left. */
+const WIN_STEP = 24;
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;
-  const r = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80 + 24 * (ui.windows.length % 5), y: 80 + 24 * (ui.windows.length % 5), w: 330, h: 420 };
+  const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
+  const n = kind === 'inspect' ? ui.windows.filter(w => w.kind === 'inspect').length : 0;
+  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);

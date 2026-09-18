@@ -60,6 +60,7 @@ const KEYMAP = [
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
+  { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
@@ -82,7 +83,8 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 /* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'.
+   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
 function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -93,7 +95,7 @@ function keyAction(e, focus){
     if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
-    return { action: k.action, arg: k.arg };
+    return { action: k.action, arg: k.arg, focus: k.focus };
   }
   return null;
 }
@@ -101,5 +103,7 @@ function keyAction(e, focus){
 /* One printable string for a key map row's chord, for the help table, the buttons, and the palette. */
 function keyName(k){
   const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
-  return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
+  /* Shift shows on a named key and on a letter or a digit. `?` and `>` already carry it in the character. */
+  const shift = k.shift && (k.key.length > 1 || /^[a-z0-9]$/i.test(k.key));
+  return `${k.meta ? '\u2318' : ''}${k.ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${k.alt ? 'Alt+' : ''}${key}`;
 }

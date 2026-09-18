@@ -38,6 +38,8 @@ function drawWorld(){
   if (isWinter()){ wctx.fillStyle = P.snow; wctx.globalAlpha = 0.28; wctx.fillRect(0, 0, W * WS, H * WS); wctx.globalAlpha = 1; }
   const s = whover || (followId ? null : cur);
   if (s){ wctx.strokeStyle = P.select; wctx.lineWidth = 2; wctx.strokeRect(s.sx * LW * WS + 1, s.sy * LH * WS + 1, LW * WS - 2, LH * WS - 2); }
+  /* The cursor's own tile, a dot inside the selected sector. */
+  wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function sectorSummary(s){
   const sticks = looseCount('stick')(s), rocks = looseCount('rock')(s);
@@ -77,6 +79,10 @@ function drawMid(){
   if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
   mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect(LW * MS + 1, LH * MS + 1, LW * MS - 2, LH * MS - 2);
   if (mhover){ mctx.globalAlpha = 0.5; mctx.strokeRect((mhover.sx - cur.sx + 1) * LW * MS + 1, (mhover.sy - cur.sy + 1) * LH * MS + 1, LW * MS - 2, LH * MS - 2); mctx.globalAlpha = 1; }
+  /* The cursor's own tile, when it lies inside the nine sectors on show. */
+  if (cursor.x >= ox && cursor.x < ox + 3 * LW && cursor.y >= oy && cursor.y < oy + 3 * LH){
+    mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect((cursor.x - ox) * MS, (cursor.y - oy) * MS, MS, MS);
+  }
 }
 
 /* ---- location view ---- */

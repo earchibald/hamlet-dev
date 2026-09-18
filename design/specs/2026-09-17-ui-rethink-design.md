@@ -49,7 +49,7 @@ The page is a CSS grid that fills the window: one strip row and one map row. The
 +--------------------------------------------------------------------------+
 ```
 
-The strip is one line at any width above 1100 px. Below that the camp half wraps to a second line. Below 800 px the drawers become full-height overlays and only one is open at a time. Touch is out of scope, but the layout must not break.
+The strip is one line at any width above 1400 px. Below 1400 px the camp half wraps to a second line. The controls gained 64×, Goals, and the palette, so the one-line strip needs 1400 px. Below 800 px the drawers become full-height overlays and only one is open at a time. Touch is out of scope, but the layout must not break.
 
 The blurb, the seed box, the legend, and Things to try leave the main screen. The blurb and seed go to the start dialog. The legend and Things to try go to the help dialog under `?`.
 

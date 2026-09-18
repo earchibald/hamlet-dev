@@ -84,6 +84,11 @@ test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', () 
   const before = api.alerts().filter(x => x.type === 'event').length;
   api.log('Someone saw the smoke. Test comes over the hills.', [], 'major'); api.notePulses();
   assert.equal(api.alerts().filter(x => x.type === 'event').length, before + 1);
+  const who = api.campHumans()[0];
+  api.tick = api.tick + 1; /* notePulses reads lines newer than the tick it last saw */
+  api.log(`${who.name} finds a fine flat stone.`, [], 'major'); api.notePulses();
+  const chip = api.alerts().find(x => x.type === 'event' && x.text.includes(who.name));
+  assert.ok(chip, 'the named line is a chip'); assert.equal(chip.being, who.id, 'the chip knows its cause');
   api.tick = api.tick + 1600; api.notePulses();
   assert.ok(!api.alerts().some(x => x.type === 'event' && x.text.includes('Test comes over the hills')), 'pulse gone');
 });
@@ -124,8 +129,10 @@ test('stages: an idle recipe folds, an idle standing goal written by hand does n
   assert.equal(hand.hidden, false, 'an idle standing goal stays on the list');
 });
 
-const KEYS = ['KEYMAP', 'keyAction', 'ACTIONS'];
+const KEYS = ['KEYMAP', 'keyAction', 'keyName', 'ACTIONS'];
 const ev = (key, mods = {}) => ({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods });
+/* keyAction also returns the matched row's focus. These tests care about the action and its argument. */
+const keyHit = (api, e, focus) => { const h = api.keyAction(e, focus); return h && { action: h.action, arg: h.arg }; };
 
 test('every key map entry names an action that exists', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -134,20 +141,20 @@ test('every key map entry names an action that exists', () => {
 
 test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the map and the row in a drawer, numbers toggle drawers on the map and pick rows in one', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  assert.deepEqual(api.keyAction(ev('Escape'), 'map'), { action: 'back', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('Escape'), 'drawer:goals'), { action: 'back', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'map'), { action: 'cursor', arg: [-1, 0, 1] });
-  assert.deepEqual(api.keyAction(ev('ArrowDown'), 'drawer:people'), { action: 'rowDown', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'drawer:goals'), { action: 'priorityDown', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('2'), 'map'), { action: 'drawer', arg: 'goals' });
-  assert.deepEqual(api.keyAction(ev('2'), 'drawer:people'), { action: 'rowPick', arg: 2 });
-  assert.deepEqual(api.keyAction(ev('Tab'), 'drawer:people'), { action: 'focusNext', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('Tab', { shiftKey: true }), 'map'), { action: 'focusPrev', arg: undefined });
-  assert.deepEqual(api.keyAction(ev(' '), 'drawer:goals'), { action: 'pause', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('.'), 'map'), { action: 'step', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('>', { shiftKey: true }), 'map'), { action: 'hour', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('F2'), 'map'), { action: 'campN', arg: 2 });
-  assert.equal(api.keyAction(ev('q'), 'map'), null);
+  assert.deepEqual(keyHit(api, ev('Escape'), 'map'), { action: 'back', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('Escape'), 'drawer:goals'), { action: 'back', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('ArrowLeft'), 'map'), { action: 'cursor', arg: [-1, 0, 1] });
+  assert.deepEqual(keyHit(api, ev('ArrowDown'), 'drawer:people'), { action: 'rowDown', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('ArrowLeft'), 'drawer:goals'), { action: 'priorityDown', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('2'), 'map'), { action: 'drawer', arg: 'goals' });
+  assert.deepEqual(keyHit(api, ev('2'), 'drawer:people'), { action: 'rowPick', arg: 2 });
+  assert.deepEqual(keyHit(api, ev('Tab'), 'drawer:people'), { action: 'focusNext', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('Tab', { shiftKey: true }), 'map'), { action: 'focusPrev', arg: undefined });
+  assert.deepEqual(keyHit(api, ev(' '), 'drawer:goals'), { action: 'pause', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('.'), 'map'), { action: 'step', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('>', { shiftKey: true }), 'map'), { action: 'hour', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('F2'), 'map'), { action: 'campN', arg: 2 });
+  assert.equal(keyHit(api, ev('q'), 'map'), null);
 });
 
 /* Buttons rendered by the interface, not by the template. */
@@ -162,6 +169,65 @@ test('every template button prints a key, and every keyed button id is in the te
   }
   const ids = new Set([...html.matchAll(/<button[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
   for (const k of api.KEYMAP) if (k.button && !RUNTIME.includes(k.button)) assert.ok(ids.has(k.button), `key map names button #${k.button}, which is not in the template`);
+});
+
+const unesc = t => t.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+const ARROW = { ArrowLeft: '\u2190', ArrowRight: '\u2192', ArrowUp: '\u2191', ArrowDown: '\u2193' };
+
+test('every keyed button in the template prints that row\u2019s key, exactly as keyName writes it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  const kbd = {};
+  for (const m of html.matchAll(/<button\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/button>/g)){
+    const k = m[2].match(/<kbd>([\s\S]*?)<\/kbd>/);
+    if (k) kbd[m[1]] = unesc(k[1]);
+  }
+  let checked = 0;
+  for (const k of api.KEYMAP){
+    if (!k.button || !(k.button in kbd)) continue;
+    assert.equal(kbd[k.button], api.keyName(k), `button #${k.button} prints ${kbd[k.button]}, the row says ${api.keyName(k)}`);
+    if (ARROW[k.key]) assert.ok(kbd[k.button].includes(ARROW[k.key]), `button #${k.button} shows no arrow`);
+    checked++;
+  }
+  assert.ok(checked >= 12, `only ${checked} template buttons carry a key map row`);
+});
+
+test('keyName prints the modifiers: \u2318K, Ctrl+K, Shift+F, Shift+Alt+1, and no Shift on ? or >', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  const named = l => api.KEYMAP.filter(k => k.label === l);
+  assert.equal(api.keyName(named('Command palette').find(k => k.meta)), '\u2318K');
+  assert.equal(api.keyName(named('Command palette').find(k => k.ctrl)), 'Ctrl+K');
+  assert.equal(api.keyName(named('Light fire, and keep it')[0]), 'Shift+F');
+  assert.equal(api.keyName(named('Nudge, and keep it')[0]), 'Shift+N');
+  assert.equal(api.keyName(named('Mute alert 1')[0]), 'Shift+Alt+1');
+  assert.equal(api.keyName(named('Jump to alert 1')[0]), 'Alt+1');
+  assert.equal(api.keyName(named('Help')[0]), '?');
+  assert.equal(api.keyName(named('Step one hour')[0]), '>');
+  assert.equal(api.keyName(named('New world')[0]), 'Ctrl+N');
+  assert.equal(api.keyName(named('A sector west')[0]), 'Ctrl+\u2190');
+  assert.equal(api.keyName(named('Previous panel')[0]), 'Shift+Tab');
+});
+
+test('Esc answers from every focus: the map, a drawer, a window, and each dialog', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  for (const focus of ['map', 'drawer:goals', 'window:3', 'dialog:mute', 'dialog:palette', 'dialog', 'dialog:chord']){
+    const hit = api.keyAction(ev('Escape'), focus);
+    assert.ok(hit, `Esc from ${focus} finds no row`);
+    assert.equal(hit.action, 'back', `Esc from ${focus} runs ${hit.action}`);
+  }
+});
+
+test('the palette lists every static action', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS, 'paletteRows']);
+  api.startWorld('r'); api.camp = api.camps[0]; api.notePulses();
+  const labels = new Set(api.paletteRows().map(r => r.label));
+  const seen = new Set();
+  for (const k of api.KEYMAP){
+    if (k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
+    if (seen.has(k.label)) continue; seen.add(k.label);
+    assert.ok(labels.has(k.label), `the palette has no row for ${k.label}`);
+  }
+  assert.ok(labels.has('New world'), 'the palette opens Start');
 });
 
 test('every key map row has a focus the dispatcher knows', () => {
@@ -214,12 +280,12 @@ test('the cursor phrase names a being under it, else the tile', () => {
 
 test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter applies, Home and W jump', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  assert.deepEqual(api.keyAction(ev('ArrowRight'), 'map'), { action: 'cursor', arg: [1, 0, 1] });
-  assert.deepEqual(api.keyAction(ev('ArrowRight', { shiftKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 5] });
-  assert.deepEqual(api.keyAction(ev('ArrowRight', { ctrlKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 'sector'] });
-  assert.deepEqual(api.keyAction(ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('Home'), 'map'), { action: 'home', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('w'), 'map'), { action: 'worldHere', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('ArrowRight'), 'map'), { action: 'cursor', arg: [1, 0, 1] });
+  assert.deepEqual(keyHit(api, ev('ArrowRight', { shiftKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 5] });
+  assert.deepEqual(keyHit(api, ev('ArrowRight', { ctrlKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 'sector'] });
+  assert.deepEqual(keyHit(api, ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('Home'), 'map'), { action: 'home', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('w'), 'map'), { action: 'worldHere', arg: undefined });
 });
 
 const WIN = [...DERIVE, 'winOpen', 'winClose', 'winFind', 'focusRing', 'WIN_MAX'];
@@ -228,6 +294,11 @@ test('windows: open reuses a window for the same target, the seventh inspector c
   const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
   const w1 = api.winOpen('inspect', { being: 1 });
   assert.equal(api.winOpen('inspect', { being: 1 }), w1, 'same target, same window');
+  const w2 = api.winOpen('inspect', { being: 2 });
+  assert.notEqual(w2.x, w1.x, 'a second inspector steps across'); assert.notEqual(w2.y, w1.y, 'and down');
+  api.ui.rects.inspect = { x: 200, y: 150, w: 330, h: 420 };
+  const w3 = api.winOpen('inspect', { being: 3 });
+  assert.equal(w3.x, 200 + 24 * 2, 'a saved rect is the base, not the whole answer'); assert.equal(w3.y, 150 + 24 * 2);
   for (let i = 2; i <= 7; i++) api.winOpen('inspect', { being: i });
   assert.equal(api.ui.windows.filter(w => w.kind === 'inspect').length, api.WIN_MAX);
   assert.equal(api.winFind('inspect', { being: 1 }), undefined, 'the oldest went');
@@ -240,10 +311,10 @@ test('windows: open reuses a window for the same target, the seventh inspector c
 
 test('window keys: O pops out or docks, Esc closes a focused window, Tab walks the ring', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  assert.deepEqual(api.keyAction(ev('o'), 'drawer:goals'), { action: 'popOut', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('o'), 'window:3'), { action: 'popOut', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('Escape'), 'window:3'), { action: 'back', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('o'), 'drawer:goals'), { action: 'popOut', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('o'), 'window:3'), { action: 'popOut', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('Escape'), 'window:3'), { action: 'back', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
 });
 
 test('tools: three, inspect first, light fire and nudge one-shot, no camp site', () => {
@@ -251,17 +322,17 @@ test('tools: three, inspect first, light fire and nudge one-shot, no camp site',
   assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'nudge']);
   assert.equal(api.TOOLS[0].oneShot, false); assert.equal(api.TOOLS[1].oneShot, true); assert.equal(api.TOOLS[2].oneShot, true);
   assert.equal(api.TOOLS[1].label, 'Light fire'); assert.equal(api.TOOLS[2].label, 'Nudge');
-  assert.deepEqual(api.keyAction(ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });
-  assert.deepEqual(api.keyAction(ev('f'), 'window:2'), { action: 'follow', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('f'), 'map'), { action: 'tool', arg: 'light' });
-  assert.equal(api.keyAction(ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
+  assert.deepEqual(keyHit(api, ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });
+  assert.deepEqual(keyHit(api, ev('f'), 'window:2'), { action: 'follow', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('f'), 'map'), { action: 'tool', arg: 'light' });
+  assert.equal(keyHit(api, ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
 });
 
 test('chip keys: Alt+n jumps, Shift+Alt+n opens the mute menu, and a single chip can be muted by its text', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS]);
-  assert.deepEqual(api.keyAction(ev('3', { altKey: true }), 'map'), { action: 'jumpChip', arg: 3 });
-  assert.deepEqual(api.keyAction(ev('3', { altKey: true, shiftKey: true }), 'drawer:goals'), { action: 'muteMenu', arg: 3 });
-  assert.deepEqual(api.keyAction(ev('2'), 'dialog:mute'), { action: 'muteChoice', arg: 2 });
+  assert.deepEqual(keyHit(api, ev('3', { altKey: true }), 'map'), { action: 'jumpChip', arg: 3 });
+  assert.deepEqual(keyHit(api, ev('3', { altKey: true, shiftKey: true }), 'drawer:goals'), { action: 'muteMenu', arg: 3 });
+  assert.deepEqual(keyHit(api, ev('2'), 'dialog:mute'), { action: 'muteChoice', arg: 2 });
   api.startWorld('r'); api.camp = api.camps[0]; const a = api.beings[0]; a.needs.warmth = 10; api.notePulses();
   const cold = api.alerts().find(x => x.type === 'cold'); assert.ok(cold);
   api.mute('cold', api.camp.id, cold.text);
@@ -288,12 +359,12 @@ test('palette rows list every static action once with its key, and the dynamic r
 
 test('palette and chord keys', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  assert.deepEqual(api.keyAction(ev('k', { metaKey: true }), 'map'), { action: 'palette', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('k', { ctrlKey: true }), 'drawer:people'), { action: 'palette', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('g'), 'map'), { action: 'chord', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('f'), 'dialog:chord'), { action: 'stage', arg: 'fire' });
-  assert.deepEqual(api.keyAction(ev('ArrowDown'), 'dialog:palette'), { action: 'paletteMove', arg: 1 });
-  assert.deepEqual(api.keyAction(ev('Enter'), 'dialog:palette'), { action: 'paletteRun', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('k', { metaKey: true }), 'map'), { action: 'palette', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('k', { ctrlKey: true }), 'drawer:people'), { action: 'palette', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('g'), 'map'), { action: 'chord', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('f'), 'dialog:chord'), { action: 'stage', arg: 'fire' });
+  assert.deepEqual(keyHit(api, ev('ArrowDown'), 'dialog:palette'), { action: 'paletteMove', arg: 1 });
+  assert.deepEqual(keyHit(api, ev('Enter'), 'dialog:palette'), { action: 'paletteRun', arg: undefined });
 });
 
 module.exports = { loadUI };

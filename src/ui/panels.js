@@ -11,8 +11,6 @@ function renderUI(force){
   const s = sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('tools').hidden = view !== 'loc';
-  const campBtn = document.querySelector('#tools [data-tool="camp"]');
-  if (campBtn){ campBtn.disabled = !!(viewCamp && viewCamp.pit); campBtn.title = campBtn.disabled ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === 'camp').hint; }
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
@@ -73,7 +71,7 @@ function renderGoals(el){
 /* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
 const CHRON_ROWS = 300;
 function renderChronicle(el){
-  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (ui.focus === 'drawer:chronicle' ? ui.row.chronicle : -1);
+  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (focusedDrawer() === 'chronicle' ? ui.row.chronicle : -1);
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const rows = drawerRows('chronicle');

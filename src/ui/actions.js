@@ -46,7 +46,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
 }
 function applyTool(c, e){
   switch (tool){
@@ -66,7 +66,20 @@ function openDrawer(id, on){
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
-function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true); }
+/* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
+const INS_SCROLL = 48;
+function rowMove(d){
+  const id = focusedDrawer();
+  if (!id){
+    if (!ui.focus.startsWith('window:')) return;
+    const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7)));
+    if (!w || w.kind !== 'inspect') return;
+    const body = document.querySelector(`#windows [data-win="${w.id}"] .body`);
+    if (body) body.scrollTop += d * INS_SCROLL;
+    return;
+  }
+  const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true);
+}
 function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
 function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
@@ -102,6 +115,8 @@ const ACTIONS = {
   back(){
     if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
     if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
+    if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
     if (tipPinned) hideTip();
   },
   rowUp(){ rowMove(-1); },
@@ -114,6 +129,7 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  newWorld(){ openStart(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
     if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }

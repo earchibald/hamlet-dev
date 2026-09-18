@@ -31,7 +31,11 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  $('start').addEventListener('close', () => { ui.focus = 'map'; newWorld($('seed').value.trim() || randomSeed()); });
+  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  $('start').addEventListener('close', () => {
+    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
+    if (make) newWorld($('seed').value.trim() || randomSeed());
+  });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
@@ -72,7 +76,8 @@ function initUI(){
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
-      const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
+      /* Under a dialog only that dialog's own rows fire. An 'any' row would pause the sim or cycle the view behind the modal. */
+      const hit = keyAction(e, ui.focus); if (hit && hit.focus !== 'any'){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
     }
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);

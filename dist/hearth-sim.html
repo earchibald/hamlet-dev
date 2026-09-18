@@ -56,7 +56,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #clock{font-weight:700}
 #season,#weather{color:var(--muted)}
 #weather.on{color:var(--warn)}
-#campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em}
+#campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em;white-space:nowrap}
 #camps{display:flex;gap:4px}
 #gauges{display:inline-flex;gap:12px;align-items:center}
 .gauge{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -146,7 +146,7 @@ dialog p{margin:6px 0;color:var(--muted);max-width:66ch}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 table.keys{border-collapse:collapse;font-size:13px;width:100%} table.keys td{padding:2px 6px;border-bottom:1px solid var(--line)} table.keys td:first-child{font-family:"JetBrains Mono",monospace;white-space:nowrap;width:30%}
 dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
-@media (max-width:1100px){
+@media (max-width:1400px){
   .strip{flex-wrap:wrap}
   .strip .world{flex:1 1 auto}
   .strip .camp{flex:1 1 100%;flex-wrap:wrap;min-width:0;padding-left:0;border-left:0}
@@ -175,7 +175,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
-      <button class="btn" id="paletteBtn">⌘K<kbd>Ctrl+K</kbd></button>
+      <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
     </div>
   </header>
@@ -188,7 +188,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
-      <span id="nav"><button class="btn small" id="nW">◀<kbd>←</kbd></button><button class="btn small" id="nN">▲<kbd>↑</kbd></button><button class="btn small" id="nS">▼<kbd>↓</kbd></button><button class="btn small" id="nE">▶<kbd>→</kbd></button></span>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
@@ -202,7 +202,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld">Make world<kbd>Enter</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
 </dialog>
 <dialog id="help">
   <h2>Keys</h2>
@@ -3041,12 +3041,19 @@ const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${ty
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 
+/* The first living person a line names, so the chip can jump to them. The camp's own people come first. */
+function pulseWho(text){
+  const who = campHumans().find(b => text.includes(b.name))
+    || beings.find(b => b.alive && b.species === 'human' && text.includes(b.name));
+  return who ? who.id : undefined;
+}
+
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
   ui.pulses = ui.pulses.filter(p => p.until > tick);
   for (const e of chronicle){
     if (e.tick <= ui.seenTick) break;
-    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500 });
+    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500, being: pulseWho(e.text) });
   }
   ui.seenTick = chronicle.length ? chronicle[0].tick : ui.seenTick;
   for (const g of GOALS){
@@ -3080,8 +3087,9 @@ function alerts(){
   if (g.food && (seasonOf() === 'autumn' || isWinter()) && g.food.level !== 'good') add('food', `Food is short: ${g.food.text}`, 'warn', { tile: camp.stashTile });
   if (g.water && camp.stash.water === 0) add('water', 'No water at camp', 'warn', { tile: camp.stashTile });
   if (camp.pit) for (const b of beings) if (b.alive && b.species === 'wolf' && nearAt(b, ...camp.pit) <= 12){ add('threat', 'A wolf near the camp', 'bad', { being: b.id }); break; }
-  if (camp.fae.known && camp.fae.favor < -20) add('sprites', `Sprite favour is ${camp.fae.favor}`, 'warn', {});
-  if (groves.some(gr => gr.swarmUntil > tick)) add('sprites', 'A grove is out for revenge', 'bad', {});
+  if (camp.fae.known && camp.fae.favor < -20) add('sprites', `Sprite favour is ${camp.fae.favor}`, 'warn', { tile: camp.stone || camp.pit });
+  const swarm = groves.find(gr => gr.swarmUntil > tick);
+  if (swarm) add('sprites', 'A grove is out for revenge', 'bad', { tile: [swarm.x, swarm.y] });
   for (const pu of ui.pulses) add('event', pu.text, 'info', { being: pu.being, tile: pu.tile });
   return out;
 }
@@ -3167,9 +3175,14 @@ function cursorPhrase(){
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
+/* Inspectors share one saved rect, so each new one steps 24 px down and across from the count already open.
+   A drawer window keeps one rect per drawer id and opens where it was left. */
+const WIN_STEP = 24;
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;
-  const r = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80 + 24 * (ui.windows.length % 5), y: 80 + 24 * (ui.windows.length % 5), w: 330, h: 420 };
+  const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
+  const n = kind === 'inspect' ? ui.windows.filter(w => w.kind === 'inspect').length : 0;
+  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
@@ -3276,6 +3289,7 @@ const KEYMAP = [
   { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
+  { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
@@ -3298,7 +3312,8 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 /* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'.
+   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
 function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -3309,7 +3324,7 @@ function keyAction(e, focus){
     if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
-    return { action: k.action, arg: k.arg };
+    return { action: k.action, arg: k.arg, focus: k.focus };
   }
   return null;
 }
@@ -3317,7 +3332,9 @@ function keyAction(e, focus){
 /* One printable string for a key map row's chord, for the help table, the buttons, and the palette. */
 function keyName(k){
   const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
-  return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
+  /* Shift shows on a named key and on a letter or a digit. `?` and `>` already carry it in the character. */
+  const shift = k.shift && (k.key.length > 1 || /^[a-z0-9]$/i.test(k.key));
+  return `${k.meta ? '\u2318' : ''}${k.ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${k.alt ? 'Alt+' : ''}${key}`;
 }
 
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
@@ -3360,6 +3377,8 @@ function drawWorld(){
   if (isWinter()){ wctx.fillStyle = P.snow; wctx.globalAlpha = 0.28; wctx.fillRect(0, 0, W * WS, H * WS); wctx.globalAlpha = 1; }
   const s = whover || (followId ? null : cur);
   if (s){ wctx.strokeStyle = P.select; wctx.lineWidth = 2; wctx.strokeRect(s.sx * LW * WS + 1, s.sy * LH * WS + 1, LW * WS - 2, LH * WS - 2); }
+  /* The cursor's own tile, a dot inside the selected sector. */
+  wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function sectorSummary(s){
   const sticks = looseCount('stick')(s), rocks = looseCount('rock')(s);
@@ -3399,6 +3418,10 @@ function drawMid(){
   if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
   mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect(LW * MS + 1, LH * MS + 1, LW * MS - 2, LH * MS - 2);
   if (mhover){ mctx.globalAlpha = 0.5; mctx.strokeRect((mhover.sx - cur.sx + 1) * LW * MS + 1, (mhover.sy - cur.sy + 1) * LH * MS + 1, LW * MS - 2, LH * MS - 2); mctx.globalAlpha = 1; }
+  /* The cursor's own tile, when it lies inside the nine sectors on show. */
+  if (cursor.x >= ox && cursor.x < ox + 3 * LW && cursor.y >= oy && cursor.y < oy + 3 * LH){
+    mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect((cursor.x - ox) * MS, (cursor.y - oy) * MS, MS, MS);
+  }
 }
 
 /* ---- location view ---- */
@@ -3606,7 +3629,8 @@ function renderClock(){
 }
 function renderStrip(){
   renderClock();
-  $('campName').textContent = camp.name + (camp.village ? ', a village' : '');
+  /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
+  $('campName').textContent = camp.name;
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
@@ -3634,6 +3658,7 @@ function renderWindows(){
     el.classList.toggle('focus', ui.focus === `window:${w.id}`);
     el.querySelector('.title').innerHTML = winTitle(w);
     const body = el.querySelector('.body'), keep = body.scrollTop;
+    body.classList.toggle('ins', w.kind === 'inspect');
     if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
     else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
     body.scrollTop = keep;
@@ -3678,8 +3703,6 @@ function renderUI(force){
   const s = sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('tools').hidden = view !== 'loc';
-  const campBtn = document.querySelector('#tools [data-tool="camp"]');
-  if (campBtn){ campBtn.disabled = !!(viewCamp && viewCamp.pit); campBtn.title = campBtn.disabled ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === 'camp').hint; }
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
@@ -3740,7 +3763,7 @@ function renderGoals(el){
 /* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
 const CHRON_ROWS = 300;
 function renderChronicle(el){
-  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (ui.focus === 'drawer:chronicle' ? ui.row.chronicle : -1);
+  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (focusedDrawer() === 'chronicle' ? ui.row.chronicle : -1);
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
@@ -3853,7 +3876,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
 }
 function applyTool(c, e){
   switch (tool){
@@ -3873,7 +3896,20 @@ function openDrawer(id, on){
   ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
-function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true); }
+/* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
+const INS_SCROLL = 48;
+function rowMove(d){
+  const id = focusedDrawer();
+  if (!id){
+    if (!ui.focus.startsWith('window:')) return;
+    const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7)));
+    if (!w || w.kind !== 'inspect') return;
+    const body = document.querySelector(`#windows [data-win="${w.id}"] .body`);
+    if (body) body.scrollTop += d * INS_SCROLL;
+    return;
+  }
+  const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true);
+}
 function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
 function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
@@ -3909,6 +3945,8 @@ const ACTIONS = {
   back(){
     if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
     if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
+    if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
     if (tipPinned) hideTip();
   },
   rowUp(){ rowMove(-1); },
@@ -3921,6 +3959,7 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  newWorld(){ openStart(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
     if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
@@ -3977,7 +4016,11 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  $('start').addEventListener('close', () => { ui.focus = 'map'; newWorld($('seed').value.trim() || randomSeed()); });
+  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  $('start').addEventListener('close', () => {
+    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
+    if (make) newWorld($('seed').value.trim() || randomSeed());
+  });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
@@ -4018,7 +4061,8 @@ function initUI(){
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
-      const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
+      /* Under a dialog only that dialog's own rows fire. An 'any' row would pause the sim or cycle the view behind the modal. */
+      const hit = keyAction(e, ui.focus); if (hit && hit.focus !== 'any'){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
     }
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
