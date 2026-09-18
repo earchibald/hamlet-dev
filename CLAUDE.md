@@ -13,6 +13,10 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/lib/run.js`: the shared runner. The script god, the event collector, the counters, and the fingerprint.
 - `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
 - `tests/crafts.js`: each recipe through the real offers. Fast.
+- `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
+- `tests/closing.js`: the cave goals, den contention, site scoring, and lightning. Fast.
+- `tests/door.js`: every act through `inject()`, logged whether it lands or not. Fast.
+- `tests/options.js`: world size and the level range at start. Fast.
 
 ## Rules of work
 - Write in plain English in the game's text. One idea per sentence.

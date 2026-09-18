@@ -7,7 +7,7 @@ const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',   hint: 'Point at a person, an animal, or a tile. Click to pin the details open.' },
-  { id: 'light',   key: 'f', label: 'Light',     hint: 'Click the fire pit to light it. Click anything else, and you start a wildfire. The hover card shows what will burn.' },
+  { id: 'light',   key: 'l', label: 'Lightning', hint: 'Click the fire pit to strike it alight. Click anything else, and lightning strikes there: a pine smoulders long enough to fetch an ember, grass burns. The hover card shows what will burn.' },
   { id: 'camp',    key: 'c', label: 'Camp site', hint: 'Click open ground to move the camp site. Only until the pit is built.' },
   { id: 'poke',    key: 'p', label: 'Poke',      hint: 'Click a person to make them drop what they are doing and think again. Click an animal to startle it.' },
 ];
@@ -221,7 +221,7 @@ function inspectTile(x, y, z = 0){
   if (GROUND[t.ground].quarry) rows.push(['Rock face', t.quarried ? 'quarried. Rocks come from here.' : 'rocks can be quarried here with the axe.']);
   if (t.slope) rows.push(['Slope', `a way up to ${levelName(z + 1).toLowerCase()}.`]);
   if (t.mouth) rows.push(['Cave mouth', `a way ${t.mouth.mouth.z === 0 ? 'in' : 'down'}. ${t.mouth.story.join(' ')}`]);
-  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}`]);
+  if (t.cave) rows.push([t.cave.kind === 'den' ? 'Den' : t.cave.kind === 'hollow' ? 'Hollow' : t.cave.kind === 'burrow' ? 'Burrow' : 'Cave', `${t.cave.story.join(' ')}${t.cave.owner ? ` ${t.cave.owner === 'sprite' ? 'Sprites' : t.cave.owner === 'wolf' ? 'Wolves' : t.cave.owner === 'gnome' ? 'Gnomes' : 'Foxes'} live here.` : ''}${t.cave.abandoned ? ' Abandoned.' : ''}${t.cave.searched ? ` Searched by ${t.cave.searched.name}.` : ''}${t.cave.cleared ? ` Cleared by ${t.cave.cleared.name}.` : ''}`]);
   if (t.cave && t.cave.blocked === t) rows.push(['Fallen rock', 'blocks the way. Tools could clear it.']);
   if (z < 0) rows.push(['Dark', 'People need a burning ember down here.']);
   const here = items.filter(i => i.x === x && i.y === y && i.z === z); if (here.length) rows.push(['Loose', here.map(i => ITEMS[i.kind].name).join(', ')]);
@@ -284,9 +284,13 @@ function renderUI(force){
   $('camps').innerHTML = camps.length > 1 ? camps.map(c => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}</button>`).join('') : '';
   const s = sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = view === 'world' ? 'World map' : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy}`;
+  $('viewcamp').textContent = view === 'loc' && camps.length > 1 ? `tools act on ${viewCamp.name}` : '';
   $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
+  const campBtn = document.querySelector('#tools [data-tool="camp"]');
+  campBtn.disabled = !!(viewCamp && viewCamp.pit);
+  campBtn.title = campBtn.disabled ? 'The fire pit is built. The camp stays where it is.' : '';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
   if (view !== 'world') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
     const b = $(id), nx = cur.sx + dx, ny = cur.sy + dy, ok = nx >= 0 && ny >= 0 && nx < SW && ny < SH;
@@ -311,7 +315,12 @@ function renderUI(force){
   if (force || key !== chronKey){ chronKey = key; $('chronicle').innerHTML = chronicle.map(e => `<li class="k-${e.kind}"><span class="when">${e.when}</span> ${e.text}</li>`).join(''); }
 }
 function say(msg){ $('hint').textContent = msg; }
-function setTool(id){ tool = id; document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); say(TOOLS.find(t => t.id === id).hint); if (tipPinned) hideTip(); }
+function setTool(id){
+  tool = id;
+  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  say(id === 'camp' && viewCamp && viewCamp.pit ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === id).hint);
+  if (tipPinned) hideTip();
+}
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); }
 function setPaused(p){ paused = p; $('pause').textContent = p ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -338,7 +347,11 @@ function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
     case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
-    case 'camp': camp = viewCamp; say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z })); break;
+    case 'camp': {
+      camp = viewCamp;
+      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z, camp: viewCamp.id }));
+      break;
+    }
     case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   renderUI(true);
@@ -363,7 +376,7 @@ function initUI(){
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false">${t.label}<kbd>${t.key.toUpperCase()}</kbd></button>`).join('');
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
-  $('speeds').innerHTML = [1, 4, 16].map(s => `<button class="btn" data-speed="${s}">${s}×</button>`).join('');
+  $('speeds').innerHTML = [1, 4, 16, 64].map(s => `<button class="btn" data-speed="${s}">${s}×</button>`).join('');
   $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b){ setSpeed(Number(b.dataset.speed)); setPaused(false); } });
   $('pause').addEventListener('click', () => setPaused(!paused));
   $('stepBtn').addEventListener('click', () => { setPaused(true); for (let k = 0; k < 2; k++) step(); renderUI(true); });

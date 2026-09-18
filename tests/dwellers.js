@@ -73,12 +73,21 @@ test('an edge-arrived fox joins the fox den with room for a pair', () => {
   assert.equal(f.den, den, 'the arriving fox should join the den with room for it');
 });
 
-test('an edge-arrived fox does not join a den already home to a pair', () => {
+test('an edge-arrived wolf does not join a den already home to a pair', () => {
   const { api, den } = denned('wolf'); /* the wolf den on seed r starts with two grown owners */
   const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
   api.beings.push(w);
   api.adoptDen(w);
   assert.notEqual(w.den, den, 'a full den should not take a third owner');
+});
+
+test('an edge-arrived wolf does not join a den the camp holds', () => {
+  const { api, den } = denned('wolf');
+  den.cleared = api.camps[0];
+  const t = den.exit; const w = api.makeBeing('wolf', t.x, t.y, null, 0);
+  api.beings.push(w);
+  api.adoptDen(w);
+  assert.equal(w.den, null, 'a cleared den should give the arrival no den');
 });
 
 test('a den with two adults bears one young in spring, once a year', () => {
@@ -106,6 +115,19 @@ test('a person who walks into a wolf den is attacked, brand or no brand, by day'
   assert.ok(h.hp < 100, 'the wolf should have bitten');
   assert.ok(h.thoughts.some(t => t.key === 'denbite'));
   assert.ok(api.chronicle.some(e => e.text.includes('in its den')));
+});
+
+test('one bite per den per 150 ticks: two adult wolves at home only bite once between them', () => {
+  const { api, b, den } = denned('wolf');
+  const owners = api.beings.filter(o => o.alive && o.species === 'wolf' && o.den === den);
+  assert.equal(owners.length, 2, 'the wolf den on seed r starts with two grown owners');
+  const t = den.tiles.find(t => api.passable(t.x, t.y, t.z));
+  for (const w of owners){ w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; w.cooldown = {}; }
+  api.tick = 10 * 1000 + 500;
+  const h = api.beings[0]; h.x = t.x; h.y = t.y; h.z = t.z; h.hp = 60; h.thoughts = [];
+  api.camp = api.camps[0];
+  for (const w of owners) api.updateBeing(w);
+  assert.ok(h.hp >= 60 - 34, `the person lost more than 34 hp: ${60 - h.hp}`);
 });
 
 test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', () => {

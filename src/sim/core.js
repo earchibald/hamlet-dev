@@ -70,15 +70,15 @@ const ITEMS = {
   venison: { name: 'deer carcass',   plural: 'deer carcasses', mat: 'flesh', fuel: 0 },
   spear:   { name: 'spear',          plural: 'spears',    mat: 'wood',  fuel: 0 },
   moss:    { name: 'tuft of glowing moss', plural: 'glowing moss', mat: 'plant', fuel: 0 },
-  firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0 },
-  bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0 },
+  firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0, find: 'Strikes a spark without a live ember.' },
+  bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0, find: 'Someone else came this way, long ago.' },
   fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
   cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
   fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
   clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
   pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
   cuttings: { name: 'bundle of cuttings', plural: 'cuttings', mat: 'plant', fuel: 3, gather: 'take' },
-  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 },
+  mushroom: { name: 'mushroom', plural: 'mushrooms', mat: 'plant', fuel: 0 }, // nothing gathers this yet; reserved for a later phase
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },

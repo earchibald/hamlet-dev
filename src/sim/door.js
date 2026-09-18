@@ -29,14 +29,20 @@ const DOOR_ACTS = {
     log(`A wish from above: ${g.title.toLowerCase()} is ${['set aside', 'wanted', 'wanted most'][e.pri]}.`, campHumans());
     return `${g.title}: ${['off', 'on', 'high'][e.pri]}.`;
   },
-  /* The camp site, before the pit is built. The three guards the interface used to hold live here. */
+  /* The camp site, before the pit is built. The event carries its camp id, so a site chosen for a
+     second camp still lands on that camp when the log is replayed and `camp` defaults to camps[0].
+     The four guards the interface used to hold, including reachability, live here. */
   site(e){
-    if (camp.pit) return 'The fire pit is already built. The camp stays where it is.';
-    if ((e.z || 0) !== 0 || !hasTile(e.x, e.y, 0)) return 'The camp must be on the valley floor.';
+    const prev = camp; camp = camps.find(c => c.id === e.camp) || camp;
+    if (camp.pit){ const msg = 'The fire pit is already built. The camp stays where it is.'; camp = prev; return msg; }
+    if ((e.z || 0) !== 0 || !hasTile(e.x, e.y, 0)){ camp = prev; return 'The camp must be on the valley floor.'; }
     const t = tileAt(e.x, e.y);
-    if (!passable(e.x, e.y) || t.feature) return 'The camp site must be open ground you can stand on.';
+    if (!passable(e.x, e.y) || t.feature){ camp = prev; return 'The camp site must be open ground you can stand on.'; }
+    const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || beings[0];
+    if (!reachable(first.x, first.y, first.z, NZ * W * H).has(idx3(e.x, e.y, 0))){ camp = prev; return 'Nobody can walk there from where they stand.'; }
     setSite(e.x, e.y); camp.siteReason = 'you chose it';
     log('The camp site moves. Someone felt it was right.', humans());
+    camp = prev;
     return 'Camp site set. The fire pit will go here.';
   },
 };

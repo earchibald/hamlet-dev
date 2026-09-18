@@ -103,8 +103,8 @@ const GOALS = [
       const out = []; if (camp.stash.rock < 2) out.push({ label: 'gather rocks for the axe', score: 44, start: a => startGather(a, 'rock') }); if (camp.stash.stick < 1) out.push({ label: 'gather a stick for the haft', score: 44, start: a => startGather(a, 'stick') }); return out;
     } },
   { id: 'firestones', title: 'Find firestones', need: { rock: 3 },
-    state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the knapping know-how that came with the axe.' }; if (camp.tools.firestones) return { s: 'done', text: 'Two stones that spark when struck. A cold pit is a chore now, not a prayer.' }; return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 3)}/3 to try. Striking sparks into tinder takes patience, and it fails more than it works.` }; },
-    offers(a){ if (!camp.tools.axe || camp.tools.firestones) return []; if (camp.stash.rock < 3) return [{ label: 'gather rocks to find firestones', score: 36, start: a => startGather(a, 'rock') }]; return [{ label: 'test rocks for sparks', score: 44, start: a => startBuild(a, camp.stashTile, 50, 'Striking rocks together', a => { if (camp.tools.firestones) return; camp.stash.rock -= 3; if (rng() < 0.4 + a.traits.patience * 0.4){ camp.tools.firestones = 1; gainXp(a, 'craft'); log(`${a.name} finds two stones that throw sparks. The camp can make its own fire now.`, campHumans(), 'major'); } else addThought(a, 'dud', 'Struck rocks all afternoon for nothing', -2, 400); }) }]; } },
+    state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the knapping know-how that came with the axe.' }; if (camp.tools.firestones) return { s: 'done', text: 'Two stones that spark when struck. A cold pit is a chore now, not a prayer.' }; const cold = camp.pit && !pitLit(); return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 3)}/3 to try. Striking sparks into tinder takes patience, and it fails more than it works.${cold ? ' The pit is dead and cold, so the camp puts this ahead of firewood.' : ''}` }; },
+    offers(a){ if (!camp.tools.axe || camp.tools.firestones) return []; const cold = camp.pit && !pitLit() ? 40 : 0; if (camp.stash.rock < 3) return [{ label: 'gather rocks to find firestones', score: 36 + cold, start: a => startGather(a, 'rock') }]; return [{ label: 'test rocks for sparks', score: 44 + cold, start: a => startBuild(a, camp.stashTile, 50, 'Striking rocks together', a => { if (camp.tools.firestones) return; camp.stash.rock -= 3; if (rng() < 0.4 + a.traits.patience * 0.4){ camp.tools.firestones = 1; gainXp(a, 'craft'); log(`${a.name} finds two stones that throw sparks. The camp can make its own fire now.`, campHumans(), 'major'); } else addThought(a, 'dud', 'Struck rocks all afternoon for nothing', -2, 400); }) }]; } },
   { id: 'firewood', title: 'Cut firewood', standing: true,
     state(){
       if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe.' };
@@ -149,6 +149,8 @@ const GOALS = [
       const g = groves.filter(gr => gr.anger > 20);
       return { s: 'active', text: `Favour ${f}. ${mood}${g.length ? ` ${g.length} grove${g.length > 1 ? 's are' : ' is'} angry.` : ''}${camp.fae.blightUntil > tick ? ' A blight is on the bushes.' : ''} They like berries left for them, and old pines standing. They hate axes in their groves, snares near them, and wards.` };
     } },
+  { id: 'gnomes', title: 'The hidden neighbours',
+    state(){ if (!camp.gnomes.known) return { s: 'blocked', text: 'Nothing seen yet. The meadow edges are not empty.' }; const near = camp.site ? c => dist(c.exit.x, c.exit.y, ...camp.site) <= 60 : () => true; const holes = caves.filter(c => c.kind === 'burrow' && c.owner === 'gnome' && near(c)).length; return { s: 'active', text: `Gnomes live in ${holes} burrow${holes === 1 ? '' : 's'} under the meadow edges. They come out at dusk, farm mushrooms, and copy what they see. They borrow made things and bring them back with a gift. They never fight, and they leave when a village grows loud.` }; } },
   { id: 'stone', title: 'Set an offering stone', need: { rock: 2 },
     state(){ if (!camp.fae.known) return { s: 'blocked', text: 'Needs a reason. Nobody has seen the sprites.' }; if (camp.stone) return { s: 'done', text: 'A flat stone at the edge of the firelight, where berries are left at dusk.' }; return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 2)}/2. Gifts taken from it earn favour, and favour brings glowing moss.` }; },
     offers(a){ if (!camp.fae.known || camp.stone || !camp.pit) return []; if (camp.stash.rock < 2) return [{ label: 'gather rocks for the offering stone', score: 30, start: a => startGather(a, 'rock') }]; const site = openSpotNear(camp.pit, 4, 6); if (!site) return [];
@@ -203,6 +205,46 @@ const GOALS = [
       return { s: ready ? 'active' : 'blocked', text: `${campHumans().length}/5 people, camp ${Math.floor((tick - camp.founded) / DAY)}/8 days old. Parties leave in spring or summer. Two go with coals and food.` };
     },
     offers(a){ if (!camp.shelter || camp.sentParty || camps.length >= 6 || campHumans().length < 5 || tick - camp.founded <= 8 * DAY || !(seasonOf() === 'spring' || seasonOf() === 'summer') || a.traits.bravery < 0.5) return []; return [{ label: 'lead a party to a new valley', score: 40, start: a => startFoundCamp(a) }]; } },
+  { id: 'caves', title: 'Search the caves',
+    state(){
+      if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
+      const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      if (!near.length) return { s: 'blocked', text: 'No cave mouth within forty tiles of the camp.' };
+      const open = near.filter(c => !c.searched && !c.blocked), blocked = near.filter(c => c.blocked), done = near.filter(c => c.searched);
+      if (!open.length && !blocked.length) return { s: 'done', text: `${done.length} cave${done.length > 1 ? 's' : ''} searched. Nothing left in the dark but the dark.` };
+      const ready = camp.tools.spear && pitLit();
+      return { s: ready ? 'active' : 'blocked', text: `${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
+    },
+    offers(a){
+      if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
+      const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40); const out = [];
+      for (const c of near){
+        if (c.blocked && camp.tools.axe) out.push({ label: 'clear the fallen rock', score: 40, start: a => startClearRock(a, c) });
+        else if (!c.blocked && !c.searched && (!c.claimed || !beings.some(b => b.alive && b.id === c.claimed))) out.push({ label: 'search the cave with a brand', score: 36 + a.traits.curiosity * 20, start: a => startSearchCave(a, c) });
+      }
+      return out;
+    } },
+  { id: 'dens', title: 'Clear a den',
+    state(){
+      if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
+      const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      if (!near.length) return { s: 'blocked', text: 'No den within forty tiles.' };
+      const held = near.filter(c => c.cleared === camp), wild = near.filter(c => !c.cleared);
+      if (!wild.length){
+        if (held.length) return { s: 'done', text: `${held.length} den${held.length > 1 ? 's' : ''} cleared. It goes back to the beasts if the fire is out for a day.` };
+        const by = [...new Set(near.map(c => c.cleared.name))];
+        return { s: 'done', text: `${near.length} den${near.length > 1 ? 's' : ''} near, held by ${by.join(' and ')}.` };
+      }
+      const party = campHumans().filter(denReady).length;
+      return { s: camp.tools.spear && pitLit() && party >= 2 ? 'active' : 'blocked', text: `${wild.length} den${wild.length > 1 ? 's' : ''} near: ${wild.map(c => c.owner === 'wolf' ? 'wolves' : 'foxes').join(', ')}. Two brave people with brands and the spear drive the beasts out. They dig a new den elsewhere, and come back if the fire fails for a day.` };
+    },
+    offers(a){
+      if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
+      const wild = caves.filter(c => c.kind === 'den' && c.owner && !c.cleared && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
+      /* The den goes in the label, so a failed offer's cooldown (keyed on the label) does not cool down
+         every other den too. */
+      return wild.map(c => ({ label: `clear the den with brands (${c.owner === 'wolf' ? 'wolves' : 'foxes'} under the hill at ${c.exit.x},${c.exit.y})`, score: c.owner === 'wolf' ? 44 : 30, start: a => startClearDen(a, c) }));
+    } },
 ];
 function goalState(g){ if (g.locked) return { s: 'locked', text: g.locked }; return g.state(); }
 function offersFor(a){

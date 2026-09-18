@@ -25,6 +25,17 @@ let goldenDirty = false;
    proven otherwise. Trace with tests/trace-deaths.js <seed>. Remove an entry when the bug is fixed. */
 const KNOWN_DEATHS = {};
 
+/* `humans` (everyone ever) is a roughly 2x random variable across commits that never touch
+   camp rules: a single seed has moved 34 -> 69, 57 -> 41 on unrelated changes, with 20 inside
+   its tail. A per-seed floor on it goes red on good changes and stays green on bad ones. Watch
+   `alive` per seed instead (a seed that actually collapses), and the sum of `humans` and `born`
+   across all six seeds together, so a change that halves every population (as fishing once did)
+   still fails. */
+const sums = { humans: 0, born: 0 };
+
+/* gamma's camp is capped by beds until one snare catch brings the hide for a hut (design/notes.md, Known weak spots); its floor is lower so an unrelated stream shift does not go red. */
+const ALIVE_FLOOR = { gamma: 6 };
+
 for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
     const t0 = Date.now();
@@ -43,7 +54,8 @@ for (const seed of SEEDS){
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
     });
     await t.test('the camps grow', () => {
-      assert.ok(counts.humans >= 20 && counts.born >= 1, `only ${counts.humans} people ever, ${counts.born} born`);
+      sums.humans += counts.humans; sums.born += counts.born;
+      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day 70, ${counts.born} born`);
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
@@ -67,6 +79,11 @@ for (const seed of SEEDS){
     });
   });
 }
+
+test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
+  t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
+  assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
+});
 
 test('the same seed tells the same story twice', () => {
   const a = runDays('r', 2), b = runDays('r', 2);
