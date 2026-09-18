@@ -74,8 +74,9 @@ function drawWorld(){
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);
-  if (ui.overlay) drawBoundaries(wctx, 0.85);
   const dark = darkness(); if (dark > 0){ wctx.fillStyle = `rgba(${P.night},${dark * 0.8})`; wctx.fillRect(0, 0, W * WS, H * WS); }
+  /* After the night wash, so the country lines read at night too. */
+  if (ui.overlay) drawBoundaries(wctx, 0.85);
   wctx.strokeStyle = P.grid; wctx.lineWidth = 1;
   for (let sx = 1; sx < SW; sx++){ wctx.beginPath(); wctx.moveTo(sx * LW * WS + 0.5, 0); wctx.lineTo(sx * LW * WS + 0.5, H * WS); wctx.stroke(); }
   for (let sy = 1; sy < SH; sy++){ wctx.beginPath(); wctx.moveTo(0, sy * LH * WS + 0.5); wctx.lineTo(W * WS, sy * LH * WS + 0.5); wctx.stroke(); }

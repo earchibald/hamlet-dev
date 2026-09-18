@@ -4018,13 +4018,14 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the god of its newest pole mark. */
+/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
+   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
 function countryLine(r){
   if (!r) return 'no country';
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
-  const m = poles.slice().sort((p, q) => q.age - p.age)[0], g = m.by === null ? null : beingById(m.by);
-  return `a country that is ${poles.map(p => p.value).join(' and ')}${g ? `, made so by ${g.name} ${g.epithet}` : ''}`;
+  const m = poles.slice().sort((p, q) => q.age - p.age)[0];
+  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${m.why.replace(/\.$/, '')}`;
 }
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
@@ -4053,24 +4054,26 @@ function fieldColor(r, pal){
 /* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
-const markLine = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}. ${m.why}`;
+const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
+const markLine = m => `${markWhen(m)} ${m.why}`;
 function markRows(x, y, z){
   if (!field || inAges() || !hasTile(x, y, z)) return [];
   const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
   /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
      hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
-  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markLine(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markWhen(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
   if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
   const c = t.cave || t.mouth;
-  if (c && c.mark) rows.push(['Dug by', markLine(c.mark)]);
+  if (c && c.mark) rows.push(['Dug by', markWhen(c.mark)]);
   if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
   if (!r) return rows;
   if (z === 0){
     const seen = new Set();
     for (const m of marksOf(r, 'scar')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Scar', `${SCAR_WORD[m.value] || m.value}. ${markLine(m)}`]); }
-    for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Made here', m.why]); }
+    const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
+    if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r)]);
+  rows.push(['Country', countryLine(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -4488,8 +4491,9 @@ function drawWorld(){
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);
-  if (ui.overlay) drawBoundaries(wctx, 0.85);
   const dark = darkness(); if (dark > 0){ wctx.fillStyle = `rgba(${P.night},${dark * 0.8})`; wctx.fillRect(0, 0, W * WS, H * WS); }
+  /* After the night wash, so the country lines read at night too. */
+  if (ui.overlay) drawBoundaries(wctx, 0.85);
   wctx.strokeStyle = P.grid; wctx.lineWidth = 1;
   for (let sx = 1; sx < SW; sx++){ wctx.beginPath(); wctx.moveTo(sx * LW * WS + 0.5, 0); wctx.lineTo(sx * LW * WS + 0.5, H * WS); wctx.stroke(); }
   for (let sy = 1; sy < SH; sy++){ wctx.beginPath(); wctx.moveTo(0, sy * LH * WS + 0.5); wctx.lineTo(W * WS, sy * LH * WS + 0.5); wctx.stroke(); }
@@ -4653,7 +4657,7 @@ function inspectGod(g){
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
-    <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${where}</div>
+    <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
     ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Opinions</h3><div class="muted">${opinions}</div>
@@ -4731,7 +4735,7 @@ function inspectTile(x, y, z = 0){
 function inspectRegion(r){
   if (!r) return '<div class="muted">Nothing is here.</div>';
   const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
-  const rows = [['Country', countryLine(r)], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
   if (here.length) rows.push(['Here', here.join('; ')]);
   const seen = new Set(), why = [];
   for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
@@ -5072,6 +5076,8 @@ function newWorld(seed){
 function onSettle(){
   acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   setSpeed(ui.savedSpeed || 1);
+  /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   const a = firstPerson();
   if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
   say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');

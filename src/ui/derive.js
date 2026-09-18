@@ -14,13 +14,14 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the god of its newest pole mark. */
+/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
+   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
 function countryLine(r){
   if (!r) return 'no country';
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
-  const m = poles.slice().sort((p, q) => q.age - p.age)[0], g = m.by === null ? null : beingById(m.by);
-  return `a country that is ${poles.map(p => p.value).join(' and ')}${g ? `, made so by ${g.name} ${g.epithet}` : ''}`;
+  const m = poles.slice().sort((p, q) => q.age - p.age)[0];
+  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${m.why.replace(/\.$/, '')}`;
 }
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
@@ -49,24 +50,26 @@ function fieldColor(r, pal){
 /* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
-const markLine = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}. ${m.why}`;
+const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
+const markLine = m => `${markWhen(m)} ${m.why}`;
 function markRows(x, y, z){
   if (!field || inAges() || !hasTile(x, y, z)) return [];
   const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
   /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
      hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
-  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markLine(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markWhen(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
   if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
   const c = t.cave || t.mouth;
-  if (c && c.mark) rows.push(['Dug by', markLine(c.mark)]);
+  if (c && c.mark) rows.push(['Dug by', markWhen(c.mark)]);
   if (c && c.god != null) rows.push(['Sleeping here', godLine(c.god)]);
   if (!r) return rows;
   if (z === 0){
     const seen = new Set();
     for (const m of marksOf(r, 'scar')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Scar', `${SCAR_WORD[m.value] || m.value}. ${markLine(m)}`]); }
-    for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); rows.push(['Made here', m.why]); }
+    const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
+    if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r)]);
+  rows.push(['Country', countryLine(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }

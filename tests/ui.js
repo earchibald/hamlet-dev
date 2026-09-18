@@ -521,6 +521,8 @@ test('a hill says who raised it, a cave says who dug it, and every surface tile 
   const raised = hr.find(r => r[0] === 'Raised by');
   assert.ok(raised && names.some(n => raised[1].includes(n)), JSON.stringify(hr));
   assert.match(raised[1], /Age \d+|Before time/i);
+  assert.ok(!/raised it/i.test(raised[1]), 'the label says Raised by, so the row does not say it again');
+  assert.ok(hr.filter(r => r[0] === 'Made here').length <= 1, 'the makings share one row');
   assert.ok(hr.some(r => r[0] === 'Country'));
   const cave = api.caves.find(c => c.mark && c.deep);
   const cr = api.markRows(cave.deep.x, cave.deep.y, cave.deep.z);
