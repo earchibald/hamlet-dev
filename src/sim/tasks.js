@@ -198,18 +198,22 @@ function startSetSnare(a){
 function startCheckSnare(a, s){
   return startBuild(a, [s.x, s.y], 4, 'Checking the snare', a => { if (s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; } });
 }
-/* A deer pit goes on grass 8 to 18 tiles from the site, beside a bush, away from snares and other
-   pits, where deer have been seen. Deer walk to bushes to eat, so a pit beside one sits on their path. */
+/* Deer live in their meadows and feed at the bushes there, often well past the camp's own sector,
+   so a pit close to camp seldom sees one. This scans everywhere passable within thirty tiles of
+   the site for grass beside a bush, away from snares and other pits, with a deer standing there
+   right now: a pit is sited only when deer are about, never merely hoped for. */
 function pitfallSite(){
-  const c = camp.site; let best = null; const s = secOf(c[0], c[1]);
-  for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
+  const c = camp.site; let best = null;
+  for (let dy = -30; dy <= 30; dy++) for (let dx = -30; dx <= 30; dx++){
+    const d = Math.abs(dx) + Math.abs(dy); if (d > 30) continue;
+    const x = c[0] + dx, y = c[1] + dy; if (!inb(x, y)) continue;
     const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct || t.ground !== 'grass') continue;
-    const d = dist(x, y, c[0], c[1]); if (d < 8 || d > 18) continue;
-    let bushes = 0; for (const [dx, dy] of RING) if (inb(x + dx, y + dy) && tileAt(x + dx, y + dy).feature === 'bush') bushes++;
+    let bushes = 0; for (const [rx, ry] of RING) if (inb(x + rx, y + ry) && tileAt(x + rx, y + ry).feature === 'bush') bushes++;
     if (!bushes) continue;
     if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4) || camp.pitfalls.some(p => dist(p.x, p.y, x, y) < 8)) continue;
-    const deer = beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, x, y) <= 20).length;
-    const sc = bushes * 3 + deer * 5 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
+    const deer = beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, x, y) <= 10).length;
+    if (!deer) continue;
+    const sc = deer * 5 + bushes * 3 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
   }
   return best ? [best.x, best.y] : null;
 }
