@@ -94,12 +94,23 @@ function inspectTile(x, y, z = 0){
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+function inspectRegion(r){
+  if (!r) return '<div class="muted">Nothing is here.</div>';
+  const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
+  const rows = [['Country', countryLine(r)], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  if (here.length) rows.push(['Here', here.join('; ')]);
+  const seen = new Set(), why = [];
+  for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
+  return `<table class="kv">${rows.map(x => `<tr><td>${x[0]}</td><td>${x[1]}</td></tr>`).join('')}</table>${why.length ? `<h3>What was done here</h3><ul class="hist">${why.join('')}</ul>` : ''}`;
+}
 function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
-  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+  const body = tipTarget.region != null ? inspectRegion(regionById(tipTarget.region))
+    : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
   tip.innerHTML = close + body;

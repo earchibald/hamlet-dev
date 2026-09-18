@@ -478,4 +478,35 @@ test('a creation watched age by age is the creation that startWorld runs', () =>
   assert.equal(b.tick, a.tick);
 });
 
+const PAL = { 'field-none': '#808080', 'field-wet': '#0000ff', 'field-dry': '#ffff00', 'field-hot': '#ff0000', 'field-cold': '#00ffff', 'field-above': '#ffffff', 'field-below': '#000000', 'field-light': '#ffffff', 'field-dark': '#000000', 'field-still': '#00ff00', 'field-moving': '#ff00ff' };
+
+test('the field colour is grey with no pole, and the mean of the poles with some', () => {
+  const api = loadUI(['state', 'derive'], ['mixHex', 'fieldColor']);
+  assert.equal(api.mixHex(['#000000', '#ffffff']), 'rgb(128,128,128)');
+  assert.equal(api.mixHex(['#ff0000']), 'rgb(255,0,0)');
+  api.startCreation('alpha', {});
+  assert.equal(api.fieldColor(api.liveRegions()[0], PAL), '#808080', 'the formless is grey');
+  for (let i = 0; i < 8; i++) api.step();
+  const made = api.liveRegions().filter(r => r.marks.some(m => m.kind === 'pole'));
+  assert.ok(made.length >= 2);
+  for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
+});
+
+test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], ['inspectRegion']);
+  api.startCreation('alpha', {}); for (let i = 0; i < 10; i++) api.step();
+  const r = api.liveRegions().slice().sort((p, q) => q.marks.length - p.marks.length)[0];
+  const html = api.inspectRegion(r);
+  assert.ok(html.includes('Country') && html.includes('Becoming'));
+  assert.ok(r.marks.every(m => html.includes(m.why)), 'every why is on the card');
+});
+
+test('C shows and hides the countries from any focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  const e = { key: 'c', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+  assert.equal(api.keyAction(e, 'map').action, 'overlay');
+  assert.equal(api.keyAction(e, 'dialog:chord').action, 'stage', 'under the chord, C is still Crafts');
+  assert.equal(api.ui.overlay, false);
+});
+
 module.exports = { loadUI };

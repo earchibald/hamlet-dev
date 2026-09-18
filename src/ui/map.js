@@ -3,6 +3,8 @@
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
+  for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
+  fieldKey = '';
   P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
@@ -28,11 +30,51 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
+/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
+function drawBoundaries(g, alpha){
+  for (const b of liveBoundaries()){
+    g.fillStyle = b.pole === 'wet' ? P['water-fg'] : P['field-line']; g.globalAlpha = b.pole === 'wet' ? 1 : alpha;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; g.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  g.globalAlpha = 1;
+}
+function drawFieldCache(){
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const r of liveRegions()){
+    octx.fillStyle = fieldColor(r, P);
+    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  }
+  drawBoundaries(octx, 0.7);
+}
+function drawField(){
+  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  if (key !== fieldKey){ drawFieldCache(); fieldKey = key; }
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.drawImage(ocv, 0, 0);
+  /* A god has no tile in the ages. It is drawn in the middle of the country it stands in. Gods that share a country stand side by side. */
+  const at = new Map();
+  for (const g of gods()){ if (g.status === 'dead') continue; const r = standsIn(g); if (!r) continue; if (!at.has(r.id)) at.set(r.id, []); at.get(r.id).push(g); }
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  for (const [id, list] of at){
+    const b = regionById(id).bbox, cx = (b.x0 + b.x1 + 1) / 2 * WS, cy = (b.y0 + b.y1 + 1) / 2 * WS;
+    list.forEach((g, k) => {
+      const x = cx + (k - (list.length - 1) / 2) * 46;
+      wctx.globalAlpha = g.status === 'awake' ? 1 : 0.55;
+      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, x, cy); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, x, cy);
+      wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.strokeText(g.name, x, cy + 14); wctx.fillStyle = P.select; wctx.fillText(g.name, x, cy + 14);
+    });
+  }
+  wctx.globalAlpha = 1;
+  wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
+}
 function drawWorld(){
-  if (inAges()){ wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.fillStyle = P.hill; wctx.fillRect(0, 0, W * WS, H * WS); return; }
+  if (inAges()){ drawField(); return; }
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   wctx.drawImage(ocv, 0, 0);
+  if (ui.overlay) drawBoundaries(wctx, 0.85);
   const dark = darkness(); if (dark > 0){ wctx.fillStyle = `rgba(${P.night},${dark * 0.8})`; wctx.fillRect(0, 0, W * WS, H * WS); }
   wctx.strokeStyle = P.grid; wctx.lineWidth = 1;
   for (let sx = 1; sx < SW; sx++){ wctx.beginPath(); wctx.moveTo(sx * LW * WS + 0.5, 0); wctx.lineTo(sx * LW * WS + 0.5, H * WS); wctx.stroke(); }

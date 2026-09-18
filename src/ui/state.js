@@ -22,6 +22,7 @@ let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', wor
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
 const AGE_MS = 2000;
 let pace = 1, lastEra = 'days';
+let fieldKey = '';     /* what the cached field was drawn from */
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -43,6 +44,7 @@ const ui = {
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
+  overlay: false,      /* the countries drawn over the world map in the days */
 };
 const WIN_MAX = 6;
 
