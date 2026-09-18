@@ -105,11 +105,13 @@ function rimExits(h, set){
   return out;
 }
 /* ---------- pre-history ---------- */
-/* Every tall hill had a spring. Its stream cut a winding passage from under the hill out to a mouth at the foot, with
-   one or two chambers, and a drop to level -2 with a chamber at the bottom. One stream in three still runs. */
-function cutWaterCaves(){
-  for (const h of hills){
-    if (h.storeys < 2) continue;
+/* A depth mark cuts water caves under the hills of its country. Each spring's stream cut a winding passage from
+   under the hill out to a mouth at the foot, with one or two chambers, and then a drop for each level of the mark
+   below the first, each with a chamber at the bottom. The stream still runs where water flowed or pooled under
+   the country. Returns the caves it cut, so the painter can stamp its mark on them. */
+function cutWaterCaves(hillList, levels, wetUnder){
+  const made = [];
+  for (const h of hillList){
     const set = new Set(h.tiles);
     const rim = rimExits(h, set); if (!rim.length) continue;
     const [exit, under] = rim[rint(rim.length)];
@@ -131,17 +133,24 @@ function cutWaterCaves(){
     }
     c.steps = spine.length - 1;
     const far = spine.reduce((p, q) => dist(q[0], q[1], exit.x, exit.y) > dist(p[0], p[1], exit.x, exit.y) ? q : p, spine[0]); [x, y] = far;
-    chamber(c, x, y, -1, set);
-    /* The drop: a slope on level -2 under the last chamber, with a chamber around it. */
-    const drop = carve(c, x, y, -2); drop.slope = true;
-    const bottom = chamber(c, x, y, -2, set);
-    c.deep = bottom[rint(bottom.length)];
+    let bottom = chamber(c, x, y, -1, set), last = c.mouth;
+    /* Each drop below the first level: a slope on the lower level under the last chamber, with a chamber around it. */
+    for (let z = -2; z >= -levels; z--){
+      const drop = carve(c, x, y, z); if (!drop) break;
+      drop.slope = true; last = drop;
+      const room = chamber(c, x, y, z, set);
+      bottom = room.length ? room : [drop];
+    }
+    c.deep = bottom.length ? bottom[rint(bottom.length)] : last;
+    c.mark = h.mark;
     c.story.push('Water cut this passage when the river ran higher.');
-    if (rng() < 1 / 3){
+    made.push(c);
+    if (wetUnder){
       const pond = RING.map(([dx, dy]) => [exit.x + dx, exit.y + dy]).filter(([px, py]) => inb(px, py) && !set.has(idx(px, py)) && passable(px, py) && !tileAt(px, py).slope && !tileAt(px, py).mouth && keepsPaths(tileAt(px, py)));
       if (pond.length){ const [px, py] = pond[rint(pond.length)]; const t = tileAt(px, py); t.ground = 'water'; t.feature = null; t.berries = 0; t.loose = null; c.story.push('A spring still runs at its mouth.'); }
     }
   }
+  return made;
 }
 /* A room around a tile: its four sides first, so the room touches the tile, then the corners, each with four chances in five.
    A corner is only cut beside one of its two sides already in this cave, so it is always four-connected to the room, never a
@@ -359,32 +368,48 @@ function placeFinds(){
   for (const c of caves) if (c.deep) addItem(['firestones', 'moss', 'bones'][rint(3)], c.deep.x, c.deep.y, c.deep.z);
 }
 /* ---------- uplift: hills ---------- */
-/* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
-   level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
-   level 1 with a floor at level 2. Each storey gets one or two slopes on its rim. The rest of the rim is cliff. */
-function uplift(){
-  const start = { sx: SW >> 1, sy: SH >> 1 };
-  const cands = shuffle(sectors.filter(s => (s.biome === 'rocky' || s.biome === 'forest') && !(s.sx === start.sx && s.sy === start.sy)));
-  const want = 6 + rint(5), jit = makeNoise(6);
-  for (const s of cands){
-    if (hills.length >= want) break;
-    for (let tries = 0; tries < 12; tries++){
-      const r = 3 + rint(12), ry = Math.max(3, Math.round(r * (0.6 + rng() * 0.4)));
-      const cx = s.sx * LW + r + rint(Math.max(1, LW - 2 * r)), cy = s.sy * LH + ry + rint(Math.max(1, LH - 2 * ry));
-      let foot = [];
-      for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - r; x <= cx + r; x++){
-        if (!inb(x, y)) continue;
-        const e = ((x - cx) / r) ** 2 + ((y - cy) / ry) ** 2 + (jit(x, y) - 0.5) * 0.5;
-        if (e <= 1) foot.push(idx(x, y));
-      }
-      if (!foot.includes(idx(cx, cy))) continue;
-      foot = component(foot, idx(cx, cy));
-      if (foot.length < 12 || !hillFits(foot, start)) continue;
-      const h = { x: cx, y: cy, r, storeys: r >= 8 ? 2 : 1, tiles: foot };
-      const shape = hillShape(h); if (!hillClimbable(shape)) continue;
-      raiseHill(h, shape); hills.push(h); break;
+/* Hills inside a country. A hill is rock at level 0 with a floor above it, and a storey more for each level of
+   the mark up to the range. Each storey gets one or two slopes on its rim. The rest of the rim is cliff.
+   `within` is the set of tile indices the foot may use; the start country is never used. */
+function uplift(within, storeys, count, mark){
+  const made = [];
+  const startTiles = new Set(creation.gate.start.tiles);
+  const jit = makeNoise(6);
+  /* A hill keeps three tiles clear of water, of a riverbank, and of another hill. A country can be mostly shore,
+     so the foot is cut from the ground that already passes that rule, and so is the middle. Otherwise almost every
+     try dies on the first tile it tests, and a wet country gets no hill at all. The foot is the dry part of the
+     ellipse, which is why a hill by the water is not a clean oval. */
+  const dry = i => {
+    const x = i % W, y = (i - x) / W;
+    if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
+      const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const q = world[idx(nx, ny)];
+      if (q.ground === 'water' || q.ground === 'sand' || q.hill) return false;
     }
+    return true;
+  };
+  const inside = [...within].filter(i => !startTiles.has(i) && dry(i));
+  if (!inside.length) return made;
+  const room = new Set(inside);
+  for (let tries = 0; tries < 40 * count && made.length < count; tries++){
+    const c = inside[rint(inside.length)]; const cx = c % W, cy = (c - cx) / W;
+    const r = 3 + rint(12), ry = Math.max(3, Math.round(r * (0.6 + rng() * 0.4)));
+    let foot = [];
+    for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - r; x <= cx + r; x++){
+      if (!inb(x, y) || !room.has(idx(x, y))) continue;
+      const e = ((x - cx) / r) ** 2 + ((y - cy) / ry) ** 2 + (jit(x, y) - 0.5) * 0.5;
+      if (e <= 1) foot.push(idx(x, y));
+    }
+    if (!foot.includes(idx(cx, cy))) continue;
+    foot = component(foot, idx(cx, cy));
+    if (foot.length < 12 || !hillFits(foot)) continue;
+    const h = { x: cx, y: cy, r, storeys, tiles: foot, mark };
+    /* hillShape lowers a hill that has no room for the storeys the mark asks for. This spot is the wrong shape:
+       try another, so a hill always stands as tall as its mark says. */
+    const shape = hillShape(h); if (h.storeys !== storeys || !hillClimbable(shape)) continue;
+    raiseHill(h, shape); hills.push(h); made.push(h);
   }
+  return made;
 }
 /* The tiles of `list` joined to `seed` by four-way steps within the list. */
 function component(list, seed){
@@ -393,14 +418,13 @@ function component(list, seed){
     for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (set.has(j) && !seen.has(j)){ seen.add(j); q.push(j); } } }
   return [...seen];
 }
-/* A footprint fits if it stays off the map edge, out of the start sector, off other hills, three tiles from any
-   water or riverbank, and beside ground the first person can walk to. */
-function hillFits(foot, start){
+/* A footprint fits if it stays off the map edge, off other hills, three tiles from any water or riverbank,
+   and beside ground the first person can walk to. Its country is the caller's business. */
+function hillFits(foot){
   const set = new Set(foot);
   let opensOut = false;
   for (const i of foot){
     const x = i % W, y = (i - x) / W;
-    const sc = secOf(x, y); if (sc.sx === start.sx && sc.sy === start.sy) return false;
     if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
       const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const q = world[idx(nx, ny)];
@@ -412,13 +436,20 @@ function hillFits(foot, start){
 }
 /* A tile is inside the shape eroded by d if every tile within d of it is in the set. */
 function erodedBy(i, set, d){ const x = i % W, y = (i - x) / W; for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.abs(dx) + Math.abs(dy) <= d && (!inb(x + dx, y + dy) || !set.has(idx(x + dx, y + dy)))) return false; return true; }
-/* The shape of a hill before it is raised: the second-storey core and the ring of first-storey floor around it. */
+/* The shape of a hill before it is raised: one layer per storey. Layer 1 is the whole footprint; each layer above
+   is the footprint eroded inward by two more tiles, and must still be one piece of four tiles or more. A hill with
+   no room for the storey it was asked for is lowered, and uplift then looks for a better spot. */
 function hillShape(h){
   const set = new Set(h.tiles);
-  let inner = h.storeys === 2 ? h.tiles.filter(i => erodedBy(i, set, 2)) : [];
-  if (inner.length){ inner = component(inner, inner[0]); if (inner.length < 4){ inner = []; h.storeys = 1; } }
-  const innerSet = new Set(inner);
-  return { set, inner, innerSet, ring: h.tiles.filter(i => !innerSet.has(i)) };
+  const layers = [null, set];
+  for (let z = 2; z <= h.storeys; z++){
+    let up = h.tiles.filter(i => erodedBy(i, set, 2 * (z - 1)));
+    if (up.length) up = component(up, up[0]);
+    if (up.length < 4){ h.storeys = z - 1; break; }
+    layers.push(new Set(up));
+  }
+  const innerSet = layers[2] || new Set();
+  return { set, layers, inner: [...innerSet], innerSet, ring: h.tiles.filter(i => !innerSet.has(i)) };
 }
 /* A hill can be climbed if its first-storey floor is one piece and some walkable tile beside it on the ground can hold a slope. */
 function hillClimbable(shape){
@@ -428,12 +459,18 @@ function hillClimbable(shape){
   return false;
 }
 function raiseHill(h, shape){
-  const { set, inner, innerSet } = shape;
+  const { set, layers } = shape;
+  const at = z => layers[z] || new Set();
   for (const i of h.tiles){ const t = world[i]; t.ground = 'rock'; t.feature = null; t.berries = 0; t.loose = null; t.hill = h; }
-  for (const i of h.tiles){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 1, innerSet.has(i) ? 'rock' : (rng() < 0.5 ? 'grass' : 'stone')); t.hill = h; }
-  for (const i of inner){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, 2, rng() < 0.5 ? 'grass' : 'stone'); t.hill = h; }
-  cutSlopes(h, 0, i => !set.has(i), i => set.has(i) && !innerSet.has(i));
-  if (inner.length) cutSlopes(h, 1, i => set.has(i) && !innerSet.has(i), i => innerSet.has(i));
+  /* A storey is a floor everywhere but where the storey above it stands; there it is the rock that holds it up. */
+  for (let z = 1; z <= h.storeys; z++){ const up = at(z + 1);
+    for (const i of at(z)){ const x = i % W, y = (i - x) / W; const t = placeTile(x, y, z, up.has(i) ? 'rock' : (rng() < 0.5 ? 'grass' : 'stone')); t.hill = h; } }
+  /* One rim per storey: the walkable floor of storey z+1, reached from the ground or from the floor below it. */
+  for (let z = 0; z < h.storeys; z++){
+    const low = at(z), high = at(z + 1), above = at(z + 2);
+    const isLow = z === 0 ? (i => !set.has(i)) : (i => low.has(i) && !high.has(i));
+    cutSlopes(h, z, isLow, i => high.has(i) && !above.has(i));
+  }
 }
 /* One or two slopes on level z at a rim: a walkable low tile beside a high tile whose floor is one level up. Slopes sit at least six tiles apart. */
 function cutSlopes(h, z, isLow, isHigh){
@@ -532,38 +569,35 @@ function paintLakes(){
     for (const i of r.tiles){ const t = world[i]; if (t.ground === 'water') continue; if (RING.some(([dx, dy]) => inb(t.x + dx, t.y + dy) && world[idx(t.x + dx, t.y + dy)].lake)){ t.ground = 'sand'; t.feature = t.feature === 'tree' ? null : t.feature; } }
   }
 }
-/* The first person: the middle of the start country's largest walkable pocket. The most central tile is no good
-   on its own. A lake or a chasm can cut the country in two, and the centre can fall in the smaller half, which
-   leaves the first person shut in a pocket with nothing in it. So walk every pocket, take the widest, and stand
-   on its tile nearest the country's middle. */
+/* The first person: the start country's best walkable pocket. The most central tile is no good on its own. A lake
+   or a chasm can cut the country in two, and the centre can fall in a pocket with nothing in it. So walk every
+   pocket and take the one that opens onto the most world, because that is the valley the person will live in;
+   a wide pocket walled off from everything else is a prison. Then stand on its tile nearest the country's middle. */
 function placeFirstPerson(){
   const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
   const mine = new Set(s.tiles.filter(i => passable(i % W, (i - i % W) / W)));
   if (!mine.size) throw new Error(`The start country has no ground to stand on.`);
   const seen = new Set(), base = ZOFF * W * H;
-  let pocket = null;
+  let pocket = null, reach = -1;
   for (const i of mine){
     if (seen.has(i)) continue;
     const x = i % W, y = (i - x) / W;
     /* A pocket reaches out of the country and back, so walk the whole map and keep the country's own tiles. */
-    const here = [];
-    for (const k of reachable(x, y, 0, NZ * W * H)){ const j = k - base; if (j >= 0 && j < W * H && mine.has(j)){ here.push(j); seen.add(j); } }
-    if (!pocket || here.length > pocket.length) pocket = here;
+    const region = reachable(x, y, 0, NZ * W * H), here = [];
+    for (const k of region){ const j = k - base; if (j >= 0 && j < W * H && mine.has(j)){ here.push(j); seen.add(j); } }
+    if (region.size > reach || (region.size === reach && here.length > pocket.length)){ reach = region.size; pocket = here; }
   }
   let best = null;
   for (const i of pocket){ const x = i % W, y = (i - x) / W; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
   const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
   return best;
 }
-/* Everything after the ground: the hills, the water caves, the dens, the finds, and the life.
-   It runs as it always has, from the sectors the marks painted. Tasks 3 and 4 make it read marks. */
+/* Everything after the ground and the hills: the dens, the finds, and the life.
+   It still picks sectors by biome. Task 4 makes it read marks. */
 function generateRest(best){
-  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
-  uplift();
-  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
-  cutWaterCaves(); rockfall();
-  /* Rockfall is the only later step that can take a tile back out of the walkable world (a boulder where there was
-     open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just washed out. */
+  /* Rockfall is the only step before this one that can take a tile back out of the walkable world (a boulder where
+     there was open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just
+     washed out. */
   startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);

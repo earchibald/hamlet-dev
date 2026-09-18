@@ -29,7 +29,7 @@ const API = `return {
   CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
   startCreation, runAges, ageStep, restGate, isStart, isLevel, startCandidates, strain, godOptions, decideGod, godNeeds, settleHome, unmake, GOD_ACTS, GOD_NAMES, EPITHET, BODY, LEAVES, SCAR_OF, MAKES, STRAIN, KINDS, polesThatMake, outgrown, REGIONS_PER_GOD,
   gods, awakeGods, godOf, makeGod, withGodRng, rint,
-  settle, beginCreation, paintSectors, paintGround, paintRivers, paintLakes, placeFirstPerson, BIOMES, FEATURES,
+  settle, beginCreation, paintSectors, paintGround, paintRivers, paintLakes, paintScars, paintHeights, paintDepths, placeFirstPerson, uplift, cutWaterCaves, rockfall, BIOMES, FEATURES,
   get godRng(){ return godRng; },
   get era(){ return era; }, get age(){ return age; }, get pulseAge(){ return pulseAge; }, get legends(){ return legends; }, get creation(){ return creation; },
   get field(){ return field; }, get boundaries(){ return boundaries; },

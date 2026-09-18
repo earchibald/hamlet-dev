@@ -55,22 +55,24 @@ function startPockets(api){
   const W = api.W, s = api.creation.gate.start;
   const a = api.beings.find(b => b.species === 'human');
   const open = s.tiles.filter(i => api.passable(i % W, (i - i % W) / W));
-  const mine = new Set(open), seen = new Set(), sizes = [];
+  const mine = new Set(open), seen = new Set(), reach = [];
   for (const i of mine){
     if (seen.has(i)) continue;
     const region = api.reachable(i % W, (i - i % W) / W, 0, api.NZ * W * api.H);
-    let n = 0; for (const j of mine) if (region.has(api.idx3(j % W, (j - j % W) / W, 0))){ seen.add(j); n++; }
-    sizes.push(n);
+    for (const j of mine) if (region.has(api.idx3(j % W, (j - j % W) / W, 0))) seen.add(j);
+    reach.push(region.size);
   }
   const here = api.reachable(a.x, a.y, 0, api.NZ * W * api.H);
   const held = open.filter(i => here.has(api.idx3(i % W, (i - i % W) / W, 0))).length;
-  return { open: open.length, sizes: sizes.sort((p, q) => q - p), held };
+  return { open: open.length, reach: reach.sort((p, q) => q - p), held, world: here.size };
 }
 
-for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person stands in the start country's largest pocket`, () => {
+/* A wide pocket walled off from everything else is a prison, so the person takes the pocket that opens onto the
+   most world, not the one that holds the most of the country. */
+for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person stands in the start country's widest pocket`, () => {
   const api = load(); api.startWorld(seed);
-  const { sizes, held } = startPockets(api);
-  assert.equal(held, sizes[0], `the person holds ${held} start tiles, and the largest pocket has ${sizes[0]}`);
+  const { reach, world } = startPockets(api);
+  assert.ok(world >= reach[0], `the person walks ${world} tiles, and the best start pocket opens onto ${reach[0]}`);
 });
 
 /* The gate says nothing about tiles, so a country can pass it and still be shattered into pockets by the
@@ -80,4 +82,43 @@ for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person can walk mos
   const api = load(); api.startWorld(seed);
   const { open, held } = startPockets(api);
   assert.ok(held >= open / 2, `${held} of ${open} passable start tiles are reachable`);
+});
+
+/* A settled world, plus the marks that made it, for the painters' tests. */
+function settled(seed = 'r'){ const api = load(); api.startWorld(seed); return api; }
+
+test('a height mark raises hills inside its country, with storeys from the mark', () => {
+  const api = settled();
+  const raised = api.liveRegions().filter(r => api.marksOf(r, 'height').length);
+  assert.ok(raised.length, 'no country raised');
+  for (const r of raised){
+    const mine = api.hills.filter(h => h.mark && h.mark.by === api.marksOf(r, 'height')[0].by && r.tiles.includes(api.idx(h.x, h.y)));
+    assert.ok(mine.length >= 1, `country ${r.id} has a height mark and no hill`);
+    for (const h of mine){ assert.equal(h.storeys, Math.min(api.marksOf(r, 'height')[0].value, api.ZMAX)); assert.ok(h.tiles.every(i => r.tiles.includes(i)), 'a hill spills out of its country'); }
+  }
+  for (const h of api.hills) assert.ok(h.mark, 'a hill without a mark');
+});
+
+test('a depth mark cuts caves under its country\'s hills, and raises one if it had none', () => {
+  const api = settled();
+  const dug = api.liveRegions().filter(r => api.marksOf(r, 'depth').length);
+  assert.ok(dug.length, 'no country dug');
+  for (const r of dug){
+    const mine = api.caves.filter(c => c.kind === 'water' && c.hill && r.tiles.includes(api.idx(c.hill.x, c.hill.y)));
+    assert.ok(mine.length >= 1, `country ${r.id} has a depth mark and no cave`);
+    for (const c of mine){ assert.ok(c.mark && c.mark.kind === 'depth'); const deepest = Math.min(...c.tiles.map(t => t.z)); assert.equal(deepest, Math.max(api.ZMIN, -Math.min(api.marksOf(r, 'depth')[0].value, -api.ZMIN))); }
+  }
+});
+
+test('scars paint what the winner\'s pole leaves', () => {
+  const api = load(); api.startCreation('r'); api.runAges();
+  for (const r of api.liveRegions()){
+    for (const m of api.marksOf(r, 'scar')){
+      const tiles = r.tiles.map(i => api.world[i]);
+      if (m.value === 'burned') assert.ok(tiles.every(t => t.ground === 'ash' || t.ground === 'water' || t.ground === 'sand' || t.ground === 'rock' || t.ground === 'stone'), 'a burned country with living ground');
+      if (m.value === 'drowned') assert.ok(tiles.some(t => t.feature === 'deadpine') && tiles.some(t => t.ground === 'water'), 'a drowned country with no dead pines in water');
+      if (m.value === 'broken') assert.ok(tiles.filter(t => t.feature === 'boulder').length >= r.area / 5, 'a broken country with few boulders');
+      if (m.value === 'cut') assert.ok(tiles.filter(t => t.ground === 'rock' && !t.hill).length >= 8, 'a cut country with no chasm');
+    }
+  }
 });
