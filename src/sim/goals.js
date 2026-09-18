@@ -1,4 +1,5 @@
 /* Goal definitions. Each goal reports a state and offers work. */
+const waterAim = () => 6 + 6 * (camp.stash.pot || 0);
 const GOALS = [
   { id: 'camp', title: 'Make camp',
     state(){ return camp.site ? { s: 'done', text: `Site chosen: ${camp.siteReason || 'set by you'}.` } : { s: 'active', text: 'Nobody has picked a spot yet.' }; },
@@ -168,9 +169,9 @@ const GOALS = [
       return { s: camp.stash.hide >= 2 ? 'active' : 'blocked', text: `Hides ${Math.min(camp.stash.hide, 2)}/2. Every cooked rabbit leaves one.` };
     },
     offers(a){ if (camp.tools.waterskin || camp.stash.hide < 2) return []; return [{ label: 'sew the waterskin', score: 54, start: a => startBuild(a, camp.stashTile, 60, 'Sewing a waterskin', a => { if (camp.tools.waterskin || camp.stash.hide < 2) return; camp.stash.hide -= 2; camp.tools.waterskin = 1; gainXp(a, 'craft'); log(`${a.name} sews two hides into a waterskin.`, [a], 'major'); }) }]; } },
-  { id: 'water', title: 'Keep water at camp', standing: true, target: 6,
-    state(){ if (!camp.tools.waterskin) return { s: 'blocked', text: 'Needs the waterskin.' }; return { s: 'active', text: `${camp.stash.water} drinks stored. Aim: ${this.target}. People drink at the fire instead of walking to the river.` }; },
-    offers(a){ if (!camp.tools.waterskin || camp.stash.water >= this.target) return []; return [{ label: 'fill the waterskin', score: camp.stash.water === 0 ? 48 : 36, start: a => startFillWater(a) }]; } },
+  { id: 'water', title: 'Keep water at camp', standing: true,
+    state(){ if (!camp.tools.waterskin) return { s: 'blocked', text: 'Needs the waterskin.' }; return { s: camp.stash.water >= waterAim() ? 'idle' : 'active', text: `${camp.stash.water} drinks stored. Aim: ${waterAim()}. People drink at the fire instead of walking to the river.` }; },
+    offers(a){ if (!camp.tools.waterskin || camp.stash.water >= waterAim()) return []; return [{ label: 'fill the waterskin', score: camp.stash.water === 0 ? 48 : 36, start: a => startFillWater(a) }]; } },
   { id: 'spear', title: 'Make a spear', need: { stick: 1, rock: 1 },
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, start: a => startBuild(a, camp.stashTile, 50, 'Shaping a spear', a => { if (camp.tools.spear) return; camp.stash.stick--; camp.stash.rock--; camp.tools.spear = 1; gainXp(a, 'craft'); log(`${a.name} hardens a shaft in the fire and binds a flaked point to it. The camp has a spear.`, [a], 'major'); }) }]; return [{ label: 'gather a rock for the spear', score: 40, start: a => startGather(a, camp.stash.rock < 1 ? 'rock' : 'stick') }]; } },

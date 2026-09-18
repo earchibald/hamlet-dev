@@ -1,9 +1,9 @@
 /* ---------- camps: the stash, the site, founding, and the per-camp tick ---------- */
 function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
-    stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0 }, rot: { cooked: [], berries: [] },
+    stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, huts: [], village: false, snares: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, huts: [], village: false, snares: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
@@ -11,7 +11,7 @@ const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r
 
 function stashAdd(kind, n){
   camp.stash[kind] = (camp.stash[kind] || 0) + n;
-  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
+  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
 }
 function stashTake(kind, n = 1){ camp.stash[kind] = Math.max(0, camp.stash[kind] - n); if (camp.rot[kind]) camp.rot[kind].splice(0, n); }
 function spoilFood(){

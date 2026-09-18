@@ -23,6 +23,12 @@ const RECIPES = [
   { id: 'clothes', title: 'Sew hide clothes', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: 70, makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 42,
     verb: 'sews', status: () => `${campHumans().filter(h => h.clothes).length} of ${campHumans().length} clothed.`,
     blurb: 'Three hides and a coil of cord. The coldest person wears them, and loses warmth slower.' },
+  { id: 'clay', title: 'Dig clay', after: 'workshop', place: 'bank', gather: a => startDigClay(a), standing: { stash: 'clay', n: 6 }, score: 32, offerLabel: 'dig clay',
+    blurb: 'Clay from the riverbank. Four lumps build a kiln, three fire a pot.' },
+  { id: 'kiln', title: 'Build the kiln', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: 120, makes: { struct: 'kiln' }, score: 46,
+    verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
+  { id: 'pot', title: 'Fire pots', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: 50, makes: { item: 'pot', n: 1 }, standing: { stash: 'pot', n: 3 }, score: 42,
+    verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -44,6 +50,8 @@ const PLACES = {
   site: { spot: () => openSpotNear(camp.pit, 2, 5) },
   reeds: {},
   water: {},
+  bank: {},
+  kiln: { spot: () => camp.kiln },
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
 const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]));
@@ -53,14 +61,15 @@ function gatherOffer(kind){
   if (kind === 'log') return a => startCutTree(a);
   if (['stick', 'rock', 'moss'].includes(kind)) return a => startGather(a, kind);
   if (kind === 'fibre') return a => startPickFibre(a);
+  if (kind === 'clay') return a => startDigClay(a);
   return null;
 }
 /* What making the thing does to the world, by the one key in r.makes. A struct maker returns false
    when the tile is already built on, so the caller can bail before it is called. */
 const MAKERS = {
-  item(r, a, at){ stashAdd(r.makes.item, r.makes.n); },
+  item(r, a, at){ stashAdd(r.makes.item, r.makes.n); if (r.place === 'kiln'){ const k = tileAt(...camp.kiln).struct; k.fired = (k.fired || 0) + r.makes.n; } },
   tool(r, a, at){ camp.tools[r.makes.tool] = 1; },
-  struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp }; camp[r.makes.struct] = at; },
+  struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp, fired: 0 }; camp[r.makes.struct] = at; },
   wear(r, a, at){ const who = campHumans().filter(h => !h[r.makes.wear]).sort((p, q) => p.needs.warmth - q.needs.warmth)[0] || a; who[r.makes.wear] = true; addThought(who, 'clothes', 'Warm in new hide clothes', 5, 1500); log(`${a.name} sews hide clothes, and ${who === a ? 'wears them' : `${who.name} wears them`}.`, [a, who], 'good'); return 'logged'; },
 };
 function recipeGoal(r){

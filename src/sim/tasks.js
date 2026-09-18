@@ -132,6 +132,22 @@ function startFish(a){
     } };
   return true;
 }
+/* Clay comes from the riverbank: any tile whose ground flags clay (sand). The bank is not used up. */
+function startDigClay(a){
+  if (a.carrying && a.carrying.kind !== 'clay') return startDeliver(a);
+  const bank = t => !!GROUND[t.ground].clay;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, bank, NEAR, z), 3000, a);
+  if (!p){ if (a.carrying) return startDeliver(a); return false; }
+  a.task = { type: 'gather', label: 'Going to the bank for clay', path: p, progress: 0,
+    arrive(a, t){
+      if (!nearFind(a.x, a.y, bank, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+      t.label = 'Digging clay from the bank';
+      if (++t.progress % 10 === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'clay', count: 1 }; }
+      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      return 'continue';
+    } };
+  return true;
+}
 function startSetSnare(a){
   const c = camp.site; let best = null;
   const s = secOf(c[0], c[1]);

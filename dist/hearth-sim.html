@@ -131,7 +131,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
       <div class="legend">
         <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
-        <span><b>/</b>stick</span><span><b>o</b>rock</span><span><b>%</b>carcass</span><span><b>=</b>log</span><span><b>○</b>fire pit</span><span><b>⌂</b>lean-to</span><span><b>Ξ</b>drying rack</span><span><b>▦</b>storehouse</span><span><b>⊞</b>workshop</span><span><b>ʌ</b>sapling</span><span><b>▤</b>stash</span><span><b>∩</b>snare</span><span><b>▲</b>fire</span>
+        <span><b>/</b>stick</span><span><b>o</b>rock</span><span><b>%</b>carcass</span><span><b>=</b>log</span><span><b>○</b>fire pit</span><span><b>⌂</b>lean-to</span><span><b>Ξ</b>drying rack</span><span><b>▦</b>storehouse</span><span><b>⊞</b>workshop</span><span><b>⌓</b>kiln</span><span><b>ʌ</b>sapling</span><span><b>▤</b>stash</span><span><b>∩</b>snare</span><span><b>▲</b>fire</span>
       </div>
       <section class="panel"><h2>Chronicle</h2><ol id="chronicle"></ol></section>
     </div>
@@ -189,7 +189,7 @@ const MATERIALS = {
 const GROUND = {
   grass: { name: 'grass',       fuel: 6, flam: 0.6, walk: true },
   soil:  { name: 'bare soil',   fuel: 0, flam: 0,   walk: true },
-  sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true },
+  sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true, clay: true },
   ash:   { name: 'ash',         fuel: 0, flam: 0,   walk: true },
   water: { name: 'water',       fuel: 0, flam: 0,   walk: false },
   rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false },
@@ -222,6 +222,8 @@ const ITEMS = {
   fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
   cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
   fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
+  clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
+  pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
@@ -852,9 +854,9 @@ function legPath(a, tx, ty, within, tz = 0){
 /* ---------- camps: the stash, the site, founding, and the per-camp tick ---------- */
 function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
-    stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0 }, rot: { cooked: [], berries: [] },
+    stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, huts: [], village: false, snares: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, huts: [], village: false, snares: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
@@ -862,7 +864,7 @@ const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r
 
 function stashAdd(kind, n){
   camp.stash[kind] = (camp.stash[kind] || 0) + n;
-  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
+  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
 }
 function stashTake(kind, n = 1){ camp.stash[kind] = Math.max(0, camp.stash[kind] - n); if (camp.rot[kind]) camp.rot[kind].splice(0, n); }
 function spoilFood(){
@@ -1709,6 +1711,22 @@ function startFish(a){
     } };
   return true;
 }
+/* Clay comes from the riverbank: any tile whose ground flags clay (sand). The bank is not used up. */
+function startDigClay(a){
+  if (a.carrying && a.carrying.kind !== 'clay') return startDeliver(a);
+  const bank = t => !!GROUND[t.ground].clay;
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, bank, NEAR, z), 3000, a);
+  if (!p){ if (a.carrying) return startDeliver(a); return false; }
+  a.task = { type: 'gather', label: 'Going to the bank for clay', path: p, progress: 0,
+    arrive(a, t){
+      if (!nearFind(a.x, a.y, bank, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+      t.label = 'Digging clay from the bank';
+      if (++t.progress % 10 === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'clay', count: 1 }; }
+      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      return 'continue';
+    } };
+  return true;
+}
 function startSetSnare(a){
   const c = camp.site; let best = null;
   const s = secOf(c[0], c[1]);
@@ -1790,6 +1808,7 @@ function startFillWater(a){
 }
 
 /* Goal definitions. Each goal reports a state and offers work. */
+const waterAim = () => 6 + 6 * (camp.stash.pot || 0);
 const GOALS = [
   { id: 'camp', title: 'Make camp',
     state(){ return camp.site ? { s: 'done', text: `Site chosen: ${camp.siteReason || 'set by you'}.` } : { s: 'active', text: 'Nobody has picked a spot yet.' }; },
@@ -1959,9 +1978,9 @@ const GOALS = [
       return { s: camp.stash.hide >= 2 ? 'active' : 'blocked', text: `Hides ${Math.min(camp.stash.hide, 2)}/2. Every cooked rabbit leaves one.` };
     },
     offers(a){ if (camp.tools.waterskin || camp.stash.hide < 2) return []; return [{ label: 'sew the waterskin', score: 54, start: a => startBuild(a, camp.stashTile, 60, 'Sewing a waterskin', a => { if (camp.tools.waterskin || camp.stash.hide < 2) return; camp.stash.hide -= 2; camp.tools.waterskin = 1; gainXp(a, 'craft'); log(`${a.name} sews two hides into a waterskin.`, [a], 'major'); }) }]; } },
-  { id: 'water', title: 'Keep water at camp', standing: true, target: 6,
-    state(){ if (!camp.tools.waterskin) return { s: 'blocked', text: 'Needs the waterskin.' }; return { s: 'active', text: `${camp.stash.water} drinks stored. Aim: ${this.target}. People drink at the fire instead of walking to the river.` }; },
-    offers(a){ if (!camp.tools.waterskin || camp.stash.water >= this.target) return []; return [{ label: 'fill the waterskin', score: camp.stash.water === 0 ? 48 : 36, start: a => startFillWater(a) }]; } },
+  { id: 'water', title: 'Keep water at camp', standing: true,
+    state(){ if (!camp.tools.waterskin) return { s: 'blocked', text: 'Needs the waterskin.' }; return { s: camp.stash.water >= waterAim() ? 'idle' : 'active', text: `${camp.stash.water} drinks stored. Aim: ${waterAim()}. People drink at the fire instead of walking to the river.` }; },
+    offers(a){ if (!camp.tools.waterskin || camp.stash.water >= waterAim()) return []; return [{ label: 'fill the waterskin', score: camp.stash.water === 0 ? 48 : 36, start: a => startFillWater(a) }]; } },
   { id: 'spear', title: 'Make a spear', need: { stick: 1, rock: 1 },
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, start: a => startBuild(a, camp.stashTile, 50, 'Shaping a spear', a => { if (camp.tools.spear) return; camp.stash.stick--; camp.stash.rock--; camp.tools.spear = 1; gainXp(a, 'craft'); log(`${a.name} hardens a shaft in the fire and binds a flaked point to it. The camp has a spear.`, [a], 'major'); }) }]; return [{ label: 'gather a rock for the spear', score: 40, start: a => startGather(a, camp.stash.rock < 1 ? 'rock' : 'stick') }]; } },
@@ -2029,6 +2048,12 @@ const RECIPES = [
   { id: 'clothes', title: 'Sew hide clothes', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: 70, makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 42,
     verb: 'sews', status: () => `${campHumans().filter(h => h.clothes).length} of ${campHumans().length} clothed.`,
     blurb: 'Three hides and a coil of cord. The coldest person wears them, and loses warmth slower.' },
+  { id: 'clay', title: 'Dig clay', after: 'workshop', place: 'bank', gather: a => startDigClay(a), standing: { stash: 'clay', n: 6 }, score: 32, offerLabel: 'dig clay',
+    blurb: 'Clay from the riverbank. Four lumps build a kiln, three fire a pot.' },
+  { id: 'kiln', title: 'Build the kiln', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: 120, makes: { struct: 'kiln' }, score: 46,
+    verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
+  { id: 'pot', title: 'Fire pots', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: 50, makes: { item: 'pot', n: 1 }, standing: { stash: 'pot', n: 3 }, score: 42,
+    verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -2050,6 +2075,8 @@ const PLACES = {
   site: { spot: () => openSpotNear(camp.pit, 2, 5) },
   reeds: {},
   water: {},
+  bank: {},
+  kiln: { spot: () => camp.kiln },
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
 const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]));
@@ -2059,14 +2086,15 @@ function gatherOffer(kind){
   if (kind === 'log') return a => startCutTree(a);
   if (['stick', 'rock', 'moss'].includes(kind)) return a => startGather(a, kind);
   if (kind === 'fibre') return a => startPickFibre(a);
+  if (kind === 'clay') return a => startDigClay(a);
   return null;
 }
 /* What making the thing does to the world, by the one key in r.makes. A struct maker returns false
    when the tile is already built on, so the caller can bail before it is called. */
 const MAKERS = {
-  item(r, a, at){ stashAdd(r.makes.item, r.makes.n); },
+  item(r, a, at){ stashAdd(r.makes.item, r.makes.n); if (r.place === 'kiln'){ const k = tileAt(...camp.kiln).struct; k.fired = (k.fired || 0) + r.makes.n; } },
   tool(r, a, at){ camp.tools[r.makes.tool] = 1; },
-  struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp }; camp[r.makes.struct] = at; },
+  struct(r, a, at){ const t = tileAt(...at); if (t.struct) return false; t.feature = null; t.struct = { type: r.makes.struct, camp, fired: 0 }; camp[r.makes.struct] = at; },
   wear(r, a, at){ const who = campHumans().filter(h => !h[r.makes.wear]).sort((p, q) => p.needs.warmth - q.needs.warmth)[0] || a; who[r.makes.wear] = true; addThought(who, 'clothes', 'Warm in new hide clothes', 5, 1500); log(`${a.name} sews hide clothes, and ${who === a ? 'wears them' : `${who.name} wears them`}.`, [a, who], 'good'); return 'logged'; },
 };
 function recipeGoal(r){
@@ -2321,6 +2349,7 @@ function drawLoc(){
       else if (t.struct.type === 'hut'){ bg = P.pit; g = '⌂'; fg = P.snare; }
       else if (t.struct.type === 'storehouse'){ bg = P.pit; g = '▦'; fg = P.stick; }
       else if (t.struct.type === 'workshop'){ bg = P.pit; g = '⊞'; fg = P.stick; }
+      else if (t.struct.type === 'kiln'){ bg = P.pit; g = '⌓'; fg = P.rock; }
       else if (t.struct.type === 'stone'){ g = '⊙'; fg = t.struct.offering ? P.berry : P.rock; }
       else if (t.struct.type === 'ward'){ g = 'ǂ'; fg = P['ash-fg']; }
       else if (t.struct.type === 'rack'){ bg = P.pit; g = 'Ξ'; fg = P.stick; }
@@ -2400,7 +2429,7 @@ function inspectTile(x, y, z = 0){
   const s = secOf(x, y), where = `${sectors[secIdx(s.sx, s.sy)].name}, ${x - s.sx * LW},${y - s.sy * LH}`;
   if (!hasTile(x, y, z)) return `<table class="kv"><tr><td>Where</td><td>${where}</td></tr><tr><td>Level</td><td>${levelName(z)}. ${z > 0 ? 'Open air. The ground is below.' : 'Solid earth. Nothing is dug here.'}</td></tr></table>`;
   const t = tileAt(x, y, z), rows = [['Where', where], ['Level', levelName(z)], ['Ground', GROUND[t.ground].name + (GROUND[t.ground].walk || t.ground === 'water' ? '' : '. Nothing walks through it.')]];
-  const c = z === 0 ? camps.find(c => c.site && ((c.site[0] === x && c.site[1] === y) || (c.stashTile[0] === x && c.stashTile[1] === y) || (c.pit && c.pit[0] === x && c.pit[1] === y) || (c.rack && c.rack[0] === x && c.rack[1] === y) || (c.shelter && c.shelter[0] === x && c.shelter[1] === y) || (c.workshop && c.workshop[0] === x && c.workshop[1] === y))) : null;
+  const c = z === 0 ? camps.find(c => c.site && ((c.site[0] === x && c.site[1] === y) || (c.stashTile[0] === x && c.stashTile[1] === y) || (c.pit && c.pit[0] === x && c.pit[1] === y) || (c.rack && c.rack[0] === x && c.rack[1] === y) || (c.shelter && c.shelter[0] === x && c.shelter[1] === y) || (c.workshop && c.workshop[0] === x && c.workshop[1] === y) || (c.kiln && c.kiln[0] === x && c.kiln[1] === y))) : null;
   const saved = camp; if (c) camp = c;
   if (z === 0 && camp.site && camp.site[0] === x && camp.site[1] === y && !camp.pit){
     const n = GOALS.find(g => g.id === 'firepit').need;
@@ -2419,6 +2448,7 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'hut') rows.push(['Hut', 'sleeps three, out of the wind and rain.']);
   if (t.struct && t.struct.type === 'storehouse') rows.push(['Storehouse', 'the stash on stilts. Food keeps twice as long, and wolves cannot reach it.']);
   if (t.struct && t.struct.type === 'workshop') rows.push(['Workshop', 'a roofed bench. Cord, baskets, rods, and clothes are made here, faster than by the fire.']);
+  if (t.struct && t.struct.type === 'kiln') rows.push(['Kiln', `a dome of rock and clay. ${t.struct.fired || 0} pots fired here.`]);
   if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
   if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);

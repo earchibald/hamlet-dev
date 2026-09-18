@@ -126,3 +126,35 @@ test('hide clothes go to the coldest person and keep them warmer', () => {
   api.updateBeing(a); api.updateBeing(bare);
   assert.ok(60 - a.needs.warmth < 60 - bare.needs.warmth, `clothed loss ${60 - a.needs.warmth} should be less than bare ${60 - bare.needs.warmth}`);
 });
+
+test('clay is dug from the riverbank, the kiln is raised, and pots are fired in it', () => {
+  const { api, a, c } = readyCamp();
+  c.workshop = [c.pit[0] + 2, c.pit[1]]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c };
+  const s = api.tileAt(c.stashTile[0] + 3, c.stashTile[1]); s.ground = 'sand'; s.feature = null; s.struct = null;
+  assert.equal(api.goalState(goal(api, 'clay')).s, 'active');
+  doOffer(api, a, 'dig clay');
+  assert.ok(c.stash.clay >= 2, `clay ${c.stash.clay}`);
+  c.stash.clay = 4; c.stash.rock = 8;
+  assert.equal(api.goalState(goal(api, 'kiln')).s, 'active');
+  doOffer(api, a, 'build the kiln');
+  assert.ok(c.kiln); assert.equal(api.tileAt(...c.kiln).struct.type, 'kiln'); assert.equal(c.stash.clay, 0); assert.equal(c.stash.rock, 0);
+  c.stash.clay = 3; c.stash.stick = 2; c.stash.pot = 0;
+  doOffer(api, a, 'fire pots');
+  assert.equal(c.stash.pot, 1); assert.equal(c.stash.stick, 0); assert.equal(api.tileAt(...c.kiln).struct.fired, 1);
+  /* Aim is three pots: one is not done. Clay is now empty and clay is another recipe's output,
+     so by the design rule (design/notes.md:105) the goal is blocked, not active, until clay is dug again. */
+  assert.equal(api.goalState(goal(api, 'pot')).s, 'blocked', 'aim is three pots');
+});
+
+test('a pot holds water at camp and keeps berries longer', () => {
+  const { api, a, c } = readyCamp();
+  c.tools.waterskin = 1; c.stash.water = 8;
+  assert.equal(api.goalState(goal(api, 'water')).s, 'idle' , 'eight drinks meet the aim of six without a pot');
+  c.stash.pot = 1;
+  assert.equal(api.goalState(goal(api, 'water')).s, 'active', 'with a pot the aim is twelve');
+  api.camp = c; c.rot.berries = []; c.stash.berries = 0;
+  api.stashAdd('berries', 1); const withPot = c.rot.berries[0] - api.tick;
+  c.stash.pot = 0; c.rot.berries = []; c.stash.berries = 0;
+  api.stashAdd('berries', 1); const without = c.rot.berries[0] - api.tick;
+  assert.equal(withPot, without * 2);
+});

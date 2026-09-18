@@ -29,7 +29,7 @@ const MATERIALS = {
 const GROUND = {
   grass: { name: 'grass',       fuel: 6, flam: 0.6, walk: true },
   soil:  { name: 'bare soil',   fuel: 0, flam: 0,   walk: true },
-  sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true },
+  sand:  { name: 'sand',        fuel: 0, flam: 0,   walk: true, clay: true },
   ash:   { name: 'ash',         fuel: 0, flam: 0,   walk: true },
   water: { name: 'water',       fuel: 0, flam: 0,   walk: false },
   rock:  { name: 'bare rock',   fuel: 0, flam: 0,   walk: false },
@@ -62,6 +62,8 @@ const ITEMS = {
   fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
   cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
   fish:    { name: 'fish',             plural: 'fish',  mat: 'flesh', fuel: 0 },
+  clay:    { name: 'lump of clay',     plural: 'clay',  mat: 'stone', fuel: 0, gather: 'dig' },
+  pot:     { name: 'clay pot',         plural: 'pots',  mat: 'stone', fuel: 0 },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
