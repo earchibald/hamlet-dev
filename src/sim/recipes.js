@@ -43,7 +43,9 @@ const RECIPES = [
 
 /* Is this stash kind made by some other recipe? Then a recipe short of it waits, blocked, rather than trying to gather it. A standing counter with a zero target is a panel sentinel, not a claim to make the kind. */
 const madeBy = (k, r) => RECIPES.some(x => x !== r && ((x.makes && x.makes.item === k) || (x.gather && x.standing && x.standing.stash === k && x.standing.n > 0)));
-const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
+/* What a recipe can actually spend of a kind: the stash, less the one hide held for a hut. The one place every needs check reads. */
+const availOf = k => (camp.stash[k] || 0) - (k === 'hide' ? hideReserved() : 0);
+const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => availOf(k) >= n);
 const takeNeeds = needs => { for (const [k, n] of Object.entries(needs || {})) stashTake(k, n); };
 const needsText = needs => Object.entries(needs || {}).map(([k, n]) => `${ITEMS[k].plural} ${Math.min(camp.stash[k] || 0, n)}/${n}`).join(', ');
 /* Has the thing this recipe waits on been done? A goal id, a tool, or a struct. */
@@ -107,9 +109,10 @@ function recipeGoal(r){
         const text = r.standing.n === 0 ? r.status() : `${have}/${r.standing.n} ${ITEMS[r.standing.stash].plural} stored. ${r.blurb}`;
         if (!ready) return { s: 'idle', text };
         if (r.needs && !stashHas(r.needs)){
-          const missing = Object.keys(r.needs).find(k => (camp.stash[k] || 0) < r.needs[k]);
-          if (madeBy(missing, r))
-            return { s: 'blocked', text: `${needsText(r.needs)}. ${r.blurb}` };
+          const missing = Object.keys(r.needs).find(k => availOf(k) < r.needs[k]);
+          const heldBack = missing === 'hide' && (camp.stash.hide || 0) >= r.needs.hide && hideReserved() > 0;
+          if (madeBy(missing, r) || heldBack)
+            return { s: 'blocked', text: `${needsText(r.needs)}. ${r.blurb}${heldBack ? ' One hide is held for a hut.' : ''}` };
         }
         return { s: 'active', text };
       }

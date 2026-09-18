@@ -34,7 +34,7 @@ const API = `return {
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
   get options(){ return options; },
-  campHumans, humans, stashFood,
+  campHumans, humans, stashFood, hideReserved, bedsFor,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },

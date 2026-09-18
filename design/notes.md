@@ -95,7 +95,7 @@ The chain, in the order camps reach it:
 12. Build a lean-to. 4 logs, 10 sticks. Sleeps three.
 13. Build a drying rack. 6 sticks. Smoked meat never spoils.
 14. Raise a storehouse. 6 logs, 8 sticks. Food keeps twice as long. Wolves cannot raid it.
-15. Build huts (ongoing), up to four. Built when people outnumber beds.
+15. Build huts (ongoing), up to four. Built when people outnumber beds. While people sleep outside, one hide is held back for the hut; the waterskin and clothes wait for the next one. Short of a hide, the card offers to set a snare for a hide.
 16. Sew a waterskin. 2 hides. Then keep water at camp.
 17. Become a village. Storehouse, two huts, eight people.
 18. Found a second camp. Roof, five people, eight days old, spring or summer, at most six camps. Two people leave with coals that last six days.
@@ -212,7 +212,7 @@ Known weak spots:
 - The sprite-birth rule counts old pines on the sector's surface only; the pines on the hill above a hollow do not count yet.
 - A person whose task fails in the dark drops what they carry there, where nobody will fetch it.
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
-- A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
+- Fixed: one hide is held for a hut while people sleep outside; growth still waits on a rabbit, but not behind the waterskin and the clothes.
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.
 - The on-demand dig for a burrow that must move may fail several times on a crowded map, trying again every three days.
 - Fixed. The soak's cave cutoff check (see section 14) caught a real one: on seed r a burrow's own exit at 2,22,0 went unreachable from the first camp's stash from around day 56 on. The dig itself was not the cause: it was never relocated. A sapling could still take root on a cave's own mouth tile, and twelve days later it matured into a solid tree there, sealing the one doorway a den or burrow has. `growPlants` in `src/sim/world.js` now refuses to plant a sapling on any tile with `t.mouth` set. `digGnomeBurrow` also now checks a live `reachable()` region, not the generation-time `startRegion`, when it digs mid-game (a village driving a burrow off), and keeps a new exit at least 2 tiles from the map edge, so a relocation dig cannot repeat the same mistake by a different route.

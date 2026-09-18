@@ -240,3 +240,53 @@ test('a dead pit with no ignition source sends a brave adult for firestones befo
   assert.ok(stones && wood, 'both offers should still be on the table with the pit lit');
   assert.ok(wood.score > stones.score, `lit pit: firewood (${wood.score}) should outrank firestones (${stones.score}), as before`);
 });
+
+test('when people sleep outside, the next hide goes to the hut, not the waterskin or clothes', () => {
+  const { api, a, c } = readyCamp();
+  /* A lean-to, a workshop, logs and sticks for a hut, cord for clothes, and eight people for three beds. */
+  c.shelter = [c.pit[0], c.pit[1]];
+  c.workshop = [c.pit[0] + 2, c.pit[1]]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c };
+  c.stash.log = 5; c.stash.stick = 10; c.stash.cord = 1;
+  const extra = [];
+  for (let i = 0; i < 7; i++){
+    const b = api.makeBeing('human', a.x, a.y, `Extra${i}`, i * 10); b.camp = c; b.alive = true; b.asleep = false; b.homeless = false;
+    api.beings.push(b); extra.push(b);
+  }
+  assert.equal(api.campHumans().length, 8, 'eight people');
+  assert.equal(api.hideReserved(), 1, 'a hide is held while people sleep outside');
+
+  /* With no hide at all: the huts card names the hide it is short of, and a snare-for-a-hide offer stands in for the missing hide. */
+  c.stash.hide = 0;
+  let offers = api.offersFor(a);
+  assert.ok(api.goalState(goal(api, 'huts')).text.includes('next hide'), api.goalState(goal(api, 'huts')).text);
+  assert.ok(offers.some(o => o.label === 'set a snare for a hide'), `no "set a snare for a hide" offer; offers: ${offers.map(o => o.label).join(', ')}`);
+  assert.ok(!offers.some(o => o.label === 'build a hut'), 'no hide yet, so no hut to build');
+
+  /* With hide 2 (the waterskin's own cost): the waterskin still waits, because one hide is held for the hut, but the hut itself can build with the one it needs. */
+  c.stash.hide = 2;
+  offers = api.offersFor(a);
+  assert.ok(!offers.some(o => o.label === 'sew the waterskin'), 'the waterskin should not offer while a hide is held back');
+  assert.ok(!api.goalState(goal(api, 'huts')).text.includes('next hide'), 'a hide is in stash now, so the hut is no longer short');
+
+  /* With hide 3 (2 for the waterskin plus the one reserved): the waterskin offers again, and the hut can be built. Clothes need 3 hides too, so it still waits, and says why. */
+  c.stash.hide = 3;
+  offers = api.offersFor(a);
+  assert.ok(offers.some(o => o.label === 'sew the waterskin'), 'the waterskin should offer once a spare hide covers the reservation');
+  const hutOffer = offers.find(o => o.label === 'build a hut');
+  assert.ok(hutOffer, `no "build a hut" offer; offers: ${offers.map(o => o.label).join(', ')}`);
+  assert.equal(hutOffer.score, 48);
+  assert.ok(!offers.some(o => o.label === 'sew hide clothes'), 'clothes should wait while a hide is held for the hut');
+  assert.equal(api.goalState(goal(api, 'clothes')).s, 'blocked');
+  assert.ok(api.goalState(goal(api, 'clothes')).text.includes('One hide is held for a hut.'), api.goalState(goal(api, 'clothes')).text);
+
+  /* One more hide (4) covers the reservation too: clothes can now be sewn. */
+  c.stash.hide = 4;
+  assert.ok(api.offersFor(a).some(o => o.label === 'sew hide clothes'), 'clothes offers once a spare hide covers the reservation');
+
+  /* Beds catch up with people: the reservation lifts and the waterskin offers at hide 2 as before. */
+  for (const b of extra.slice(0, 5)) b.alive = false;
+  assert.equal(api.campHumans().length, 3, 'three people left, matching the three beds');
+  c.stash.hide = 2;
+  assert.equal(api.hideReserved(), 0, 'nobody sleeps outside now');
+  assert.ok(api.offersFor(a).some(o => o.label === 'sew the waterskin'), 'the waterskin offers at two hides once nobody sleeps outside');
+});
