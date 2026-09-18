@@ -5,8 +5,22 @@ function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 
 const needColor = v => v < 25 ? 'var(--bad)' : v < 50 ? 'var(--warn)' : 'var(--good)';
 function moodWord(a, m){ if (!a.alive) return 'Dead'; return m >= 65 ? 'Happy' : m >= 45 ? 'Content' : m >= 30 ? 'Uneasy' : m >= 15 ? 'Unhappy' : 'Miserable'; }
 function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 0.7 ? w[2] : w[1]; }
+/* A god is a being in the list, but it is not a creature of the day era: it has no life clock, no camp, no
+   traits the day era reads, and its needs are its own four. So it gets its own card, and the shared one never
+   reads a field a god lacks. The card says who it is, what it became, and where its body lies. */
+function inspectGod(g){
+  const s = secOf(g.x, g.y);
+  const where = `${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}`;
+  const body = g.status === 'dead' ? 'Unmade. Nothing on the field was its pole any more.'
+    : `${g.name} lies down and is ${BODY[g.pole]}, in the ${where}.`;
+  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">age ${e.age === undefined ? '-' : e.age}</span> ${e.text}</li>`).join('');
+  return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
+    <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${g.status === 'dead' ? 'Dead' : 'Asleep'} since age ${g.sleptAt || g.born}. ${body}</div>
+    ${said ? `<h3>What the legends say</h3><ul class="hist">${said}</ul>` : ''}`;
+}
 /* full is the window's card: the long history and the Follow button. The hover tip shows the short one. */
 function inspectBeing(a, full = false){
+  if (a.species === 'god') return inspectGod(a);
   const m = mood(a), sp = SPECIES[a.species];
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   const thoughts = a.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';

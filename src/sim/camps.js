@@ -84,10 +84,25 @@ function openSpotNear(at, dmin, dmax){
   return best ? [best.x, best.y] : null;
 }
 
+/* A party founds where a pit can be built: rocks, sticks, and water within reach. A mark-painted meadow can be
+   wide and bare. Reach is the sector and its four neighbours; the cost is the fire pit goal's own need. */
+function aroundSector(s, count){
+  let n = count(s);
+  for (const [dx, dy] of DIRS){ const nx = s.sx + dx, ny = s.sy + dy; if (nx >= 0 && nx < SW && ny >= 0 && ny < SH) n += count(sectors[secIdx(nx, ny)]); }
+  return n;
+}
+function foundingSites(){
+  const need = GOALS.find(g => g.id === 'firepit').need;
+  const wet = s => sectorCount(s, 'water', t => t.ground === 'water');
+  return sectors.filter(s => GROWS[s.biome] &&
+    aroundSector(s, looseCount('rock')) >= need.rock &&
+    aroundSector(s, looseCount('stick')) >= need.stick &&
+    aroundSector(s, wet) > 0);
+}
 function startFoundCamp(leader){
   const here = secOf(...camp.site);
   const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
-  const cands = sectors.filter(s => s.biome === 'meadow' && camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= 3) && region.has(idx3(...secCenter(s), 0)));
+  const cands = foundingSites().filter(s => camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= 3) && region.has(idx3(...secCenter(s), 0)));
   if (!cands.length) return false;
   const target = cands.sort((p, q) => dist(p.sx, p.sy, here.sx, here.sy) - dist(q.sx, q.sy, here.sx, here.sy))[0];
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));

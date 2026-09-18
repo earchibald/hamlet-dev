@@ -9,7 +9,7 @@ test('a creation opens the gods era with one formless region and no god', () => 
   assert.equal(api.liveRegions().length, 1);
   assert.equal(api.gods().length, 0);
   assert.deepEqual(api.legends, []);
-  assert.deepEqual(api.creation, { ages: 0, backstops: 0, settled: false, failed: false, gate: null });
+  assert.deepEqual(api.creation, { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {} });
   assert.ok(api.godRng);
 });
 
@@ -122,14 +122,30 @@ test('flow runs through neighbouring countries, and pool marks one', () => {
   const { g, r } = godWith(api, 'wet');
   const flows = () => api.liveRegions().reduce((n, q) => n + api.marksOf(q, 'flow').length, 0);
   const before = flows();
+  const dryBefore = api.liveRegions().filter(q => !api.hasPole(q, 'wet')).map(q => q.id);
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.flow.apply(g, r)); });
   assert.ok(flows() >= before + 2, 'flow touched fewer than two countries');
-  assert.ok(api.hasPole(r, 'wet'), 'flow left the country dry');
-  const { g: s, r: p } = godWith(api, 'still');
+  const flowedDry = api.liveRegions().filter(q => api.hasMark(q, 'flow') && dryBefore.includes(q.id));
+  if (flowedDry.length) assert.ok(flowedDry.every(q => !api.hasPole(q, 'wet')), 'flow changed a dry country\'s nature');
+  const p = api.liveRegions().find(q => !api.hasPole(q, 'wet')) || api.liveRegions()[0];
+  const s = api.withGodRng(() => api.makeGod('still', p, 'Test.'));
+  api.setPole(p, 'still', s, 'test');
+  const pWasDry = !api.hasPole(p, 'wet');
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
   assert.ok(api.hasMark(p, 'pool'));
-  assert.ok(api.hasPole(p, 'wet'), 'pool left the country dry');
+  if (pWasDry) assert.ok(!api.hasPole(p, 'wet'), 'pool changed a dry country\'s nature');
   assert.equal(api.GOD_ACTS.pool.targets(s).includes(p), false, 'a pooled region is offered again');
+});
+
+test('the gate reads a flow or pool mark as water', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a] = api.awakeGods(); const r = api.regionById(a.region);
+  api.setPole(r, 'dry', a, ''); api.setPole(r, 'hot', a, '');
+  for (const n of api.neighboursOf(r)) api.setPole(n, 'dry', a, '');
+  assert.equal(api.restGate().lack, 'water');
+  api.mark(api.neighboursOf(r)[0], 'flow', 'surface', a, '');
+  assert.notEqual(api.restGate().lack, 'water');
 });
 
 test('burning scars another god\'s country and offends it', () => {
@@ -246,4 +262,41 @@ test('a world that outgrows its gods calls a new difference into being', () => {
   api.withGodRng(() => api.outgrown());
   assert.equal(api.gods().length, before + 1);
   assert.equal(new Set(api.gods().map(g => g.contrast)).size, new Set(api.gods().slice(0, before).map(g => g.contrast)).size + 1);
+});
+
+test('the gate wants a hill and a cave, and the lacks strain above and below', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a] = api.awakeGods(); const r = api.regionById(a.region);
+  /* Build a world that passes every old item, then check the two new ones in order. */
+  api.setPole(r, 'dry', a, '');
+  /* The neighbour is the water and the fuel both: a flow mark reads as water, and dry cold ground is forest. */
+  for (const n of api.neighboursOf(r)){ api.setPole(n, 'dry', a, ''); api.setPole(n, 'cold', a, ''); api.mark(n, 'flow', 'surface', a, ''); }
+  api.setPole(r, 'hot', a, '');
+  api.mark(r, 'making', 'rabbit', a, ''); api.mark(r, 'making', 'human', a, '');
+  const n0 = api.neighboursOf(r)[0];
+  assert.equal(api.restGate().lack, 'height');
+  api.mark(n0, 'height', 1, a, '');
+  assert.equal(api.restGate().lack, 'depth');
+  api.mark(n0, 'depth', 1, a, '');
+  assert.equal(api.restGate().lack, 'hunter', 'rabbit is prey; hunter is still missing');
+  api.mark(n0, 'making', 'fox', a, '');
+  assert.equal(api.restGate().lack, 'fae');
+  api.mark(n0, 'making', 'sprite', a, '');
+  /* The people are not the folk the gate wants: a second people, the gnomes, are the below god's. */
+  assert.equal(api.restGate().lack, 'folk');
+  api.mark(n0, 'making', 'gnome', a, '');
+  assert.equal(api.restGate().ok, true);
+  assert.deepEqual(api.STRAIN.height, ['above']); assert.deepEqual(api.STRAIN.depth, ['below']);
+  assert.deepEqual(api.MAKES.below, ['gnome']); assert.ok(api.MAKES.light.includes('sprite'));
+  assert.deepEqual(api.polesThatMake('folk'), ['below']);
+  assert.deepEqual(api.polesThatMake('fae'), ['dark', 'light']);
+  assert.deepEqual(api.MAKES.wet, ['deer']);
+});
+
+test('a lack of fae strains a pole that makes fae', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  api.withGodRng(() => api.strain('fae'));
+  assert.ok(api.polesThatMake('fae').some(p => api.godOf(p)), 'no god of a fae-making pole after the strain');
 });

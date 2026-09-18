@@ -5,7 +5,7 @@ const { load } = require('../src/sim');
 
 function readyCamp(seed = 'r'){
   const api = load(); api.startWorld(seed);
-  const a = api.beings[0]; const c = api.camps[0]; api.camp = c;
+  const a = api.firstPerson(); const c = api.camps[0]; api.camp = c;
   api.setSite(a.x, a.y);
   const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
   c.everLit = true; c.bestStreak = 4000; c.tools.axe = 1; c.tools.spear = 1;
@@ -14,6 +14,19 @@ function readyCamp(seed = 'r'){
   for (const k in a.needs) a.needs[k] = 90;
   return { api, a, c };
 }
+/* A wolf den is dug only in the country where a god made wolves, and only if that country holds a hill, so a
+   seed may have none. A den test takes the first soak seed that has one. */
+const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
+let wolfDenSeed;
+function seedWithWolfDen(){
+  if (wolfDenSeed !== undefined) return wolfDenSeed;
+  for (const s of SEEDS){ const api = load(); api.startWorld(s); if (api.caves.some(k => k.kind === 'den' && k.owner === 'wolf')) return wolfDenSeed = s; }
+  return wolfDenSeed = null;
+}
+function readyDenCamp(){ const s = seedWithWolfDen(); return s ? readyCamp(s) : null; }
+
+test('some soak seed digs a wolf den', () => { assert.ok(seedWithWolfDen(), 'no soak seed digs a wolf den'); });
+
 function doOffer(api, a, label, ticks = 2000){
   const o = api.offersFor(a).find(o => o.label === label || o.label.startsWith(label));
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
@@ -22,9 +35,23 @@ function doOffer(api, a, label, ticks = 2000){
   for (let k = 0; k < ticks && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null, `"${label}" did not finish in ${ticks} ticks`);
 }
-/* Move the camp beside a water cave's exit so the search is short. */
-function campByCave(api, c, a, cave){
-  const e = cave.exit; api.setSite(e.x + 2, e.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
+/* Move the camp near a cave's exit so the walk is short. `gap` is how far off the exit the site sits: two tiles
+   for a cave nobody lives in, and further for a den, so a wolf standing in its own mouth is not already a threat
+   at the fire and the party is not sent running before it sets out. */
+function campByCave(api, c, a, cave, gap = 2){
+  const e = cave.exit;
+  /* Any open tile about `gap` off the mouth will do. A cave near the map edge or in a thicket has no room in the
+     four compass directions, so the eight around it, out to two tiles further, are tried in order of how near
+     they sit to the gap asked for. */
+  const cands = [];
+  for (let dx = -gap - 2; dx <= gap + 2; dx++) for (let dy = -gap - 2; dy <= gap + 2; dy++){
+    const d = Math.hypot(dx, dy); if (d < gap || d > gap + 2) continue;
+    cands.push([e.x + dx, e.y + dy, Math.abs(d - gap)]);
+  }
+  cands.sort((p, q) => p[2] - q[2]);
+  const spot = cands.find(([x, y]) => api.hasTile(x, y, 0) && api.passable(x, y) && x > 2 && y > 2 && x < api.W - 3 && y < api.H - 3);
+  assert.ok(spot, `no room for a camp ${gap} tiles off the cave mouth at ${e.x},${e.y}`);
+  api.setSite(spot[0], spot[1]); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
   for (const [dx, dy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]){ const q = api.tileAt(t.x + dx, t.y + dy); if (q.mouth) continue; q.ground = 'soil'; q.feature = null; q.struct = null; }
   a.x = c.stashTile[0]; a.y = c.stashTile[1]; a.z = 0;
 }
@@ -74,6 +101,9 @@ test('fallen rock is cleared with the axe before the search', () => {
   const cave = api.caves.find(k => k.kind === 'water' && k.blocked) || (() => { const k = api.caves.find(k => k.kind === 'water'); const t = k.tiles.find(t => t.z === -1 && t !== k.mouth && !t.slope); t.ground = 'rock'; k.blocked = t; k.story.push('Fallen rock blocks the way.'); return k; })();
   assert.ok(!api.keepsPaths(cave.blocked), 'the forced rock tile does not sit at a real chokepoint, unlike the ones world generation picks');
   campByCave(api, c, a, cave);
+  /* A mark-painted world can put a second cave within reach of the same camp. The others count as searched, so
+     the only cave on offer is the one with rock in it. */
+  for (const k of api.caves) if (k !== cave && k.kind === 'water') k.searched = c;
   api.tick = 9 * 1000;
   const labels = api.offersFor(a).map(o => o.label);
   assert.ok(labels.includes('clear the fallen rock'), labels.join(', ')); assert.ok(!labels.includes('search the cave with a brand'));
@@ -81,10 +111,11 @@ test('fallen rock is cleared with the axe before the search', () => {
   assert.equal(cave.blocked, null); assert.ok(cave.story.some(s => s.includes('cleared')));
 });
 
-test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', () => {
-  const { api, a, c } = readyCamp();
+test('two brave people with brands and the spear clear a wolf den; the wolves dig a new one, and take the old back when the fire fails', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
-  campByCave(api, c, a, den);
+  campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
@@ -104,10 +135,11 @@ test('two brave people with brands and the spear clear a wolf den; the wolves di
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
 
-test('a den reverts to homeless owners too, when the fire fails before they redig', () => {
-  const { api, a, c } = readyCamp();
+test('a den reverts to homeless owners too, when the fire fails before they redig', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
-  campByCave(api, c, a, den);
+  campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
@@ -123,10 +155,11 @@ test('a den reverts to homeless owners too, when the fire fails before they redi
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
 
-test('the party keeps its brands lit until home, and the guard goal leaves a just-driven wolf alone', () => {
-  const { api, a, c } = readyCamp();
+test('the party keeps its brands lit until home, and the guard goal leaves a just-driven wolf alone', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
-  campByCave(api, c, a, den);
+  campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; mate.hp = 100; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
@@ -166,10 +199,11 @@ test('withBrand ends with no live ember when the chain does not start', () => {
   assert.equal(c.stash.ember || 0, 0);
 });
 
-test('a walled-off mate carries no ember, and an ember can never be stashed', () => {
-  const { api, a, c } = readyCamp();
+test('a walled-off mate carries no ember, and an ember can never be stashed', ctx => {
+  const ready = readyDenCamp(); if (!ready) return ctx.skip('no soak seed digs a wolf den a camp can be built beside');
+  const { api, a, c } = ready;
   const den = api.caves.find(k => k.kind === 'den' && k.owner === 'wolf');
-  campByCave(api, c, a, den);
+  campByCave(api, c, a, den, 8);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; mate.hp = 100; api.beings.push(mate);
   /* Wall the mate into an isolated pocket: no path anywhere, so startClearDen must fail cleanly. */
   let iso = null;
@@ -192,7 +226,7 @@ test('a walled-off mate carries no ember, and an ember can never be stashed', ()
 });
 
 test('a camp site likes stone close by and dislikes a wolf den', () => {
-  const api = load(); api.startWorld('r'); const a = api.beings[0]; const c = api.camps[0]; api.camp = c;
+  const api = load(); api.startWorld('r'); const a = api.firstPerson(); const c = api.camps[0]; api.camp = c;
   api.chooseSite(a); const base = c.siteReason;
   assert.ok(typeof base === 'string');
   /* A rock face beside the chosen spot. */

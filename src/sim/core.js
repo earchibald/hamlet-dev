@@ -54,6 +54,7 @@ const FEATURES = {
   reeds:   { name: 'reeds',      solid: false, mat: 'plant', fuel: 8 },
   sapling: { name: 'pine sapling', solid: false, mat: 'plant', fuel: 5 },
   hollow:  { name: 'hollow pine, older than any camp', solid: true, mat: 'wood', fuel: 90 },
+  deadpine: { name: 'dead pine, drowned standing', solid: true, mat: 'wood', fuel: 30 },
   mushrooms: { name: 'mushroom patch', solid: false, mat: 'plant', fuel: 4 },
 };
 const ITEMS = {
@@ -85,6 +86,8 @@ const BIOMES = {
   forest:  { name: 'Pine forest' },
   rocky:   { name: 'Stony ground' },
   wetland: { name: 'Reedy marsh' },
+  river:   { name: 'Riverside' },
+  ash:     { name: 'Burnt ground' },
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140, PIT_BURN = 0.25, EMBER_LIFE = 420;
 

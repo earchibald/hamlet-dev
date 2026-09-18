@@ -38,7 +38,7 @@ const DOOR_ACTS = {
     if ((e.z || 0) !== 0 || !hasTile(e.x, e.y, 0)){ camp = prev; return 'The camp must be on the valley floor.'; }
     const t = tileAt(e.x, e.y);
     if (!passable(e.x, e.y) || t.feature){ camp = prev; return 'The camp site must be open ground you can stand on.'; }
-    const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || beings[0];
+    const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || firstPerson();
     if (!reachable(first.x, first.y, first.z, NZ * W * H).has(idx3(e.x, e.y, 0))){ camp = prev; return 'Nobody can walk there from where they stand.'; }
     setSite(e.x, e.y); camp.siteReason = 'you chose it';
     log('The camp site moves. Someone felt it was right.', humans());

@@ -95,8 +95,14 @@ test('biomes come from the mark table', () => {
   api.setPole(r, 'wet', patient, ''); api.setPole(r, 'moving', patient, ''); assert.equal(api.biomeOf(r), 'river');
   api.setPole(r, 'still', patient, ''); assert.equal(api.biomeOf(r), 'wetland');
   api.setPole(r, 'dry', patient, ''); api.setPole(r, 'cold', patient, ''); assert.equal(api.biomeOf(r), 'forest');
+  /* Trees grow in the dark as well as in the cold, and a hide mark reads as the dark pole. */
+  api.setPole(r, 'dark', patient, ''); r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'cold')); assert.equal(api.biomeOf(r), 'forest');
+  r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'dark')); api.mark(r, 'hide', true, patient, ''); assert.equal(api.biomeOf(r), 'forest');
+  r.marks = r.marks.filter(m => m.kind !== 'hide');
   api.setPole(r, 'hot', patient, ''); assert.equal(api.biomeOf(r), 'meadow');
-  api.setPole(r, 'above', patient, ''); assert.equal(api.biomeOf(r), 'rocky');
+  /* Highland that is hot or cold still grows; stony ground is the bare highland. */
+  api.setPole(r, 'above', patient, ''); assert.equal(api.biomeOf(r), 'meadow');
+  r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'hot')); assert.equal(api.biomeOf(r), 'rocky');
   api.mark(r, 'scar', 'burned', patient, ''); assert.equal(api.biomeOf(r), 'ash');
   assert.equal(api.GROWS.forest, true); assert.equal(api.GROWS.ash, false);
 });
@@ -138,7 +144,8 @@ test('a boundary whose side was split is not live', () => {
 
 test('the era, the age, and the stamp', () => {
   const api = load(); api.startWorld('r');
-  assert.equal(api.era, 'days'); assert.equal(api.age, 0); assert.deepEqual(api.legends, []);
+  /* Every world begins with its creation, so startWorld lands in the days era with the ages behind it. */
+  assert.equal(api.era, 'days'); assert.ok(api.age > 0); assert.ok(api.legends.length > 0);
   assert.equal(api.SPECIES.rabbit.prey, true); assert.equal(api.SPECIES.deer.prey, true); assert.equal(api.SPECIES.wolf.prey, undefined);
   assert.deepEqual(api.options, { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 });
 });

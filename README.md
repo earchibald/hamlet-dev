@@ -10,6 +10,9 @@ A two-scale colony simulation in one HTML file, on its way to being a project.
     node tests/ui.js                 # the view model and the key map, no browser: a few seconds
     node tests/gnomes.js             # the gnomes, their burrows, and their mushrooms: under a second
     node tests/closing.js            # cave goals, den contention, site scoring, lightning: under a second
+    node tests/settle.js             # the painters, the founding sites, the creatures, the bodies: a few seconds
+    node tests/gods.js               # the primal gods, their acts, and the rest gate: a few seconds
+    npm run fast                     # every fast suite above, and the rest: about half a minute
     SEEDS=r DAYS=10 node tests/soak.js   # a quick run
     node tests/trace-deaths.js x     # where, why, and what they were thinking
     open dist/hearth-sim.html

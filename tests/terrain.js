@@ -73,8 +73,11 @@ test('rabbits never climb, deer do', () => {
 test('a wolf on a hilltop is not near a person below it', () => {
   const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, false);
-  const wolf = api.beings.find(b => b.species === 'wolf'); wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
-  const person = api.beings[0]; person.x = x0 + 1; person.y = y0 + 3; person.z = 0;
+  /* Seed r's gods never made wolves. The hill is hand-built here, so the wolf on it is too. */
+  let wolf = api.beings.find(b => b.species === 'wolf');
+  if (!wolf){ wolf = api.makeBeing('wolf', x0 + 1, y0 + 1, null, 0); api.beings.push(wolf); }
+  wolf.x = x0 + 1; wolf.y = y0 + 1; wolf.z = 1; wolf.needs.food = 10;
+  const person = api.firstPerson(); person.x = x0 + 1; person.y = y0 + 3; person.z = 0;
   assert.equal(api.near(wolf, person), 8);
   const threats = api.threatsFor(person);
   assert.equal(threats.some(([x, y]) => x === wolf.x && y === wolf.y), false, 'a wolf one level up should not be a threat at three tiles');
@@ -95,8 +98,8 @@ test('fire on a hilltop burns and is seen from the hilltop, not from below', () 
 
 for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${seed}: the hills are sound`, () => {
   const api = load(); api.startWorld(seed);
-  assert.ok(api.hills.length >= 6 && api.hills.length <= 10, `${api.hills.length} hills`);
-  const start = { sx: 5, sy: 3 };
+  assert.ok(api.hills.length >= 1, `${api.hills.length} hills`);
+  const start = new Set(api.creation.gate.start.tiles);
   const full = api.levels.length * api.world.length;
   const slopes = []; for (const t of api.world) if (t.slope) slopes.push(t); for (const t of api.raised) if (t.slope) slopes.push(t);
   const out = [];
@@ -112,7 +115,10 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
       const t = api.world[i];
       /* A den pocket at level 0 turns its footprint tiles to cave floor; every other footprint tile stays rock. */
       if (!t.cave) assert.equal(t.ground, 'rock', `hill at ${h.x},${h.y}: footprint tile ${t.x},${t.y} is ${t.ground}`);
-      const s = api.secOf(t.x, t.y); assert.ok(!(s.sx === start.sx && s.sy === start.sy), 'a hill in the start sector');
+      assert.ok(!start.has(i), 'a hill in the start country');
+      /* A hill is raised by a height mark, or by the depth mark that needed rock for a cave, or by the making mark of
+         a species that dens. */
+      assert.ok(h.mark && ['height', 'depth', 'making'].includes(h.mark.kind), 'a hill without a mark');
       for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
         const qx = Math.min(api.W - 1, Math.max(0, t.x + dx)), qy = Math.min(api.H - 1, Math.max(0, t.y + dy));
         const q = api.tileAt(qx, qy);
@@ -132,7 +138,7 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta']) test(`seed ${s
 test('a person walks up the slope, stands on the floor, and drops a stick there', () => {
   const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, true);
-  const a = api.beings[0]; a.x = x0 - 2; a.y = y0 + 1; a.z = 0; a.asleep = false; a.homeless = false;
+  const a = api.firstPerson(); a.x = x0 - 2; a.y = y0 + 1; a.z = 0; a.asleep = false; a.homeless = false;
   const path = api.bfs(a.x, a.y, 0, (x, y, z) => z === 1 && x === x0 + 1 && y === y0 + 1, 500, a);
   assert.ok(path, 'no path up');
   a.task = { type: 'wander', label: 'Climbing', path, arrive: () => 'done', started: api.tick, key: 'wander', fast: true };
@@ -178,20 +184,28 @@ test('keepsPaths refuses a solid that would cut the last way through', () => {
 const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
 const stepList = (api, t) => { const out = []; api.steps(t.x, t.y, t.z, out); const r = []; for (let k = 0; k < out.length; k += 3) r.push([out[k], out[k + 1], out[k + 2]]); return r; };
 
-for (const seed of SEEDS) test(`seed ${seed}: water cut a cave under every tall hill`, () => {
+for (const seed of SEEDS) test(`seed ${seed}: every water cave sits under a hill of a country a god dug`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
-  const tall = api.hills.filter(h => h.storeys === 2);
   const water = api.caves.filter(c => c.kind === 'water');
-  assert.equal(water.length, tall.length, `${tall.length} tall hills, ${water.length} water caves`);
+  assert.ok(water.length >= 1, 'no water cave anywhere');
   for (const c of water){
+    /* The cave's country is the one its hill stands in, and that country carries the depth mark that cut it. */
+    const r = api.regionAt(c.hill.x, c.hill.y);
+    assert.ok(api.marksOf(r, 'depth').length, `a cave under hill ${c.hill.x},${c.hill.y} in a country nobody dug`);
+    assert.ok(c.mark && c.mark.kind === 'depth', 'a cave without a depth mark');
+    const levels = Math.max(1, Math.min(c.mark.value, -api.ZMIN));
+    assert.equal(Math.min(...c.tiles.map(t => t.z)), -levels, `a cave ${levels} levels deep by its mark`);
+    assert.equal(c.deep.z, -levels, 'the find lies on the lowest level the mark cut');
     assert.ok(c.mouth && c.mouth.slope && c.mouth.z === -1, 'the mouth is a slope on level -1');
     assert.ok(c.exit && c.exit.z === 0 && c.exit.mouth === c && api.passable(c.exit.x, c.exit.y), 'the exit is a walkable surface tile that knows its cave');
     assert.ok(stepList(api, c.mouth).some(([x, y, z]) => x === c.exit.x && y === c.exit.y && z === 0), 'the mouth leads up to the exit');
-    assert.ok(c.deep && c.deep.z === -2 && api.passable(c.deep.x, c.deep.y, -2), 'a deep chamber at level -2');
+    assert.ok(c.deep && api.passable(c.deep.x, c.deep.y, c.deep.z), 'a deep chamber to walk into');
     const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
     assert.ok(floors.length >= 10, `a passage of ${floors.length} tiles is too short`);
-    assert.ok(c.steps >= 8 && c.steps <= 20, `a passage of ${c.steps} steps`);
+    /* The water cut a walk of 8 to 20 steps, or fewer where the hill boxed it in: a hill raised only to hold a
+       cave is small, and the walk stops when no tile of it is left. The floor count above is the real floor. */
+    assert.ok(c.steps <= 20, `a passage of ${c.steps} steps`);
     const region = api.reachable(c.exit.x, c.exit.y, 0, full);
     if (!c.blocked) for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `cave under hill ${c.hill.x},${c.hill.y}: floor ${t.x},${t.y},${t.z} cannot be reached from the exit`);
     for (const t of c.tiles) assert.ok(c.hill.tiles.includes(api.idx(t.x, t.y)), 'every cave tile lies under the hill');
@@ -213,22 +227,51 @@ for (const seed of SEEDS) test(`seed ${seed}: rock fell at the hill feet and blo
     if (c.blocked){
       assert.equal(c.blocked.ground, 'rock'); assert.ok(c.tiles.includes(c.blocked)); assert.notEqual(c.blocked, c.mouth);
       assert.ok(region.has(api.idx3(c.mouth.x, c.mouth.y, -1)), 'the mouth is still reachable');
-      assert.equal(region.has(api.idx3(c.deep.x, c.deep.y, -2)), false, 'the deep chamber is sealed off');
+      assert.equal(region.has(api.idx3(c.deep.x, c.deep.y, c.deep.z)), false, 'the deep chamber is sealed off');
       assert.ok(c.story.some(s => s.includes('Fallen rock')));
     } else {
-      assert.ok(region.has(api.idx3(c.deep.x, c.deep.y, -2)), 'an open cave reaches its deep chamber');
+      assert.ok(region.has(api.idx3(c.deep.x, c.deep.y, c.deep.z)), 'an open cave reaches its deep chamber');
     }
   }
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with one mouth, and start in them`, () => {
+/* A boulder that would shut a cave mouth off is taken back. The tile must come back whole: the loose rock or stick
+   that lay there before the boulder fell belongs to the valley, not to the boulder. Every rim tile is given a loose
+   rock and a mouth of its own, so every boulder rockfall tries is rolled back. The control run shows the same tiles
+   take boulders when no mouth stands on them. */
+test('a boulder taken back leaves the loose rock where it lay', () => {
+  const rimTiles = api => {
+    const out = [];
+    for (const h of api.hills){ const set = new Set(h.tiles);
+      for (const [t] of api.rimExits(h, set)) if (!t.feature && !t.struct && !t.mouth && api.keepsPaths(t)) out.push(t); }
+    return out;
+  };
+  const control = load(); control.startWorld('r');
+  const before = rimTiles(control);
+  control.rockfall();
+  assert.ok(before.some(t => t.feature === 'boulder'), 'no boulder fell on a rim tile at all');
+
+  const api = load(); api.startWorld('r');
+  const rim = rimTiles(api);
+  assert.ok(rim.length, 'no rim tile to test');
+  for (const t of rim){ t.loose = 'rock'; api.caves.push({ kind: 'test', exit: t, tiles: [], story: [] }); }
+  api.rockfall();
+  for (const t of rim){
+    assert.notEqual(t.feature, 'boulder', `a boulder stood on a cave mouth at ${t.x},${t.y}`);
+    assert.equal(t.loose, 'rock', `the loose rock at ${t.x},${t.y} was lost with the boulder`);
+  }
+});
+
+/* A den is dug in the country where a god made foxes or wolves, and only if that country holds a hill, so a seed
+   can have none of one kind. `some seed digs a den for each hunter` below keeps the rule honest. */
+for (const seed of SEEDS) test(`seed ${seed}: every den has one mouth, stands in its owners' country, and holds them`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const dens = api.caves.filter(c => c.kind === 'den');
-  assert.ok(dens.length >= 1 && dens.length <= 4, `${dens.length} dens`);
-  assert.ok(new Set(dens.map(c => c.hill)).size >= Math.min(dens.length, Math.min(3, api.hills.length)), 'dens crowd onto too few hills');
-  assert.equal(dens.filter(c => c.owner === 'wolf').length, 1, 'one wolf den');
   for (const c of dens){
+    assert.ok(['fox', 'wolf'].includes(c.owner), `a den owned by ${c.owner}`);
+    const made = api.liveRegions().filter(r => api.marksOf(r, 'making').some(m => m.value === c.owner));
+    assert.ok(made.some(r => r.tiles.includes(api.idx(c.hill.x, c.hill.y))), `a ${c.owner} den outside the country the ${c.owner}s were made in`);
     const floors = c.tiles.filter(t => api.GROUND[t.ground].walk);
     assert.ok(floors.length >= 2 && floors.length <= 6, `den of ${floors.length} tiles`);
     const tileSet = new Set(c.tiles);
@@ -239,28 +282,38 @@ for (const seed of SEEDS) test(`seed ${seed}: foxes and wolves have dens with on
     for (const t of floors) assert.ok(region.has(api.idx3(t.x, t.y, t.z)), `den floor ${t.x},${t.y},${t.z} cannot be reached`);
     assert.ok(c.story.some(s => s.includes('Dug by foxes')));
     if (c.owner === 'wolf') assert.ok(c.story.some(s => s.includes('Widened by wolves')));
+    assert.ok(api.beings.some(b => b.den === c), `the den at ${c.exit.x},${c.exit.y} stands empty`);
   }
   for (const sp of ['wolf', 'fox']){
-    const homed = api.beings.filter(b => b.species === sp && b.den);
-    assert.ok(homed.length >= 1, `no ${sp} starts in a den`);
-    for (const b of homed) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
+    for (const b of api.beings.filter(b => b.species === sp && b.den)) assert.ok(b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z), `${b.name} is not standing in its den`);
   }
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in a hollow under it`, () => {
+test('some test seed digs a den for each hunter', () => {
+  const owners = new Set();
+  for (const seed of SEEDS){ const api = load(); api.startWorld(seed); for (const c of api.caves.filter(c => c.kind === 'den')) owners.add(c.owner); }
+  assert.ok(owners.has('wolf'), 'no test seed digs a wolf den');
+  assert.ok(owners.has('fox'), 'no test seed digs a fox den');
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: every grove carries a sprite making, and lives under a hill of its country when it has one`, () => {
   const api = load(); api.startWorld(seed);
-  let under = 0;
   for (const g of api.groves){
-    const hill = api.hills.find(h => api.secOf(h.x, h.y).sx === g.sector.sx && api.secOf(h.x, h.y).sy === g.sector.sy);
-    if (!hill){ assert.equal(g.cave, null); assert.equal(api.tileAt(g.x, g.y).feature, 'hollow'); continue; }
-    under++;
-    assert.ok(api.raised.some(t => t.hill === hill && t.feature === 'tree'), 'old pines stand on the hill above');
-    assert.ok(g.cave && g.cave.kind === 'hollow' && g.cave.owner === 'sprite', 'the grove has a hollow cave');
+    assert.ok(g.mark && g.mark.kind === 'making' && g.mark.value === 'sprite', 'a grove without a sprite making');
     const hollowTile = api.tileAt(g.x, g.y);
-    assert.equal(hollowTile.feature, 'hollow'); assert.equal(hollowTile.cave, g.cave);
+    assert.equal(hollowTile.feature, 'hollow');
+    const kin = api.beings.filter(b => b.species === 'sprite' && b.grove === g);
+    assert.ok(kin.length >= 1, 'a grove with no sprites');
+    if (!g.cave){ assert.ok(api.near({ x: g.x, y: g.y, z: 0 }, kin[0]) <= 4, 'a sprite far from its hollow'); continue; }
+    const hill = g.cave.hill;
+    assert.ok(hill, 'a hollow cave without a hill');
+    const country = api.liveRegions().find(r => r.tiles.includes(api.idx(hill.x, hill.y)));
+    assert.ok(country && api.marksOf(country, 'making').some(m => m.value === 'sprite'), 'a hollow under a hill of another country');
+    assert.ok(g.cave.kind === 'hollow' && g.cave.owner === 'sprite', 'the grove has a hollow cave');
+    assert.equal(hollowTile.cave, g.cave);
     assert.ok(g.cave.tiles.filter(t => api.passable(t.x, t.y, t.z)).length >= 2, 'room to dance');
     assert.ok(g.cave.exit && g.cave.exit.mouth === g.cave);
-    for (const sp of api.beings.filter(b => b.species === 'sprite' && b.grove === g)) assert.ok(g.cave.tiles.some(t => t.x === sp.x && t.y === sp.y && t.z === sp.z), `${sp.name} is not in the hollow`);
+    for (const sp of kin) assert.ok(g.cave.tiles.some(t => t.x === sp.x && t.y === sp.y && t.z === sp.z), `${sp.name} is not in the hollow`);
     assert.ok(g.cave.story.some(s => s.includes('oldest hollow')));
   }
 });
@@ -268,8 +321,14 @@ for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in 
 for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable world`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
-  const b = api.beings[0]; const region = api.reachable(b.x, b.y, 0, full);
+  const b = api.firstPerson(); const region = api.reachable(b.x, b.y, 0, full);
   for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} ${c.hill ? `under hill ${c.hill.x},${c.hill.y}` : `at ${c.exit.x},${c.exit.y}`} opens onto a sealed pocket`);
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: a hill stands beside the walkable world`, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  const b = api.firstPerson(); const region = api.reachable(b.x, b.y, 0, full);
   assert.ok(api.hills.some(h => h.tiles.some(i => { const x = i % api.W, y = (i - x) / api.W; return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => region.has(api.idx3(x + dx, y + dy, 0))); })), 'no hill stands beside the walkable world');
 });
 
@@ -278,7 +337,7 @@ test('standing in a hollow costs the camp favour and the sprites notice', () => 
   let A = null, g = null;
   for (const s of SEEDS){ const api = load(); api.startWorld(s); g = api.groves.find(g => g.cave); if (g){ A = api; break; } }
   assert.ok(g, 'no grove under a hill on any test seed');
-  const person = A.beings[0]; const floor = g.cave.tiles.find(t => A.passable(t.x, t.y, t.z));
+  const person = A.firstPerson(); const floor = g.cave.tiles.find(t => A.passable(t.x, t.y, t.z));
   person.x = floor.x; person.y = floor.y; person.z = floor.z; person.camp.fae.known = true;
   const before = person.camp.fae.favor;
   A.camp = person.camp; A.faeTick();
@@ -290,10 +349,10 @@ test('standing in a hollow costs the camp favour and the sprites notice', () => 
 for (const seed of SEEDS) test(`seed ${seed}: each deep chamber holds one find`, () => {
   const api = load(); api.startWorld(seed);
   for (const c of api.caves.filter(c => c.kind === 'water')){
-    const here = api.items.filter(i => i.x === c.deep.x && i.y === c.deep.y && i.z === -2);
+    const here = api.items.filter(i => i.x === c.deep.x && i.y === c.deep.y && i.z === c.deep.z);
     assert.equal(here.length, 1, `deep chamber under hill ${c.hill.x},${c.hill.y} holds ${here.length} items`);
     assert.ok(['firestones', 'moss', 'bones'].includes(here[0].kind), here[0].kind);
-    assert.equal(api.itemAt(c.deep.x, c.deep.y, -2), here[0]);
+    assert.equal(api.itemAt(c.deep.x, c.deep.y, c.deep.z), here[0]);
   }
   assert.ok(api.items.every(i => i.z >= 0 || (api.hasTile(i.x, i.y, i.z) && api.tileAt(i.x, i.y, i.z).cave)), 'no item lies in solid earth');
 });
@@ -311,12 +370,12 @@ test('no rain falls under rock, and the ground below stays mild', () => {
   const api = load(); api.startWorld('r'); const x0 = 160, y0 = 62;
   makeCave3(api, x0, y0);
   api.tick = 60 * 1000 + 100; api.weather.storm = true; api.weather.until = api.tick + 500;
-  const inside = api.beings[0]; inside.x = x0 + 1; inside.y = y0; inside.z = -1; inside.asleep = false; inside.needs.warmth = 50; inside.thoughts = [];
+  const inside = api.firstPerson(); inside.x = x0 + 1; inside.y = y0; inside.z = -1; inside.asleep = false; inside.needs.warmth = 50; inside.thoughts = [];
   api.updateBeing(inside);
   assert.ok(!inside.thoughts.some(t => t.key === 'wet'), 'no rain underground');
   assert.ok(!inside.thoughts.some(t => t.key === 'dry'), 'no rain, and no thought of it, below ground');
   const under = 50 - inside.needs.warmth;
-  const probe = api.beings[0]; probe.x = x0 - 1; probe.y = y0; probe.z = 0; probe.needs.warmth = 50; probe.thoughts = []; probe.task = null;
+  const probe = api.firstPerson(); probe.x = x0 - 1; probe.y = y0; probe.z = 0; probe.needs.warmth = 50; probe.thoughts = []; probe.task = null;
   api.updateBeing(probe);
   const above = 50 - probe.needs.warmth;
   assert.ok(under < above, `underground loss ${under} should be less than a winter night's ${above}`);
@@ -325,23 +384,29 @@ test('no rain falls under rock, and the ground below stays mild', () => {
 test('below the surface without a brand it is too dark to work, and walking is slow', () => {
   const api = load(); api.startWorld('r'); const x0 = 160, y0 = 62;
   makeCave3(api, x0, y0);
-  const a = api.beings[0]; a.x = x0 + 2; a.y = y0; a.z = -1; a.asleep = false; a.carrying = null; a.thoughts = []; a.cooldown = {};
+  const a = api.firstPerson(); a.x = x0 + 2; a.y = y0; a.z = -1; a.asleep = false; a.carrying = null; a.thoughts = []; a.cooldown = {};
   for (const k in a.needs) a.needs[k] = 90;
   a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
   api.updateBeing(a);
   assert.ok(a.thoughts.some(t => t.key === 'dark'), 'a dark thought');
   assert.equal(a.inDark, true);
-  a.task = { type: 'wander', label: 'Groping deeper', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
-  api.updateBeing(a); assert.equal(a.task, null, 'a task that stays below fails again, thought or no thought');
-  a.task = { type: 'wander', label: 'Feeling for the light', path: [[x0 + 1, y0, -1], [x0, y0, -1], [x0 - 1, y0, 0]], arrive: () => 'done', started: api.tick, key: 'wander' };
-  api.updateBeing(a); assert.ok(a.task, 'a walk that ends in the light is allowed');
-  const x1 = a.x; let moved = 0;
+  /* Compare the task itself, not whether there is one: a failed task is replaced at once by the next choice. */
+  const deeper = { type: 'wander', label: 'Groping deeper', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  a.task = deeper;
+  api.updateBeing(a); assert.notEqual(a.task, deeper, 'a task that stays below fails again, thought or no thought');
+  const out = { type: 'wander', label: 'Feeling for the light', path: [[x0 + 1, y0, -1], [x0, y0, -1], [x0 - 1, y0, 0]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  a.task = out;
+  api.updateBeing(a); assert.equal(a.task, out, 'a walk that ends in the light is allowed');
+  /* Set the walker back at the far end of the passage: the speed is measured over two steps, wherever the last task left them. */
+  a.x = x0 + 2; a.y = y0; a.z = -1;
+  let moved = 0;
   a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
   for (let k = 0; k < 4; k++){ const bx = a.x; api.runTask(a); if (a.x !== bx) moved++; }
   assert.equal(moved, 2, 'two steps in four calls: half speed');
   a.x = x0 + 2; a.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; a.thoughts = [];
-  a.task = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  const lit = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  a.task = lit;
   api.updateBeing(a);
   assert.ok(!a.thoughts.some(t => t.key === 'dark'), 'a brand lights the way');
-  assert.ok(a.task, 'the task goes on with a brand');
+  assert.equal(a.task, lit, 'the task goes on with a brand');
 });
