@@ -124,5 +124,25 @@ function drawerRows(id){
 function viewKey(){
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold)].join('#');
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    cursor.x, cursor.y, cursor.z].join('#');
+}
+
+/* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
+function cursorAfter(c, dx, dy, mult, view){
+  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
+}
+/* One phrase for what is under the cursor. A being first, then the tile. */
+function cursorPhrase(){
+  const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
+  if (a) return `${a.name}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
+  if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
+  const t = tileAt(cursor.x, cursor.y, cursor.z), parts = [];
+  if (t.struct) parts.push(t.struct.type === 'firepit' ? (t.struct.lit ? 'the hearth, burning' : 'the fire pit, cold') : t.struct.type);
+  if (t.feature) parts.push(FEATURES[t.feature].name);
+  const it = itemAt(cursor.x, cursor.y, cursor.z); if (it) parts.push(ITEMS[it.kind].name);
+  if (t.fire > 0) parts.push('burning');
+  parts.push(GROUND[t.ground].name);
+  return parts.join(', ');
 }

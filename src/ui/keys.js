@@ -21,10 +21,21 @@ const KEYMAP = [
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
-  { key: 'ArrowLeft',  focus: 'map',    action: 'nav', arg: [-1, 0], label: 'West', button: 'nW' },
-  { key: 'ArrowRight', focus: 'map',    action: 'nav', arg: [1, 0],  label: 'East', button: 'nE' },
-  { key: 'ArrowUp',    focus: 'map',    action: 'nav', arg: [0, -1], label: 'North', button: 'nN' },
-  { key: 'ArrowDown',  focus: 'map',    action: 'nav', arg: [0, 1],  label: 'South', button: 'nS' },
+  { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
+  { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
+  { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
+  { key: 'ArrowDown',  focus: 'map', action: 'cursor', arg: [0, 1, 1],  label: 'Cursor south' },
+  { key: 'ArrowLeft',  shift: true, focus: 'map', action: 'cursor', arg: [-1, 0, 5], label: 'Cursor west by five' },
+  { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
+  { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
+  { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
+  { key: 'ArrowLeft',  ctrl: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
+  { key: 'ArrowRight', ctrl: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
+  { key: 'ArrowUp',    ctrl: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
+  { key: 'ArrowDown',  ctrl: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
+  { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
+  { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },
   { key: 'ArrowUp',    focus: 'drawer', action: 'rowUp',       label: 'Row up' },
   { key: 'ArrowDown',  focus: 'drawer', action: 'rowDown',     label: 'Row down' },
   { key: 'ArrowLeft',  focus: 'drawer', action: 'priorityDown', label: 'Goal priority down' },
@@ -52,8 +63,7 @@ function keyAction(e, focus){
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;
     if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
-    if (k.key.length > 1 && !!k.shift !== e.shiftKey) continue;
-    if (k.key.length === 1 && k.shift && !e.shiftKey) continue;
+    if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
     return { action: k.action, arg: k.arg };
   }

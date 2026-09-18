@@ -136,7 +136,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
   assert.deepEqual(api.keyAction(ev('Escape'), 'map'), { action: 'back', arg: undefined });
   assert.deepEqual(api.keyAction(ev('Escape'), 'drawer:goals'), { action: 'back', arg: undefined });
-  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'map'), { action: 'nav', arg: [-1, 0] });
+  assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'map'), { action: 'cursor', arg: [-1, 0, 1] });
   assert.deepEqual(api.keyAction(ev('ArrowDown'), 'drawer:people'), { action: 'rowDown', arg: undefined });
   assert.deepEqual(api.keyAction(ev('ArrowLeft'), 'drawer:goals'), { action: 'priorityDown', arg: undefined });
   assert.deepEqual(api.keyAction(ev('2'), 'map'), { action: 'drawer', arg: 'goals' });
@@ -189,6 +189,37 @@ test('persist and restore keep the open drawers, the mutes, and the speed, and c
   assert.deepEqual(api.ui.open, ['goals']); assert.ok(api.ui.mutes.has('cold'));
   delete global.localStorage;
   assert.doesNotThrow(() => api.persist()); assert.doesNotThrow(() => api.restore());
+});
+
+const CURSOR = [...DERIVE, 'cursor', 'cursorAfter', 'cursorPhrase', 'W', 'H', 'LW', 'LH'];
+
+test('the cursor moves by tiles in the sector view, by sectors elsewhere, and never leaves the world', () => {
+  const api = loadUI(['state', 'derive'], CURSOR); api.startWorld('r'); api.camp = api.camps[0];
+  const c = { x: 10, y: 10, z: 0 };
+  assert.deepEqual(api.cursorAfter(c, 1, 0, 1, 'loc'), { x: 11, y: 10, z: 0 });
+  assert.deepEqual(api.cursorAfter(c, 0, -1, 5, 'loc'), { x: 10, y: 5, z: 0 });
+  assert.deepEqual(api.cursorAfter(c, -1, 0, 'sector', 'loc'), { x: 10 - api.LW, y: 10, z: 0 }.x < 0 ? { x: 0, y: 10, z: 0 } : { x: 10 - api.LW, y: 10, z: 0 });
+  assert.deepEqual(api.cursorAfter(c, 1, 0, 1, 'world'), { x: 10 + api.LW, y: 10, z: 0 });
+  assert.deepEqual(api.cursorAfter({ x: 0, y: 0, z: 0 }, -1, -1, 5, 'loc'), { x: 0, y: 0, z: 0 });
+  assert.deepEqual(api.cursorAfter({ x: api.W - 1, y: api.H - 1, z: 0 }, 1, 1, 'sector', 'loc'), { x: api.W - 1, y: api.H - 1, z: 0 });
+});
+
+test('the cursor phrase names a being under it, else the tile', () => {
+  const api = loadUI(['state', 'derive'], CURSOR); api.startWorld('r'); api.camp = api.camps[0];
+  const a = api.beings[0]; api.cursor.x = a.x; api.cursor.y = a.y; api.cursor.z = a.z;
+  assert.match(api.cursorPhrase(), new RegExp(`^${a.name}`));
+  api.cursor.x = a.x + 1; while (api.beings.some(b => b.alive && b.x === api.cursor.x && b.y === api.cursor.y && b.z === 0)) api.cursor.x++;
+  assert.match(api.cursorPhrase(), /grass|soil|sand|water|rock|stone|ash|tree|bush|boulder|reeds|pine/i);
+});
+
+test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter applies, Home and W jump', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(api.keyAction(ev('ArrowRight'), 'map'), { action: 'cursor', arg: [1, 0, 1] });
+  assert.deepEqual(api.keyAction(ev('ArrowRight', { shiftKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 5] });
+  assert.deepEqual(api.keyAction(ev('ArrowRight', { ctrlKey: true }), 'map'), { action: 'cursor', arg: [1, 0, 'sector'] });
+  assert.deepEqual(api.keyAction(ev('Enter'), 'map'), { action: 'applyAt', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('Home'), 'map'), { action: 'home', arg: undefined });
+  assert.deepEqual(api.keyAction(ev('w'), 'map'), { action: 'worldHere', arg: undefined });
 });
 
 module.exports = { loadUI };

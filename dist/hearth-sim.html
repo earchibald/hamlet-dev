@@ -2955,6 +2955,9 @@ const ui = {
   savedSpeed: 0,       /* from storage, applied by newWorld */
 };
 
+/* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
+let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
@@ -3097,7 +3100,27 @@ function drawerRows(id){
 function viewKey(){
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold)].join('#');
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    cursor.x, cursor.y, cursor.z].join('#');
+}
+
+/* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
+function cursorAfter(c, dx, dy, mult, view){
+  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
+}
+/* One phrase for what is under the cursor. A being first, then the tile. */
+function cursorPhrase(){
+  const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
+  if (a) return `${a.name}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
+  if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
+  const t = tileAt(cursor.x, cursor.y, cursor.z), parts = [];
+  if (t.struct) parts.push(t.struct.type === 'firepit' ? (t.struct.lit ? 'the hearth, burning' : 'the fire pit, cold') : t.struct.type);
+  if (t.feature) parts.push(FEATURES[t.feature].name);
+  const it = itemAt(cursor.x, cursor.y, cursor.z); if (it) parts.push(ITEMS[it.kind].name);
+  if (t.fire > 0) parts.push('burning');
+  parts.push(GROUND[t.ground].name);
+  return parts.join(', ');
 }
 
 /* The key map and the dispatcher. No DOM.
@@ -3123,10 +3146,21 @@ const KEYMAP = [
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
-  { key: 'ArrowLeft',  focus: 'map',    action: 'nav', arg: [-1, 0], label: 'West', button: 'nW' },
-  { key: 'ArrowRight', focus: 'map',    action: 'nav', arg: [1, 0],  label: 'East', button: 'nE' },
-  { key: 'ArrowUp',    focus: 'map',    action: 'nav', arg: [0, -1], label: 'North', button: 'nN' },
-  { key: 'ArrowDown',  focus: 'map',    action: 'nav', arg: [0, 1],  label: 'South', button: 'nS' },
+  { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
+  { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
+  { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
+  { key: 'ArrowDown',  focus: 'map', action: 'cursor', arg: [0, 1, 1],  label: 'Cursor south' },
+  { key: 'ArrowLeft',  shift: true, focus: 'map', action: 'cursor', arg: [-1, 0, 5], label: 'Cursor west by five' },
+  { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
+  { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
+  { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
+  { key: 'ArrowLeft',  ctrl: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
+  { key: 'ArrowRight', ctrl: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
+  { key: 'ArrowUp',    ctrl: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
+  { key: 'ArrowDown',  ctrl: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
+  { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
+  { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },
   { key: 'ArrowUp',    focus: 'drawer', action: 'rowUp',       label: 'Row up' },
   { key: 'ArrowDown',  focus: 'drawer', action: 'rowDown',     label: 'Row down' },
   { key: 'ArrowLeft',  focus: 'drawer', action: 'priorityDown', label: 'Goal priority down' },
@@ -3154,8 +3188,7 @@ function keyAction(e, focus){
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;
     if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
-    if (k.key.length > 1 && !!k.shift !== e.shiftKey) continue;
-    if (k.key.length === 1 && k.shift && !e.shiftKey) continue;
+    if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
     return { action: k.action, arg: k.arg };
   }
@@ -3316,7 +3349,11 @@ function drawLoc(){
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
-  if (hover){ ctx.strokeStyle = P.select; ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.strokeRect(hover.lx * T + 0.5, hover.ly * T + 0.5, T - 1, T - 1); ctx.globalAlpha = 1; }
+  if (secOf(cursor.x, cursor.y).sx === cur.sx && secOf(cursor.x, cursor.y).sy === cur.sy && cursor.z === lvl){
+    const cx = (cursor.x - ox) * T, cy = (cursor.y - oy) * T;
+    ctx.strokeStyle = P.select; ctx.lineWidth = 2; ctx.strokeRect(cx + 1, cy + 1, T - 2, T - 2);
+    ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  }
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
@@ -3397,7 +3434,10 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
-  tip.innerHTML = close + (tipTarget.being ? inspectBeing(beingById(tipTarget.being)) : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]));
+  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+    : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
+    : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
+  tip.innerHTML = close + body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
   tip.classList.toggle('pinned', tipPinned); tip.setAttribute('role', tipPinned ? 'dialog' : 'tooltip'); tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight, gap = 14, vw = window.innerWidth, vh = window.innerHeight;
@@ -3536,13 +3576,16 @@ function renderCamp(el){
   $('count-camp').textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A note wins the foot for four seconds. Then the newest chronicle line comes back. */
+/* A note wins the foot for four seconds. Then the newest chronicle line comes back.
+   The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
 function renderFoot(){
-  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `<span>${ui.note.text}</span>`; return; }
+  const phrase = `<span class="muted">${cursorPhrase()}</span>`;
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
   ui.note = null;
   const e = chronicle[0];
-  $('foot').innerHTML = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
@@ -3581,9 +3624,24 @@ function setView(v, s){
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView('loc', { sx, sy }); }
+function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
-function move(dx, dy){ const sx = cur.sx + dx, sy = cur.sy + dy; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView(view === 'world' ? 'loc' : view, { sx, sy }); }
+function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
+function cursorTo(x, y, z){
+  cursor = { x: clamp(x, 0, W - 1), y: clamp(y, 0, H - 1), z: clamp(z, ZMIN, ZMAX) };
+  const s = secOf(cursor.x, cursor.y);
+  if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
+  if (view === 'loc' && cursor.z !== lvl) setLevel(cursor.z);
+}
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
+/* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
+function applyAt(){
+  if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
+  const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
+  const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
+  applyTool(c, e);
+}
 function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
@@ -3592,6 +3650,7 @@ function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clam
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
   startWorld(seed, {});
+  cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
   viewCamp = camps[0]; followId = null; lvl = 0; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = beings[0]; setView('loc', secOf(a.x, a.y));
@@ -3644,7 +3703,11 @@ const ACTIONS = {
   view(){ cycleView(); },
   levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
   levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
-  nav([dx, dy]){ move(dx, dy); },
+  nav([dx, dy]){ moveCursor([dx, dy, 'sector']); },
+  cursor(arg){ moveCursor(arg); },
+  applyAt(){ applyAt(); },
+  home(){ if (viewCamp.pit) cursorTo(viewCamp.pit[0], viewCamp.pit[1], 0); else if (viewCamp.site) cursorTo(viewCamp.site[0], viewCamp.site[1], 0); },
+  worldHere(){ followId = null; const t = viewCamp.site || [cursor.x, cursor.y]; cursor = { x: t[0], y: t[1], z: 0 }; setView('world', secOf(t[0], t[1])); },
   drawer(id){ openDrawer(id); },
   focusNext(){ focusStep(1); },
   focusPrev(){ focusStep(-1); },
@@ -3710,14 +3773,18 @@ function initUI(){
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
-  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
-  cv.addEventListener('pointermove', e => { hover = cellFrom(e); if (e.pointerType === 'mouse') tipForCell(hover, e); });
+  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
+  cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); say(sectorSummary(sectors[secIdx(whover.sx, whover.sy)])); });
-  wcv.addEventListener('pointerleave', () => { whover = null; say('Click a sector to go there.'); });
+  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
-  mcv.addEventListener('pointermove', e => { mhover = sectorFromMid(e); say(mhover ? sectorSummary(sectors[secIdx(mhover.sx, mhover.sy)]) : 'The edge of the world.'); });
-  mcv.addEventListener('pointerleave', () => { mhover = null; say('Click a sector to go there.'); });
+  mcv.addEventListener('pointermove', e => {
+    mhover = sectorFromMid(e);
+    if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }
+    else hideTip();
+  });
+  mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;

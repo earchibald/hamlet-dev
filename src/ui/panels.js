@@ -85,11 +85,14 @@ function renderCamp(el){
   $('count-camp').textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A note wins the foot for four seconds. Then the newest chronicle line comes back. */
+/* A note wins the foot for four seconds. Then the newest chronicle line comes back.
+   The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
 function renderFoot(){
-  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `<span>${ui.note.text}</span>`; return; }
+  const phrase = `<span class="muted">${cursorPhrase()}</span>`;
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
   ui.note = null;
   const e = chronicle[0];
-  $('foot').innerHTML = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }

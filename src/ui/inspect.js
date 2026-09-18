@@ -75,7 +75,10 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
-  tip.innerHTML = close + (tipTarget.being ? inspectBeing(beingById(tipTarget.being)) : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]));
+  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+    : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
+    : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
+  tip.innerHTML = close + body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
   tip.classList.toggle('pinned', tipPinned); tip.setAttribute('role', tipPinned ? 'dialog' : 'tooltip'); tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight, gap = 14, vw = window.innerWidth, vh = window.innerHeight;

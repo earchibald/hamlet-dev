@@ -36,6 +36,9 @@ const ui = {
   savedSpeed: 0,       /* from storage, applied by newWorld */
 };
 
+/* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
+let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){

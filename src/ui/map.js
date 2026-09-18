@@ -152,6 +152,10 @@ function drawLoc(){
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
-  if (hover){ ctx.strokeStyle = P.select; ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.strokeRect(hover.lx * T + 0.5, hover.ly * T + 0.5, T - 1, T - 1); ctx.globalAlpha = 1; }
+  if (secOf(cursor.x, cursor.y).sx === cur.sx && secOf(cursor.x, cursor.y).sy === cur.sy && cursor.z === lvl){
+    const cx = (cursor.x - ox) * T, cy = (cursor.y - oy) * T;
+    ctx.strokeStyle = P.select; ctx.lineWidth = 2; ctx.strokeRect(cx + 1, cy + 1, T - 2, T - 2);
+    ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  }
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }

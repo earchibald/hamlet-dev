@@ -47,14 +47,18 @@ function initUI(){
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
-  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
-  cv.addEventListener('pointermove', e => { hover = cellFrom(e); if (e.pointerType === 'mouse') tipForCell(hover, e); });
+  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
+  cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); say(sectorSummary(sectors[secIdx(whover.sx, whover.sy)])); });
-  wcv.addEventListener('pointerleave', () => { whover = null; say('Click a sector to go there.'); });
+  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
-  mcv.addEventListener('pointermove', e => { mhover = sectorFromMid(e); say(mhover ? sectorSummary(sectors[secIdx(mhover.sx, mhover.sy)]) : 'The edge of the world.'); });
-  mcv.addEventListener('pointerleave', () => { mhover = null; say('Click a sector to go there.'); });
+  mcv.addEventListener('pointermove', e => {
+    mhover = sectorFromMid(e);
+    if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }
+    else hideTip();
+  });
+  mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;
