@@ -292,3 +292,47 @@ for (const seed of SEEDS) test(`seed ${seed}: each deep chamber holds one find`,
   }
   assert.ok(api.items.every(i => i.z >= 0 || (api.hasTile(i.x, i.y, i.z) && api.tileAt(i.x, i.y, i.z).cave)), 'no item lies in solid earth');
 });
+
+/* A hand-made cave: three stone tiles on level -1 under the start sector, the first a slope up to the surface. */
+function makeCave3(api, x0, y0){
+  for (let x = x0 - 1; x <= x0 + 4; x++) for (let y = y0 - 1; y <= y0 + 1; y++){ const t = api.tileAt(x, y); t.ground = 'grass'; t.feature = null; t.struct = null; t.fire = 0; t.slope = false; t.mouth = null; }
+  const c = api.makeCave('water', null);
+  const m = api.carve(c, x0, y0, -1); m.slope = true; c.mouth = m; c.exit = api.tileAt(x0 - 1, y0); c.exit.mouth = c;
+  api.carve(c, x0 + 1, y0, -1); api.carve(c, x0 + 2, y0, -1);
+  return c;
+}
+
+test('no rain falls under rock, and the ground below stays mild', () => {
+  const api = load(); api.startWorld('r'); const x0 = 160, y0 = 62;
+  makeCave3(api, x0, y0);
+  api.tick = 60 * 1000 + 100; api.weather.storm = true; api.weather.until = api.tick + 500;
+  const inside = api.beings[0]; inside.x = x0 + 1; inside.y = y0; inside.z = -1; inside.asleep = false; inside.needs.warmth = 50; inside.thoughts = [];
+  api.updateBeing(inside);
+  assert.ok(!inside.thoughts.some(t => t.key === 'wet'), 'no rain underground');
+  assert.ok(inside.thoughts.some(t => t.key === 'dry'), 'dry under the rock');
+  const under = 50 - inside.needs.warmth;
+  const probe = api.beings[0]; probe.x = x0 - 1; probe.y = y0; probe.z = 0; probe.needs.warmth = 50; probe.thoughts = []; probe.task = null;
+  api.updateBeing(probe);
+  const above = 50 - probe.needs.warmth;
+  assert.ok(under < above, `underground loss ${under} should be less than a winter night's ${above}`);
+});
+
+test('below the surface without a brand it is too dark to work, and walking is slow', () => {
+  const api = load(); api.startWorld('r'); const x0 = 160, y0 = 62;
+  makeCave3(api, x0, y0);
+  const a = api.beings[0]; a.x = x0 + 2; a.y = y0; a.z = -1; a.asleep = false; a.carrying = null; a.thoughts = []; a.cooldown = {};
+  for (const k in a.needs) a.needs[k] = 90;
+  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  api.updateBeing(a);
+  assert.ok(a.thoughts.some(t => t.key === 'dark'), 'a dark thought');
+  assert.equal(a.inDark, true);
+  const x1 = a.x; let moved = 0;
+  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  for (let k = 0; k < 4; k++){ const bx = a.x; api.runTask(a); if (a.x !== bx) moved++; }
+  assert.equal(moved, 2, 'two steps in four calls: half speed');
+  a.x = x0 + 2; a.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; a.thoughts = [];
+  a.task = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  api.updateBeing(a);
+  assert.ok(!a.thoughts.some(t => t.key === 'dark'), 'a brand lights the way');
+  assert.ok(a.task, 'the task goes on with a brand');
+});

@@ -21,7 +21,7 @@ function source(){
 const API = `return {
   startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  runTask, dropCarried,
+  runTask, updateBeing, dropCarried,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt,
   near, nearAt, ZMIN, ZMAX, ZOFF, NZ, W, H,
   campHumans, humans, stashFood,
@@ -29,7 +29,7 @@ const API = `return {
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
-  get tick(){ return tick; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
+  get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
   get goalPriority(){ return goalPriority; },
 };`;

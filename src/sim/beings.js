@@ -255,6 +255,7 @@ function runTask(a){
   const t = a.task; a.status = t.label;
   if (t.wait > 0){ t.wait--; return; }
   if (t.path.length){
+    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
     const [nx, ny, nz] = t.path[0];
     if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + 40; failTask(a); return; }
     a.x = nx; a.y = ny; a.z = nz; t.path.shift();
@@ -278,8 +279,8 @@ function updateBeing(a){
   if (a.camp) camp = a.camp;
   for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
   if (a.species === 'human'){
-    const season = seasonOf(), cold = season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
-    const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1);
+    const season = seasonOf(), under = a.z < 0, cold = under ? 0.012 : season === 'winter' ? (night ? 0.06 : 0.025) : season === 'summer' ? 0 : (night ? 0.012 : 0.003);
+    const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = under || hasTile(a.x, a.y, a.z + 1) || (camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
     n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? 0.5 : 0), 0, 100);
     if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, 50); a.hp -= 0.03; }
     if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, 300);
@@ -302,6 +303,9 @@ function updateBeing(a){
     if (n.rest >= 100 || (!night && n.rest >= 60)){ a.asleep = false; if (a.species === 'human'){ const roof = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1), warm = camp && pitLit() && nearAt(a, ...camp.pit) <= 4; addThought(a, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, 600); } }
     else { a.status = 'Sleeping'; return; }
   }
+  /* Below the surface it is dark. Without a burning ember a person cannot see to work, and feels their way out at half speed. */
+  a.inDark = a.species === 'human' && a.z < 0 && !(a.carrying && a.carrying.kind === 'ember');
+  if (a.inDark && !hasThought(a, 'dark')){ addThought(a, 'dark', 'It is too dark down here to see', -6, 400); if (a.task) failTask(a); }
   const fast = a.task && a.task.fast;
   if (!fast && (tick + a.id) % sp.stride) return;
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, 500); }
