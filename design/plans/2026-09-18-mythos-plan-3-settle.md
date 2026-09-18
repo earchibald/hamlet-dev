@@ -412,6 +412,12 @@ In `src/sim/gods.js` `restGate`, the fuel item becomes a forest within two neigh
 
 Tests: in `tests/field.js`'s biome test, after the forest assertion add `api.setPole(r, 'dark', patient, ''); r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'cold')); assert.equal(api.biomeOf(r), 'forest');` and `r.marks = r.marks.filter(m => !(m.kind === 'pole' && m.value === 'dark')); api.mark(r, 'hide', true, patient, ''); assert.equal(api.biomeOf(r), 'forest');`. In `tests/gods.js`'s gate test, the fuel step must set a neighbour to dry and cold (or dark) rather than hot; adjust the setup so the lack sequence still reads water, fuel, food, people, height, depth, kinds. Run `node --test tests/ages.js`: every seed must still settle with no backstop on the soak seeds; report the age range. Update the spec's biome sentence in section 1 and gate item 3 to match.
 
+- [ ] **Step 0b: Three asks from task 2's review**
+
+- `package.json`: the `fast` script runs `tests/field.js tests/gods.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js`.
+- `tests/terrain.js`: the test "every cave opens onto the walkable world" was parked whole. Split it: the assertion that every cave exit lies in the first person's reachable region stays strict; only the line that asserts a hill stands beside the walkable world keeps the `todo`.
+- `placeFirstPerson()` in `src/sim/settle.js`: pick the start country's largest walkable pocket, not its most central tile. Compute pockets with `reachable(x, y, 0, NZ * W * H)` from each unvisited passable tile of the country until every passable tile is assigned; take the pocket with the most tiles; stand on its tile nearest the country's bbox centre. If the country has no passable tile, throw `new Error(\`The start country has no ground to stand on.\`)` rather than dereference null; the tile check in Task 5 turns that into a discarded settle. Add to `tests/settle.js`: the first person's reachable region (`api.reachable(a.x, a.y, 0, api.NZ * api.W * api.H)`) holds at least half of the start country's passable tiles on every soak seed.
+
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/settle.js`:
