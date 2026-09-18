@@ -8,6 +8,7 @@ A two-scale colony simulation in one HTML file, on its way to being a project.
     node tests/terrain.js            # levels, slopes, hills: under a second
     node tests/crafts.js             # every recipe through the real offers: under a second
     node tests/gnomes.js             # the gnomes, their burrows, and their mushrooms: under a second
+    node tests/closing.js            # cave goals, den contention, site scoring, lightning: under a second
     SEEDS=r DAYS=10 node tests/soak.js   # a quick run
     node tests/trace-deaths.js x     # where, why, and what they were thinking
     open dist/hearth-sim.html
