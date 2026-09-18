@@ -60,7 +60,13 @@ Check `gh pr view 1 --repo earchibald/hamlet-dev --json state,mergedAt`. If it i
 cd ~/Worktrees/hamlet-ui-rethink && git fetch origin && git merge origin/dev
 ```
 
-Expected: a conflict in `src/ui.js`, which `dev` edits and this branch deleted. Resolve it by deleting `src/ui.js` (`git rm src/ui.js`) and carrying `dev`'s two edits into `src/ui/actions.js` by hand: the `light` and `poke` cases of `applyTool` call `inject` as the Interfaces block shows, and `newWorld` calls `startWorld(seed, {})`. Other conflicts, if any, resolve by keeping both sides. `dist/hearth-sim.html`: rebuild, do not hand-resolve. `tests/soak-golden.json`: take `dev`'s.
+Expected: a modify/delete conflict in `src/ui.js`, which `dev` edits and this branch deleted, and perhaps conflicts in `src/sim/index.js` (both sides edit the `API` string and `FILES`) and `design/notes.md`. Resolve `src/ui.js` by deleting it (`git rm src/ui.js`) and porting every hunk of `dev`'s change to it since the branch point into the matching `src/ui/` file:
+
+```bash
+git diff fb30f63 origin/dev -- src/ui.js
+```
+
+Read that whole diff before you port. It is more than the two door hunks: `dev` also added a 64× speed, made the toolbar name the camp, changed what poke says, and touched `newWorld`. For each hunk, find the function it changes by name in `src/ui/` (`applyTool`, `newWorld`, and `initUI` are in `actions.js` and `main.js`) and apply the change there. The `light`, `poke`, and `site` cases of `applyTool` call `inject` as the Interfaces block shows; `newWorld` calls `startWorld(seed, {})`. The 64× speed becomes a fourth speed button `speed64` in the template with a `KEYMAP` row like the other three, and `slower` and `faster` in `ACTIONS` walk 1, 4, 16, 64. The toolbar-names-the-camp hunk is already covered by the strip's camp name and is not ported. A hunk that touches only the old `#goals` click handler becomes the `inject` priority call in the drawer pointerdown handler and in `setPriority` and `rowOpen`. List every hunk and where it went in the report. Other conflicts resolve by keeping both sides. `dist/hearth-sim.html`: rebuild, do not hand-resolve. `tests/soak-golden.json`: take `dev`'s.
 
 - [ ] **Step 3: What the door changed under the interface**
 
