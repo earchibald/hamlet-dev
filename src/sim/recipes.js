@@ -33,7 +33,7 @@ const RECIPES = [
     verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home.' },
   { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 38,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
-    blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in twenty. Up to two pits.' },
+    blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in eight. Up to two pits.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);

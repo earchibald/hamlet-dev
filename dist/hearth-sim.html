@@ -1314,10 +1314,10 @@ function checkSnare(r){
     log('A rabbit is caught in a snare.', [], 'good');
   }
 }
-/* A deer that steps onto a pit is caught one time in twenty. */
+/* A deer that steps onto a pit is caught one time in eight. */
 function checkPitfall(d){
   const t = tileAt(d.x, d.y, d.z);
-  if (t && t.struct && t.struct.type === 'pitfall' && !t.struct.pit.catch && rng() < 0.05){
+  if (t && t.struct && t.struct.type === 'pitfall' && !t.struct.pit.catch && rng() < 0.125){
     const p = t.struct.pit; p.catch = 'venison'; d.alive = false; d.status = 'Dead';
     log('A deer falls into the pit.', [], 'good');
     for (const o of beings) if (o.alive && o.species === 'deer' && near(o, d) <= 10) addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200);
@@ -1789,15 +1789,18 @@ function startSetSnare(a){
 function startCheckSnare(a, s){
   return startBuild(a, [s.x, s.y], 4, 'Checking the snare', a => { if (s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; } });
 }
-/* A deer pit goes on grass 8 to 18 tiles from the site, away from snares and other pits, where deer have been seen. */
+/* A deer pit goes on grass 8 to 18 tiles from the site, beside a bush, away from snares and other
+   pits, where deer have been seen. Deer walk to bushes to eat, so a pit beside one sits on their path. */
 function pitfallSite(){
   const c = camp.site; let best = null; const s = secOf(c[0], c[1]);
   for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
     const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct || t.ground !== 'grass') continue;
     const d = dist(x, y, c[0], c[1]); if (d < 8 || d > 18) continue;
+    let bushes = 0; for (const [dx, dy] of RING) if (inb(x + dx, y + dy) && tileAt(x + dx, y + dy).feature === 'bush') bushes++;
+    if (!bushes) continue;
     if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4) || camp.pitfalls.some(p => dist(p.x, p.y, x, y) < 8)) continue;
     const deer = beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, x, y) <= 20).length;
-    const sc = deer * 5 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
+    const sc = bushes * 3 + deer * 5 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
   }
   return best ? [best.x, best.y] : null;
 }
@@ -2117,7 +2120,7 @@ const RECIPES = [
     verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home.' },
   { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 38,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
-    blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in twenty. Up to two pits.' },
+    blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in eight. Up to two pits.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -2542,7 +2545,7 @@ function inspectTile(x, y, z = 0){
   if (t.feature === 'hollow'){ const g = groves.find(g => g.x === x && g.y === y); if (g) rows.push(['Grove', `${beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g).length} sprites live here. Anger ${g.anger}${g.swarmUntil > tick ? ', and they are out for revenge' : ''}.`]); }
   if (t.struct && t.struct.type === 'rack') rows.push(['Drying rack', `meat hung here keeps. ${camp.stash.smoked} strips stored.`]);
   if (t.struct && t.struct.type === 'snare') rows.push(['Snare', t.struct.snare.catch ? 'holds a rabbit' : t.struct.snare.armed ? 'armed' : 'sprung, needs a stick']);
-  if (t.struct && t.struct.type === 'pitfall') rows.push(['Deer pit', t.struct.pit.catch ? 'a deer lies in it' : 'covered with logs and cord. One deer in twenty steps in.']);
+  if (t.struct && t.struct.type === 'pitfall') rows.push(['Deer pit', t.struct.pit.catch ? 'a deer lies in it' : 'covered with logs and cord. One deer in eight steps in.']);
   if (z === 0 && camp.stashTile && camp.stashTile[0] === x && camp.stashTile[1] === y) rows.push(['Stash', Object.entries(camp.stash).filter(([k, v]) => v > 0).map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty']);
   rows.push(['Burns', t.fire > 0 ? `yes, ${t.fire} ticks left` : tileFuel(t) > 0 ? `flammability ${tileFlam(t).toFixed(2)}, fuel ${tileFuel(t)}` : 'no']);
   const who = beings.filter(a => a.alive && a.x === x && a.y === y && a.z === z).map(a => a.name); if (who.length) rows.push(['Here', who.join(', ')]);

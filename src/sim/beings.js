@@ -287,10 +287,10 @@ function checkSnare(r){
     log('A rabbit is caught in a snare.', [], 'good');
   }
 }
-/* A deer that steps onto a pit is caught one time in twenty. */
+/* A deer that steps onto a pit is caught one time in eight. */
 function checkPitfall(d){
   const t = tileAt(d.x, d.y, d.z);
-  if (t && t.struct && t.struct.type === 'pitfall' && !t.struct.pit.catch && rng() < 0.05){
+  if (t && t.struct && t.struct.type === 'pitfall' && !t.struct.pit.catch && rng() < 0.125){
     const p = t.struct.pit; p.catch = 'venison'; d.alive = false; d.status = 'Dead';
     log('A deer falls into the pit.', [], 'good');
     for (const o of beings) if (o.alive && o.species === 'deer' && near(o, d) <= 10) addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200);
