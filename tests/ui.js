@@ -145,4 +145,26 @@ test('every template button has a key in the key map', () => {
   for (const id of ids) assert.ok(keyed.has(id), `button #${id} has no key`);
 });
 
+test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {
+  const api = loadUI(['state', 'derive', 'keys'], DERIVE);
+  api.startWorld('r'); api.camp = api.camps[0];
+  const rows = api.drawerRows('goals');
+  assert.ok(rows.length >= 1);
+  assert.equal(rows[0].kind, 'stage'); assert.equal(rows[0].id, 'fire');
+  assert.ok(rows.slice(1).every(r => r.kind === 'goal' || r.kind === 'stage'));
+  const people = api.drawerRows('people'); assert.equal(people.length, 1); assert.equal(people[0].kind, 'person');
+  api.ui.unfold.fire = true;
+  assert.ok(api.drawerRows('goals').length >= rows.length, 'unfolding shows at least as many rows');
+});
+
+test('persist and restore keep the open drawers, the mutes, and the speed, and cope with no storage', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['ui', 'persist', 'restore', 'mute']);
+  const store = {}; global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  api.ui.open = ['goals']; api.mute('cold', 0); api.persist();
+  api.ui.open = []; api.ui.mutes.clear(); api.restore();
+  assert.deepEqual(api.ui.open, ['goals']); assert.ok(api.ui.mutes.has('cold'));
+  delete global.localStorage;
+  assert.doesNotThrow(() => api.persist()); assert.doesNotThrow(() => api.restore());
+});
+
 module.exports = { loadUI };

@@ -37,6 +37,16 @@ function initUI(){
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderTip(); }
   });
   document.addEventListener('pointerdown', e => { if (tipPinned && !e.target.closest('#tip, #map, #drawers')) hideTip(); });
+  $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
+  $('drawers').addEventListener('pointerdown', e => {
+    const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ goalPriority[pri.dataset.goal] = Number(pri.dataset.pri); renderUI(true); return; }
+    const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
+    if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
+    const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;
+    if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
+  });
+  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });

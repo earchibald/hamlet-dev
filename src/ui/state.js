@@ -34,3 +34,19 @@ const ui = {
   chronFilter: 'all',  /* 'all' or 'major' */
   savedSpeed: 0,       /* from storage, applied by newWorld */
 };
+
+/* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
+const STORE_KEY = 'hearth.ui';
+function persist(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter })); } catch (e) { /* no storage */ }
+}
+function restore(){
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if (!s) return;
+    if (Array.isArray(s.open)) ui.open = s.open.filter(id => DRAWERS.some(d => d.id === id));
+    if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
+    if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
+    if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if ([1, 4, 16].includes(s.speed)) ui.savedSpeed = s.speed;
+  } catch (e) { /* no storage, or bad data */ }
+}

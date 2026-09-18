@@ -36,13 +36,22 @@ function applyTool(c, e){
 }
 
 /* The action table. Every key and every click ends here. The only place view state changes. */
-function persist(){ /* task 7 */ }
-function restore(){ /* task 7 */ }
-function openDrawer(id, on){ /* task 7 */ }
-function rowMove(d){ /* task 7 */ }
-function rowOpen(){ /* task 7 */ }
-function rowPick(n){ /* task 7 */ }
-function setPriority(d){ /* task 7 */ }
+function openDrawer(id, on){
+  const has = ui.open.includes(id), want = on === undefined ? !has : on;
+  if (want && !has) ui.open.push(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
+  ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
+}
+const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : null;
+function rowMove(d){ const id = focusedDrawer(); if (!id) return; const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true); }
+function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
+function rowOpen(){
+  const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
+  if (r.kind === 'person'){ const a = beingById(r.id); const el = document.querySelector(`#drawers [data-being="${r.id}"]`); const rect = el ? el.getBoundingClientRect() : { left: 400, top: 200 }; tipTarget = { being: a.id }; tipAnchor = { x: rect.left, y: rect.top, left: true }; tipPinned = true; renderTip(); }
+  else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
+  else if (r.kind === 'goal'){ goalPriority[r.id] = ((goalPriority[r.id] ?? 1) + 1) % 3; renderUI(true); }
+  /* 'line' rows open nothing until plan B gives the cursor a place to jump to. */
+}
+function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; goalPriority[r.id] = clamp((goalPriority[r.id] ?? 1) + d, 0, 2); renderUI(true); }
 function focusStep(d){
   const ring = ['map', ...ui.open.map(id => `drawer:${id}`)];
   const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length;

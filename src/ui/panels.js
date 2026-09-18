@@ -18,9 +18,46 @@ function renderUI(force){
   }
   renderTip();
   renderDrawers();
+  renderFoot();
 }
+const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
 function renderDrawers(){
   $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}<kbd>${d.key}</kbd></button>`).join('');
-  $('drawers').innerHTML = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2>${d.label}<span class="k">${d.key}</span></h2><div class="body" id="body-${id}"></div></section>`; }).join('');
+  const html = ui.open.map(id => { const d = DRAWERS.find(d => d.id === id); return `<section class="drawer ${ui.focus === 'drawer:' + id ? 'focus' : ''}" data-drawer="${id}"><h2><span>${d.label}<span class="muted" id="count-${id}"></span></span><span class="k">${d.key} · ↑↓ · ⏎</span></h2>${id === 'chronicle' ? `<div class="filter"><button class="btn small ${ui.chronFilter === 'all' ? 'on' : ''}" data-filter="all">All</button><button class="btn small ${ui.chronFilter === 'major' ? 'on' : ''}" data-filter="major">Major</button></div>` : ''}${id === 'goals' ? `<div class="filter"><button class="btn small ${ui.showAll ? 'on' : ''}" id="showAllBtn">All<kbd>A</kbd></button></div>` : ''}<div class="body" id="body-${id}"></div></section>`; }).join('');
+  const keep = {}; for (const b of document.querySelectorAll('#drawers .body')) keep[b.id] = b.scrollTop;
+  $('drawers').innerHTML = html;
+  for (const id of ui.open){ const el = $(`body-${id}`); ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el); if (keep[el.id] != null) el.scrollTop = keep[el.id]; }
+  const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
   document.querySelector('.mapbox').classList.toggle('drawers-open', ui.open.length > 0);
+}
+function renderPeople(el){
+  const rows = drawerRows('people');
+  $('count-people').textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+}
+function renderGoals(el){
+  const rows = drawerRows('goals');
+  $('count-goals').textContent = '';
+  el.innerHTML = rows.map((r, i) => {
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span>${s.label}</span><span>${fold}</span></div>`; }
+    const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
+    const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
+    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ''}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
+  }).join('');
+}
+function renderChronicle(el){
+  const rows = drawerRows('chronicle');
+  $('count-chronicle').textContent = ` · ${rows.length}`;
+  el.innerHTML = `<ol id="chronicle">${rows.map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
+}
+function renderCamp(el){
+  const c = campSummary();
+  const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
+  $('count-camp').textContent = '';
+  el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+}
+function renderFoot(){
+  const e = chronicle[0];
+  $('foot').innerHTML = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
 }
