@@ -99,14 +99,14 @@ function alerts(){
   return out;
 }
 
-/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle recipes fold. */
+/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle goals fold to a count too. */
 function stages(showAll){
   const byId = Object.fromEntries(GOALS.map(g => [g.id, g]));
   return STAGES.filter(s => showAll || stageReached(s.id)).map(s => {
     const goals = GOALS.filter(g => g.stage === s.id).map(g => {
       const st = goalState(g), pr = goalPriority[g.id] ?? 1;
       const preq = g.after && byId[g.after];
-      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      const hidden = !showAll && (st.s === 'done' || st.s === 'idle' || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
     return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };

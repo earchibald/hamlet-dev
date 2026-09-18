@@ -1,7 +1,7 @@
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog. A focused row wins over an 'any' row on the same key.
+   'dialog:<name>' only inside that dialog. A focused row wins over an 'any' row on the same key.
    A quiet row works but stays out of the help table.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
 /* A drawer with `fit` is as tall as its rows, up to a cap. The others share the height that is left. */
@@ -33,10 +33,11 @@ const KEYMAP = [
   { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
   { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
   { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
-  { key: 'ArrowLeft',  ctrl: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
-  { key: 'ArrowRight', ctrl: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
-  { key: 'ArrowUp',    ctrl: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
-  { key: 'ArrowDown',  ctrl: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  /* Not Ctrl: macOS takes Ctrl with an arrow for Mission Control, and the page never sees it. */
+  { key: 'ArrowLeft',  alt: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
+  { key: 'ArrowRight', alt: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
+  { key: 'ArrowUp',    alt: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
+  { key: 'ArrowDown',  alt: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
   { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
   { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
   { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },
@@ -58,8 +59,9 @@ const KEYMAP = [
   { key: 'F4',         focus: 'any',    action: 'campN', arg: 4, label: 'Camp 4' },
   { key: 'F5',         focus: 'any',    action: 'campN', arg: 5, label: 'Camp 5' },
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
-  { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
-  { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
+  /* Start and help each have their own focus. When they shared one, Enter in help opened Start. */
+  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Make world', button: 'newWorld' },
+  { key: 'Escape',     focus: 'dialog:help',  action: 'back',      label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
@@ -86,7 +88,7 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 /* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'.
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>'.
    Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
 function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;

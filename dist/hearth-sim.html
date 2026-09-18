@@ -189,7 +189,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
-      <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
@@ -3952,7 +3952,7 @@ const ui = {
   seenTick: -1,        /* the newest chronicle tick notePulses has read */
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
   open: ['people', 'goals'], /* drawers open, in order */
-  focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
+  focus: 'map',        /* 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>' */
   row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
@@ -4089,14 +4089,14 @@ function alerts(){
   return out;
 }
 
-/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle recipes fold. */
+/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle goals fold to a count too. */
 function stages(showAll){
   const byId = Object.fromEntries(GOALS.map(g => [g.id, g]));
   return STAGES.filter(s => showAll || stageReached(s.id)).map(s => {
     const goals = GOALS.filter(g => g.stage === s.id).map(g => {
       const st = goalState(g), pr = goalPriority[g.id] ?? 1;
       const preq = g.after && byId[g.after];
-      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      const hidden = !showAll && (st.s === 'done' || st.s === 'idle' || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
     return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
@@ -4231,7 +4231,7 @@ function paletteMatch(query, rows){
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
-   'dialog' only inside a dialog. A focused row wins over an 'any' row on the same key.
+   'dialog:<name>' only inside that dialog. A focused row wins over an 'any' row on the same key.
    A quiet row works but stays out of the help table.
    Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
 /* A drawer with `fit` is as tall as its rows, up to a cap. The others share the height that is left. */
@@ -4263,10 +4263,11 @@ const KEYMAP = [
   { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
   { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
   { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
-  { key: 'ArrowLeft',  ctrl: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
-  { key: 'ArrowRight', ctrl: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
-  { key: 'ArrowUp',    ctrl: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
-  { key: 'ArrowDown',  ctrl: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  /* Not Ctrl: macOS takes Ctrl with an arrow for Mission Control, and the page never sees it. */
+  { key: 'ArrowLeft',  alt: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
+  { key: 'ArrowRight', alt: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
+  { key: 'ArrowUp',    alt: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
+  { key: 'ArrowDown',  alt: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
   { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
   { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
   { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },
@@ -4288,8 +4289,9 @@ const KEYMAP = [
   { key: 'F4',         focus: 'any',    action: 'campN', arg: 4, label: 'Camp 4' },
   { key: 'F5',         focus: 'any',    action: 'campN', arg: 5, label: 'Camp 5' },
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
-  { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
-  { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
+  /* Start and help each have their own focus. When they shared one, Enter in help opened Start. */
+  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Make world', button: 'newWorld' },
+  { key: 'Escape',     focus: 'dialog:help',  action: 'back',      label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
@@ -4316,7 +4318,7 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 /* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'.
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>'.
    Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
 function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
@@ -4814,7 +4816,7 @@ function renderFoot(){
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
 function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
 let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
 function muteChoice(k){
@@ -4827,7 +4829,7 @@ function openHelp(){
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
-  ui.focus = 'dialog'; $('help').showModal();
+  ui.focus = 'dialog:help'; $('help').showModal();
 }
 
 /* The command palette: every action and every named thing, one search box. */
@@ -4981,7 +4983,8 @@ const ACTIONS = {
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
-  start(){ openStart(); },
+  /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
+  makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
