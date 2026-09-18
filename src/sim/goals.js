@@ -67,10 +67,11 @@ const GOALS = [
        this read the rabbit carcasses alone a speared deer lay uncut in the stash, and a camp starved
        in winter with nine meals waiting beside the fire. */
     state(){ if (!camp.everLit) return { s: 'blocked', text: 'Needs a lit fire.' };
-      const raw = camp.stash.carcass + camp.stash.venison;
+      const raw = camp.stash.carcass + camp.stash.venison + camp.pitfalls.filter(p => p.catch).length;
       const waiting = [camp.stash.venison > 0 ? `${camp.stash.venison} deer` : '', camp.stash.carcass > 0 ? `${camp.stash.carcass} carcass` : ''].filter(Boolean).join(' and ');
-      return { s: camp.stash.carcass > 0 || camp.stash.fish > 0 ? 'active' : 'idle', text: camp.stash.carcass > 0 || camp.stash.fish > 0 ? `${camp.stash.carcass} carcass and ${camp.stash.fish} fish waiting.` : 'Nothing to cook. Cooked meat is a better meal than berries.' }; },
+      return { s: raw > 0 || camp.stash.fish > 0 ? 'active' : 'idle', text: raw > 0 || camp.stash.fish > 0 ? `${camp.stash.carcass} carcass and ${camp.stash.fish} fish waiting.` : 'Nothing to cook. Cooked meat is a better meal than berries.' }; },
     offers(a){ if (!pitLit()) return [];
+      for (const p of camp.pitfalls) if (p.catch) return [{ label: 'haul the deer from the pit', score: 66, start: a => startHaulPit(a, p) }];
       if (camp.stash.venison > 0) return [{ label: 'butcher and cook the deer', score: 62, start: a => startBuild(a, camp.pit, 60, 'Butchering the deer', a => { if (camp.stash.venison <= 0) return; camp.stash.venison--; stashAdd('cooked', 5); stashAdd('hide', 2); if (camp.rack) stashAdd('smoked', 4); gainXp(a, 'cook'); log(`${a.name} butchers the deer. Meat for days${camp.rack ? ', and strips on the rack' : ''}.`, campHumans(), 'good'); }) }];
       if (camp.stash.fish > 0) return [{ label: 'cook the fish', score: camp.stash.fish >= 2 ? 62 : 45, start: a => startBuild(a, camp.pit, 25, 'Cooking fish over the fire', a => { if (camp.stash.fish > 0){ stashTake('fish'); stashAdd('cooked', 2); gainXp(a, 'cook'); log(`${a.name} cooks a fish over the fire.`, [a], 'good'); } }) }];
       if (camp.stash.carcass <= 0) return []; return [{ label: 'cook the catch', score: camp.stash.cooked === 0 ? 55 : 35, start: a => startBuild(a, camp.pit, 35, 'Cooking over the fire', a => { if (camp.stash.carcass > 0){ camp.stash.carcass--; stashAdd('cooked', 3); stashAdd('hide', 1); gainXp(a, 'cook'); camp.bestCook = Math.max(camp.bestCook || 0, a.skills.cook); log(`${a.name} cooks a rabbit over the fire and keeps the hide.`, [a], 'good'); } }) }]; } },

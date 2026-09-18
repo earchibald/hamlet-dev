@@ -31,6 +31,9 @@ const RECIPES = [
     verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
   { id: 'garden', title: 'Plant a garden', after: 'axe', needs: { cuttings: 4 }, tools: ['axe'], place: 'garden', skill: 'gather', work: 80, makes: { garden: true }, score: 40,
     verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home.' },
+  { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 38,
+    verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
+    blurb: 'Four logs and two coils of cord over a hole on a deer path. A deer that steps in is caught one time in twenty. Up to two pits.' },
 ];
 
 const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
@@ -55,6 +58,7 @@ const PLACES = {
   bank: {},
   kiln: { spot: () => camp.kiln },
   garden: { spot: () => camp.garden ? null : gardenSpot() },
+  pitfall: { spot: () => pitfallSite() },
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
 const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && camp.garden));
@@ -82,6 +86,12 @@ const MAKERS = {
     camp.garden = at;
     log(`${a.name} plants a garden of four bushes by the fire.`, campHumans(), 'good');
     addThought(a, 'garden', 'Planted a garden', 5, 1500);
+    return 'logged';
+  },
+  pitfall(r, a, at){
+    const q = tileAt(...at); if (q.struct) return false;
+    const p = { x: at[0], y: at[1], catch: null, camp }; camp.pitfalls.push(p); q.struct = { type: 'pitfall', pit: p, camp };
+    log(`${a.name} digs a deer pit and covers it with logs and cord.`, [a], 'good');
     return 'logged';
   },
 };

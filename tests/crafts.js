@@ -163,6 +163,22 @@ test('cuttings from wild bushes make a garden of four near the fire', () => {
   assert.ok(api.chronicle.some(e => e.text.includes('plants a garden')));
 });
 
+test('a deer pit catches a deer that steps in, and the camp hauls it home', () => {
+  const { api, a, c } = readyCamp();
+  c.stash.log = 4; c.stash.cord = 2;
+  for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++){ const t = api.tileAt(c.site[0] + dx, c.site[1] + dy); if (!t.struct && t.ground !== 'water'){ t.feature = null; if (Math.abs(dx) + Math.abs(dy) > 3) t.ground = 'grass'; } }
+  assert.equal(api.goalState(goal(api, 'pitfall')).s, 'active');
+  doOffer(api, a, 'dig a deer pit');
+  assert.equal(c.pitfalls.length, 1); const p = c.pitfalls[0]; assert.equal(api.tileAt(p.x, p.y).struct.type, 'pitfall');
+  const d = api.beings.find(b => b.species === 'deer'); d.x = p.x; d.y = p.y; d.z = 0; d.alive = true;
+  let caught = false; for (let k = 0; k < 80 && !caught; k++){ api.checkPitfall(d); caught = !!p.catch; }
+  assert.ok(caught, 'no catch in eighty steps at one in twenty');
+  assert.equal(d.alive, false);
+  assert.ok(api.chronicle.some(e => e.text.includes('falls into the pit')));
+  doOffer(api, a, 'haul the deer from the pit');
+  assert.equal(p.catch, null); assert.equal(c.stash.venison, 1);
+});
+
 test('a pot holds water at camp and keeps berries longer', () => {
   const { api, a, c } = readyCamp();
   c.tools.waterskin = 1; c.stash.water = 8;

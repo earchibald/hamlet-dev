@@ -198,6 +198,24 @@ function startSetSnare(a){
 function startCheckSnare(a, s){
   return startBuild(a, [s.x, s.y], 4, 'Checking the snare', a => { if (s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; } });
 }
+/* A deer pit goes on grass 8 to 18 tiles from the site, away from snares and other pits, where deer have been seen. */
+function pitfallSite(){
+  const c = camp.site; let best = null; const s = secOf(c[0], c[1]);
+  for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
+    const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct || t.ground !== 'grass') continue;
+    const d = dist(x, y, c[0], c[1]); if (d < 8 || d > 18) continue;
+    if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4) || camp.pitfalls.some(p => dist(p.x, p.y, x, y) < 8)) continue;
+    const deer = beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, x, y) <= 20).length;
+    const sc = deer * 5 - d * 0.1 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
+  }
+  return best ? [best.x, best.y] : null;
+}
+/* Haul a caught deer home from the pit. */
+function startHaulPit(a, p){
+  /* The pit stands away from camp, but startBuild has no way to chain into a walk home, so the
+     catch goes straight to the stash here, the same as any other kill finished at the fire. */
+  return startBuild(a, [p.x, p.y], 12, 'Hauling the deer out of the pit', a => { if (!p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good'); });
+}
 
 function deerNear(){ if (!camp.site) return null; return beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, ...camp.site) <= 34).sort((p, q) => nearAt(p, ...camp.site) - nearAt(q, ...camp.site))[0] || null; }
 function startHuntDeer(a, d){

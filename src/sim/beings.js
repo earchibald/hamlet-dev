@@ -272,7 +272,7 @@ function runTask(a){
     const [nx, ny, nz] = t.path[0];
     if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + 40; failTask(a); return; }
     a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') checkSnare(a);
+    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer') checkPitfall(a);
     return;
   }
   const r = t.arrive(a, t);
@@ -285,6 +285,15 @@ function checkSnare(r){
   if (t.struct && t.struct.type === 'snare' && t.struct.snare.armed && rng() < (t.struct.snare.chance || 0.7) + (t.struct.snare.camp.fae.favor >= 30 ? 0.1 : 0)){
     const s = t.struct.snare; s.armed = false; s.catch = 'carcass'; r.alive = false; r.status = 'Dead';
     log('A rabbit is caught in a snare.', [], 'good');
+  }
+}
+/* A deer that steps onto a pit is caught one time in twenty. */
+function checkPitfall(d){
+  const t = tileAt(d.x, d.y, d.z);
+  if (t && t.struct && t.struct.type === 'pitfall' && !t.struct.pit.catch && rng() < 0.05){
+    const p = t.struct.pit; p.catch = 'venison'; d.alive = false; d.status = 'Dead';
+    log('A deer falls into the pit.', [], 'good');
+    for (const o of beings) if (o.alive && o.species === 'deer' && near(o, d) <= 10) addThought(o, 'herdloss', 'One of the herd was taken', -6, 1200);
   }
 }
 function updateBeing(a){

@@ -17,13 +17,13 @@ function nearFind(x, y, pred, offs = NEAR, z = 0){
 }
 function tileFlam(t){
   let f = t.feature ? MATERIALS[matOf(t)].flam : GROUND[t.ground].flam;
-  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)) f = Math.max(f, 0.3);
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop', 'pitfall'].includes(t.struct.type)) f = Math.max(f, 0.3);
   const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, MATERIALS[ITEMS[it.kind].mat].flam);
   return f;
 }
 function tileFuel(t){
   let f = t.feature ? FEATURES[t.feature].fuel : GROUND[t.ground].fuel;
-  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)) f = Math.max(f, 60);
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop', 'pitfall'].includes(t.struct.type)) f = Math.max(f, 60);
   const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, ITEMS[it.kind].fuel);
   return f;
 }
@@ -499,8 +499,10 @@ function generate(){
 
 /* A sapling becomes a solid tree only if it does not close a path. The open
    tiles beside it must still touch each other around the ring once it is
-   solid. Two people starved in pockets sealed this way before this rule. */
-function saplingMayGrow(t){ return keepsPaths(t); }
+   solid. Two people starved in pockets sealed this way before this rule.
+   It also waits for the tile itself to be empty: someone standing still
+   there, gathering or sleeping, must not wake up inside solid wood. */
+function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
   for (let k = 0; k < 60; k++){
