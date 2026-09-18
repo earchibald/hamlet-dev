@@ -117,6 +117,16 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 let era = 'days', age = 0, pulseAge = null, godRng = null, legends = [], creation = null, field = null, boundaries = [];
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* The ladder in stages. The panel groups goals by these, in this order. */
+const STAGES = [
+  { id: 'fire',       label: 'Fire' },
+  { id: 'food',       label: 'Food' },
+  { id: 'tools',      label: 'Tools' },
+  { id: 'shelter',    label: 'Shelter' },
+  { id: 'crafts',     label: 'Crafts' },
+  { id: 'sprites',    label: 'Neighbours' },
+  { id: 'settlement', label: 'Settlement' },
+];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
 const isWinter = () => seasonOf() === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;

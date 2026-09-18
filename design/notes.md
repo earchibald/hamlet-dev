@@ -98,7 +98,7 @@ The chain, in the order camps reach it:
 12. Build a lean-to. 4 logs, 10 sticks. Sleeps three.
 13. Build a drying rack. 6 sticks. Smoked meat never spoils.
 14. Raise a storehouse. 6 logs, 8 sticks. Food keeps twice as long. Wolves cannot raid it.
-15. Build huts (ongoing), up to four. Built when people outnumber beds.
+15. Build huts (ongoing), up to four. Built when people outnumber beds. While people sleep outside, one hide is held back for the hut; the waterskin and clothes wait for the next one. Short of a hide, the card offers to set a snare for a hide.
 16. Sew a waterskin. 2 hides. Then keep water at camp.
 17. Become a village. Storehouse, two huts, eight people.
 18. Found a second camp. Roof, five people, eight days old, spring or summer, at most six camps. Two people leave with coals that last six days.
@@ -172,14 +172,24 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 
 ## 13. Interface
 
-- World map: whole world at 3 pixels per tile, sector grid, camp markers, sector summary on hover.
-- Nearby view: the sector and its eight neighbours at 9 pixels per tile, drawn from the world map cache. Beings are glyphs. Hover shows the sector summary; a click opens the sector. M cycles sector, nearby, world map. Arrow keys step between sectors in the sector and nearby views.
-- Location view: one sector at 26 pixels per tile. Tools: Inspect (hover shows, click pins, Follow button), Lightning (key L), Camp site, Poke. Hover cards work with every tool. Speeds run 1, 4, 16, 64.
-- The toolbar names the camp the tools act on, once there is more than one camp. The camp-site tool refuses ground nobody can walk to from where they stand, and it disables itself once the pit is built.
-- Poke's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
-- Goals panel with camp selector, People panel for the selected camp, Chronicle.
-- Rain and winter overlays, firelight glow at night.
-- Every rule change needs a visible trace: a chronicle line, a thought, a goal state, or a tooltip row. The player has to be able to see cause.
+The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+
+- The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
+- Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Only a day-era line pulses. The creation writes a chronicle of major lines, all at tick 0 and all carrying an age, and they are the story of the world, not news from the camp, so they are never chips. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
+- The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
+- Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
+- Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
+- The hover card and the pinned card are as before.
+- A tile cursor lives on the map. Arrows move it, Shift by five, Ctrl by a sector. Enter applies the tool. Home goes to the hearth, W to the world map at the camp. The mouse moves it too. The foot names what is under it.
+- Tools: Inspect is the default. Light fire and Nudge are one-shot and return to Inspect. Shift with the key or the click keeps them. Camp site left the interface; `setSite` stays in the sim for tests.
+- Every act the player makes goes through the door, `inject()`: the `light` act and the `poke` act behind Nudge, and the `priority` act behind a goal row. Speeds run 1, 4, 16, 64.
+- Nudge's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
+- Floating windows: any drawer pops out with O and docks back with O. Enter or a click on a being or tile opens an inspector window; up to six stand at once, each live, F follows. Positions persist.
+- Alert chips: Alt+number jumps to the cause, Shift+Alt+number opens the mute menu: this chip, this kind here, this kind everywhere. Muted chips are listed in help and in the palette as Unmute rows.
+- Cmd-K or Ctrl-K opens the command palette: every action with its key, and rows for people, goals, camps, sectors, chips, and mutes. G opens the stage chord.
+- The gods stay in the world after the ages. A sleeping god is a being like any other, so the interface says so plainly: its own colour from `--map-god`, its own star glyph on the maps where every other sleeper draws a `z`, its own inspect card (name, epithet, what it became, where it lies, and the legends it stands in), and its name with its epithet in the sector summary, apart from the animals. A nudge is refused at the door: what wakes a god is its own rule, and it is not built yet.
+- A drowned country's dead pines draw `†` in the ash colour, and the tile card names them from the `FEATURES` table.
+- Every clickable thing has a key, printed on it. `tests/ui.js` fails on a button without one. Movement keys are provisional; change them in `KEYMAP` only.
 
 ## 14. Testing
 
@@ -217,7 +227,7 @@ Known weak spots:
 - The sprite-birth rule counts old pines on the sector's surface only; the pines on the hill above a hollow do not count yet.
 - A person whose task fails in the dark drops what they carry there, where nobody will fetch it.
 - Deer do not yet prefer the high ground when wolves are about; they climb hills only by chance.
-- A camp short of one hide cannot raise its bed cap; the huts goal offers no work toward a hide, so growth waits on a rabbit. Seed gamma's population hangs on the date of one snare catch.
+- A camp short of one hide cannot raise its bed cap, and growth waits on a rabbit. One hide is now held for the hut while people sleep outside, so the waterskin and clothes cannot take it first, and the huts card offers a snare. That did not move seed gamma: its camp held no hide at all from day 11 to day 64, so the limit there is the snare catch rate itself, listed above.
 - The dens, caves and burrows now sit in their own countries, and a camp may never reach them in 70 days. `densCleared`, `searched`, `finds`, `borrowed`, `repaid` and `benches` are 0 on most seeds. The soak prints them per seed so the loss is visible, and floors `searched`, `finds`, `repaid` and `benches` across the six seeds together, at about a third of the measured sum. Den clearing is seen on one seed in six since the dens moved to their makers' countries, so `densCleared` stays a printed diagnostic and the soak does not assert it.
 - `rockfall` runs a full-map `reachable` for each boulder it lays, to count the cave mouths still joined to the world. It costs 113 to 237 ms a paint, under 2% of a seed's budget. Recorded and deferred: the cheap fix (one walk a hill, not one a boulder) would let two boulders across a narrow way each look safe alone, which is the bug the per-boulder walk was written to catch.
 - Gnomes have no births, so a burrow's line ends when its gnomes die of age, at 110 days.

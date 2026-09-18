@@ -15,7 +15,7 @@
   --map-water:#a6c6db; --map-water-fg:#43789e; --map-tree:#2c6532; --map-bush:#6e8a3d; --map-berry:#b02c5a; --map-reeds:#7c9a4a;
   --map-boulder:#8c8880; --map-boulder-fg:#5a564f; --map-stick:#8a5a2b; --map-rock:#5e5a53; --map-carcass:#8a3a3a;
   --map-fire-bg:#f3b35c; --map-fire:#c2331a; --map-fire2:#e5691c; --map-pit:#b9aa93; --map-snare:#4a6b8a; --map-stash:rgba(42,95,124,.18);
-  --map-night:18,26,52; --map-halo:rgba(247,249,250,.85); --map-select:#1b2631; --map-rabbit:#7a6248; --map-fox:#c5581c; --map-deer:#8a5a3c; --map-wolf:#3a3f4a; --map-sprite:#6a3fb5; --map-gnome:#7a5c2e; --map-rain:#4a78a8; --map-snow:#ffffff; --map-corpse:#5a6773; --map-grid:rgba(27,38,49,.35); --map-hill:#a9a297; --map-hill-fg:#6f685d; --map-stone:#d3cec4; --map-stone-fg:#9a9388; --agent-light:32%;
+  --map-night:18,26,52; --map-halo:rgba(247,249,250,.85); --map-select:#1b2631; --map-rabbit:#7a6248; --map-fox:#c5581c; --map-deer:#8a5a3c; --map-wolf:#3a3f4a; --map-sprite:#6a3fb5; --map-gnome:#7a5c2e; --map-god:#a8761b; --map-rain:#4a78a8; --map-snow:#ffffff; --map-corpse:#5a6773; --map-grid:rgba(27,38,49,.35); --map-hill:#a9a297; --map-hill-fg:#6f685d; --map-stone:#d3cec4; --map-stone-fg:#9a9388; --agent-light:32%;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
@@ -24,7 +24,7 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; } }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; } }
 :root[data-theme="dark"]{
   --bg:#161c22; --panel:#1e262d; --ink:#e3e9ed; --muted:#96a3ad; --line:#2f3a43;
   --accent:#7fb3d1; --accent-ink:#10181e; --good:#7cc58a; --warn:#e0b25a; --bad:#ef7d6d; --major:#e3e9ed; --bar-bg:#2a343c;
@@ -32,133 +32,219 @@
   --map-water:#142838; --map-water-fg:#3e7aa5; --map-tree:#5ea35d; --map-bush:#86a655; --map-berry:#e45c86; --map-reeds:#7fa25a;
   --map-boulder:#4f4b46; --map-boulder-fg:#77716a; --map-stick:#c08a4f; --map-rock:#b7b1a6; --map-carcass:#d97a7a;
   --map-fire-bg:#6a2a10; --map-fire:#ffb347; --map-fire2:#ff7a2e; --map-pit:#4a4238; --map-snare:#8fb6d6; --map-stash:rgba(127,179,209,.16);
-  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; }
+  --map-night:4,8,20; --map-halo:rgba(22,28,34,.85); --map-select:#e3e9ed; --map-rabbit:#c9b299; --map-fox:#ff8a3d; --map-deer:#d9a878; --map-wolf:#b9c3d6; --map-sprite:#c9a4ff; --map-gnome:#d9a66b; --map-god:#ffd97a; --map-rain:#8fb6e0; --map-snow:#cfd8e6; --map-corpse:#96a3ad; --map-grid:rgba(227,233,237,.3); --map-hill:#3a3630; --map-hill-fg:#6b6458; --map-stone:#4a4640; --map-stone-fg:#7a736a; --agent-light:70%; }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
 button,input{font:inherit;color:inherit}
-button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1360px;margin:0 auto;padding:18px 20px 40px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:14px}
-.brand h1{margin:0;font:700 30px/1 "JetBrains Mono",ui-monospace,Menlo,monospace;letter-spacing:-.02em}
-.brand h1 span{color:var(--accent)}
-.brand p{margin:6px 0 0;color:var(--muted);max-width:66ch}
-.seed{display:flex;gap:8px;align-items:center}
-.seed input{width:170px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
-.btn{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{padding:3px 9px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;white-space:nowrap}
 .btn:hover:not(:disabled){border-color:var(--accent)}
 .btn:disabled{opacity:.4;cursor:default}
 .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn.small{padding:1px 8px;font-size:12px}
-.btn kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:6px}
-.toolbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-#where{font-weight:700}
-#clock{min-width:150px;color:var(--muted)}
-.hint{margin:8px 0 12px;color:var(--muted);min-height:1.45em}
-main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
-@media (max-width:980px){main{grid-template-columns:1fr}}
-.map-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
-canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
-#map,#mmap{min-width:560px}
-.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 2px 18px;color:var(--muted);font-size:13px}
-.legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
-section.panel,details.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
-.panel h2{margin:0 0 8px;font-size:16px}
-details.panel summary{cursor:pointer;font-weight:700}
-details.panel ul{margin:8px 0 0;padding-left:18px} details.panel li{margin-bottom:5px}
-#chronicle{list-style:none;margin:0;padding:0;max-height:320px;overflow:auto}
-#chronicle li{padding:4px 0;border-bottom:1px solid var(--line)}
-#chronicle .when{color:var(--muted);font-size:12px;display:inline-block;min-width:92px}
-.k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
-#goals{list-style:none;margin:0;padding:0}
-.goal{padding:7px 0;border-bottom:1px solid var(--line)}
-.goal:last-child{border-bottom:0}
-.gt{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
-.gs{color:var(--muted);font-size:13px;margin-top:2px}
-.ongoing{font-size:11px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:6px;vertical-align:middle}
-.g-done .gt span:first-child{color:var(--good)} .g-locked{opacity:.55} .g-blocked .gt span:first-child{color:var(--muted)}
+.btn.small{padding:1px 7px;font-size:12px}
+kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
+.btn.on kbd{opacity:.85}
+.btn .pin{margin-left:4px;opacity:.85}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+/* The strip: world half, a divider, camp half, controls at the right. */
+.strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
+.strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.strip .world{flex:none}
+.strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0;flex-wrap:nowrap}
+.strip .ctl{margin-left:auto;gap:6px;flex:none}
+#clock{font-weight:700}
+#season,#weather{color:var(--muted)}
+#weather.on{color:var(--warn)}
+#campName{font:700 15px/1 "JetBrains Mono",monospace;letter-spacing:-.01em;white-space:nowrap}
+#camps{display:flex;gap:4px}
+#gauges{display:inline-flex;gap:12px;align-items:center}
+.gauge{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.gauge .bar{width:64px;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden;display:inline-block}
+.gauge .bar i{display:block;height:100%}
+.gauge .t{color:var(--muted)}
+.gauge.warn .t{color:var(--warn)} .gauge.bad .t{color:var(--bad)}
+.g-good i{background:var(--good)} .g-warn i{background:var(--warn)} .g-bad i{background:var(--bad)}
+#chips{display:flex;gap:6px;flex:1 1 0;min-width:0;overflow:hidden;flex-wrap:nowrap}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:12px;border:1px solid;font-size:12px;cursor:default;background:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip kbd{margin:0;opacity:.7}
+.chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+/* The map box fills the rest. Everything else floats over it. */
+.mapbox{position:relative;overflow:hidden;background:var(--panel)}
+.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox.drawers-open .views{right:392px}
+.map-wrap{max-width:100%;max-height:100%;overflow:auto}
+canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
+.over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
+.over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
+#foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
+#foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
+/* Drawers: tabs on the right edge, open drawers stacked beside them. */
+#drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
+#drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
+#drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
+.drawer .body{overflow:auto;padding:6px 10px;min-height:0}
+.row{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;padding:4px 4px;border-bottom:1px solid var(--line);border-radius:4px}
+.row:last-child{border-bottom:0}
+.row .n{font:500 11px "JetBrains Mono",monospace;color:var(--muted)}
+.row.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.row.dead{opacity:.55}
+.row .st{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.row.trouble .st{color:var(--bad)}
+.stage{margin:8px 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:2px}
+.gs{color:var(--muted);font-size:12px;grid-column:2/4}
+.tag{font-size:10px;border:1px solid var(--line);border-radius:10px;padding:0 5px;color:var(--muted);margin-left:5px;vertical-align:middle}
 .pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
-.pbtn{font-size:11px;padding:1px 7px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
-.pbtn:last-child{border-right:0}
-.pbtn.on{background:var(--accent);color:var(--accent-ink)}
-.settler{display:grid;grid-template-columns:18px 64px 70px 1fr;gap:8px;align-items:center;width:100%;text-align:left;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
-.settler:hover{border-color:var(--line)} .settler.on{border-color:var(--accent)} .settler.dead{opacity:.55}
-.sg{font:700 15px "JetBrains Mono",monospace;text-align:center}
-.ss{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbtn{font-size:11px;padding:1px 6px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
+.pbtn:last-child{border-right:0} .pbtn.on{background:var(--accent);color:var(--accent-ink)}
+.g-done .gt{color:var(--good)} .g-blocked .gt{color:var(--muted)}
 .bar{display:block;height:7px;border-radius:4px;background:var(--bar-bg);overflow:hidden} .bar i{display:block;height:100%}
-#stats{margin-top:8px;color:var(--muted);font-size:13px}
-.need{display:grid;grid-template-columns:60px 1fr 30px;gap:8px;align-items:center;font-size:13px;margin:3px 0}
-.num{text-align:right;color:var(--muted)}
+#chronicle{list-style:none;margin:0;padding:0}
+#chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
+#chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+#chronicle .when{color:var(--muted);font-size:11px;font-family:"JetBrains Mono",monospace;display:inline-block;min-width:88px}
+.k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
+.filter{display:flex;gap:4px;padding:6px 10px 0}
+table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
+/* Floating windows. */
+#windows{position:absolute;inset:0;z-index:4;pointer-events:none}
+.win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
+.win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
+.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
+.win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
+.win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
+/* The hover and pinned card, as before. */
 .tip{position:fixed;z-index:10;width:310px;max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;font-size:13px}
-.tip[hidden]{display:none}
-.tip.pinned{pointer-events:auto;border-color:var(--accent)}
+.tip[hidden]{display:none} .tip.pinned{pointer-events:auto;border-color:var(--accent)}
 .tip .close{float:right;margin:-4px -6px 0 8px;padding:0 7px;border:1px solid var(--line);border-radius:5px;background:none;cursor:pointer;line-height:1.5}
 .tip .hist{max-height:150px;overflow:auto}
 .ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
 .ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}
 .ins .why{display:flex;flex-wrap:wrap;gap:4px 10px} .ins .why .picked{color:var(--accent);font-weight:700} .ins .why .failed{color:var(--muted);text-decoration:line-through}
 .ins ul{list-style:none;margin:0;padding:0} .ins li{padding:1px 0}
-.chips{display:flex;flex-wrap:wrap;gap:5px} .chip{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;flex-wrap:wrap;gap:5px} .chips .chip{color:var(--ink);border-color:var(--line)}
 .pos b{color:var(--good)} .neg b{color:var(--bad)}
-table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:30%}
+.need{display:grid;grid-template-columns:60px 1fr 30px;gap:8px;align-items:center;font-size:13px;margin:3px 0}
+.num{text-align:right;color:var(--muted)}
 .muted{color:var(--muted);font-size:13px}
+/* Dialogs. */
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:18px 22px;max-width:720px;width:min(92vw,720px);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h1{margin:0 0 6px;font:700 28px/1 "JetBrains Mono",monospace} dialog h1 span{color:var(--accent)}
+dialog h2{margin:14px 0 6px;font-size:15px}
+dialog p{margin:6px 0;color:var(--muted);max-width:66ch}
+.seed{display:flex;gap:8px;align-items:center;margin-top:12px}
+.seed input{width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:13px}
+.legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
+table.keys{border-collapse:collapse;font-size:13px;width:100%} table.keys td{padding:2px 6px;border-bottom:1px solid var(--line)} table.keys td:first-child{font-family:"JetBrains Mono",monospace;white-space:nowrap;width:30%}
+dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
+@media (max-width:1400px){
+  .strip{flex-wrap:wrap}
+  .strip .world{flex:1 1 auto}
+  .strip .camp{flex:1 1 100%;flex-wrap:wrap;min-width:0;padding-left:0;border-left:0}
+  #chips{flex:1 1 100%;flex-wrap:wrap;overflow:visible}
+  .strip .ctl{margin-left:0;flex:1 1 100%}
+}
+/* Below 800 px a drawer is a full-height overlay, and only one is open. */
+@media (max-width:800px){.mapbox.drawers-open .views{right:0} #drawers{left:10px;width:auto}}
+#palette{padding:10px}
+#paletteInput{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:15px}
+#paletteList{list-style:none;margin:8px 0 0;padding:0;max-height:50vh;overflow:auto}
+#paletteList li{display:flex;justify-content:space-between;gap:12px;padding:5px 8px;border-radius:5px}
+#paletteList li.sel{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+#paletteList li kbd{margin:0}
 [hidden]{display:none !important}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <h1>Hearth<span>@</span></h1>
-      <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
+<div class="app">
+  <header class="strip" id="strip">
+    <div class="world"><span id="clock"></span><span id="season"></span><span id="weather"></span></div>
+    <div class="camp"><span id="campName"></span><span id="camps"></span><span id="gauges"></span><span id="chips"></span></div>
+    <div class="ctl">
+      <button class="btn" id="pause">Pause<kbd>Space</kbd></button>
+      <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
+      <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
+      <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
+      <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
+      <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
     </div>
-    <div class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld">Make world</button></div>
   </header>
-  <div class="toolbar">
-    <div class="group">
-      <button class="btn" id="viewBtn" title="Sector, nearby, world map">World map<kbd>M</kbd></button>
-      <span id="where"></span>
-      <span id="viewcamp" class="muted"></span>
-      <span class="group" id="nav"><button class="btn" id="nW">◀</button><button class="btn" id="nN">▲</button><button class="btn" id="nS">▼</button><button class="btn" id="nE">▶</button></span>
-      <span class="group" id="levels"><button class="btn" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
-      <span class="group" id="tools" role="toolbar" aria-label="Tools"></span>
-    </div>
-    <div class="group"><button class="btn" id="pause">Pause</button><button class="btn" id="stepBtn">Step</button><span class="group" id="speeds"></span><span id="clock"></span></div>
-  </div>
-  <p class="hint" id="hint"></p>
-  <main>
-    <div>
+  <main class="mapbox">
+    <div class="views">
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
       <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
-      <div class="legend">
-        <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
-        <span><b>/</b>stick</span><span><b>o</b>rock</span><span><b>%</b>carcass</span><span><b>=</b>log</span><span><b>○</b>fire pit</span><span><b>⌂</b>lean-to</span><span><b>Ξ</b>drying rack</span><span><b>▦</b>storehouse</span><span><b>⊞</b>workshop</span><span><b>⌓</b>kiln</span><span><b>ʌ</b>sapling</span><span><b>▤</b>stash</span><span><b>∩</b>snare</span><span><b>⊔</b>deer pit</span><span><b>▲</b>fire</span>
-      </div>
-      <section class="panel"><h2>Chronicle</h2><ol id="chronicle"></ol></section>
     </div>
-    <aside>
-      <section class="panel"><h2>Goals</h2><div class="group" id="camps" style="margin-bottom:8px"></div><ul id="goals"></ul><p class="muted" style="margin:8px 0 0">People pick their own work from the goals that are on. High makes a goal count for more. Off takes it away.</p></section>
-      <section class="panel"><h2>People</h2><div id="people"></div><div id="stats"></div></section>
-      <details class="panel"><summary>Things to try</summary><ul>
-        <li>Wait for the fire pit, then use Lightning on it. Then strike the grass instead and compare.</li>
-        <li>Let the fire go out. Watch the goal list, the moods, and who comes to fix it.</li>
-        <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
-        <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
-        <li>Use Poke on someone who is sitting by the fire when the woodpile is empty.</li>
-        <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view of nine sectors, and the world map. Arrow keys step between sectors.</li>
-        <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
-        <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
-        <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
-        <li>Wait for someone to see a light at the edge of the firelight. Then set an offering stone, or a ward, or neither, and watch what the difference costs.</li>
-        <li>Cut trees in a grove sector on purpose. Count the nights until the fire goes out on its own.</li>
-        <li>Pin an elder and watch who sits with them. Skills pass by the fire.</li>
-        <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the buttons above the goals.</li>
-      </ul></details>
-    </aside>
+    <div class="over tl">
+      <span id="tools" role="toolbar" aria-label="Tools"></span>
+      <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
+      <span id="nav"><button class="btn small" id="nW">◀<kbd>Ctrl+←</kbd></button><button class="btn small" id="nN">▲<kbd>Ctrl+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Ctrl+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Ctrl+→</kbd></button></span>
+      <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
+    </div>
+    <div class="over tl2" id="where"></div>
+    <div id="foot"></div>
+    <div id="drawerTabs"></div>
+    <div id="drawers"></div>
+    <div id="windows"></div>
   </main>
 </div>
 <div id="tip" class="tip ins" role="tooltip" hidden></div>
+<dialog id="start">
+  <h1>Hearth<span>@</span></h1>
+  <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
+</dialog>
+<dialog id="help">
+  <h2>Keys</h2>
+  <table class="keys" id="helpKeys"></table>
+  <h2>Muted</h2>
+  <div id="helpMuted"></div>
+  <h2>The map</h2>
+  <div class="legend" id="legend">
+    <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
+    <span><b>/</b>stick</span><span><b>o</b>rock</span><span><b>%</b>carcass</span><span><b>=</b>log</span><span><b>○</b>fire pit</span><span><b>⌂</b>lean-to</span><span><b>Ξ</b>drying rack</span><span><b>▦</b>storehouse</span><span><b>⊞</b>workshop</span><span><b>⌓</b>kiln</span><span><b>ʌ</b>sapling</span><span><b>▤</b>stash</span><span><b>∩</b>snare</span><span><b>⊔</b>deer pit</span><span><b>▲</b>fire</span>
+  </div>
+  <h2>Things to try</h2>
+  <ul id="tips">
+    <li>Wait for the fire pit, then use Light fire on it. Then strike the grass instead and compare.</li>
+    <li>Let the fire go out. Watch the goals, the moods, and who comes to fix it.</li>
+    <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
+    <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
+    <li>Nudge someone who is sitting by the fire when the woodpile is empty.</li>
+    <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view, and the world map.</li>
+    <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
+    <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
+    <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
+    <li>Wait for someone to see a light at the edge of the firelight. Then set an offering stone, or a ward, or neither, and watch what the difference costs.</li>
+    <li>Cut trees in a grove sector on purpose. Count the nights until the fire goes out on its own.</li>
+    <li>Pin an elder and watch who sits with them. Skills pass by the fire.</li>
+    <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the tabs in the strip.</li>
+  </ul>
+  <p><button class="btn" id="helpClose">Close<kbd>Esc</kbd></button></p>
+</dialog>
+<dialog id="mute">
+  <h2 id="muteTitle">Mute</h2>
+  <p><button class="btn" id="mute1">This alert<kbd>1</kbd></button> <button class="btn" id="mute2">This kind, this camp<kbd>2</kbd></button> <button class="btn" id="mute3">This kind, everywhere<kbd>3</kbd></button></p>
+  <p class="muted">Unmute from the command palette or the help dialog.</p>
+</dialog>
+<dialog id="palette">
+  <input id="paletteInput" placeholder="Type a command, a name, a goal, a place" autocomplete="off">
+  <ol id="paletteList"></ol>
+</dialog>
+<dialog id="chord">
+  <h2>Goals by stage</h2>
+  <p id="chordButtons"></p>
+</dialog>
 <script>
 'use strict';
 /* ============================================================
@@ -279,6 +365,16 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 let era = 'days', age = 0, pulseAge = null, godRng = null, legends = [], creation = null, field = null, boundaries = [];
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* The ladder in stages. The panel groups goals by these, in this order. */
+const STAGES = [
+  { id: 'fire',       label: 'Fire' },
+  { id: 'food',       label: 'Food' },
+  { id: 'tools',      label: 'Tools' },
+  { id: 'shelter',    label: 'Shelter' },
+  { id: 'crafts',     label: 'Crafts' },
+  { id: 'sprites',    label: 'Neighbours' },
+  { id: 'settlement', label: 'Settlement' },
+];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
 const isWinter = () => seasonOf() === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;
@@ -2559,11 +2655,16 @@ function startFillWater(a){
 
 /* Goal definitions. Each goal reports a state and offers work. */
 const waterAim = () => 6 + 6 * (camp.stash.pot || 0);
+/* One hide is held back for a hut while people sleep outside. The waterskin and clothes wait for the next one. */
+function hideReserved(){
+  if (!camp.shelter || camp.huts.length >= 4 || campHumans().length <= bedsFor()) return 0;
+  return 1;
+}
 const GOALS = [
-  { id: 'camp', title: 'Make camp',
+  { id: 'camp', title: 'Make camp', stage: 'fire',
     state(){ return camp.site ? { s: 'done', text: `Site chosen: ${camp.siteReason || 'set by you'}.` } : { s: 'active', text: 'Nobody has picked a spot yet.' }; },
     offers(a){ return camp.site ? [] : [{ label: 'choose a camp site', score: 70, start: a => chooseSite(a) }]; } },
-  { id: 'firepit', title: 'Build a fire pit', need: { rock: 6, stick: 8 },
+  { id: 'firepit', title: 'Build a fire pit', stage: 'fire', after: 'camp', need: { rock: 6, stick: 8 },
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp site first.' };
       if (camp.pit) return { s: 'done', text: 'A ring of stones with the fire laid inside.' };
@@ -2589,7 +2690,7 @@ const GOALS = [
       }
       return out;
     } },
-  { id: 'fire', title: 'Keep the fire burning', standing: true,
+  { id: 'fire', title: 'Keep the fire burning', stage: 'fire', after: 'firepit', standing: true,
     state(){
       const t = pitTile(); if (!t) return { s: 'blocked', text: 'There is no fire pit yet.' };
       const p = t.struct;
@@ -2612,16 +2713,16 @@ const GOALS = [
       if (!p.lit && p.fuel <= 0 && camp.stash.stick >= 4) out.push({ label: 'lay the fire again', score: 60, start: a => startBuild(a, camp.pit, 15, 'Laying the fire', a => { if (camp.stash.stick >= 4){ camp.stash.stick -= 4; p.fuel = 160; log(`${a.name} lays fresh wood in the pit.`, [a]); } }) });
       return out;
     } },
-  { id: 'hearth', title: 'Keep the hearth three days without a break',
+  { id: 'hearth', title: 'Keep the hearth three days without a break', stage: 'fire', after: 'fire',
     state(){
       if (!camp.everLit) return { s: 'blocked', text: 'Needs a lit fire first.' };
       if (camp.bestStreak >= 3 * DAY) return { s: 'done', text: 'The hearth is established. People trust this place now.' };
       return { s: 'active', text: `Current run ${(camp.streak / DAY).toFixed(1)} days. Best ${(camp.bestStreak / DAY).toFixed(1)}. A steady hearth earns the time to make tools.` };
     } },
-  { id: 'food', title: 'Stock food', standing: true,
+  { id: 'food', title: 'Stock food', stage: 'food', after: 'camp', standing: true,
     state(){ if (!camp.site) return { s: 'blocked', text: 'Needs a camp site first.' }; const t = foodTarget(); return { s: stashFood() >= t ? 'done' : 'active', text: `${camp.stash.berries} berries, ${camp.stash.cooked} cooked, ${camp.stash.smoked} smoked. Aim: ${t} meals${seasonOf() === 'autumn' ? ', more before winter' : isWinter() ? '. Bushes are bare in winter' : ''}. Fresh food spoils.${stashFood() >= t ? '' : ' Until the aim is met, no newcomer is taken in and no child is born here.'}` }; },
     offers(a){ if (!camp.site || stashFood() >= foodTarget()) return []; return [{ label: 'pick berries for the stash', score: stashFood() === 0 ? 50 : 38, start: a => startPickBerries(a) }]; } },
-  { id: 'cook', title: 'Cook what we catch', standing: true,
+  { id: 'cook', title: 'Cook what we catch', stage: 'food', after: 'fire', standing: true,
     /* The state must count every kind of raw meat. A goal that is not active offers no work, so while
        this read the rabbit carcasses alone a speared deer lay uncut in the stash, and a camp starved
        in winter with nine meals waiting beside the fire. */
@@ -2634,7 +2735,7 @@ const GOALS = [
       if (camp.stash.venison > 0) return [{ label: 'butcher and cook the deer', score: 62, start: a => startBuild(a, camp.pit, 60, 'Butchering the deer', a => { if (camp.stash.venison <= 0) return; camp.stash.venison--; stashAdd('cooked', 5); stashAdd('hide', 2); if (camp.rack) stashAdd('smoked', 4); gainXp(a, 'cook'); log(`${a.name} butchers the deer. Meat for days${camp.rack ? ', and strips on the rack' : ''}.`, campHumans(), 'good'); }) }];
       if (camp.stash.fish > 0) return [{ label: 'cook the fish', score: camp.stash.fish >= 2 ? 62 : 45, start: a => startBuild(a, camp.pit, 25, 'Cooking fish over the fire', a => { if (camp.stash.fish > 0){ stashTake('fish'); stashAdd('cooked', 2); gainXp(a, 'cook'); log(`${a.name} cooks a fish over the fire.`, [a], 'good'); } }) }];
       if (camp.stash.carcass <= 0) return []; return [{ label: 'cook the catch', score: camp.stash.cooked === 0 ? 55 : 35, start: a => startBuild(a, camp.pit, 35, 'Cooking over the fire', a => { if (camp.stash.carcass > 0){ camp.stash.carcass--; stashAdd('cooked', 3); stashAdd('hide', 1); gainXp(a, 'cook'); camp.bestCook = Math.max(camp.bestCook || 0, a.skills.cook); log(`${a.name} cooks a rabbit over the fire and keeps the hide.`, [a], 'good'); } }) }]; } },
-  { id: 'snare', title: 'Set snares for rabbits', standing: true, max: 4,
+  { id: 'snare', title: 'Set snares for rabbits', stage: 'food', after: 'fire', standing: true, max: 4,
     state(){
       if (!camp.everLit) return { s: 'blocked', text: 'People settle first. Needs a lit fire.' };
       const snares = camp.snares, c = snares.filter(s => s.catch).length, armed = snares.filter(s => s.armed).length;
@@ -2650,7 +2751,7 @@ const GOALS = [
       else if (snares.length < this.max) out.push({ label: 'gather sticks for snares', score: 25, start: a => startGather(a, 'stick') });
       return out;
     } },
-  { id: 'axe', title: 'Knap a stone axe',
+  { id: 'axe', title: 'Knap a stone axe', stage: 'tools', after: 'hearth',
     state(){
       if (camp.bestStreak < 3 * DAY) return { s: 'blocked', text: 'Needs an established hearth. Two rocks struck together the right way make an edge.' };
       if (camp.tools.axe) return { s: 'done', text: 'A stone axe, hafted on a stick. Trees are firewood now.' };
@@ -2661,10 +2762,10 @@ const GOALS = [
       if (camp.stash.rock >= 2 && camp.stash.stick >= 1) return [{ label: 'knap the axe', score: 58, start: a => startBuild(a, camp.stashTile, 70, 'Knapping an axe', a => { if (camp.tools.axe || camp.stash.rock < 2) return; camp.stash.rock -= 2; camp.stash.stick--; camp.tools.axe = 1; gainXp(a, 'craft'); log(`${a.name} strikes flakes off a rock until it holds an edge, then binds it to a stick. The camp has an axe.`, [a], 'major'); addThought(a, 'axe', 'Made the first tool', 8, 1500); }) }];
       const out = []; if (camp.stash.rock < 2) out.push({ label: 'gather rocks for the axe', score: 44, start: a => startGather(a, 'rock') }); if (camp.stash.stick < 1) out.push({ label: 'gather a stick for the haft', score: 44, start: a => startGather(a, 'stick') }); return out;
     } },
-  { id: 'firestones', title: 'Find firestones', need: { rock: 3 },
+  { id: 'firestones', title: 'Find firestones', stage: 'tools', after: 'axe', need: { rock: 3 },
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the knapping know-how that came with the axe.' }; if (camp.tools.firestones) return { s: 'done', text: 'Two stones that spark when struck. A cold pit is a chore now, not a prayer.' }; const cold = camp.pit && !pitLit(); return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 3)}/3 to try. Striking sparks into tinder takes patience, and it fails more than it works.${cold ? ' The pit is dead and cold, so the camp puts this ahead of firewood.' : ''}` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.firestones) return []; const cold = camp.pit && !pitLit() ? 40 : 0; if (camp.stash.rock < 3) return [{ label: 'gather rocks to find firestones', score: 36 + cold, start: a => startGather(a, 'rock') }]; return [{ label: 'test rocks for sparks', score: 44 + cold, start: a => startBuild(a, camp.stashTile, 50, 'Striking rocks together', a => { if (camp.tools.firestones) return; camp.stash.rock -= 3; if (rng() < 0.4 + a.traits.patience * 0.4){ camp.tools.firestones = 1; gainXp(a, 'craft'); log(`${a.name} finds two stones that throw sparks. The camp can make its own fire now.`, campHumans(), 'major'); } else addThought(a, 'dud', 'Struck rocks all afternoon for nothing', -2, 400); }) }]; } },
-  { id: 'firewood', title: 'Cut firewood', standing: true,
+  { id: 'firewood', title: 'Cut firewood', stage: 'tools', after: 'axe', standing: true,
     state(){
       if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe.' };
       return { s: 'active', text: `${camp.stash.log} logs in the woodpile. A log burns three times longer than a stick. Aim: 4.` };
@@ -2676,7 +2777,7 @@ const GOALS = [
       if (camp.stash.log + looseLogs < 4) out.push({ label: 'cut a tree for logs', score: 48, start: a => startCutTree(a) });
       return out;
     } },
-  { id: 'shelter', title: 'Build a lean-to', need: { log: 4, stick: 10 },
+  { id: 'shelter', title: 'Build a lean-to', stage: 'shelter', after: 'axe', need: { log: 4, stick: 10 },
     state(){
       if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe, for logs.' };
       if (camp.shelter) return { s: 'done', text: 'A roof of logs and sticks beside the fire. Nobody sleeps on bare ground now.' };
@@ -2690,61 +2791,67 @@ const GOALS = [
       }
       const out = []; if (camp.stash.stick < n.stick) out.push({ label: 'gather sticks for the lean-to', score: 40, start: a => startGather(a, 'stick') }); return out;
     } },
-  { id: 'storehouse', title: 'Raise a storehouse', need: { log: 6, stick: 8 },
+  { id: 'storehouse', title: 'Raise a storehouse', stage: 'shelter', after: 'axe', need: { log: 6, stick: 8 },
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe, for logs.' }; if (camp.storehouse) return { s: 'done', text: 'Food on a raised floor, out of the damp and out of reach of wolves. It keeps twice as long.' }; return { s: 'active', text: `Logs ${Math.min(camp.stash.log, 6)}/6, sticks ${Math.min(camp.stash.stick, 8)}/8. Wolves cannot raid a storehouse.` }; },
     offers(a){ if (!camp.tools.axe || camp.storehouse || !camp.shelter) return []; const n = this.need; if (camp.stash.log >= n.log && camp.stash.stick >= n.stick){ const site = openSpotNear(camp.pit, 2, 4); if (!site) return []; return [{ label: 'raise the storehouse', score: 50, start: a => startBuild(a, site, 140, 'Raising the storehouse', a => { if (camp.storehouse || camp.stash.log < n.log) return; camp.stash.log -= n.log; camp.stash.stick -= n.stick; tileAt(...site).struct = { type: 'storehouse', camp }; camp.storehouse = site; gainXp(a, 'build'); log(`${a.name} finishes a storehouse on stilts. The stash moves under a roof.`, campHumans(), 'major'); }) }]; }
       return camp.stash.stick < n.stick ? [{ label: 'gather sticks for the storehouse', score: 34, start: a => startGather(a, 'stick') }] : []; } },
-  { id: 'huts', title: 'Build huts', standing: true, need: { log: 5, stick: 10, hide: 1 },
-    state(){ if (!camp.shelter) return { s: 'blocked', text: 'Needs the lean-to first.' }; const beds = bedsFor(), n = campHumans().length; return { s: n > beds ? 'active' : 'idle', text: `${camp.huts.length} huts, ${beds} sleeping places for ${n} people. Each hut sleeps three and costs 5 logs, 10 sticks, a hide.` }; },
+  { id: 'huts', title: 'Build huts', stage: 'shelter', after: 'shelter', standing: true, need: { log: 5, stick: 10, hide: 1 },
+    state(){ if (!camp.shelter) return { s: 'blocked', text: 'Needs the lean-to first.' }; const beds = bedsFor(), n = campHumans().length, active = n > beds;
+      const short = active && camp.stash.hide < this.need.hide;
+      return { s: active ? 'active' : 'idle', text: `${camp.huts.length} huts, ${beds} sleeping places for ${n} people. Each hut sleeps three and costs 5 logs, 10 sticks, a hide.${short ? ' Short of a hide: the next hide goes to the hut.' : ''}` }; },
     offers(a){ if (!camp.shelter || camp.huts.length >= 4 || campHumans().length <= bedsFor()) return []; const n = this.need;
       if (camp.stash.log >= n.log && camp.stash.stick >= n.stick && camp.stash.hide >= n.hide){ const site = openSpotNear(camp.pit, 3, 6); if (!site) return []; return [{ label: 'build a hut', score: 48, start: a => startBuild(a, site, 120, 'Building a hut', a => { if (camp.stash.log < n.log || tileAt(...site).struct) return; camp.stash.log -= n.log; camp.stash.stick -= n.stick; camp.stash.hide -= n.hide; tileAt(...site).struct = { type: 'hut', camp }; camp.huts.push(site); gainXp(a, 'build'); log(`${a.name} finishes a hut. ${bedsFor()} can sleep under a roof now.`, campHumans(), 'good'); }) }]; }
-      return camp.stash.stick < n.stick ? [{ label: 'gather sticks for a hut', score: 32, start: a => startGather(a, 'stick') }] : []; } },
-  { id: 'village', title: 'Become a village',
+      const out = [];
+      if (camp.stash.stick < n.stick) out.push({ label: 'gather sticks for a hut', score: 32, start: a => startGather(a, 'stick') });
+      if (camp.stash.hide < n.hide){ const snareGoal = GOALS.find(g => g.id === 'snare'); if (camp.snares.length < snareGoal.max && camp.stash.stick >= 3) out.push({ label: 'set a snare for a hide', score: 40, start: a => startSetSnare(a) }); }
+      return out; } },
+  { id: 'village', title: 'Become a village', stage: 'settlement', after: 'storehouse',
     state(){ if (camp.village) return { s: 'done', text: `${camp.name} is a village. Travellers come more readily, and the young grow up here.` }; const ok = camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8; return { s: camp.storehouse && camp.huts.length >= 1 ? 'active' : 'blocked', text: `Needs a storehouse (${camp.storehouse ? 'yes' : 'no'}), two huts (${camp.huts.length}), and eight people (${campHumans().length}).` }; } },
-  { id: 'fae', title: 'The sprites of the groves',
+  { id: 'fae', title: 'The sprites of the groves', stage: 'sprites',
     state(){
       if (!camp.fae.known) return { s: 'blocked', text: 'Nothing seen yet. The old pines are not empty.' };
       const f = camp.fae.favor, mood = f >= 30 ? 'They favour this camp.' : f >= 0 ? 'They are curious and watch the fire.' : f >= -40 ? 'They are cross with this camp. Expect pranks.' : 'They hate this camp. Fires go out and food goes bad.';
       const g = groves.filter(gr => gr.anger > 20);
       return { s: 'active', text: `Favour ${f}. ${mood}${g.length ? ` ${g.length} grove${g.length > 1 ? 's are' : ' is'} angry.` : ''}${camp.fae.blightUntil > tick ? ' A blight is on the bushes.' : ''} They like berries left for them, and old pines standing. They hate axes in their groves, snares near them, and wards.` };
     } },
-  { id: 'gnomes', title: 'The hidden neighbours',
+  { id: 'gnomes', title: 'The hidden neighbours', stage: 'sprites',
     state(){ if (!camp.gnomes.known) return { s: 'blocked', text: 'Nothing seen yet. The meadow edges are not empty.' }; const near = camp.site ? c => dist(c.exit.x, c.exit.y, ...camp.site) <= 60 : () => true; const holes = caves.filter(c => c.kind === 'burrow' && c.owner === 'gnome' && near(c)).length; return { s: 'active', text: `Gnomes live in ${holes} burrow${holes === 1 ? '' : 's'} under the meadow edges. They come out at dusk, farm mushrooms, and copy what they see. They borrow made things and bring them back with a gift. They never fight, and they leave when a village grows loud.` }; } },
-  { id: 'stone', title: 'Set an offering stone', need: { rock: 2 },
+  { id: 'stone', title: 'Set an offering stone', stage: 'sprites', after: 'fae', need: { rock: 2 },
     state(){ if (!camp.fae.known) return { s: 'blocked', text: 'Needs a reason. Nobody has seen the sprites.' }; if (camp.stone) return { s: 'done', text: 'A flat stone at the edge of the firelight, where berries are left at dusk.' }; return { s: 'active', text: `Rocks ${Math.min(camp.stash.rock, 2)}/2. Gifts taken from it earn favour, and favour brings glowing moss.` }; },
     offers(a){ if (!camp.fae.known || camp.stone || !camp.pit) return []; if (camp.stash.rock < 2) return [{ label: 'gather rocks for the offering stone', score: 30, start: a => startGather(a, 'rock') }]; const site = openSpotNear(camp.pit, 4, 6); if (!site) return [];
       return [{ label: 'set the offering stone', score: 42, start: a => startBuild(a, site, 30, 'Setting the offering stone', a => { if (camp.stone) return; camp.stash.rock -= 2; tileAt(...site).struct = { type: 'stone', camp, offering: 0 }; camp.stone = site; log(`${a.name} sets a flat stone at the edge of the firelight, for the sprites.`, campHumans(), 'good'); }) }]; } },
-  { id: 'offer', title: 'Leave gifts for the sprites', standing: true,
+  { id: 'offer', title: 'Leave gifts for the sprites', stage: 'sprites', after: 'stone', standing: true,
     state(){ if (!camp.stone) return { s: 'blocked', text: 'Needs the offering stone.' }; const st = tileAt(...camp.stone).struct; return { s: camp.fae.favor < 60 ? 'active' : 'idle', text: st.offering > 0 ? `${st.offering} berries wait on the stone. They go at night.` : `Nothing on the stone. Favour ${camp.fae.favor}.` }; },
     offers(a){ if (!camp.stone || camp.fae.favor >= 60 || camp.stash.berries < 3) return []; const st = tileAt(...camp.stone).struct; if (st.offering > 0) return []; return [{ label: 'leave berries on the stone', score: camp.fae.favor < 0 ? 46 : 30, start: a => startBuild(a, camp.stone, 8, 'Leaving berries on the stone', a => { if (camp.stash.berries < 2) return; stashTake('berries', 2); st.offering = 2; addThought(a, 'gift', 'Left a gift for the sprites', 3, 400); }) }]; } },
-  { id: 'ward', title: 'Ward the camp', need: { stick: 6 },
+  { id: 'ward', title: 'Ward the camp', stage: 'sprites', after: 'fae', need: { stick: 6 },
     state(){ if (!camp.fae.known) return { s: 'blocked', text: 'Needs a reason. Nobody has seen the sprites.' }; if (camp.ward) return { s: 'done', text: 'Ash-blackened posts around the camp. Sprites will not cross the line, and they resent it.' }; return { s: camp.fae.favor > -10 ? 'idle' : 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6, charred in the fire. Keeps sprites out of the camp. Costs favour.` }; },
     offers(a){ if (!camp.fae.known || camp.ward || !camp.pit || !pitLit() || camp.fae.favor > -10) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the ward posts', score: 28, start: a => startGather(a, 'stick') }]; const site = openSpotNear(camp.pit, 3, 5); if (!site) return [];
       return [{ label: 'set the ward posts', score: camp.fae.favor < -20 ? 55 : 30, start: a => startBuild(a, site, 60, 'Charring and setting ward posts', a => { if (camp.ward) return; camp.stash.stick -= 6; tileAt(...site).struct = { type: 'ward', camp }; camp.ward = site; camp.fae.favor -= 10; log(`${a.name} sets charred posts around the camp. The sprites will keep their distance now.`, campHumans(), 'good'); }) }]; } },
-  { id: 'faefight', title: 'Drive off the sprites', standing: true,
+  { id: 'faefight', title: 'Drive off the sprites', stage: 'sprites', after: 'fae', standing: true,
     state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nearAt(sp, ...camp.pit)} tiles from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
     offers(a){ const sp = spriteNear(); if (!sp || camp.fae.favor >= -30 || !camp.tools.spear || a.traits.bravery < 0.5) return []; return [{ label: 'drive off the sprite with the spear', score: 60 + a.traits.bravery * 15, start: a => startFightSprite(a, sp) }]; } },
-  { id: 'waterskin', title: 'Sew a waterskin', need: { hide: 2 },
+  { id: 'waterskin', title: 'Sew a waterskin', stage: 'tools', after: 'cook', need: { hide: 2 },
     state(){
       if (!camp.everLit) return { s: 'blocked', text: 'Needs hides, which come from cooking rabbits.' };
       if (camp.tools.waterskin) return { s: 'done', text: 'Two hides, stitched with sinew. Water can come to the camp.' };
-      return { s: camp.stash.hide >= 2 ? 'active' : 'blocked', text: `Hides ${Math.min(camp.stash.hide, 2)}/2. Every cooked rabbit leaves one.` };
+      const need = 2 + hideReserved(), held = camp.stash.hide >= 2 && camp.stash.hide < need;
+      return { s: camp.stash.hide >= need ? 'active' : 'blocked', text: held ? `Hides ${Math.min(camp.stash.hide, 2)}/2, and one is held for a hut.` : `Hides ${Math.min(camp.stash.hide, 2)}/2. Every cooked rabbit leaves one.` };
     },
-    offers(a){ if (camp.tools.waterskin || camp.stash.hide < 2) return []; return [{ label: 'sew the waterskin', score: 54, start: a => startBuild(a, camp.stashTile, 60, 'Sewing a waterskin', a => { if (camp.tools.waterskin || camp.stash.hide < 2) return; camp.stash.hide -= 2; camp.tools.waterskin = 1; gainXp(a, 'craft'); log(`${a.name} sews two hides into a waterskin.`, [a], 'major'); }) }]; } },
-  { id: 'water', title: 'Keep water at camp', standing: true,
+    offers(a){ if (camp.tools.waterskin || camp.stash.hide < 2 + hideReserved()) return []; return [{ label: 'sew the waterskin', score: 54, start: a => startBuild(a, camp.stashTile, 60, 'Sewing a waterskin', a => { if (camp.tools.waterskin || camp.stash.hide < 2 + hideReserved()) return; camp.stash.hide -= 2; camp.tools.waterskin = 1; gainXp(a, 'craft'); log(`${a.name} sews two hides into a waterskin.`, [a], 'major'); }) }]; } },
+  { id: 'water', title: 'Keep water at camp', stage: 'tools', after: 'waterskin', standing: true,
     state(){ if (!camp.tools.waterskin) return { s: 'blocked', text: 'Needs the waterskin.' }; return { s: camp.stash.water >= waterAim() ? 'idle' : 'active', text: `${camp.stash.water} drinks stored. Aim: ${waterAim()}. People drink at the fire instead of walking to the river.` }; },
     offers(a){ if (!camp.tools.waterskin || camp.stash.water >= waterAim()) return []; return [{ label: 'fill the waterskin', score: camp.stash.water === 0 ? 48 : 36, start: a => startFillWater(a) }]; } },
-  { id: 'spear', title: 'Make a spear', need: { stick: 1, rock: 1 },
+  { id: 'spear', title: 'Make a spear', stage: 'tools', after: 'axe', need: { stick: 1, rock: 1 },
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, start: a => startBuild(a, camp.stashTile, 50, 'Shaping a spear', a => { if (camp.tools.spear) return; camp.stash.stick--; camp.stash.rock--; camp.tools.spear = 1; gainXp(a, 'craft'); log(`${a.name} hardens a shaft in the fire and binds a flaked point to it. The camp has a spear.`, [a], 'major'); }) }]; return [{ label: 'gather a rock for the spear', score: 40, start: a => startGather(a, camp.stash.rock < 1 ? 'rock' : 'stick') }]; } },
-  { id: 'deer', title: 'Hunt deer', standing: true,
+  { id: 'deer', title: 'Hunt deer', stage: 'food', after: 'spear', standing: true,
     state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nearAt(d, ...camp.site)} tiles. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
     offers(a){ const d = deerNear(); if (!d || !camp.tools.spear || a.traits.bravery < 0.4 || camp.stash.venison > 0) return []; return [{ label: 'hunt a deer', score: 48 + a.skills.hunt * 5 + (stashFood() < 4 ? 15 : 0), start: a => startHuntDeer(a, d) }]; } },
-  { id: 'rack', title: 'Build a drying rack', need: { stick: 6 },
+  { id: 'rack', title: 'Build a drying rack', stage: 'food', after: 'firepit', need: { stick: 6 },
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
     offers(a){ if (!camp.pit || camp.rack) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the rack', score: 30, start: a => startGather(a, 'stick') }]; const site = openSpotNear(camp.pit, 2, 3); if (!site) return [];
       return [{ label: 'build the drying rack', score: 45, start: a => startBuild(a, site, 50, 'Building a drying rack', a => { if (camp.rack || camp.stash.stick < 6) return; camp.stash.stick -= 6; tileAt(...site).struct = { type: 'rack', camp }; camp.rack = site; gainXp(a, 'build'); log(`${a.name} lashes sticks into a drying rack beside the fire.`, [a], 'good'); }) }]; } },
-  { id: 'smoke', title: 'Smoke meat for lean days', standing: true,
+  { id: 'smoke', title: 'Smoke meat for lean days', stage: 'food', after: 'rack', standing: true,
     state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS * 4} days long in all, and the bushes give nothing then.` }; },
     offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
       const out = [];
@@ -2752,10 +2859,10 @@ const GOALS = [
       if (camp.stash.fish >= 1) out.push({ label: 'smoke a fish over the fire', score: seasonOf() === 'autumn' ? 64 : camp.stash.smoked < 4 ? 58 : 28, start: a => startBuild(a, camp.rack, 40, 'Smoking fish', a => { if (camp.stash.fish < 1) return; stashTake('fish'); stashAdd('smoked', 2); gainXp(a, 'cook'); log(`${a.name} hangs a fish in the smoke. It will keep.`, [a]); }) });
       return out;
     } },
-  { id: 'guard', title: 'Keep wolves off', standing: true,
+  { id: 'guard', title: 'Keep wolves off', stage: 'settlement', after: 'fire', standing: true,
     state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nearAt(w, ...camp.pit)} tiles from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
     offers(a){ const w = wolfNear(); if (!w || !pitLit() || a.traits.bravery < 0.35) return []; return [{ label: 'drive off the wolf with a firebrand', score: 72 + a.traits.bravery * 20, start: a => startDriveOff(a, w) }]; } },
-  { id: 'scout', title: 'Found a second camp',
+  { id: 'scout', title: 'Found a second camp', stage: 'settlement', after: 'shelter',
     state(){
       if (!camp.shelter) return { s: 'blocked', text: 'A camp sends people out only when it has a roof, and at least five people.' };
       if (camp.sentParty) return { s: 'done', text: `${camp.sentParty} set out for a new valley.` };
@@ -2764,7 +2871,7 @@ const GOALS = [
       return { s: ready ? 'active' : 'blocked', text: `${campHumans().length}/5 people, camp ${Math.floor((tick - camp.founded) / DAY)}/8 days old. Parties leave in spring or summer. Two go with coals and food.` };
     },
     offers(a){ if (!camp.shelter || camp.sentParty || camps.length >= 6 || campHumans().length < 5 || tick - camp.founded <= 8 * DAY || !(seasonOf() === 'spring' || seasonOf() === 'summer') || a.traits.bravery < 0.5) return []; return [{ label: 'lead a party to a new valley', score: 40, start: a => startFoundCamp(a) }]; } },
-  { id: 'caves', title: 'Search the caves',
+  { id: 'caves', title: 'Search the caves', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
@@ -2783,7 +2890,7 @@ const GOALS = [
       }
       return out;
     } },
-  { id: 'dens', title: 'Clear a den',
+  { id: 'dens', title: 'Clear a den', stage: 'tools', after: 'spear',
     state(){
       if (!camp.site) return { s: 'blocked', text: 'Needs a camp first.' };
       const near = caves.filter(c => c.kind === 'den' && c.owner && dist(c.exit.x, c.exit.y, ...camp.site) <= 40);
@@ -2806,6 +2913,11 @@ const GOALS = [
     } },
 ];
 function goalState(g){ if (g.locked) return { s: 'locked', text: g.locked }; return g.state(); }
+/* A stage is reached when any goal in it is not blocked. The fire stage always is. Reads the current camp. */
+function stageReached(stageId){
+  if (stageId === 'fire') return true;
+  return GOALS.some(g => g.stage === stageId && goalState(g).s !== 'blocked');
+}
 function offersFor(a){
   const out = [];
   for (const g of GOALS){
@@ -2829,39 +2941,41 @@ function offersFor(a){
    ITEMS rows) because ITEMS lives in core.js, which loads before these task starters exist. */
 const GATHERERS = { stick: a => startGather(a, 'stick'), rock: a => startGather(a, 'rock'), moss: a => startGather(a, 'moss'), log: a => startCutTree(a), fibre: a => startPickFibre(a), clay: a => startDigClay(a), cuttings: a => startTakeCuttings(a) };
 const RECIPES = [
-  { id: 'fibre', title: 'Gather fibre', after: 'firepit', place: 'reeds', gather: a => startPickFibre(a), standing: { stash: 'fibre', n: 6 }, score: 26, offerLabel: 'gather fibre from the reeds',
+  { id: 'fibre', title: 'Gather fibre', stage: 'crafts', after: 'firepit', place: 'reeds', gather: a => startPickFibre(a), standing: { stash: 'fibre', n: 6 }, score: 26, offerLabel: 'gather fibre from the reeds',
     blurb: 'Reed fibre twists into cord. Reeds grow in the marsh and along the water.' },
-  { id: 'cord', title: 'Twist cord', after: 'firepit', needs: { fibre: 4 }, place: 'stash', skill: 'craft', work: 30, makes: { item: 'cord', n: 2 }, standing: { stash: 'cord', n: 4 }, score: 36,
+  { id: 'cord', title: 'Twist cord', stage: 'crafts', after: 'firepit', needs: { fibre: 4 }, place: 'stash', skill: 'craft', work: 30, makes: { item: 'cord', n: 2 }, standing: { stash: 'cord', n: 4 }, score: 36,
     verb: 'twists', blurb: 'Four bundles of fibre make two coils. Cord binds a rod, a basket, and clothes.' },
-  { id: 'workshop', title: 'Build the workshop', after: 'axe', needs: { log: 6, stick: 10, rock: 4 }, tools: ['axe'], place: 'site', skill: 'build', work: 140, makes: { struct: 'workshop' }, score: 46,
+  { id: 'workshop', title: 'Build the workshop', stage: 'crafts', after: 'axe', needs: { log: 6, stick: 10, rock: 4 }, tools: ['axe'], place: 'site', skill: 'build', work: 140, makes: { struct: 'workshop' }, score: 46,
     verb: 'raises', done: 'A roofed bench beside the fire. Work here goes faster, and cord, baskets, rods, and clothes are made here.', blurb: 'A roofed bench beside the fire. Six logs, ten sticks, four rocks.' },
-  { id: 'basket', title: 'Weave a basket', after: 'workshop', needs: { cord: 3 }, place: 'workshop', skill: 'craft', work: 60, makes: { tool: 'basket' }, score: 40,
+  { id: 'basket', title: 'Weave a basket', stage: 'crafts', after: 'workshop', needs: { cord: 3 }, place: 'workshop', skill: 'craft', work: 60, makes: { tool: 'basket' }, score: 40,
     verb: 'weaves', done: 'A basket of cord and reed. Gatherers carry three more.', blurb: 'Three coils of cord. A gatherer with a basket carries three more.' },
-  { id: 'rod', title: 'Make a fishing rod', after: 'workshop', needs: { stick: 1, cord: 2 }, place: 'workshop', skill: 'craft', work: 40, makes: { tool: 'rod' }, score: 40,
+  { id: 'rod', title: 'Make a fishing rod', stage: 'crafts', after: 'workshop', needs: { stick: 1, cord: 2 }, place: 'workshop', skill: 'craft', work: 40, makes: { tool: 'rod' }, score: 40,
     verb: 'binds', done: 'A stick, a line of cord, a bone hook. The river feeds the camp now.', blurb: 'A stick and two coils of cord. Opens fishing.' },
-  { id: 'fish', title: 'Fish the river', after: 'rod', tools: ['rod'], place: 'water', gather: a => startFish(a), standing: { stash: 'fish', n: 4 }, active: () => camp.stash.fish < 4 && stashFood() + camp.stash.fish * 2 < foodTarget(), score: 36, offerLabel: 'fish the river',
+  { id: 'fish', title: 'Fish the river', stage: 'food', after: 'rod', tools: ['rod'], place: 'water', gather: a => startFish(a), standing: { stash: 'fish', n: 4 }, active: () => camp.stash.fish < 4 && stashFood() + camp.stash.fish * 2 < foodTarget(), score: 36, offerLabel: 'fish the river',
     blurb: 'A fish cooks to two meals or smokes on the rack. People fish when food is short.' },
-  { id: 'clothes', title: 'Sew hide clothes', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: 70, makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 50,
+  { id: 'clothes', title: 'Sew hide clothes', stage: 'crafts', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: 70, makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 50,
     verb: 'sews', status: () => `${campHumans().filter(h => h.clothes).length} of ${campHumans().length} clothed.`,
     blurb: 'Three hides and a coil of cord. The coldest person wears them, and loses warmth slower.' },
-  { id: 'clay', title: 'Dig clay', after: 'workshop', place: 'bank', gather: a => startDigClay(a), standing: { stash: 'clay', n: 6 }, score: 28, offerLabel: 'dig clay',
+  { id: 'clay', title: 'Dig clay', stage: 'crafts', after: 'workshop', place: 'bank', gather: a => startDigClay(a), standing: { stash: 'clay', n: 6 }, score: 28, offerLabel: 'dig clay',
     blurb: 'Clay from the riverbank. Four lumps build a kiln, three fire a pot.' },
-  { id: 'kiln', title: 'Build the kiln', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: 120, makes: { struct: 'kiln' }, score: 42,
+  { id: 'kiln', title: 'Build the kiln', stage: 'crafts', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: 120, makes: { struct: 'kiln' }, score: 42,
     verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
-  { id: 'pot', title: 'Fire pots', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: 50, makes: { item: 'pot', n: 1 }, counts: 'fired', standing: { stash: 'pot', n: 3 }, score: 38,
+  { id: 'pot', title: 'Fire pots', stage: 'crafts', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: 50, makes: { item: 'pot', n: 1 }, counts: 'fired', standing: { stash: 'pot', n: 3 }, score: 38,
     verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
-  { id: 'garden', title: 'Plant a garden', after: 'axe', needs: { cuttings: 4 }, tools: ['axe'], place: 'garden', skill: 'gather', work: 80, makes: { garden: true }, score: 36,
+  { id: 'garden', title: 'Plant a garden', stage: 'crafts', after: 'axe', needs: { cuttings: 4 }, tools: ['axe'], place: 'garden', skill: 'gather', work: 80, makes: { garden: true }, score: 36,
     verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home. A garden that burns or dies is planted again.' },
-  { id: 'pitfall', title: 'Dig a deer pit', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 34,
+  { id: 'pitfall', title: 'Dig a deer pit', stage: 'crafts', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: 90, makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 34,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
     blurb: 'Four logs and two coils of cord over a hole on a deer path. One deer in eight that steps in is caught. Up to two pits.' },
-  { id: 'quarry', title: 'Quarry stone', after: 'axe', tools: ['axe'], place: 'face', gather: a => startQuarry(a), standing: { stash: 'rock', n: 6 }, score: 36, offerLabel: 'quarry rocks',
+  { id: 'quarry', title: 'Quarry stone', stage: 'crafts', after: 'axe', tools: ['axe'], place: 'face', gather: a => startQuarry(a), standing: { stash: 'rock', n: 6 }, score: 36, offerLabel: 'quarry rocks',
     blurb: 'Rocks from a rock face within thirty tiles. Two a go. The loose-rock hunt is over.' },
 ];
 
 /* Is this stash kind made by some other recipe? Then a recipe short of it waits, blocked, rather than trying to gather it. A standing counter with a zero target is a panel sentinel, not a claim to make the kind. */
 const madeBy = (k, r) => RECIPES.some(x => x !== r && ((x.makes && x.makes.item === k) || (x.gather && x.standing && x.standing.stash === k && x.standing.n > 0)));
-const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => (camp.stash[k] || 0) >= n);
+/* What a recipe can actually spend of a kind: the stash, less the one hide held for a hut. The one place every needs check reads. */
+const availOf = k => (camp.stash[k] || 0) - (k === 'hide' ? hideReserved() : 0);
+const stashHas = needs => Object.entries(needs || {}).every(([k, n]) => availOf(k) >= n);
 const takeNeeds = needs => { for (const [k, n] of Object.entries(needs || {})) stashTake(k, n); };
 const needsText = needs => Object.entries(needs || {}).map(([k, n]) => `${ITEMS[k].plural} ${Math.min(camp.stash[k] || 0, n)}/${n}`).join(', ');
 /* Has the thing this recipe waits on been done? A goal id, a tool, or a struct. */
@@ -2915,7 +3029,7 @@ const MAKERS = {
   },
 };
 function recipeGoal(r){
-  return { id: r.id, title: r.title, standing: !!r.standing, recipe: r,
+  return { id: r.id, title: r.title, stage: r.stage, after: r.after, standing: !!r.standing, recipe: r,
     state(){
       if (!recipeUnlocked(r)) return { s: 'blocked', text: r.blurb };
       if (recipeDone(r)) return { s: 'done', text: r.done || r.blurb };
@@ -2925,9 +3039,10 @@ function recipeGoal(r){
         const text = r.standing.n === 0 ? r.status() : `${have}/${r.standing.n} ${ITEMS[r.standing.stash].plural} stored. ${r.blurb}`;
         if (!ready) return { s: 'idle', text };
         if (r.needs && !stashHas(r.needs)){
-          const missing = Object.keys(r.needs).find(k => (camp.stash[k] || 0) < r.needs[k]);
-          if (madeBy(missing, r))
-            return { s: 'blocked', text: `${needsText(r.needs)}. ${r.blurb}` };
+          const missing = Object.keys(r.needs).find(k => availOf(k) < r.needs[k]);
+          const heldBack = missing === 'hide' && (camp.stash.hide || 0) >= r.needs.hide && hideReserved() > 0;
+          if (madeBy(missing, r) || heldBack)
+            return { s: 'blocked', text: `${needsText(r.needs)}. ${r.blurb}${heldBack ? ' One hide is held for a hut.' : ''}` };
         }
         return { s: 'active', text };
       }
@@ -3720,6 +3835,9 @@ function lightTile(x, y, z = 0){
 }
 function poke(a){
   if (!a.alive) return 'Nothing stirs.';
+  /* A sleeping god is a being in the list like any other, and a nudge would startle it awake and set it wandering.
+     What wakes a god is its own rule, and it is not built yet (the spec's section 5). Until then the door refuses. */
+  if (a.species === 'god') return `${a.name} sleeps on, ${a.epithet}. A nudge from above does not wake a god.`;
   if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + 400; addThought(a, 'poked', 'Felt a nudge from above', 2, 400); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
   failTask(a); a.asleep = false; a.task = null; START.flee(a) || START.wander(a); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
@@ -3811,11 +3929,11 @@ const T = 26, WS = 3, MS = 9;
 /* The three views, and the order M walks them: sector, nearby, world, sector. */
 const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
-  { id: 'inspect', key: 'i', label: 'Inspect',   hint: 'Point at a person, an animal, or a tile. Click to pin the details open.' },
-  { id: 'light',   key: 'l', label: 'Lightning', hint: 'Click the fire pit to strike it alight. Click anything else, and lightning strikes there: a pine smoulders long enough to fetch an ember, grass burns. The hover card shows what will burn.' },
-  { id: 'camp',    key: 'c', label: 'Camp site', hint: 'Click open ground to move the camp site. Only until the pit is built.' },
-  { id: 'poke',    key: 'p', label: 'Poke',      hint: 'Click a person to make them drop what they are doing and think again. Click an animal to startle it.' },
+  { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
+  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
@@ -3826,18 +3944,392 @@ let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = nu
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 const $ = id => document.getElementById(id);
 
+/* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
+const ui = {
+  pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */
+  mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
+  seenTick: -1,        /* the newest chronicle tick notePulses has read */
+  lastStates: {},      /* goal id to state, to see a goal leave blocked */
+  open: ['people', 'goals'], /* drawers open, in order */
+  focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  showAll: false,      /* goals: the whole ladder */
+  unfold: {},          /* stage id to true when the player unfolded it */
+  chronFilter: 'all',  /* 'all' or 'major' */
+  note: null,          /* { text, at }: a said message that holds the foot for four seconds */
+  savedSpeed: 0,       /* from storage, applied by newWorld */
+  windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
+  nextWin: 1,
+  rects: {},           /* remembered rect per window kind or drawer id, from storage */
+  sticky: false,       /* true keeps a one-shot tool selected after it is used */
+  recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
+};
+const WIN_MAX = 6;
+
+/* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
+let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
+
+/* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
+const STORE_KEY = 'hearth.ui';
+function persist(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent })); } catch (e) { /* no storage */ }
+}
+function restore(){
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if (!s) return;
+    if (Array.isArray(s.open)) ui.open = s.open.filter(id => DRAWERS.some(d => d.id === id));
+    if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
+    if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
+    if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
+    if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
+  } catch (e) { /* no storage, or bad data */ }
+}
+
+/* View model. Pure functions from sim state to what the strip and drawers show. No DOM.
+   Everything reads the current `camp` unless it says otherwise. */
+const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
+
+function daysOfWood(){
+  const p = camp.pit && tileAt(...camp.pit).struct;
+  const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
+  return fuel / (PIT_BURN * DAY);
+}
+function gauges(){
+  const p = camp.pit && tileAt(...camp.pit).struct;
+  const days = daysOfWood();
+  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : days < 1 ? 'under a day of wood' : `${Math.floor(days)} days of wood`, level: !p.lit ? 'bad' : days < 1 ? 'bad' : days < 2 ? 'warn' : 'good' };
+  const meals = stashFood() + camp.stash.fish * 2, aim = foodTarget();
+  const food = !camp.site ? null : { v: Math.min(1, meals / aim), text: `${meals} of ${aim}`, level: level3(meals, aim) };
+  const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
+  const n = campHumans().length, beds = bedsFor();
+  const bedsG = !camp.shelter ? null : { v: Math.min(1, beds / Math.max(1, n)), text: `${beds} for ${n}`, level: beds >= n ? 'good' : 'warn' };
+  return { hearth, food, water, beds: bedsG };
+}
+
+/* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. 'cold:3:Ada is cold' mutes that one chip. */
+const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`) || (text != null && ui.mutes.has(`${type}:${campId}:${text}`));
+function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+
+/* The first living person a line names, so the chip can jump to them. The camp's own people come first. */
+function pulseWho(text){
+  const who = campHumans().find(b => text.includes(b.name))
+    || beings.find(b => b.alive && b.species === 'human' && text.includes(b.name));
+  return who ? who.id : undefined;
+}
+
+/* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
+function notePulses(){
+  ui.pulses = ui.pulses.filter(p => p.until > tick);
+  for (const e of chronicle){
+    if (e.tick <= ui.seenTick) break;
+    /* A legend of the ages carries its age and stands at tick 0. It is the story of the creation, not something
+       that just happened to the camp, so it never becomes a chip. Without this the first day opens with a
+       chipful of mingles and makings, several of them word for word the same line. */
+    if (e.age !== undefined) continue;
+    if ((e.kind === 'major' || e.kind === 'death') && e.tick + 1500 > tick) ui.pulses.push({ text: e.text, until: e.tick + 1500, being: pulseWho(e.text) });
+  }
+  ui.seenTick = chronicle.length ? chronicle[0].tick : ui.seenTick;
+  for (const g of GOALS){
+    const s = goalState(g).s, was = ui.lastStates[g.id];
+    if (was === 'blocked' && s !== 'blocked') ui.pulses.push({ text: `${g.title} is open now.`, until: tick + 1500 });
+    ui.lastStates[g.id] = s;
+  }
+}
+
+/* The first burning tile in the camp's sector, or null. */
+function burningNearCamp(){
+  if (!camp.site || !fireCount) return null;
+  const s = secOf(...camp.site);
+  for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (tileAt(x, y).fire > 0) return [x, y];
+  return null;
+}
+
+/* Alerts for the current camp. Conditions read state. Chips are numbered from one. */
+function alerts(){
+  const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
+  const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
+  if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
+  else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });
+  const burning = burningNearCamp(); if (burning) add('fire', 'A wildfire in the camp sector', 'bad', { tile: burning });
+  for (const a of campHumans()){
+    if (a.needs.warmth < 30) add('cold', `${a.name} is cold`, 'bad', { being: a.id });
+    if (a.needs.food < 25) add('food', `${a.name} is hungry`, 'warn', { being: a.id });
+    if (a.needs.water < 25) add('water', `${a.name} is thirsty`, 'warn', { being: a.id });
+  }
+  const g = gauges();
+  if (g.food && (seasonOf() === 'autumn' || isWinter()) && g.food.level !== 'good') add('food', `Food is short: ${g.food.text}`, 'warn', { tile: camp.stashTile });
+  if (g.water && camp.stash.water === 0) add('water', 'No water at camp', 'warn', { tile: camp.stashTile });
+  if (camp.pit) for (const b of beings) if (b.alive && b.species === 'wolf' && nearAt(b, ...camp.pit) <= 12){ add('threat', 'A wolf near the camp', 'bad', { being: b.id }); break; }
+  if (camp.fae.known && camp.fae.favor < -20) add('sprites', `Sprite favour is ${camp.fae.favor}`, 'warn', { tile: camp.stone || camp.pit });
+  const swarm = groves.find(gr => gr.swarmUntil > tick);
+  if (swarm) add('sprites', 'A grove is out for revenge', 'bad', { tile: [swarm.x, swarm.y] });
+  for (const pu of ui.pulses) add('event', pu.text, 'info', { being: pu.being, tile: pu.tile });
+  return out;
+}
+
+/* Goals by stage. A stage shows when reached. Done goals fold to a count. A blocked goal hides until its prerequisite is done. Idle recipes fold. */
+function stages(showAll){
+  const byId = Object.fromEntries(GOALS.map(g => [g.id, g]));
+  return STAGES.filter(s => showAll || stageReached(s.id)).map(s => {
+    const goals = GOALS.filter(g => g.stage === s.id).map(g => {
+      const st = goalState(g), pr = goalPriority[g.id] ?? 1;
+      const preq = g.after && byId[g.after];
+      const hidden = !showAll && (st.s === 'done' || (st.s === 'idle' && !!g.recipe) || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
+      return { g, st, pr, hidden };
+    });
+    return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
+  });
+}
+
+/* People of the current camp, trouble first. The dead leave the list at once until a death stamp exists. */
+function peopleRows(){
+  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt && tick - b.diedAt < DAY))).map(a => {
+    const m = a.alive ? mood(a) : 0;
+    const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
+    return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
+  });
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+}
+
+function campSummary(){
+  return {
+    stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
+    tools: Object.entries(camp.tools).filter(([k, v]) => v).map(([k]) => k),
+    favor: camp.fae.known ? camp.fae.favor : null,
+    animals: ['rabbit', 'deer', 'fox', 'wolf', 'sprite'].map(sp => [sp, beings.filter(b => b.alive && b.species === sp).length]),
+    burning: fireCount, age: dayOf() - Math.floor((camp.founded || 0) / DAY),
+  };
+}
+
+function seasonLine(){
+  const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
+  return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
+}
+
+/* The rows a drawer's keys act on, in the order the drawer shows them. */
+function drawerRows(id){
+  if (id === 'people') return peopleRows().map(r => ({ kind: 'person', id: r.a.id, r }));
+  if (id === 'goals'){
+    const out = [];
+    for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
+    return out;
+  }
+  if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  return [];
+}
+
+/* A short string that changes when anything the strip or drawers show changes. */
+function viewKey(){
+  const g = gauges();
+  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    cursor.x, cursor.y, cursor.z].join('#');
+}
+
+/* Where the cursor lands after a move. mult is a number of tiles, or 'sector'. In the nearby and world views every step is a sector. */
+function cursorAfter(c, dx, dy, mult, view){
+  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
+}
+/* One phrase for what is under the cursor. A being first, then the tile. */
+function cursorPhrase(){
+  const a = beings.find(b => b.alive && b.x === cursor.x && b.y === cursor.y && b.z === cursor.z);
+  if (a) return `${a.name}${a.species === 'god' ? ' ' + a.epithet : ''}, ${a.alive ? a.status.toLowerCase() : 'dead'}`;
+  if (!hasTile(cursor.x, cursor.y, cursor.z)) return cursor.z > 0 ? 'open air' : 'solid earth';
+  const t = tileAt(cursor.x, cursor.y, cursor.z), parts = [];
+  if (t.struct) parts.push(t.struct.type === 'firepit' ? (t.struct.lit ? 'the hearth, burning' : 'the fire pit, cold') : t.struct.type);
+  if (t.feature) parts.push(FEATURES[t.feature].name);
+  const it = itemAt(cursor.x, cursor.y, cursor.z); if (it) parts.push(ITEMS[it.kind].name);
+  if (t.fire > 0) parts.push('burning');
+  parts.push(GROUND[t.ground].name);
+  return parts.join(', ');
+}
+
+/* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
+const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
+function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
+/* Inspectors share one saved rect, so each new one steps 24 px down and across from the count already open.
+   A drawer window keeps one rect per drawer id and opens where it was left. */
+const WIN_STEP = 24;
+function winOpen(kind, target){
+  const have = winFind(kind, target); if (have) return have;
+  const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
+  const n = kind === 'inspect' ? ui.windows.filter(w => w.kind === 'inspect').length : 0;
+  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
+  const w = { id: ui.nextWin++, kind, target, ...r };
+  ui.windows.push(w);
+  const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
+  return w;
+}
+function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.focus === `window:${id}`) ui.focus = 'map'; }
+/* Where Tab goes: the map, each docked drawer in order, then each window in order. */
+function focusRing(){
+  const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+}
+
+/* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
+   STAGE_LETTER lives in keys.js, which loads after this file; this function only reads it when called, not at
+   load time, so the order is fine. */
+function paletteRows(){
+  const out = [], seen = new Set();
+  for (const k of KEYMAP){
+    if (k.focus === 'speedrow' || k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
+    if (seen.has(k.label)) continue; seen.add(k.label);
+    out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
+  }
+  for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
+  for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
+  for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
+  camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
+  for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  for (const m of ui.mutes) out.push({ label: `Unmute: ${m}`, key: '', action: 'unmute', arg: m, group: 9 });
+  for (const s of STAGES) if (stageReached(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
+  return out;
+}
+/* Fuzzy match: every word of the query is a substring of the label. Prefix matches first, then shorter labels. Empty query: help, chips, tools and drawers, recent, the rest. */
+function paletteMatch(query, rows){
+  const q = query.trim().toLowerCase();
+  if (!q){
+    const rank = r => r.group < 9 ? r.group : ui.recent.includes(r.label) ? 3 + ui.recent.indexOf(r.label) / 10 : 9;
+    return rows.slice().sort((a, b) => rank(a) - rank(b));
+  }
+  const words = q.split(/\s+/);
+  const hit = rows.filter(r => { const l = r.label.toLowerCase(); return words.every(w => l.includes(w)); });
+  const score = r => (r.label.toLowerCase().startsWith(words[0]) ? 0 : 1) * 1000 + r.label.length;
+  return hit.sort((a, b) => score(a) - score(b));
+}
+
+/* The key map and the dispatcher. No DOM.
+   One table. Every clickable thing has a row here, and the button prints the key.
+   focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
+   'dialog' only inside a dialog.
+   Movement keys are provisional. A feedback pass follows the first build. Change them here and nowhere else. */
+const DRAWERS = [
+  { id: 'people',    label: 'People',    key: '1' },
+  { id: 'goals',     label: 'Goals',     key: '2' },
+  { id: 'chronicle', label: 'Chronicle', key: '3' },
+  { id: 'camp',      label: 'Camp',      key: '4' },
+];
+/* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
+const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
+const KEYMAP = [
+  { key: 'Escape',     focus: 'any',    action: 'back',        label: 'Back' },
+  { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
+  { key: 'Tab',        shift: true, focus: 'any', action: 'focusPrev', label: 'Previous panel' },
+  { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
+  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick', button: 'stepBtn' },
+  { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
+  { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
+  { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
+  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
+  { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
+  { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
+  { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
+  { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
+  { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
+  { key: 'ArrowDown',  focus: 'map', action: 'cursor', arg: [0, 1, 1],  label: 'Cursor south' },
+  { key: 'ArrowLeft',  shift: true, focus: 'map', action: 'cursor', arg: [-1, 0, 5], label: 'Cursor west by five' },
+  { key: 'ArrowRight', shift: true, focus: 'map', action: 'cursor', arg: [1, 0, 5],  label: 'Cursor east by five' },
+  { key: 'ArrowUp',    shift: true, focus: 'map', action: 'cursor', arg: [0, -1, 5], label: 'Cursor north by five' },
+  { key: 'ArrowDown',  shift: true, focus: 'map', action: 'cursor', arg: [0, 1, 5],  label: 'Cursor south by five' },
+  { key: 'ArrowLeft',  ctrl: true, focus: 'map', action: 'cursor', arg: [-1, 0, 'sector'], label: 'A sector west', button: 'nW' },
+  { key: 'ArrowRight', ctrl: true, focus: 'map', action: 'cursor', arg: [1, 0, 'sector'],  label: 'A sector east', button: 'nE' },
+  { key: 'ArrowUp',    ctrl: true, focus: 'map', action: 'cursor', arg: [0, -1, 'sector'], label: 'A sector north', button: 'nN' },
+  { key: 'ArrowDown',  ctrl: true, focus: 'map', action: 'cursor', arg: [0, 1, 'sector'],  label: 'A sector south', button: 'nS' },
+  { key: 'Enter',      focus: 'map', action: 'applyAt',   label: 'Apply the tool at the cursor' },
+  { key: 'Home',       focus: 'map', action: 'home',      label: 'Cursor to the hearth' },
+  { key: 'w',          focus: 'map', action: 'worldHere', label: 'World map at the camp' },
+  { key: 'ArrowUp',    focus: 'drawer', action: 'rowUp',       label: 'Row up' },
+  { key: 'ArrowDown',  focus: 'drawer', action: 'rowDown',     label: 'Row down' },
+  { key: 'ArrowLeft',  focus: 'drawer', action: 'priorityDown', label: 'Goal priority down' },
+  { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
+  { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
+  { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
+  { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
+  { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
+  { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
+  { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
+  { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
+  { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
+  { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
+  { key: 'F3',         focus: 'any',    action: 'campN', arg: 3, label: 'Camp 3' },
+  { key: 'F4',         focus: 'any',    action: 'campN', arg: 4, label: 'Camp 4' },
+  { key: 'F5',         focus: 'any',    action: 'campN', arg: 5, label: 'Camp 5' },
+  { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
+  { key: 'Enter',      focus: 'dialog', action: 'start',       label: 'Make world', button: 'newWorld' },
+  { key: 'Escape',     focus: 'dialog', action: 'back',        label: 'Close', button: 'helpClose' },
+  { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
+  { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
+  { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
+  { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
+  { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
+  { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
+];
+KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
+/* Stage letters are checked before the tool keys below, since those rows fire on any focus and would shadow them. */
+for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
+for (const t of TOOLS){
+  KEYMAP.push({ key: t.key, focus: 'any', action: 'tool', arg: t.id, label: t.label });
+  if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
+}
+for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
+for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
+for (let n = 1; n <= 9; n++){
+  KEYMAP.push({ key: String(n), alt: true, focus: 'any', action: 'jumpChip', arg: n, label: `Jump to alert ${n}` });
+  KEYMAP.push({ key: String(n), alt: true, shift: true, focus: 'any', action: 'muteMenu', arg: n, label: `Mute alert ${n}` });
+}
+for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute', action: 'muteChoice', arg: k, label: ['Mute this alert', 'Mute this kind here', 'Mute this kind everywhere'][k - 1], button: `mute${k}` });
+/* The palette's text box swallows plain digits while typing, so number-row picks fire only through Alt+digit there. */
+for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
+
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'.
+   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
+function keyAction(e, focus){
+  const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
+  for (const k of KEYMAP){
+    if (k.focus !== 'any' && k.focus !== kind) continue;
+    const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
+    if (rowKey !== key && !(code && rowKey === code)) continue;
+    if (!!k.shift !== e.shiftKey) continue;
+    if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
+    return { action: k.action, arg: k.arg, focus: k.focus };
+  }
+  return null;
+}
+
+/* One printable string for a key map row's chord, for the help table, the buttons, and the palette. */
+function keyName(k){
+  const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
+  /* Shift shows on a named key and on a letter or a digit. `?` and `>` already carry it in the character. */
+  const shift = k.shift && (k.key.length > 1 || /^[a-z0-9]$/i.test(k.key));
+  return `${k.meta ? '\u2318' : ''}${k.ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${k.alt ? 'Alt+' : ''}${key}`;
+}
+
+/* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
+
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
+  for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
 }
-const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
+const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
+/* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
+   so the thing lying in the hill reads as the god the legends name. */
+const beingGlyph = a => a.asleep && a.species !== 'god' ? 'z' : SPECIES[a.species].glyph;
 function hash(x, y){ let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function darkness(){ const h = hourOf(); if (h >= 7 && h < 19) return 0; if (h >= 19 && h < 21) return (h - 19) / 2 * 0.45; if (h >= 5 && h < 7) return (7 - h) / 2 * 0.45; return 0.45; }
 function tileColor(t){
   if (t.fire > 0) return P.fire;
   if (t.struct && t.struct.type === 'firepit') return t.struct.lit ? P.fire2 : P.pit;
-  if (t.feature === 'tree') return P.tree; if (t.feature === 'boulder') return P.boulder; if (t.feature === 'bush') return t.berries ? P.berry : P.bush; if (t.feature === 'reeds') return P.reeds;
+  if (t.feature === 'tree') return P.tree; if (t.feature === 'deadpine') return P['ash-fg']; if (t.feature === 'boulder') return P.boulder; if (t.feature === 'bush') return t.berries ? P.berry : P.bush; if (t.feature === 'reeds') return P.reeds;
   return P[t.ground] || P.stone;
 }
 
@@ -3864,6 +4356,8 @@ function drawWorld(){
   if (isWinter()){ wctx.fillStyle = P.snow; wctx.globalAlpha = 0.28; wctx.fillRect(0, 0, W * WS, H * WS); wctx.globalAlpha = 1; }
   const s = whover || (followId ? null : cur);
   if (s){ wctx.strokeStyle = P.select; wctx.lineWidth = 2; wctx.strokeRect(s.sx * LW * WS + 1, s.sy * LH * WS + 1, LW * WS - 2, LH * WS - 2); }
+  /* The cursor's own tile, a dot inside the selected sector. */
+  wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function sectorSummary(s){
   const sticks = looseCount('stick')(s), rocks = looseCount('rock')(s);
@@ -3872,9 +4366,12 @@ function sectorSummary(s){
   const hs = hills.filter(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy);
   const cs = caves.filter(c => c.exit && secOf(c.exit.x, c.exit.y).sx === s.sx && secOf(c.exit.x, c.exit.y).sy === s.sy);
   const people = beings.filter(b => b.alive && b.species === 'human' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
-  const animals = beings.filter(b => b.alive && b.species !== 'human' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
+  const animals = beings.filter(b => b.alive && b.species !== 'human' && b.species !== 'god' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
+  /* A sleeping god is no animal. It is named, with its epithet, so a sector holding a body says so. */
+  const theGods = beings.filter(b => b.alive && b.species === 'god' && secOf(b.x, b.y).sx === s.sx && secOf(b.x, b.y).sy === s.sy);
   const parts = [`${sticks} sticks`, `${rocks} rocks`, `${bushes} berry bushes`, water ? 'water' : 'no water', hs.length ? `${hs.length} hill${hs.length > 1 ? 's' : ''}` : '', cs.length ? `${cs.length} cave mouth${cs.length > 1 ? 's' : ''}` : ''];
   if (animals.length) parts.push(animals.map(a => SPECIES[a.species].label).sort().join(', '));
+  if (theGods.length) parts.push(theGods.map(g => `${g.name} ${g.epithet}, ${g.status}`).join('; '));
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
   return `${s.name}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
@@ -3895,7 +4392,7 @@ function drawMid(){
   mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
-    const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = a.asleep ? 'z' : SPECIES[a.species].glyph;
+    const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
     if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
     mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
   }
@@ -3903,6 +4400,10 @@ function drawMid(){
   if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
   mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect(LW * MS + 1, LH * MS + 1, LW * MS - 2, LH * MS - 2);
   if (mhover){ mctx.globalAlpha = 0.5; mctx.strokeRect((mhover.sx - cur.sx + 1) * LW * MS + 1, (mhover.sy - cur.sy + 1) * LH * MS + 1, LW * MS - 2, LH * MS - 2); mctx.globalAlpha = 1; }
+  /* The cursor's own tile, when it lies inside the nine sectors on show. */
+  if (cursor.x >= ox && cursor.x < ox + 3 * LW && cursor.y >= oy && cursor.y < oy + 3 * LH){
+    mctx.strokeStyle = P.select; mctx.lineWidth = 2; mctx.strokeRect((cursor.x - ox) * MS, (cursor.y - oy) * MS, MS, MS);
+  }
 }
 
 /* ---- location view ---- */
@@ -3924,7 +4425,7 @@ function drawLoc(){
     if (t.ground === 'stone'){ bg = P.stone; if (h % 5 === 0){ g = '·'; fg = P['stone-fg']; } }
     if (t.mouth && t.z === 0){ g = '◠'; fg = P['hill-fg']; }
     if (t.feature === 'tree'){ g = '♣'; fg = P.tree; } else if (t.feature === 'sapling'){ g = 'ʌ'; fg = P.tree; } else if (t.feature === 'hollow'){ g = '♠'; fg = P.sprite; } else if (t.feature === 'bush'){ g = '*'; fg = t.berries > 0 ? P.berry : P.bush; }
-    else if (t.feature === 'boulder'){ bg = P.boulder; g = '#'; fg = P['boulder-fg']; } else if (t.feature === 'reeds'){ g = '"'; fg = P.reeds; }
+    else if (t.feature === 'deadpine'){ g = '†'; fg = P['ash-fg']; } else if (t.feature === 'boulder'){ bg = P.boulder; g = '#'; fg = P['boulder-fg']; } else if (t.feature === 'reeds'){ g = '"'; fg = P.reeds; }
     else if (t.feature === 'mushrooms'){ g = 'ɸ'; fg = t.shrooms > 0 ? P.gnome : P['ash-fg']; }
     const it = itemAt(x, y, t.z);
     if (it && !t.feature){ g = it.kind === 'stick' ? '/' : it.kind === 'rock' ? 'o' : it.kind === 'log' ? '=' : '%'; fg = it.kind === 'stick' || it.kind === 'log' ? P.stick : it.kind === 'rock' ? P.rock : P.carcass; }
@@ -3971,28 +4472,48 @@ function drawLoc(){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
     ctx.globalAlpha = a.z === lvl ? 1 : 0.5;
-    const px = (a.x - ox) * T + T / 2, py = (a.y - oy) * T + T / 2 + 1, glyph = a.asleep ? 'z' : SPECIES[a.species].glyph;
+    const px = (a.x - ox) * T + T / 2, py = (a.y - oy) * T + T / 2 + 1, glyph = beingGlyph(a);
     ctx.lineWidth = 3; ctx.strokeStyle = P.halo; ctx.strokeText(glyph, px, py);
     ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
     if (a.carrying){ ctx.fillStyle = a.carrying.kind === 'rock' ? P.rock : a.carrying.kind === 'stick' || a.carrying.kind === 'spear' || a.carrying.kind === 'log' ? P.stick : a.carrying.kind === 'berries' ? P.berry : a.carrying.kind === 'ember' ? P.fire : a.carrying.kind === 'water' ? P['water-fg'] : P.carcass; ctx.fillRect((a.x - ox) * T + T - 7, (a.y - oy) * T + 2, 5, 5); }
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
-  if (hover){ ctx.strokeStyle = P.select; ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.strokeRect(hover.lx * T + 0.5, hover.ly * T + 0.5, T - 1, T - 1); ctx.globalAlpha = 1; }
+  if (secOf(cursor.x, cursor.y).sx === cur.sx && secOf(cursor.x, cursor.y).sy === cur.sy && cursor.z === lvl){
+    const cx = (cursor.x - ox) * T, cy = (cursor.y - oy) * T;
+    ctx.strokeStyle = P.select; ctx.lineWidth = 2; ctx.strokeRect(cx + 1, cy + 1, T - 2, T - 2);
+    ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  }
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+
+/* Inspection: hover and pinned detail on a being or a tile. */
 
 /* ---- inspection ---- */
 function bar(v, color){ return `<span class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${color}"></i></span>`; }
 const needColor = v => v < 25 ? 'var(--bad)' : v < 50 ? 'var(--warn)' : 'var(--good)';
 function moodWord(a, m){ if (!a.alive) return 'Dead'; return m >= 65 ? 'Happy' : m >= 45 ? 'Content' : m >= 30 ? 'Uneasy' : m >= 15 ? 'Unhappy' : 'Miserable'; }
 function traitWord(k, v){ const w = TRAIT_WORDS[k]; return v < 0.3 ? w[0] : v > 0.7 ? w[2] : w[1]; }
-function inspectBeing(a){
+/* A god is a being in the list, but it is not a creature of the day era: it has no life clock, no camp, no
+   traits the day era reads, and its needs are its own four. So it gets its own card, and the shared one never
+   reads a field a god lacks. The card says who it is, what it became, and where its body lies. */
+function inspectGod(g){
+  const s = secOf(g.x, g.y);
+  const where = `${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}`;
+  const body = g.status === 'dead' ? 'Unmade. Nothing on the field was its pole any more.'
+    : `${g.name} lies down and is ${BODY[g.pole]}, in the ${where}.`;
+  const said = g.history.slice(0, 8).map(e => `<li><span class="muted">age ${e.age === undefined ? '-' : e.age}</span> ${e.text}</li>`).join('');
+  return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
+    <div class="muted" style="margin:1px 0 5px">A primal god of the ${g.contrast}, ${g.pole}. ${g.status === 'dead' ? 'Dead' : 'Asleep'} since age ${g.sleptAt || g.born}. ${body}</div>
+    ${said ? `<h3>What the legends say</h3><ul class="hist">${said}</ul>` : ''}`;
+}
+function inspectBeing(a, full = tipPinned){
+  if (a.species === 'god') return inspectGod(a);
   const m = mood(a), sp = SPECIES[a.species];
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   const thoughts = a.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const why = a.lastChoice ? `<div class="why">${a.lastChoice.opts.slice(0, 6).map(o => { const k = o.label || o.type; return `<span class="${k === a.lastChoice.picked ? 'picked' : o.failed ? 'failed' : ''}">${k} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
-  const hist = a.history.slice(0, tipPinned ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
+  const hist = a.history.slice(0, full ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   const s = secOf(a.x, a.y);
   let extra = '';
   if (a.species === 'human'){
@@ -4003,13 +4524,13 @@ function inspectBeing(a){
     const learned = [a.skills.wary ? `wary ${a.skills.wary}` : '', a.skills.hunt ? `hunter ${a.skills.hunt}` : ''].filter(Boolean);
     extra = `<h3>Nature and learning</h3><div class="chips"><span class="chip">${traitWord('bravery', a.traits.bravery)}</span>${a.species === 'deer' ? `<span class="chip">${traitWord('sociability', a.traits.sociability)}</span>` : ''}<span class="chip">${habit}</span>${learned.map(l => `<span class="chip">${l}</span>`).join('')}${drowsy(a) ? '<span class="chip">resting hours</span>' : ''}${a.grove ? `<span class="chip">grove in ${a.grove.sector.name.toLowerCase()} ${a.grove.sector.sx},${a.grove.sector.sy}, anger ${a.grove.anger}</span>` : ''}${a.den ? `<span class="chip">${a.den.hill ? `den under the hill at ${a.den.hill.x},${a.den.hill.y}` : `burrow at ${a.den.exit.x},${a.den.exit.y}`}</span>` : ''}</div>`;
   }
-  const follow = tipPinned && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
+  const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}">${a.name}</strong><span>${moodWord(a, m)} (${m})</span></div>
     <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
-    ${hist ? `<h3>${tipPinned ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
+    ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
 }
 function inspectTile(x, y, z = 0){
   const s = secOf(x, y), where = `${sectors[secIdx(s.sx, s.sy)].name}, ${x - s.sx * LW},${y - s.sy * LH}`;
@@ -4057,7 +4578,10 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   const close = tipPinned ? '<button class="close" data-close aria-label="Close">×</button>' : '';
-  tip.innerHTML = close + (tipTarget.being ? inspectBeing(beingById(tipTarget.being)) : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]));
+  const body = tipTarget.being ? inspectBeing(beingById(tipTarget.being))
+    : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
+    : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
+  tip.innerHTML = close + body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
   tip.classList.toggle('pinned', tipPinned); tip.setAttribute('role', tipPinned ? 'dialog' : 'tooltip'); tip.hidden = false;
   const w = tip.offsetWidth, h = tip.offsetHeight, gap = 14, vw = window.innerWidth, vh = window.innerHeight;
@@ -4071,9 +4595,8 @@ function hideTip(){ tipTarget = null; tipAnchor = null; tipPinned = false; rende
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
-  const same = tipPinned && tipTarget && (t.being ? tipTarget.being === t.being : tipTarget.tile && tipTarget.tile[0] === c.x && tipTarget.tile[1] === c.y && tipTarget.tile[2] === c.z);
-  if (same){ hideTip(); return; }
-  tipTarget = t; tipAnchor = { x: e.clientX, y: e.clientY, left: false }; tipPinned = true; renderTip();
+  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
+  ui.focus = `window:${w.id}`; hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
   if (tipPinned) return;
@@ -4082,154 +4605,468 @@ function tipForCell(c, e){
   tipAnchor = { x: e.clientX, y: e.clientY, left: false }; renderTip();
 }
 
+/* The strip: clock, season, weather, the camp's name and tabs, four gauges, and alert chips. */
+const GAUGE_LABEL = { hearth: 'Hearth', food: 'Food', water: 'Water', beds: 'Beds' };
+function gaugeHTML(id, g){
+  if (!g) return '';
+  return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
+}
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function chipHTML(a){
+  const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
+}
+/* The clock runs on every gate tick, not on the view key, so the time never freezes. */
+function renderClock(){
+  $('clock').textContent = stamp();
+  $('season').textContent = seasonLine();
+  const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
+  $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
+}
+function renderStrip(){
+  renderClock();
+  /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
+  $('campName').textContent = camp.name;
+  $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
+  const g = gauges();
+  $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
+  $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
+}
+
+/* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
+   A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
+function winTitle(w){
+  if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${moodWord(a, mood(a))}</span>` : 'Gone'; }
+  const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
+}
+function renderWindows(){
+  const box = $('windows'), seen = new Set();
+  for (const w of ui.windows){
+    seen.add(w.id);
+    let el = box.querySelector(`[data-win="${w.id}"]`);
+    if (!el){
+      el = document.createElement('section'); el.className = 'win'; el.dataset.win = w.id;
+      el.innerHTML = `<div class="bar"><span class="title"></span><span><span class="k">${w.kind === 'drawer' ? 'O dock' : 'F follow'} · Esc</span> <button class="btn small" data-close aria-label="Close">×</button></span></div><div class="body"></div><div class="grip"></div>`;
+      box.appendChild(el);
+    }
+    el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
+    el.classList.toggle('focus', ui.focus === `window:${w.id}`);
+    el.querySelector('.title').innerHTML = winTitle(w);
+    const body = el.querySelector('.body'), keep = body.scrollTop;
+    body.classList.toggle('ins', w.kind === 'inspect');
+    if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
+    else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
+    body.scrollTop = keep;
+  }
+  for (const el of [...box.children]) if (!seen.has(Number(el.dataset.win))) el.remove();
+  ui.windows.forEach((w, n) => {
+    const el = box.querySelector(`[data-win="${w.id}"]`);
+    if (el && box.children[n] !== el) box.insertBefore(el, box.children[n] || null);
+  });
+}
+/* Drag by the bar, resize by the grip. Positions persist per kind. */
+function wireWindows(){
+  const box = $('windows'); let drag = null;
+  box.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.win'); if (!el) return; const w = ui.windows.find(w => w.id === Number(el.dataset.win)); if (!w) return;
+    ui.focus = `window:${w.id}`; ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
+    if (e.target.closest('[data-close]')){ winClose(w.id); persist(); renderUI(true); return; }
+    const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderUI(true); return; }
+    const grip = e.target.closest('.grip'), bar = e.target.closest('.bar');
+    if (!grip && !bar) return;
+    drag = { w, grip: !!grip, x0: e.clientX, y0: e.clientY, x: w.x, y: w.y, wd: w.w, ht: w.h }; el.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  box.addEventListener('pointermove', e => {
+    if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (drag.grip){ drag.w.w = Math.max(220, drag.wd + dx); drag.w.h = Math.max(120, drag.ht + dy); }
+    else { drag.w.x = Math.max(0, drag.x + dx); drag.w.y = Math.max(0, drag.y + dy); }
+    renderWindows();
+  });
+  box.addEventListener('pointerup', () => { if (!drag) return; const w = drag.w; ui.rects[w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect'] = { x: w.x, y: w.y, w: w.w, h: w.h }; persist(); drag = null; });
+}
+
+/* The side panels: clock, camps, goals, people, chronicle. */
+
 /* ---- panels ---- */
 function renderUI(force){
   if (!viewCamp || !camps.includes(viewCamp)) viewCamp = camps[0];
   camp = viewCamp;
-  $('clock').textContent = `${stamp()}, ${seasonOf()}${weather.storm ? (isWinter() ? ', sleet' : ', rain') : isNight() ? ', night' : ''}`;
-  $('camps').innerHTML = camps.length > 1 ? camps.map(c => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}</button>`).join('') : '';
+  /* The clock and the foot run every tick. The view key does not know the wall clock. */
+  renderClock(); renderFoot();
+  const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
+  renderStrip();
   const s = sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = view === 'world' ? 'World map' : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy}`;
-  $('viewcamp').textContent = view === 'loc' && camps.length > 1 ? `tools act on ${viewCamp.name}` : '';
+  $('where').textContent = view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('tools').hidden = view !== 'loc';
   $('nav').hidden = view === 'world';
   $('levels').hidden = view !== 'loc';
-  const campBtn = document.querySelector('#tools [data-tool="camp"]');
-  campBtn.disabled = !!(viewCamp && viewCamp.pit);
-  campBtn.title = campBtn.disabled ? 'The fire pit is built. The camp stays where it is.' : '';
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
   if (view !== 'world') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
     const b = $(id), nx = cur.sx + dx, ny = cur.sy + dy, ok = nx >= 0 && ny >= 0 && nx < SW && ny < SH;
     b.disabled = !ok; b.title = ok ? sectors[secIdx(nx, ny)].name : '';
   }
-  $('goals').innerHTML = GOALS.map(g => {
-    const st = goalState(g), pr = goalPriority[g.id] ?? 1;
-    const kind = g.standing && st.s === 'active' ? '<span class="ongoing">ongoing</span>' : '';
-    const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
-    return `<li class="goal g-${st.s}"><div class="gt"><span>${g.title}${kind}</span>${pri}</div><div class="gs">${st.text}</div></li>`;
-  }).join('');
-  const hs = beings.filter(b => b.species === 'human' && (b.camp === viewCamp || !b.alive && b.camp === viewCamp));
-  $('people').innerHTML = hs.map(a => { const m = mood(a); const s = secOf(a.x, a.y);
-    return `<button class="settler ${tipTarget && tipTarget.being === a.id ? 'on' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}"><span class="sg" style="color:${beingColor(a)}">${a.alive ? (a.asleep ? 'z' : '@') : 'x'}</span><span>${a.name}</span>${bar(a.alive ? m : 0, needColor(m))}<span class="ss">${a.alive ? a.status : 'Dead'}</span></button>`; }).join('');
-  const st = camp.stash;
-  const tools = Object.entries(camp.tools).filter(([k, v]) => v).map(([k]) => k).join(', ');
-  const young = hs.filter(a => a.alive && stage(a) === 'young').length, old = hs.filter(a => a.alive && stage(a) === 'old').length;
-  const others = beings.filter(b => b.alive && b.species === 'human' && b.camp !== viewCamp).length;
-  $('stats').textContent = `${hs.filter(a => a.alive).length} people here${young ? `, ${young} young` : ''}${old ? `, ${old} old` : ''}${others ? `, ${others} in other camps` : ''}. Stash: ${Object.entries(st).filter(([k, v]) => v > 0).map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'}.${tools ? ` Tools: ${tools}.` : ''} ${camp.fae.known ? ` Sprite favour ${camp.fae.favor}.` : ''} ${['rabbit', 'deer', 'fox', 'wolf', 'sprite'].map(sp => `${beings.filter(b => b.alive && b.species === sp).length} ${sp}`).join(', ')} in the world.${fireCount ? ` ${fireCount} tiles burning.` : ''}`;
   renderTip();
-  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick + chronicle[0].text : '');
-  if (force || key !== chronKey){ chronKey = key; $('chronicle').innerHTML = chronicle.map(e => `<li class="k-${e.kind}"><span class="when">${e.when}</span> ${e.text}</li>`).join(''); }
+  renderDrawers();
+  renderWindows();
+  const sel = document.querySelector('#drawers .sel, #windows .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
-function say(msg){ $('hint').textContent = msg; }
-function setTool(id){
-  tool = id;
-  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  say(id === 'camp' && viewCamp && viewCamp.pit ? 'The fire pit is built. The camp stays where it is.' : TOOLS.find(t => t.id === id).hint);
-  if (tipPinned) hideTip();
+const rowClass = (id, i) => focusedDrawer() === id && ui.row[id] === i ? 'sel' : '';
+const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
+/* The header and the filter row of a drawer. Built once, then kept. */
+function drawerHTML(d){
+  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button></div>`
+    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
+  return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
-function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); }
-function setPaused(p){ paused = p; $('pause').textContent = p ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', p); }
+/* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
+function renderDrawers(){
+  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
+  for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
+  docked.forEach((id, n) => {
+    const d = DRAWERS.find(d => d.id === id);
+    let sec = host.querySelector(`section[data-drawer="${id}"]`);
+    if (!sec){ sec = document.createElement('section'); sec.className = 'drawer'; sec.dataset.drawer = id; sec.innerHTML = drawerHTML(d); }
+    if (host.children[n] !== sec) host.insertBefore(sec, host.children[n] || null);
+    sec.classList.toggle('focus', ui.focus === 'drawer:' + id);
+    for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
+    const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
+  });
+  for (const id of docked){
+    const el = $(`body-${id}`), keep = el.scrollTop;
+    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    if (el.scrollTop !== keep) el.scrollTop = keep;
+  }
+  document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
+}
+function renderPeople(el){
+  const rows = drawerRows('people');
+  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = stage(a);
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.name}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar" style="width:70px;display:inline-block;margin-left:8px;vertical-align:middle"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || '<div class="muted">Nobody yet.</div>';
+}
+function renderGoals(el){
+  const rows = drawerRows('goals');
+  const c = $('count-goals'); if (c) c.textContent = '';
+  el.innerHTML = rows.map((r, i) => {
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
+    const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
+    const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
+    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
+  }).join('');
+}
+/* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
+const CHRON_ROWS = 300;
+function renderChronicle(el){
+  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (focusedDrawer() === 'chronicle' ? ui.row.chronicle : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  const rows = drawerRows('chronicle');
+  const c = $('count-chronicle'); if (c) c.textContent = ` · ${rows.length}`;
+  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
+}
+function renderCamp(el){
+  const c = campSummary();
+  const kv = [['Name', camp.name + (camp.village ? ', a village' : '')], ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null].filter(Boolean);
+  const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
+  el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+}
+/* A note wins the foot for four seconds. Then the newest chronicle line comes back.
+   The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
+const NOTE_MS = 4000;
+function renderFoot(){
+  const phrase = `<span class="muted">${cursorPhrase()}</span>`;
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
+  ui.note = null;
+  const e = chronicle[0];
+  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
+}
+
+/* Start and help dialogs. One dialog is open at a time. Esc closes it. */
+function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
+function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+let muteFor = null;
+function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
+function muteChoice(k){
+  if (!muteFor) return;
+  if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
+  muteFor = null; closeDialogs(); persist(); renderUI(true);
+}
+function openHelp(){
+  closeDialogs();
+  const seen = new Set();
+  $('helpKeys').innerHTML = KEYMAP.map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
+  $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(m)}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
+  ui.focus = 'dialog'; $('help').showModal();
+}
+
+/* The command palette: every action and every named thing, one search box. */
+let palRows = [], palHit = [], palSel = 0;
+function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; ui.focus = 'dialog:palette'; $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
+function renderPalette(){
+  palHit = paletteMatch($('paletteInput').value, palRows).slice(0, 40); palSel = clamp(palSel, 0, Math.max(0, palHit.length - 1));
+  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${r.label}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
+  const sel = $('paletteList').querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+function paletteMove(d){ palSel = clamp(palSel + d, 0, Math.max(0, palHit.length - 1)); renderPalette(); }
+function paletteRun(i = palSel){
+  const r = palHit[i]; if (!r) return;
+  closeDialogs(); ui.recent = [r.label, ...ui.recent.filter(l => l !== r.label)].slice(0, 5); persist();
+  ACTIONS[r.action](r.arg); renderUI(true);
+}
+/* The stage chord: `g` opens this with one lettered button per reached stage. Built at run time, so its ids are not in the template. */
+function openChord(){
+  closeDialogs();
+  $('chordButtons').innerHTML = STAGES.filter(s => stageReached(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
+  ui.focus = 'dialog:chord'; $('chord').showModal();
+}
+
+/* God actions: tools, view changes, movement, and world control. */
+
+/* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
+const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
+function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
+function setTool(id, sticky = false){
+  tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
+  document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
+}
+function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
   $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
-  if (v === 'world') say('Click a sector to go there. Point at one to see what it holds.');
-  else if (v === 'mid') say('The sector and its eight neighbours. Arrow keys move. Click a sector to go there.');
-  else say(TOOLS.find(t => t.id === tool).hint);
   renderUI(true);
 }
-function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView('loc', { sx, sy }); }
+function goto(sx, sy){ if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; const s = { sx, sy }; cursor = { x: clamp(cursor.x - cur.sx * LW + sx * LW, sx * LW, (sx + 1) * LW - 1), y: clamp(cursor.y - cur.sy * LH + sy * LH, sy * LH, (sy + 1) * LH - 1), z: cursor.z }; setView('loc', s); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
-function move(dx, dy){ const sx = cur.sx + dx, sy = cur.sy + dy; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; setView(view === 'world' ? 'loc' : view, { sx, sy }); }
+function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
+function cursorTo(x, y, z){
+  cursor = { x: clamp(x, 0, W - 1), y: clamp(y, 0, H - 1), z: clamp(z, ZMIN, ZMAX) };
+  const s = secOf(cursor.x, cursor.y);
+  if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
+  if (view === 'loc' && cursor.z !== lvl) setLevel(cursor.z);
+}
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
+/* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
+function applyAt(){
+  if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
+  const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
+  const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
+  applyTool(c, e);
+}
 function cycleView(){ followId = null; setView(NEXT_VIEW[view]); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
-function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = firstPerson(); setView('loc', secOf(a.x, a.y)); }
+/* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
+function newWorld(seed){
+  startWorld(seed, {});
+  cursor = { x: W >> 1, y: H >> 1, z: 0 };
+  wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  ocv.width = W * WS; ocv.height = H * WS;
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed); const a = firstPerson(); setView('loc', secOf(a.x, a.y));
+}
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
     case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
-    case 'camp': {
-      camp = viewCamp;
-      say(inject({ source: 'player', act: 'site', x: c.x, y: c.y, z: c.z, camp: viewCamp.id }));
-      break;
-    }
-    case 'poke': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
+    case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
+  if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');
   renderUI(true);
 }
+
+/* The action table. Every key and every click ends here. The only place view state changes. */
+function openDrawer(id, on){
+  const has = ui.open.includes(id), want = on === undefined ? !has : on;
+  const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
+  if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
+  ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
+}
+const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
+/* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
+const INS_SCROLL = 48;
+function rowMove(d){
+  const id = focusedDrawer();
+  if (!id){
+    if (!ui.focus.startsWith('window:')) return;
+    const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7)));
+    if (!w || w.kind !== 'inspect') return;
+    const body = document.querySelector(`#windows [data-win="${w.id}"] .body`);
+    if (body) body.scrollTop += d * INS_SCROLL;
+    return;
+  }
+  const n = drawerRows(id).length; if (!n) return; ui.row[id] = (ui.row[id] + d + n) % n; renderUI(true);
+}
+function rowPick(n){ const id = focusedDrawer(); if (!id) return; if (n - 1 < drawerRows(id).length){ ui.row[id] = n - 1; rowOpen(); } }
+function rowOpen(){
+  const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
+  if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
+  else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
+  /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
+  else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => r.e.text.includes(b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
+}
+function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
+function focusStep(d){ const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
+const ACTIONS = {
+  pause(){ setPaused(!paused); },
+  step(){ setPaused(true); step(); renderUI(true); },
+  hour(){ setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  slower(){ setSpeed(speed === 64 ? 16 : speed === 16 ? 4 : 1); setPaused(false); },
+  faster(){ setSpeed(speed === 1 ? 4 : speed === 4 ? 16 : 64); setPaused(false); },
+  speed(s){ setSpeed(s); setPaused(false); },
+  tool(id){ setTool(id); },
+  toolSticky(id){ setTool(id, true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; cursorTo(a.x, a.y, a.z); renderUI(true); },
+  follow(id){ const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
+  view(){ cycleView(); },
+  levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
+  levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
+  nav([dx, dy]){ moveCursor([dx, dy, 'sector']); },
+  cursor(arg){ moveCursor(arg); },
+  applyAt(){ applyAt(); },
+  home(){ if (viewCamp.pit) cursorTo(viewCamp.pit[0], viewCamp.pit[1], 0); else if (viewCamp.site) cursorTo(viewCamp.site[0], viewCamp.site[1], 0); },
+  worldHere(){ followId = null; const t = viewCamp.site || [cursor.x, cursor.y]; cursor = { x: t[0], y: t[1], z: 0 }; setView('world', secOf(t[0], t[1])); },
+  drawer(id){ openDrawer(id); },
+  focusNext(){ focusStep(1); },
+  focusPrev(){ focusStep(-1); },
+  back(){
+    if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
+    if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
+    if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
+    if (tipPinned) hideTip();
+  },
+  rowUp(){ rowMove(-1); },
+  rowDown(){ rowMove(1); },
+  rowOpen(){ rowOpen(); },
+  rowPick(n){ rowPick(n); },
+  priorityUp(){ setPriority(1); },
+  priorityDown(){ setPriority(-1); },
+  showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  help(){ openHelp(); },
+  start(){ openStart(); },
+  newWorld(){ openStart(); },
+  jumpChip(n){
+    const a = alerts()[n - 1]; if (!a) return;
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+  },
+  muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
+  muteChoice(k){ muteChoice(k); },
+  popOut(){
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
+    persist(); renderUI(true);
+  },
+  palette(){ openPalette(); },
+  paletteMove(d){ paletteMove(d); },
+  paletteRun(){ paletteRun(); },
+  palettePick(n){ paletteRun(n - 1); },
+  chord(){ openChord(); },
+  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
+  gotoSector({ sx, sy }){ goto(sx, sy); },
+  unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },
+};
+
+/* The frame loop and page wiring: initUI() sets up canvases and events, frame() drives the loop. */
+
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   if (!paused){ acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
   if (followId){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
-  if (now - lastUi > 250){ renderUI(false); lastUi = now; }
+  /* Pulses read every goal's state. Once a render, not once a frame. */
+  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
   requestAnimationFrame(frame);
 }
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
-  wcv = $('wmap'); wctx = wcv.getContext('2d'); wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  wcv = $('wmap'); wctx = wcv.getContext('2d');
   mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
-  ocv = document.createElement('canvas'); ocv.width = W * WS; ocv.height = H * WS; octx = ocv.getContext('2d');
+  ocv = document.createElement('canvas'); octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false">${t.label}<kbd>${t.key.toUpperCase()}</kbd></button>`).join('');
-  $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
-  $('speeds').innerHTML = [1, 4, 16, 64].map(s => `<button class="btn" data-speed="${s}">${s}×</button>`).join('');
-  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b){ setSpeed(Number(b.dataset.speed)); setPaused(false); } });
-  $('pause').addEventListener('click', () => setPaused(!paused));
-  $('stepBtn').addEventListener('click', () => { setPaused(true); for (let k = 0; k < 2; k++) step(); renderUI(true); });
-  $('newWorld').addEventListener('click', () => newWorld($('seed').value.trim() || randomSeed()));
-  $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') newWorld($('seed').value.trim() || randomSeed()); });
-  $('viewBtn').addEventListener('click', cycleView);
-  $('nW').onclick = () => move(-1, 0); $('nE').onclick = () => move(1, 0); $('nN').onclick = () => move(0, -1); $('nS').onclick = () => move(0, 1);
-  $('lvUp').onclick = () => setLevel(lvl + 1); $('lvDown').onclick = () => setLevel(lvl - 1);
-  $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b){ viewCamp = camps.find(c => c.id === Number(b.dataset.camp)); if (viewCamp.site){ followId = null; setView('loc', secOf(...viewCamp.site)); } renderUI(true); } });
-  $('goals').addEventListener('click', e => { const b = e.target.closest('[data-goal]'); if (b){ say(inject({ source: 'player', act: 'priority', id: b.dataset.goal, pri: Number(b.dataset.pri) })); renderUI(true); } });
-  const tipForRow = (e, pin) => {
-    const b = e.target.closest('[data-being]'); if (!b) return; const id = Number(b.dataset.being);
-    if (pin && tipPinned && tipTarget && tipTarget.being === id){ hideTip(); return; }
-    if (!pin && tipPinned) return;
-    const r = b.getBoundingClientRect(), stacked = r.left < 340;
-    tipTarget = { being: id }; tipAnchor = stacked ? { x: r.left + 40, y: r.bottom, left: false } : { x: r.left, y: r.top, left: true }; tipPinned = pin; renderTip();
-  };
-  $('people').addEventListener('pointerover', e => tipForRow(e, false));
-  $('people').addEventListener('pointerdown', e => tipForRow(e, true));
-  $('people').addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  window.addEventListener('scroll', () => { if (!tipPinned) hideTip(); }, { passive: true });
+  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
+  $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
+  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(b.dataset.speed)); });
+  $('pause').addEventListener('click', ACTIONS.pause);
+  $('stepBtn').addEventListener('click', ACTIONS.step);
+  $('hourBtn').addEventListener('click', ACTIONS.hour);
+  $('helpBtn').addEventListener('click', ACTIONS.help);
+  $('helpClose').addEventListener('click', closeDialogs);
+  $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
+  $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
+  $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
+  for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
+  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  $('start').addEventListener('close', () => {
+    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
+    if (make) newWorld($('seed').value.trim() || randomSeed());
+  });
+  $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
+  $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
+  $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
+  $('viewBtn').addEventListener('click', ACTIONS.view);
+  $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
+  $('lvUp').onclick = ACTIONS.levelUp; $('lvDown').onclick = ACTIONS.levelDown;
+  $('camps').addEventListener('click', e => { const b = e.target.closest('[data-camp]'); if (b) ACTIONS.campN(camps.findIndex(c => c.id === Number(b.dataset.camp)) + 1); });
   $('tip').addEventListener('pointerdown', e => {
-    if (e.target.closest('[data-close]')) hideTip();
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderTip(); }
   });
-  document.addEventListener('pointerdown', e => { if (tipPinned && !e.target.closest('#tip, #map, #people')) hideTip(); });
-  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
-  cv.addEventListener('pointermove', e => { hover = cellFrom(e); if (e.pointerType === 'mouse') tipForCell(hover, e); });
+  $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
+  $('drawers').addEventListener('pointerdown', e => {
+    const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
+    const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
+    if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
+    const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;
+    if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
+  });
+  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
+  wireWindows();
+  cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
+  cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse' && !tipPinned) hideTip(); });
-  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); say(sectorSummary(sectors[secIdx(whover.sx, whover.sy)])); });
-  wcv.addEventListener('pointerleave', () => { whover = null; say('Click a sector to go there.'); });
+  wcv.addEventListener('pointermove', e => { whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => { const s = sectorFrom(e); goto(s.sx, s.sy); });
-  mcv.addEventListener('pointermove', e => { mhover = sectorFromMid(e); say(mhover ? sectorSummary(sectors[secIdx(mhover.sx, mhover.sy)]) : 'The edge of the world.'); });
-  mcv.addEventListener('pointerleave', () => { mhover = null; say('Click a sector to go there.'); });
+  mcv.addEventListener('pointermove', e => {
+    mhover = sectorFromMid(e);
+    if (mhover){ const s = mhover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); }
+    else hideTip();
+  });
+  mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT') return;
-    if (e.key === ' '){ e.preventDefault(); setPaused(!paused); return; }
-    if (e.key === 'Escape'){ if (tipPinned) hideTip(); else if (view !== 'world'){ followId = null; setView('world'); } return; }
-    if (e.key === 'm' || e.key === 'M'){ cycleView(); return; }
-    if (view !== 'world'){ const nav = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (nav){ e.preventDefault(); move(...nav); return; } }
-    if (view === 'loc' && e.key === ']'){ setLevel(lvl + 1); return; }
-    if (view === 'loc' && e.key === '['){ setLevel(lvl - 1); return; }
-    const t = TOOLS.find(t => t.key === e.key.toLowerCase()); if (t) setTool(t.id);
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    if (anyDialogOpen()){
+      if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
+      if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
+      /* Under a dialog only that dialog's own rows fire. An 'any' row would pause the sim or cycle the view behind the modal. */
+      const hit = keyAction(e, ui.focus); if (hit && hit.focus !== 'any'){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return;
+    }
+    const hit = keyAction(e, ui.focus); if (!hit) return;
+    e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });
-  setTool('inspect'); setSpeed(1);
+  setTool('inspect');
   newWorld(randomSeed());
+  if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  openStart();
   requestAnimationFrame(frame);
 }
 if (typeof document !== 'undefined') initUI();
