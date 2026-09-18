@@ -97,6 +97,22 @@ function startPickBerries(a){
     } };
   return true;
 }
+/* Fibre comes from reeds. Reeds are not used up. */
+function startPickFibre(a){
+  if (a.carrying && a.carrying.kind !== 'fibre') return startDeliver(a);
+  const hasReeds = t => t.feature === 'reeds';
+  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasReeds, NEAR, z), 2500, a);
+  if (!p){ if (a.carrying) return startDeliver(a); return false; }
+  a.task = { type: 'gather', label: 'Going to the reeds for fibre', path: p, progress: 0,
+    arrive(a, t){
+      if (!nearFind(a.x, a.y, hasReeds, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+      t.label = 'Pulling fibre from the reeds';
+      if (++t.progress % 8 === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'fibre', count: 1 }; }
+      if (a.carrying && a.carrying.count >= 3){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      return 'continue';
+    } };
+  return true;
+}
 function startSetSnare(a){
   const c = camp.site; let best = null;
   const s = secOf(c[0], c[1]);

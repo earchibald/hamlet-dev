@@ -59,6 +59,8 @@ const ITEMS = {
   moss:    { name: 'tuft of glowing moss', plural: 'glowing moss', mat: 'plant', fuel: 0 },
   firestones: { name: 'pair of firestones', plural: 'firestones', mat: 'stone', fuel: 0 },
   bones:   { name: 'old bones',       plural: 'old bones', mat: 'stone', fuel: 0 },
+  fibre:   { name: 'bundle of reed fibre', plural: 'fibre', mat: 'plant', fuel: 4 },
+  cord:    { name: 'coil of cord',     plural: 'cord',  mat: 'plant', fuel: 2 },
 };
 const BIOMES = {
   meadow:  { name: 'Open meadow' },
