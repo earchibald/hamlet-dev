@@ -118,3 +118,31 @@ test('a camp site likes stone close by and dislikes a wolf den', () => {
   c.site = null; c.siteReason = ''; api.chooseSite(a);
   assert.ok(c.siteReason.includes('stone close by'), c.siteReason);
 });
+
+test('lightning strikes a tree, smoulders open ground with nothing to burn, and lights the pit', () => {
+  const { api, a, c } = readyCamp();
+  /* A bare, cleared tile beside the pit: nothing here will burn. */
+  const [px, py] = c.pit; const bare = api.tileAt(px + 1, py);
+  assert.equal(bare.feature, null); assert.equal(bare.ground, 'soil');
+  const nothing = api.inject({ source: 'player', act: 'light', x: bare.x, y: bare.y, z: 0 });
+  assert.equal(nothing, 'Nothing here will burn.');
+
+  /* Find a pine tree tile at the surface to strike. */
+  let tree = null;
+  for (let x = 0; x < api.W && !tree; x++) for (let y = 0; y < api.H && !tree; y++){
+    const t = api.tileAt(x, y); if (t.feature === 'tree') tree = t;
+  }
+  assert.ok(tree, 'a pine tree exists on seed r');
+  const before = api.chronicle.length;
+  const msg = api.inject({ source: 'player', act: 'light', x: tree.x, y: tree.y, z: 0 });
+  assert.equal(msg, 'Lightning. Something is burning, and it will smoulder a while.');
+  assert.ok(tree.fire >= 240, `fire is ${tree.fire}`);
+  assert.ok(api.chronicle.length > before, 'a chronicle line was added');
+  assert.ok(api.chronicle[0].text.startsWith('Lightning strikes a pine'), api.chronicle[0].text);
+
+  /* The pit: unchanged return text, new chronicle wording. */
+  api.tileAt(...c.pit).struct.lit = false; c.everLit = false;
+  const pitMsg = api.inject({ source: 'player', act: 'light', x: px, y: py, z: 0 });
+  assert.equal(pitMsg, 'The fire pit is lit.');
+  assert.ok(api.chronicle[0].text.includes('Lightning strikes the pit'), api.chronicle[0].text);
+});

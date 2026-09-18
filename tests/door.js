@@ -18,11 +18,11 @@ test('lighting the ground through the door burns it, logs the event with its tic
   assert.ok(t, 'no grass near the first person');
   const before = api.chronicle.length;
   const msg = api.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: 0 });
-  assert.equal(msg, 'The ground is burning. This fire is not contained.');
+  assert.equal(msg, 'Lightning. Something is burning, and it will smoulder a while.');
   assert.ok(t.fire > 0);
   assert.deepEqual(api.doorLog, [{ tick: api.tick, source: 'player', act: 'light', x: t.x, y: t.y, z: 0 }]);
   assert.equal(api.chronicle.length, before + 1);
-  assert.match(api.chronicle[0].text, /from the sky/);
+  assert.match(api.chronicle[0].text, /Lightning strikes/);
 });
 
 test('a lighting that does nothing is still logged', () => {
@@ -39,7 +39,7 @@ test('a poke through the door names the person in the chronicle and is logged by
   const api = load(); api.startWorld('r');
   const a = api.beings[0];
   const msg = api.inject({ source: 'player', act: 'poke', id: a.id });
-  assert.equal(msg, `${a.name} looks up, then gets to it.`);
+  assert.match(msg, new RegExp(`^${a.name} looks up, then (goes to .+|gets to it)\\.$`));
   assert.deepEqual(api.doorLog, [{ tick: api.tick, source: 'player', act: 'poke', id: a.id }]);
   /* chooseTask runs after the nudge and may write its own lines, so look for the line, not at the top. */
   assert.ok(api.chronicle.some(e => e.text === `${a.name} feels a nudge from above.`), 'no chronicle line for the nudge');
@@ -93,6 +93,6 @@ test('an event that carries a tick must arrive at that tick', () => {
   assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick - 1 }), 'Not now.');
   assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick + 1 }), 'Not now.');
   assert.deepEqual(api.doorLog, []);
-  assert.equal(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick }), `${a.name} looks up, then gets to it.`);
+  assert.match(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick }), new RegExp(`^${a.name} looks up, then (goes to .+|gets to it)\\.$`));
   assert.deepEqual(api.doorLog, [{ source: 'player', act: 'poke', id: a.id, tick: api.tick }]);
 });

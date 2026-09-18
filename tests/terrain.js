@@ -84,7 +84,7 @@ test('fire on a hilltop burns and is seen from the hilltop, not from below', () 
   const api = load(); api.startWorld('r'); const x0 = 150, y0 = 66;
   makeHill(api, x0, y0, true);
   const top = api.tileAt(x0 + 1, y0 + 1, 1); top.ground = 'grass';
-  assert.equal(api.lightTile(x0 + 1, y0 + 1, 1), 'The ground is burning. This fire is not contained.');
+  assert.equal(api.lightTile(x0 + 1, y0 + 1, 1), 'Lightning. Something is burning, and it will smoulder a while.');
   assert.ok(top.fire > 0);
   assert.equal(api.nearestFire(x0 + 1, y0 + 2, 2, 1), 1);
   assert.equal(api.nearestFire(x0 + 1, y0 + 4, 3, 0), -1, 'a fire one level up is not on this level');
