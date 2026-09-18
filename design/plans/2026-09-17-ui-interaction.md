@@ -13,6 +13,7 @@
 - Spec: `design/specs/2026-09-17-ui-rethink-design.md`, sections 4 (jump and mute), 6, 7, 8, 9, 10, 11 (mute), 13, and steps 7 to 11 of section 15. Plan A must be complete and green first.
 - Files in `src/ui/` are plain scripts in one scope. No `import`, no `export`.
 - The sim does not change in this plan. `node tests/soak.js` must report the record matches on every seed at the end. `poke` and `setSite` stay in the sim; the interface stops calling `setSite`.
+- Every act from outside the engine enters by the door, `inject(event)` in `src/sim/door.js`, which PR 1 on the `mythos` branch adds. The interface never calls `lightTile` or `poke` directly. Task 0 merges `dev` once PR 1 has landed there, before any other task in this plan.
 - Every clickable thing has a key printed on it, and `tests/ui.js` fails on a button without one.
 - Movement keys are provisional. Change them in `KEYMAP` only.
 - Work on branch `ui-rethink` in `~/Worktrees/hamlet-ui-rethink`. Commit after every task by path with the attribution trailer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
@@ -37,6 +38,45 @@
 | `src/page.template.html` | `#windows`, the three new dialogs, window CSS. |
 | `tests/ui.js` | Tests for every pure function above and the new key rows. |
 | `design/notes.md` | Section 13, final form. |
+
+---
+
+### Task 0: Merge dev, and route the tools through the door
+
+**Files:**
+- Modify: everything the merge touches. Then `src/ui/actions.js` (`applyTool`), `src/ui/main.js` if `newWorld` needs the options argument.
+
+**Interfaces:**
+- Consumes: `inject(event)` from `src/sim/door.js`. `inject({ source: 'player', act: 'light', x, y, z })` and `inject({ source: 'player', act: 'poke', id })` return the same message strings `lightTile` and `poke` did. `startWorld(seed, options = {})` with `sw`, `sh`, `zmin`, `zmax`.
+- Produces: a branch that contains PR 1, with `applyTool` calling `inject` for both acts and no direct call to `lightTile` or `poke` anywhere under `src/ui/`.
+
+- [ ] **Step 1: Wait for PR 1**
+
+Check `gh pr view 1 --repo earchibald/hamlet-dev --json state,mergedAt`. If it is not merged, stop and report BLOCKED: this plan waits for it.
+
+- [ ] **Step 2: Merge**
+
+```bash
+cd ~/Worktrees/hamlet-ui-rethink && git fetch origin && git merge origin/dev
+```
+
+Expected: a conflict in `src/ui.js`, which `dev` edits and this branch deleted. Resolve it by deleting `src/ui.js` (`git rm src/ui.js`) and carrying `dev`'s two edits into `src/ui/actions.js` by hand: the `light` and `poke` cases of `applyTool` call `inject` as the Interfaces block shows, and `newWorld` calls `startWorld(seed, {})`. Other conflicts, if any, resolve by keeping both sides. `dist/hearth-sim.html`: rebuild, do not hand-resolve. `tests/soak-golden.json`: take `dev`'s.
+
+- [ ] **Step 3: Rebuild and run everything**
+
+```bash
+node build.js && node tests/ui.js && node tests/terrain.js && node tests/crafts.js && node tests/soak.js 2>&1 | tail -6
+```
+
+Expected: all pass. `grep -rn "lightTile\|poke(" src/ui/` shows no direct call.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A && git commit -m "Merge dev: the door, and the tools go through it
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+```
 
 ---
 
@@ -571,8 +611,8 @@ function setTool(id, sticky = false){
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(lightTile(c.x, c.y, c.z)); camp = viewCamp; break;
-    case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? poke(a) : 'Nobody is there to nudge.'); break; }
+    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
+    case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');
   renderUI(true);
@@ -1026,6 +1066,6 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 | 10 palette: static and dynamic rows, empty order, fuzzy, keys shown | 5 |
 | 11 mute dialog, one dialog at a time | 4, 5 |
 | 13 tests: Esc from each focus, palette lists every static action, button keys | 1 to 5 |
-| 15 steps 7 to 11 | 1 to 6 |
+| 15 steps 7 to 11 | 0 to 6 |
 
 Not done here, and named: the spoil chip and the dead-for-a-day people row wait on the naming work's chronicle tags and death stamp. The chronicle name search in the drawer filter is in the naming spec's interface section and lands with it.

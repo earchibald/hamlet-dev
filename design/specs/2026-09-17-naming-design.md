@@ -51,7 +51,7 @@ Nameable things and where the list lives:
 
 ## 2. Generation: the lost people, the old tongue, the mythos
 
-**A second random stream.** `names.js` owns a random generator seeded from the world seed with a fixed salt. Everything in this spec draws from it. The world stream is never touched. On every soak seed the land, the beings, and the items must be byte-identical to today's, and `tests/names.js` checks it.
+**A second random stream.** `names.js` owns a random generator seeded from the world seed with the salt `:names`. The mythos branch uses `:gods` for its own stream; the two must differ. Everything in this spec draws from it. The world stream is never touched. On every soak seed the land, the beings, and the items must be byte-identical to today's, and `tests/names.js` checks it.
 
 **The old tongue.** A syllable table is built from the name stream at generation: 8 to 12 onsets, 5 vowels, 6 to 8 codas, with a few forbidden pairs so words stay sayable. An old name is one or two words of one to three syllables: `Aska Vel`, `Orun`, `Tirra Mosk`. Each old name carries a meaning drawn from a table of land words: `the sleeping hill`, `where the water turns`, `the pines that watch`. A meaning is never used twice in a world.
 
@@ -161,7 +161,7 @@ Input to the UI plans.
 
 ## 9. Sim changes and testing
 
-**New file** `src/sim/names.js`, loaded after `core.js` and before `world.js`. It owns: the record shape, the name stream, the syllable and word tables, `nameThing`, `rename`, `describe`, `fullName`, `eventName`, `formerNames`, the epithet scorer, and the mythos builder. World generation calls the mythos builder and the old-name pass at its end. `camps.js` calls the camp moments. `tasks.js` calls the sector moment when a task finishes. `main.js` calls the nightly event and epithet passes inside `updateCamps`, at the end of that function, so the world stream's order does not move.
+**New file** `src/sim/names.js`, loaded after `core.js` and before `world.js`. It owns: the record shape, the name stream, the syllable and word tables, `nameThing`, `rename`, `describe`, `fullName`, `eventName`, `formerNames`, the epithet scorer, and the mythos builder. The mythos builder and the old-name pass are one standalone function, `nameTheLand()`, that `startWorld` calls after generation returns. It is not a block inside `generate()`, so the mythos branch's settle work, which takes `generate()` apart into painters, can call the same function. `camps.js` calls the camp moments. `tasks.js` calls the sector moment when a task finishes. `main.js` calls the nightly event and epithet passes inside `updateCamps`, at the end of that function, so the world stream's order does not move.
 
 Rules read the record. Rules do not check name text.
 
