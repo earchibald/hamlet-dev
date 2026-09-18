@@ -269,7 +269,7 @@ for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const b = api.beings[0]; const region = api.reachable(b.x, b.y, 0, full);
-  for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} under hill ${c.hill.x},${c.hill.y} opens onto a sealed pocket`);
+  for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} ${c.hill ? `under hill ${c.hill.x},${c.hill.y}` : `at ${c.exit.x},${c.exit.y}`} opens onto a sealed pocket`);
   assert.ok(api.hills.some(h => h.tiles.some(i => { const x = i % api.W, y = (i - x) / api.W; return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => region.has(api.idx3(x + dx, y + dy, 0))); })), 'no hill stands beside the walkable world');
 });
 

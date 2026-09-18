@@ -19,6 +19,7 @@ function makeBeing(species, x, y, name, hue){
   if (species !== 'human') b.name = `${sp.label[0].toUpperCase()}${sp.label.slice(1)} ${b.id}`;
   if (species === 'sprite'){ b.hp = 30; b.grove = null; b.returnAt = 0; b.target = null; }
   if (species === 'fox' || species === 'wolf') b.den = null;
+  if (species === 'gnome') b.den = null;
   return b;
 }
 const beingById = id => beings.find(b => b.id === id);

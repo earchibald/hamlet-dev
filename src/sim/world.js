@@ -288,6 +288,44 @@ function hollowUnderHill(sc, h){
   }
   return null;
 }
+/* A sector has a neighbour, one of the four sides, that is forest. */
+function forestBeside(s){
+  return DIRS.some(([dx, dy]) => { const nx = s.sx + dx, ny = s.sy + dy; return nx >= 0 && nx < SW && ny >= 0 && ny < SH && sectors[secIdx(nx, ny)].biome === 'forest'; });
+}
+/* ---------- gnome burrows ---------- */
+/* Two or three burrows under the meadow edges, beside a forest sector or a hill, at least 25 tiles from the start.
+   A burrow is 2 to 4 tiles on level -1 with a slope mouth, like a fox burrow, and a mushroom patch around the mouth. */
+function digGnomeBurrows(){
+  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
+  const want = 2 + rint(2); let made = 0;
+  const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
+    hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
+  for (const s of cands){
+    if (made >= want) break;
+    for (let tries = 0; tries < 40; tries++){
+      const x = s.sx * LW + 2 + rint(LW - 4), y = s.sy * LH + 2 + rint(LH - 4);
+      const t = tileAt(x, y);
+      if (!passable(x, y) || t.feature || t.struct || t.mouth || t.cave || t.hill || dist(x, y, ...start) < 25 || !startRegion.has(idx3(x, y, 0))) continue;
+      if (caves.some(c => c.kind === 'burrow' && dist(c.exit.x, c.exit.y, x, y) < 30)) continue;
+      /* The mouth is under a neighbour of the exit, so the slope climbs onto the exit. */
+      const under = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).find(([ux, uy]) => inb(ux, uy) && !tileAt(ux, uy).cave && !tileAt(ux, uy).mouth && clearOfCaves(ux, uy, -1, null) && !hasTile(ux, uy, -1));
+      if (!under) continue;
+      const c = makeCave('burrow', null); c.owner = 'gnome'; c.patch = []; c.bench = 0; c.holding = null; c.disturbed = 0;
+      const mouth = carve(c, under[0], under[1], -1); mouth.slope = true; c.mouth = mouth; c.exit = t; t.mouth = c;
+      let [bx, by] = under; const size = 2 + rint(3);
+      for (let k = 1; k < size; k++){
+        const opts = shuffle(DIRS).map(([dx, dy]) => [bx + dx, by + dy]).filter(([nx, ny]) => inb(nx, ny) && !hasTile(nx, ny, -1) && clearOfCaves(nx, ny, -1, c) && !(nx === x && ny === y));
+        if (!opts.length) break; [bx, by] = opts[0]; carve(c, bx, by, -1);
+      }
+      for (const [dx, dy] of RING.concat([[2,0],[-2,0],[0,2],[0,-2]])){ const q = hasTile(x + dx, y + dy, 0) ? tileAt(x + dx, y + dy) : null; if (q && passable(q.x, q.y) && !q.feature && !q.struct && !q.mouth && rng() < 0.7){ q.feature = 'mushrooms'; q.shrooms = 1 + rint(3); c.patch.push(q); } }
+      if (c.patch.length < 4){ for (const q of c.patch){ q.feature = null; q.shrooms = 0; } c.patch = []; for (const q of c.tiles){ levels[q.z + ZOFF][idx(q.x, q.y)] = null; const k = raised.indexOf(q); if (k >= 0) raised.splice(k, 1); } t.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
+      c.story.push('Gnomes dug this hole under the meadow, and farm the patch around it.');
+      const n = 2 + rint(2); const floor = c.tiles.filter(q => passable(q.x, q.y, q.z));
+      for (let k = 0; k < n; k++){ const q = floor[k % floor.length]; const g = makeBeing('gnome', q.x, q.y, null, 0); g.z = q.z; g.den = c; beings.push(g); }
+      made++; break;
+    }
+  }
+}
 /* Every deep chamber holds one thing worth the walk: firestones, glowing moss, or old bones. */
 function placeFinds(){
   for (const c of caves) if (c.deep) addItem(['firestones', 'moss', 'bones'][rint(3)], c.deep.x, c.deep.y, c.deep.z);
@@ -470,6 +508,7 @@ function generate(){
   spawnAnimal('rabbit', ['meadow', 'wetland'], 14);
   spawnAnimal('fox', ['forest', 'rocky'], 3 - spawnInDens('fox', 3));
   spawnAnimal('wolf', ['forest'], 2 - spawnInDens('wolf', 2));
+  digGnomeBurrows();
   /* Groves. The oldest pines in the deepest forests are hollow, and something lives in them. */
   groves = [];
   const forests = sectors.filter(sc => sc.biome === 'forest').map(sc => ({ sc, n: sectorCount(sc, 'trees', t => t.feature === 'tree') })).sort((p, q) => q.n - p.n).slice(0, 3);
@@ -515,6 +554,7 @@ function growPlants(){
       if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
     }
     else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12 && saplingMayGrow(t)) t.feature = 'tree'; }
+    else if (t.feature === 'mushrooms'){ if (t.shrooms < 4 && rng() < 0.3) t.shrooms++; }
     else if (t.feature === 'tree'){
       if (weather.storm && (tick - (t.planted || 0)) / DAY > 100 && rng() < 0.03){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
       if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
