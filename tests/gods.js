@@ -90,3 +90,108 @@ test('a creation ends: every god sleeps, the gate passes, the era flips, and the
   const again = load(); again.startCreation('r'); again.runAges();
   assert.deepEqual(again.legends.map(e => e.text), api.legends.map(e => e.text));
 });
+
+/* A god of a pole, standing in a region that carries the pole, with its needs where the test wants them. */
+function godWith(api, pole, needs = {}){
+  const r = api.liveRegions()[0];
+  const g = api.withGodRng(() => api.makeGod(pole, r, 'Test.'));
+  api.setPole(r, pole, g, 'test'); Object.assign(g.needs, needs);
+  return { g, r };
+}
+
+test('raising takes ages and leaves a height mark; digging leaves depth', () => {
+  const api = load(); api.startCreation('r');
+  const { g, r } = godWith(api, 'above', { expression: 10 });
+  g.traits.diligence = 1;
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.raise.apply(g, r)); });
+  assert.ok(g.task && g.task.type === 'raise' && g.task.left === 4 && g.task.done === 1);
+  assert.equal(api.marksOf(r, 'height')[0].value, 1);
+  api.withGodRng(() => { for (let k = 0; k < 3; k++) api.GOD_ACTS.raise.continue(g, g.task); });
+  assert.equal(g.task, null);
+  assert.equal(api.marksOf(r, 'height')[0].value, 4);
+  assert.ok(api.legends.some(e => /raised a mountain/.test(e.text)));
+  const { g: d, r: q } = godWith(api, 'below');
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.dig.apply(d, q)); });
+  assert.equal(api.marksOf(q, 'depth')[0].value, 1);
+});
+
+test('flow runs through neighbouring countries, and pool marks one', () => {
+  const api = load(); api.startCreation('r');
+  api.step(); api.step(); api.step();
+  const { g, r } = godWith(api, 'wet');
+  const flows = () => api.liveRegions().reduce((n, q) => n + api.marksOf(q, 'flow').length, 0);
+  const before = flows();
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.flow.apply(g, r)); });
+  assert.ok(flows() >= before + 2, 'flow touched fewer than two countries');
+  const { g: s, r: p } = godWith(api, 'still');
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
+  assert.ok(api.hasMark(p, 'pool'));
+  assert.equal(api.GOD_ACTS.pool.targets(s).includes(p), false, 'a pooled region is offered again');
+});
+
+test('burning scars another god\'s country and offends it', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a, b] = api.awakeGods();
+  const hot = api.withGodRng(() => api.makeGod('hot', null, 'Test.'));
+  /* The splitter wrote the poles on both children, so burning b's country offends a, the marker. */
+  const target = api.regionById(b.region);
+  const calm = a.needs.calm;
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.burn.apply(hot, target)); });
+  assert.ok(api.hasMark(target, 'scar', 'burned'));
+  assert.equal(api.biomeOf(target), 'ash');
+  assert.equal(a.needs.calm, calm - 20);
+  assert.equal(a.opinions[hot.id], -10);
+});
+
+test('freeze, hide, and show write their own mark kinds', () => {
+  const api = load(); api.startCreation('r');
+  for (const [pole, act] of [['cold', 'freeze'], ['dark', 'hide'], ['light', 'show']]){
+    const { g, r } = godWith(api, pole);
+    api.withGodRng(() => { assert.ok(api.GOD_ACTS[act].apply(g, r)); });
+    assert.ok(api.hasMark(r, act, true), `${act} left no mark`);
+  }
+});
+
+test('rivals battle, the winner marks the country, and the loser\'s mark is a scar', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a, b] = api.awakeGods();
+  a.opinions[b.id] = -50; b.opinions[a.id] = -50; api.withGodRng(() => api.strain('people')); /* setRelation runs inside strain: -45 each, rivals */
+  assert.equal(a.rel[b.id], 'rival');
+  /* b marks its own country, so a has something of b's to fight over. */
+  const target = api.regionById(b.region);
+  api.setPole(target, b.pole, b, 'mine');
+  assert.ok(api.GOD_ACTS.battle.targets(a).includes(target), 'the rival\'s country is not offered');
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.battle.apply(a, target)); });
+  const winnerPole = api.poleOf(target, a.contrast);
+  const winner = winnerPole === a.pole ? a : b, loser = winner === a ? b : a;
+  assert.ok(api.hasMark(target, 'scar', api.SCAR_OF[winner.pole]), 'no scar of the winner\'s kind');
+  assert.ok(api.legends.some(e => e.text.includes(`${winner.name} wins`)));
+  assert.equal(loser.opinions[winner.id], -60);
+  assert.equal(winner.opinions[loser.id], -50);
+});
+
+test('a twist needs a scar and a making', () => {
+  const api = load(); api.startCreation('r');
+  const { g, r } = godWith(api, 'hot');
+  assert.equal(api.GOD_ACTS.twist.targets(g).length, 0);
+  api.mark(r, 'scar', 'burned', g, ''); api.mark(r, 'making', 'rabbit', g, '');
+  assert.ok(api.GOD_ACTS.twist.targets(g).includes(r));
+  api.withGodRng(() => { assert.ok(api.GOD_ACTS.twist.apply(g, r)); });
+  assert.ok(api.hasMark(r, 'twist', 'rabbit'));
+});
+
+test('a god whose pole is unmade from the whole field dies, and leaves a scar', () => {
+  const api = load(); api.startCreation('r');
+  api.step();
+  const [a, b] = api.awakeGods();
+  /* Take b's pole off the field, then run the unmaking as ageStep would. */
+  for (const r of api.liveRegions()) if (api.hasPole(r, b.pole)) api.setPole(r, a.pole, a, 'over');
+  assert.equal(api.poleShare(b.pole), 0);
+  api.withGodRng(() => api.unmake(b));
+  assert.equal(b.status, 'dead'); assert.equal(b.alive, false);
+  assert.deepEqual(api.awakeGods(), [a]);
+  assert.ok(api.legends.some(e => e.text.includes(`${b.name} is no more`)));
+  assert.ok(api.liveRegions().some(q => api.marksOf(q, 'scar').some(m => m.by === b.id)), 'no scar for the dead god');
+});

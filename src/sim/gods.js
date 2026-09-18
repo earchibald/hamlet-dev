@@ -9,12 +9,14 @@ const GOD_NAMES = ['Ondru', 'Sael', 'Ashka', 'Veyl', 'Morrow', 'Ilse', 'Thrum', 
 const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet', dry: 'who is Dry', hot: 'who is Hot', cold: 'who is Cold', still: 'who is Still', moving: 'who Moves', light: 'who is Light', dark: 'who is Dark' };
 /* What a god becomes when it sleeps. */
 const BODY = { above: 'a hill', below: 'the deep', wet: 'the river', dry: 'the plain', hot: 'an ember', cold: 'the frost', still: 'a lake', moving: 'the wind', light: 'the day', dark: 'a cave' };
+/* What a god leaves behind, beyond its body, when it sleeps. */
+const LEAVES = { hot: 'A spark stayed.' };
 /* The scar a winner's pole leaves on what it beat. */
 const SCAR_OF = { hot: 'burned', cold: 'broken', wet: 'drowned', dry: 'burned', above: 'cut', below: 'cut', still: 'broken', moving: 'cut', light: 'broken', dark: 'broken' };
 /* Who makes what. The people are made by a mingling. */
 const MAKES = { wet: ['deer'], dark: ['sprite', 'fox'], cold: ['wolf'], hot: ['rabbit'], dry: ['rabbit'] };
-/* The pole a lack calls for. */
-const STRAIN = { start: 'dry', water: 'wet', fuel: 'hot', food: 'hot' };
+/* The poles a lack calls for, in order of preference. */
+const STRAIN = { start: ['dry'], water: ['wet'], fuel: ['hot', 'cold'], food: ['hot', 'wet'] };
 let godNamePool = [];
 const gods = () => beings.filter(b => b.species === 'god');
 const awakeGods = () => gods().filter(g => g.status === 'awake');
@@ -78,6 +80,17 @@ function offend(r, g){
 /* ---------- the acts ----------
    name: { poles: who may (null is anyone), targets(g): regions, score(g, r), apply(g, r): true if done,
    continue(g, task) for acts that take ages }. */
+/* Raising and digging spend one age a storey or a level. The diligent spend more ages. */
+function spendAges(kind, verb, done){
+  return {
+    apply(g, r){ const left = 1 + Math.round(g.traits.diligence * 3); g.task = { type: kind === 'height' ? 'raise' : 'dig', region: r.id, left, done: 0 }; log(`${g.name} begins to ${verb}.`, [g]); this.continue(g, g.task); return true; },
+    continue(g, t){
+      const r = regionById(t.region); let m = marksOf(r, kind)[0]; if (!m) m = mark(r, kind, 0, g, `${g.name} ${verb === 'raise the land' ? 'raised' : 'dug'} it.`);
+      m.value++; t.done++; r.lastBy = g.id; r.lastAge = age;
+      if (t.done >= t.left){ g.task = null; log(done(g, m.value), [g], 'major'); }
+    },
+  };
+}
 const GOD_ACTS = {
   split: {
     poles: null,
@@ -110,6 +123,92 @@ const GOD_ACTS = {
       return true;
     },
   },
+  raise: {
+    poles: ['above'],
+    targets: g => liveRegions().filter(r => hasPole(r, 'above')),
+    score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'height').length ? -10 : 10) + rng() * 8,
+    ...spendAges('height', 'raise the land', (g, n) => n >= 3 ? `${g.name} has raised a mountain, ${n} storeys of stone.` : `${g.name} has raised a hill of ${n} ${n === 1 ? 'storey' : 'storeys'}.`),
+  },
+  dig: {
+    poles: ['below'],
+    targets: g => liveRegions().filter(r => hasPole(r, 'below')),
+    score: (g, r) => (100 - g.needs.expression) * 0.5 + 20 * g.traits.diligence + (marksOf(r, 'depth').length ? -10 : 10) + rng() * 8,
+    ...spendAges('depth', 'dig into the dark', (g, n) => n >= 3 ? `${g.name} has dug a deep, ${n} levels down.` : `${g.name} has dug a cave of ${n} ${n === 1 ? 'level' : 'levels'}.`),
+  },
+  flow: {
+    poles: ['wet', 'moving'],
+    targets: g => { const r = settleHome(g); return r ? [r] : []; },
+    score: (g, r) => (100 - g.needs.expression) * 0.5 + 15 + rng() * 8,
+    apply(g, r){
+      const path = [r]; let cur = r;
+      const len = 2 + rint(3);
+      for (let k = 0; k < len; k++){ const next = shuffle(neighboursOf(cur)).find(n => !path.includes(n)); if (!next) break; path.push(next); cur = next; }
+      if (path.length < 2) return false;
+      for (const p of path){ mark(p, 'flow', marksOf(p, 'depth').length ? 'under' : 'surface', g, `${g.name} flowed through.`); p.lastBy = g.id; p.lastAge = age; }
+      log(`${g.name} flows through ${path.length} countries${path.some(p => marksOf(p, 'depth').length) ? ', and under one of them' : ''}.`, [g], 'major');
+      return true;
+    },
+  },
+  pool: {
+    poles: ['wet', 'still'],
+    targets: g => liveRegions().filter(r => !hasMark(r, 'pool') && (hasPole(r, 'wet') || hasPole(r, 'still') || r.id === g.region)),
+    score: (g, r) => (100 - g.needs.expression) * 0.4 + 10 + rng() * 8,
+    apply(g, r){ mark(r, 'pool', marksOf(r, 'depth').length ? 'under' : 'surface', g, `${g.name} pooled here.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} pools in a country, and the water is still.`, [g]); return true; },
+  },
+  burn: {
+    poles: ['hot'],
+    targets: g => liveRegions().filter(r => !hasMark(r, 'scar', 'burned') && r.marks.some(m => m.by !== null && m.by !== g.id && !m.inherited)),
+    score: (g, r) => (100 - g.needs.calm) * 0.6 + g.traits.temper * 20 - 15 + rng() * 8,
+    apply(g, r){ offend(r, g); mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} burns a country to ash.`, [g], 'bad'); return true; },
+  },
+  freeze: {
+    poles: ['cold'],
+    targets: g => liveRegions().filter(r => !hasMark(r, 'freeze') && (marksOf(r, 'height').length || r.id === g.region)),
+    score: (g, r) => (100 - g.needs.expression) * 0.4 + (marksOf(r, 'height').length ? 15 : 0) + rng() * 8,
+    apply(g, r){ mark(r, 'freeze', true, g, `${g.name} froze it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} breathes on a country, and the frost stays.`, [g]); return true; },
+  },
+  hide: {
+    poles: ['dark'],
+    targets: g => liveRegions().filter(r => !hasMark(r, 'hide') && (marksOf(r, 'depth').length || r.id === g.region)),
+    score: (g, r) => (100 - g.needs.expression) * 0.4 + (marksOf(r, 'depth').length ? 15 : 0) + rng() * 8,
+    apply(g, r){ mark(r, 'hide', true, g, `${g.name} hid it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} draws the dark over a country, and things hide in it.`, [g]); return true; },
+  },
+  show: {
+    poles: ['light'],
+    targets: g => { const r = settleHome(g); return r ? [r, ...neighboursOf(r)].filter(q => !hasMark(q, 'show')) : []; },
+    score: (g, r) => (100 - g.needs.expression) * 0.4 + rng() * 8,
+    apply(g, r){ mark(r, 'show', true, g, `${g.name} showed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} opens a country to the light, and it can be seen from far off.`, [g]); return true; },
+  },
+  battle: {
+    poles: null,
+    targets(g){ const out = []; for (const o of awakeGods()) if (o !== g && g.rel[o.id] === 'rival') for (const r of liveRegions()) if (r.marks.some(m => m.kind === 'pole' && m.by === o.id && !m.inherited)) out.push(r); return out; },
+    score: (g, r) => (100 - g.needs.calm) * 0.7 + g.traits.bravery * 20 - 25 + rng() * 8,
+    apply(g, r){
+      const v = awakeGods().find(o => o !== g && g.rel[o.id] === 'rival' && r.marks.some(m => m.kind === 'pole' && m.by === o.id && !m.inherited)); if (!v) return false;
+      const might = p => p.traits.bravery + (p.skills.battle || 0) * 0.1 + rng() * 0.6;
+      const win = might(g) > might(v) ? g : v, lose = win === g ? v : g;
+      const lost = r.marks.filter(m => m.kind === 'pole' && m.by === lose.id);
+      r.marks = r.marks.filter(m => !lost.includes(m));
+      mark(r, 'scar', SCAR_OF[win.pole], win, `${win.name} beat ${lose.name} here.`);
+      setPole(r, win.pole, win, `${win.name} won it from ${lose.name}.`);
+      r.lastBy = win.id; r.lastAge = age;
+      lose.opinions[win.id] = clamp((lose.opinions[win.id] || 0) - 15, -100, 100); win.opinions[lose.id] = clamp((win.opinions[lose.id] || 0) - 5, -100, 100);
+      win.needs.calm = clamp(win.needs.calm + 30, 0, 100); lose.needs.calm = clamp(lose.needs.calm - 20, 0, 100);
+      log(`${g.name} and ${v.name} fight over a country. ${win.name} wins, and the ground there is ${SCAR_OF[win.pole]}.`, [g, v], 'bad');
+      return true;
+    },
+  },
+  twist: {
+    poles: null,
+    targets: g => liveRegions().filter(r => marksOf(r, 'scar').length && marksOf(r, 'making').some(m => !hasMark(r, 'twist', m.value))),
+    score: (g, r) => g.traits.curiosity * 25 - 15 + rng() * 8,
+    apply(g, r){
+      const m = marksOf(r, 'making').find(m => !hasMark(r, 'twist', m.value)); if (!m) return false;
+      mark(r, 'twist', m.value, g, `${g.name} twisted the ${SPECIES[m.value].label}s on the scar.`); r.lastBy = g.id; r.lastAge = age;
+      log(`${g.name} bends the ${SPECIES[m.value].label}s that live on the scar. They will not be quite like the others.`, [g], 'bad');
+      return true;
+    },
+  },
   mingle: {
     poles: null,
     targets(g){
@@ -138,12 +237,13 @@ const GOD_ACTS = {
       mark(r, 'rest', g.id, g, `${g.name} sleeps here, and is ${BODY[g.pole]}.`);
       g.status = 'asleep'; g.asleep = true; g.needs.rest = 100; g.region = r.id; r.lastBy = g.id; r.lastAge = age;
       log(`${g.name} lies down and sleeps, and is ${BODY[g.pole]}.`, [g], 'major');
-      if (g.pole === 'hot') log('A spark stayed.', [g], 'major');
+      if (LEAVES[g.pole]) log(LEAVES[g.pole], [g], 'major');
       return true;
     },
   },
 };
 
+/* godOptions and decideGod draw from rng; call them inside withGodRng, as ageStep does. */
 function godOptions(g){
   const opts = [];
   for (const name in GOD_ACTS){ const act = GOD_ACTS[name]; if (act.poles && !act.poles.includes(g.pole)) continue;
@@ -186,9 +286,7 @@ function restGate(){
    pressed to act. A lack of people draws every god toward every other. */
 function strain(lack){
   if (lack === 'people'){ const gs = awakeGods(); for (const g of gs) for (const o of gs) if (o !== g){ g.opinions[o.id] = clamp((g.opinions[o.id] || 0) + 5, -100, 100); setRelation(g, o); } return; }
-  let pole = STRAIN[lack];
-  if (godOf(pole) && lack === 'fuel') pole = 'cold';
-  if (godOf(pole) && lack === 'food') pole = 'wet';
+  const pole = STRAIN[lack].find(p => !godOf(p)) || STRAIN[lack][0];
   const g = godOf(pole);
   if (!g) makeGod(pole, null, `The world cannot yet hold a life: it lacks ${lack}.`);
   else if (g.status === 'awake') g.needs.expression = Math.max(0, g.needs.expression - 10);
@@ -204,6 +302,13 @@ function settle(){
   log(`The last of the gods sleeps. The world is ${age} ages old, and holds its breath.`, [], 'major');
   creation.ages = age; creation.settled = true; creation.gate = restGate();
   era = 'days';
+}
+/* A god whose pole is gone from the whole live field is unmade. Its death is a scar. */
+function unmake(g){
+  g.status = 'dead'; g.alive = false; g.asleep = false;
+  const r = settleHome(g) || liveRegions()[0];
+  mark(r, 'scar', SCAR_OF[g.pole], g, `${g.name} died here, unmade.`);
+  log(`Nothing on the field is ${g.pole} any more. ${g.name} is no more, and where ${g.name} stood the ground is ${SCAR_OF[g.pole]}.`, [g], 'death');
 }
 /* Past the age limit the eldest awake god does what has to be done, once an age, and every awake god
    wearies. At twice the limit the creation fails and everyone sleeps. */
@@ -225,6 +330,7 @@ function ageStep(){
     if (age === 1) firstGod();
     if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
     for (const g of gods()) if (g.status === 'awake'){ settleHome(g); godNeeds(g); decideGod(g); }
+    for (const g of awakeGods()) if (g.acted > 0 && poleShare(g.pole) === 0) unmake(g);
     const gate = restGate(); creation.gate = gate;
     /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
     if (!gate.ok && pulseAge !== null) strain(gate.lack);
