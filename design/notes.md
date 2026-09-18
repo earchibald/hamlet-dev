@@ -169,14 +169,22 @@ Newcomers spawn only at world edges from which the camp is reachable, and never 
 
 ## 13. Interface
 
-- World map: whole world at 3 pixels per tile, sector grid, camp markers, sector summary on hover.
-- Nearby view: the sector and its eight neighbours at 9 pixels per tile, drawn from the world map cache. Beings are glyphs. Hover shows the sector summary; a click opens the sector. M cycles sector, nearby, world map. Arrow keys step between sectors in the sector and nearby views.
-- Location view: one sector at 26 pixels per tile. Tools: Inspect (hover shows, click pins, Follow button), Lightning (key L), Camp site, Poke. Hover cards work with every tool. Speeds run 1, 4, 16, 64.
-- The toolbar names the camp the tools act on, once there is more than one camp. The camp-site tool refuses ground nobody can walk to from where they stand, and it disables itself once the pit is built.
-- Poke's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
-- Goals panel with camp selector, People panel for the selected camp, Chronicle.
-- Rain and winter overlays, firelight glow at night.
-- Every rule change needs a visible trace: a chronicle line, a thought, a goal state, or a tooltip row. The player has to be able to see cause.
+The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+
+- The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
+- Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
+- The map fills the rest. Three views: sector at 26 px, nearby at 9 px, world at 3 px. M cycles them. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut.
+- Four drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals). Keys 1 to 4 toggle them. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
+- Goals carry a `stage` and an `after`. `stageReached` says whether a stage shows. Both are data.
+- The hover card and the pinned card are as before.
+- A tile cursor lives on the map. Arrows move it, Shift by five, Ctrl by a sector. Enter applies the tool. Home goes to the hearth, W to the world map at the camp. The mouse moves it too. The foot names what is under it.
+- Tools: Inspect is the default. Light fire and Nudge are one-shot and return to Inspect. Shift with the key or the click keeps them. Camp site left the interface; `setSite` stays in the sim for tests.
+- Every act the player makes goes through the door, `inject()`: the `light` act and the `poke` act behind Nudge, and the `priority` act behind a goal row. Speeds run 1, 4, 16, 64.
+- Nudge's reply names the person's chosen goal: it says who they go to, or that they get to it when no choice was made yet.
+- Floating windows: any drawer pops out with O and docks back with O. Enter or a click on a being or tile opens an inspector window; up to six stand at once, each live, F follows. Positions persist.
+- Alert chips: Alt+number jumps to the cause, Shift+Alt+number opens the mute menu: this chip, this kind here, this kind everywhere. Muted chips are listed in help and in the palette as Unmute rows.
+- Cmd-K or Ctrl-K opens the command palette: every action with its key, and rows for people, goals, camps, sectors, chips, and mutes. G opens the stage chord.
+- Every clickable thing has a key, printed on it. `tests/ui.js` fails on a button without one. Movement keys are provisional; change them in `KEYMAP` only.
 
 ## 14. Testing
 

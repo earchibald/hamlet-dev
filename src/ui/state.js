@@ -1,0 +1,64 @@
+/* ============================================================
+   INTERFACE. Reads the simulation state and draws it.
+   ============================================================ */
+const T = 26, WS = 3, MS = 9;
+/* The three views, and the order M walks them: sector, nearby, world, sector. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
+const TOOLS = [
+  { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
+  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Shift makes the tool stick.' },
+];
+const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
+const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief' };
+let viewCamp = null;
+let lvl = 0;
+let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null, tipPinned = false;
+let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+const $ = id => document.getElementById(id);
+
+/* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
+const ui = {
+  pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */
+  mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
+  seenTick: -1,        /* the newest chronicle tick notePulses has read */
+  lastStates: {},      /* goal id to state, to see a goal leave blocked */
+  open: ['people', 'goals'], /* drawers open, in order */
+  focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  showAll: false,      /* goals: the whole ladder */
+  unfold: {},          /* stage id to true when the player unfolded it */
+  chronFilter: 'all',  /* 'all' or 'major' */
+  note: null,          /* { text, at }: a said message that holds the foot for four seconds */
+  savedSpeed: 0,       /* from storage, applied by newWorld */
+  windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
+  nextWin: 1,
+  rects: {},           /* remembered rect per window kind or drawer id, from storage */
+  sticky: false,       /* true keeps a one-shot tool selected after it is used */
+  recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
+};
+const WIN_MAX = 6;
+
+/* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
+let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
+
+/* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
+const STORE_KEY = 'hearth.ui';
+function persist(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent })); } catch (e) { /* no storage */ }
+}
+function restore(){
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if (!s) return;
+    if (Array.isArray(s.open)) ui.open = s.open.filter(id => DRAWERS.some(d => d.id === id));
+    if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
+    if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
+    if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
+    if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
+  } catch (e) { /* no storage, or bad data */ }
+}

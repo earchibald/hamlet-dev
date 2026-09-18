@@ -7,6 +7,7 @@ A two-scale colony simulation in one HTML file, on its way to being a project.
     node tests/soak.js               # 70-day soak on six seeds, with assertions (about 15 seconds a seed)
     node tests/terrain.js            # levels, slopes, hills: under a second
     node tests/crafts.js             # every recipe through the real offers: under a second
+    node tests/ui.js                 # the view model and the key map, no browser: a few seconds
     node tests/gnomes.js             # the gnomes, their burrows, and their mushrooms: under a second
     node tests/closing.js            # cave goals, den contention, site scoring, lightning: under a second
     SEEDS=r DAYS=10 node tests/soak.js   # a quick run

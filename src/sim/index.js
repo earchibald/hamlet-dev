@@ -19,7 +19,7 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
-  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS, LIFE,
+  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, START, SPECIES, GROUND, ITEMS, LIFE,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startPickFibre, startFish, startGather, startBuild, startClearDen, startDeliver, addItem, removeItem, stashAdd,
   runTask, updateBeing, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask,
@@ -49,4 +49,4 @@ function load(){
   return new Function(source() + '\n' + API)();
 }
 
-module.exports = { FILES, source, load };
+module.exports = { FILES, source, load, API };
