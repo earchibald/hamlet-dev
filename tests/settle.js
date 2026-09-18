@@ -47,3 +47,37 @@ test('the same seed paints the same valley twice', () => {
   const a = load(); a.startWorld('x'); const b = load(); b.startWorld('x');
   assert.deepEqual(a.world.map(t => t.ground + (t.feature || '')).join(''), b.world.map(t => t.ground + (t.feature || '')).join(''));
 });
+
+/* The first person stands in the widest part of the start country, not in a pocket cut off from it. */
+const SOAK_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
+/* Every pocket of the start country, largest first, and the one the first person stands in. */
+function startPockets(api){
+  const W = api.W, s = api.creation.gate.start;
+  const a = api.beings.find(b => b.species === 'human');
+  const open = s.tiles.filter(i => api.passable(i % W, (i - i % W) / W));
+  const mine = new Set(open), seen = new Set(), sizes = [];
+  for (const i of mine){
+    if (seen.has(i)) continue;
+    const region = api.reachable(i % W, (i - i % W) / W, 0, api.NZ * W * api.H);
+    let n = 0; for (const j of mine) if (region.has(api.idx3(j % W, (j - j % W) / W, 0))){ seen.add(j); n++; }
+    sizes.push(n);
+  }
+  const here = api.reachable(a.x, a.y, 0, api.NZ * W * api.H);
+  const held = open.filter(i => here.has(api.idx3(i % W, (i - i % W) / W, 0))).length;
+  return { open: open.length, sizes: sizes.sort((p, q) => q - p), held };
+}
+
+for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person stands in the start country's largest pocket`, () => {
+  const api = load(); api.startWorld(seed);
+  const { sizes, held } = startPockets(api);
+  assert.equal(held, sizes[0], `the person holds ${held} start tiles, and the largest pocket has ${sizes[0]}`);
+});
+
+/* The gate says nothing about tiles, so a country can pass it and still be shattered into pockets by the
+   water the painters lay down. Seed gamma's start country breaks into 450, 127, 83, 48 and smaller.
+   Task 5's tile check is what discards such a settle. */
+for (const seed of SOAK_SEEDS) test(`seed ${seed}: the first person can walk most of the start country`, { todo: 'plan 3 task 5: the tile check discards a settle whose start pocket is too small; seed gamma is shattered' }, () => {
+  const api = load(); api.startWorld(seed);
+  const { open, held } = startPockets(api);
+  assert.ok(held >= open / 2, `${held} of ${open} passable start tiles are reachable`);
+});

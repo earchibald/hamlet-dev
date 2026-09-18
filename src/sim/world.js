@@ -532,11 +532,26 @@ function paintLakes(){
     for (const i of r.tiles){ const t = world[i]; if (t.ground === 'water') continue; if (RING.some(([dx, dy]) => inb(t.x + dx, t.y + dy) && world[idx(t.x + dx, t.y + dy)].lake)){ t.ground = 'sand'; t.feature = t.feature === 'tree' ? null : t.feature; } }
   }
 }
-/* The first person: the start country's most central passable tile. */
+/* The first person: the middle of the start country's largest walkable pocket. The most central tile is no good
+   on its own. A lake or a chasm can cut the country in two, and the centre can fall in the smaller half, which
+   leaves the first person shut in a pocket with nothing in it. So walk every pocket, take the widest, and stand
+   on its tile nearest the country's middle. */
 function placeFirstPerson(){
   const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+  const mine = new Set(s.tiles.filter(i => passable(i % W, (i - i % W) / W)));
+  if (!mine.size) throw new Error(`The start country has no ground to stand on.`);
+  const seen = new Set(), base = ZOFF * W * H;
+  let pocket = null;
+  for (const i of mine){
+    if (seen.has(i)) continue;
+    const x = i % W, y = (i - x) / W;
+    /* A pocket reaches out of the country and back, so walk the whole map and keep the country's own tiles. */
+    const here = [];
+    for (const k of reachable(x, y, 0, NZ * W * H)){ const j = k - base; if (j >= 0 && j < W * H && mine.has(j)){ here.push(j); seen.add(j); } }
+    if (!pocket || here.length > pocket.length) pocket = here;
+  }
   let best = null;
-  for (const i of s.tiles){ const x = i % W, y = (i - x) / W; if (!passable(x, y)) continue; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
+  for (const i of pocket){ const x = i % W, y = (i - x) / W; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
   const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
   return best;
 }

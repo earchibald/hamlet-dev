@@ -265,11 +265,17 @@ for (const seed of SEEDS) test(`seed ${seed}: a grove on a forest hill lives in 
   }
 });
 
-for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable world`, { todo: 'plan 3 task 5: uplift, dens, burrows, and groves still pick sectors by the old biomes, so a mark-painted world has no forest and few hills' }, () => {
+for (const seed of SEEDS) test(`seed ${seed}: every cave opens onto the walkable world`, () => {
   const api = load(); api.startWorld(seed);
   const full = api.levels.length * api.world.length;
   const b = api.firstPerson(); const region = api.reachable(b.x, b.y, 0, full);
   for (const c of api.caves) assert.ok(region.has(api.idx3(c.exit.x, c.exit.y, 0)), `cave ${c.kind} ${c.hill ? `under hill ${c.hill.x},${c.hill.y}` : `at ${c.exit.x},${c.exit.y}`} opens onto a sealed pocket`);
+});
+
+for (const seed of SEEDS) test(`seed ${seed}: a hill stands beside the walkable world`, { todo: 'plan 3 task 5: the tile check discards a settle whose start pocket is too small, so a hill can still stand off the first person\'s region' }, () => {
+  const api = load(); api.startWorld(seed);
+  const full = api.levels.length * api.world.length;
+  const b = api.firstPerson(); const region = api.reachable(b.x, b.y, 0, full);
   assert.ok(api.hills.some(h => h.tiles.some(i => { const x = i % api.W, y = (i - x) / api.W; return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => region.has(api.idx3(x + dx, y + dy, 0))); })), 'no hill stands beside the walkable world');
 });
 
