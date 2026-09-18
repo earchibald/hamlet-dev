@@ -394,4 +394,60 @@ test('the legends drawer lists every line of the creation, oldest first', () => 
   assert.equal(api.ui.row.legends, 0);
 });
 
+const AGES = [...DERIVE, 'inAges', 'ageName', 'nOf', 'standsIn', 'countryLine', 'godRows', 'cursorPhrase', 'paletteRows'];
+function inTheAges(seed = 'alpha', n = 6){
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...AGES, 'inspectGod']);
+  api.startCreation(seed, {}); api.camp = api.camps[0];
+  for (let i = 0; i < n; i++) api.step();
+  assert.equal(api.era, 'gods', 'the probe must still be in the ages');
+  return api;
+}
+
+test('in the ages the view model holds: no gauges, no chips, no goals, and the gods are the people', () => {
+  const api = inTheAges();
+  assert.equal(api.inAges(), true);
+  assert.deepEqual(api.gauges(), { hearth: null, food: null, water: null, beds: null });
+  assert.deepEqual(api.alerts(), []);
+  assert.deepEqual(api.drawerRows('goals'), []);
+  const people = api.drawerRows('people');
+  assert.equal(people.length, api.gods().length);
+  assert.ok(people.every(r => r.kind === 'person' && r.r.a.species === 'god'));
+  assert.doesNotThrow(() => api.notePulses());
+  assert.doesNotThrow(() => api.paletteRows());
+  assert.match(api.seasonLine(), /countr/);
+  assert.equal(typeof api.cursorPhrase(), 'string');
+});
+
+test('in the ages the view key moves with the age and holds still between', () => {
+  const api = inTheAges(); const k = api.viewKey();
+  assert.equal(api.viewKey(), k);
+  api.step(); assert.notEqual(api.viewKey(), k);
+});
+
+test('ageName counts from the Pulse, standsIn finds a live country and changes nothing, countryLine names the god', () => {
+  const api = inTheAges('alpha', 8);
+  assert.equal(api.ageName(0), 'Before time');
+  assert.equal(api.ageName(api.pulseAge), 'Age 1');
+  assert.equal(api.nOf(1, 'god', 'gods'), '1 god'); assert.equal(api.nOf(3, 'god', 'gods'), '3 gods');
+  const g = api.gods().find(g => g.status === 'awake'), before = g.region, r = api.standsIn(g);
+  assert.ok(r && !r.children, 'a live region');
+  assert.equal(g.region, before, 'standsIn must not move the god');
+  const made = api.liveRegions().find(q => q.marks.some(m => m.kind === 'pole'));
+  assert.ok(api.gods().some(q => api.countryLine(made).includes(q.name)), api.countryLine(made));
+});
+
+test('the god card shows the needs, the thoughts, the opinions, and the last decision while the god is awake', () => {
+  const api = inTheAges('alpha', 8);
+  const html = api.inspectGod(api.gods().find(g => g.status === 'awake'));
+  for (const word of ['Expression', 'Company', 'Rest', 'Calm', 'Thoughts', 'Opinions', 'Last decision']) assert.ok(html.includes(word), `the card lacks ${word}`);
+});
+
+test('after settle the view model is the day-era one again', () => {
+  const api = loadUI(['state', 'derive', 'keys'], AGES);
+  api.startWorld('alpha'); api.camp = api.camps[0];
+  assert.equal(api.inAges(), false);
+  assert.equal(api.drawerRows('people').length, 1);
+  assert.equal(api.drawerRows('goals')[0].kind, 'stage');
+});
+
 module.exports = { loadUI };

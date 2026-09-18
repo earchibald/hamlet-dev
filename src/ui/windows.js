@@ -2,7 +2,7 @@
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
   const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
 }
 function renderWindows(){
