@@ -96,6 +96,16 @@ function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; 
 let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
 
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* The ladder in stages. The panel groups goals by these, in this order. */
+const STAGES = [
+  { id: 'fire',       label: 'Fire' },
+  { id: 'food',       label: 'Food' },
+  { id: 'tools',      label: 'Tools' },
+  { id: 'shelter',    label: 'Shelter' },
+  { id: 'crafts',     label: 'Crafts' },
+  { id: 'sprites',    label: 'Sprites' },
+  { id: 'settlement', label: 'Settlement' },
+];
 const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
 const isWinter = () => seasonOf() === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;

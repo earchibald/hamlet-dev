@@ -22,4 +22,26 @@ test('the manifest lists every file in src/ui once, and state comes first', () =
   assert.equal(ui.FILES[ui.FILES.length - 1], 'main');
 });
 
+const { runDays } = require('./lib/run');
+
+test('every goal has a stage from STAGES, and a prerequisite names a goal that exists', () => {
+  const api = loadUI(['state'], ['STAGES', 'stageReached']); api.startWorld('r');
+  const ids = new Set(api.GOALS.map(g => g.id)), stages = new Set(api.STAGES.map(s => s.id));
+  for (const g of api.GOALS){
+    assert.ok(stages.has(g.stage), `${g.id} has stage ${g.stage}`);
+    if (g.after) assert.ok(ids.has(g.after), `${g.id} is after ${g.after}, which does not exist`);
+  }
+  assert.deepEqual(api.STAGES.map(s => s.id), ['fire', 'food', 'tools', 'shelter', 'crafts', 'sprites', 'settlement']);
+});
+
+test('at the start only the fire stage is reached; by day 25 of seed r the ladder is open to crafts', () => {
+  const fresh = loadUI(['state'], ['STAGES', 'stageReached']); fresh.startWorld('r'); fresh.camp = fresh.camps[0];
+  assert.equal(fresh.stageReached('fire'), true);
+  assert.equal(fresh.stageReached('tools'), false);
+  assert.equal(fresh.stageReached('sprites'), false);
+  const { api } = runDays('r', 25); api.camp = api.camps[0];
+  for (const s of ['fire', 'food', 'tools', 'shelter', 'crafts']) assert.equal(api.stageReached(s), true, s);
+  assert.equal(api.stageReached('sprites'), api.camps[0].fae.known, 'sprites follow first sight');
+});
+
 module.exports = { loadUI };
