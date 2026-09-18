@@ -22,7 +22,7 @@ const API = `return {
   startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startFish, startGather, startBuild, addItem, stashAdd,
-  runTask, updateBeing, dropCarried, makeBeing, checkPitfall,
+  runTask, updateBeing, dropCarried, makeBeing, checkPitfall, denTick,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt,
   near, nearAt, dist, ZMIN, ZMAX, ZOFF, NZ, W, H,
   campHumans, humans, stashFood,

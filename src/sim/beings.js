@@ -248,10 +248,10 @@ function chooseTask(a){
   } else if (a.species === 'wolf'){
     const hungry = isWinter() ? 75 : 65;
     opts = [{ type: 'flee', score: threatsFor(a).length ? 100 : 0 }, { type: 'raid', score: night && n.food < hungry ? 75 : 0 }, { type: 'stalk', score: night && n.food < 35 && a.traits.bravery > 0.5 ? 70 : 0 }, { type: 'hunt', score: n.food < 55 ? 55 + (55 - n.food) : 0 }, { type: 'scavenge', score: n.food < 70 ? 45 : 0 },
-      { type: 'drink', score: urg(n.water) }, { type: 'rest', score: n.rest < 40 ? 50 : (drowsy(a) ? 40 : 0) }, { type: 'wander', score: drowsy(a) ? 4 : 14 }];
+      { type: 'drink', score: urg(n.water) }, { type: a.den ? 'home' : 'rest', score: n.rest < 40 ? 50 : (drowsy(a) ? 40 : 0) }, { type: 'wander', score: drowsy(a) ? 4 : 14 }];
   } else {
     opts = [{ type: 'flee', score: threatsFor(a).length ? 100 : 0 }, { type: 'hunt', score: n.food < 55 ? 60 + (55 - n.food) : 0 }, { type: 'scavenge', score: n.food < 70 ? 45 : 0 },
-      { type: 'drink', score: urg(n.water) }, { type: 'rest', score: n.rest < 40 ? 50 : (drowsy(a) ? 35 : 0) }, { type: 'wander', score: drowsy(a) ? 4 : 12 }];
+      { type: 'drink', score: urg(n.water) }, { type: a.den ? 'home' : 'rest', score: n.rest < 40 ? 50 : (drowsy(a) ? 35 : 0) }, { type: 'wander', score: drowsy(a) ? 4 : 12 }];
   }
   for (const o of opts) o.score = Math.round(o.score + rng() * 6);
   opts.sort((x, y) => y.score - x.score);
