@@ -27,6 +27,10 @@ function initUI(){
   $('hourBtn').addEventListener('click', ACTIONS.hour);
   $('helpBtn').addEventListener('click', ACTIONS.help);
   $('helpClose').addEventListener('click', closeDialogs);
+  $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
+  $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
+  $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
+  for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
   $('start').addEventListener('close', () => { ui.focus = 'map'; newWorld($('seed').value.trim() || randomSeed()); });
   $('viewBtn').addEventListener('click', ACTIONS.view);
   $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
@@ -61,7 +65,7 @@ function initUI(){
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;
-    if (anyDialogOpen()){ if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); } return; }
+    if (anyDialogOpen()){ if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; } const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return; }
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });

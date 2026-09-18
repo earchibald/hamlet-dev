@@ -64,14 +64,21 @@ for (const t of TOOLS){
 }
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
+for (let n = 1; n <= 9; n++){
+  KEYMAP.push({ key: String(n), alt: true, focus: 'any', action: 'jumpChip', arg: n, label: `Jump to alert ${n}` });
+  KEYMAP.push({ key: String(n), alt: true, shift: true, focus: 'any', action: 'muteMenu', arg: n, label: `Mute alert ${n}` });
+}
+for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute', action: 'muteChoice', arg: k, label: ['Mute this alert', 'Mute this kind here', 'Mute this kind everywhere'][k - 1], button: `mute${k}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', or 'dialog'. Returns { action, arg } or null. */
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
 function keyAction(e, focus){
-  const kind = focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
+  const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;
-    if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
+    const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
+    if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
     return { action: k.action, arg: k.arg };

@@ -166,7 +166,7 @@ test('every template button prints a key, and every keyed button id is in the te
 
 test('every key map row has a focus the dispatcher knows', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog'].includes(k.focus), `${k.key} has focus ${k.focus}`);
+  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog'].includes(k.focus) || k.focus.startsWith('dialog:'), `${k.key} has focus ${k.focus}`);
 });
 
 test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {
@@ -255,6 +255,18 @@ test('tools: three, inspect first, light fire and nudge one-shot, no camp site',
   assert.deepEqual(api.keyAction(ev('f'), 'window:2'), { action: 'follow', arg: undefined });
   assert.deepEqual(api.keyAction(ev('f'), 'map'), { action: 'tool', arg: 'light' });
   assert.equal(api.keyAction(ev('F', { shiftKey: true }), 'map').action, 'toolSticky', 'shift on a letter is its own row');
+});
+
+test('chip keys: Alt+n jumps, Shift+Alt+n opens the mute menu, and a single chip can be muted by its text', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS]);
+  assert.deepEqual(api.keyAction(ev('3', { altKey: true }), 'map'), { action: 'jumpChip', arg: 3 });
+  assert.deepEqual(api.keyAction(ev('3', { altKey: true, shiftKey: true }), 'drawer:goals'), { action: 'muteMenu', arg: 3 });
+  assert.deepEqual(api.keyAction(ev('2'), 'dialog:mute'), { action: 'muteChoice', arg: 2 });
+  api.startWorld('r'); api.camp = api.camps[0]; const a = api.beings[0]; a.needs.warmth = 10; api.notePulses();
+  const cold = api.alerts().find(x => x.type === 'cold'); assert.ok(cold);
+  api.mute('cold', api.camp.id, cold.text);
+  assert.equal(api.alerts().some(x => x.type === 'cold'), false, 'that one chip is muted');
+  const b = { ...a, name: 'Other' }; assert.equal(api.isMuted('cold', api.camp.id, 'Other is cold'), false, 'another cold chip is not');
 });
 
 module.exports = { loadUI };

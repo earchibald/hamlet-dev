@@ -199,6 +199,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
+  <h2>Muted</h2>
+  <div id="helpMuted"></div>
   <h2>The map</h2>
   <div class="legend" id="legend">
     <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
@@ -221,6 +223,11 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the tabs in the strip.</li>
   </ul>
   <p><button class="btn" id="helpClose">Close<kbd>Esc</kbd></button></p>
+</dialog>
+<dialog id="mute">
+  <h2 id="muteTitle">Mute</h2>
+  <p><button class="btn" id="mute1">This alert<kbd>1</kbd></button> <button class="btn" id="mute2">This kind, this camp<kbd>2</kbd></button> <button class="btn" id="mute3">This kind, everywhere<kbd>3</kbd></button></p>
+  <p class="muted">Unmute from the command palette or the help dialog.</p>
 </dialog>
 <script>
 __SIM__

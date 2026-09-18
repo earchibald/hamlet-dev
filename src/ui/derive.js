@@ -19,10 +19,10 @@ function gauges(){
   return { hearth, food, water, beds: bedsG };
 }
 
-/* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. */
-const isMuted = (type, campId) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`);
-function mute(type, campId){ ui.mutes.add(campId ? `${type}:${campId}` : type); }
-function unmute(type, campId){ ui.mutes.delete(campId ? `${type}:${campId}` : type); }
+/* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. 'cold:3:Ada is cold' mutes that one chip. */
+const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`) || (text != null && ui.mutes.has(`${type}:${campId}:${text}`));
+function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
@@ -49,7 +49,7 @@ function burningNearCamp(){
 
 /* Alerts for the current camp. Conditions read state. Chips are numbered from one. */
 function alerts(){
-  const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
+  const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
   else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });

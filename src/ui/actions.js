@@ -114,6 +114,13 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  jumpChip(n){
+    const a = alerts()[n - 1]; if (!a) return;
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+  },
+  muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
+  muteChoice(k){ muteChoice(k); },
   popOut(){
     if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }

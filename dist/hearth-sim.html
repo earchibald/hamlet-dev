@@ -199,6 +199,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
+  <h2>Muted</h2>
+  <div id="helpMuted"></div>
   <h2>The map</h2>
   <div class="legend" id="legend">
     <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
@@ -221,6 +223,11 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the tabs in the strip.</li>
   </ul>
   <p><button class="btn" id="helpClose">Close<kbd>Esc</kbd></button></p>
+</dialog>
+<dialog id="mute">
+  <h2 id="muteTitle">Mute</h2>
+  <p><button class="btn" id="mute1">This alert<kbd>1</kbd></button> <button class="btn" id="mute2">This kind, this camp<kbd>2</kbd></button> <button class="btn" id="mute3">This kind, everywhere<kbd>3</kbd></button></p>
+  <p class="muted">Unmute from the command palette or the help dialog.</p>
 </dialog>
 <script>
 'use strict';
@@ -3011,10 +3018,10 @@ function gauges(){
   return { hearth, food, water, beds: bedsG };
 }
 
-/* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. */
-const isMuted = (type, campId) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`);
-function mute(type, campId){ ui.mutes.add(campId ? `${type}:${campId}` : type); }
-function unmute(type, campId){ ui.mutes.delete(campId ? `${type}:${campId}` : type); }
+/* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. 'cold:3:Ada is cold' mutes that one chip. */
+const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${type}:${campId}`) || (text != null && ui.mutes.has(`${type}:${campId}:${text}`));
+function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
+function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 
 /* Pulses: a major or death line, or a goal that just left blocked, shows as a chip for 1500 ticks. */
 function notePulses(){
@@ -3041,7 +3048,7 @@ function burningNearCamp(){
 
 /* Alerts for the current camp. Conditions read state. Chips are numbered from one. */
 function alerts(){
-  const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
+  const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
   else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });
@@ -3223,14 +3230,21 @@ for (const t of TOOLS){
 }
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
+for (let n = 1; n <= 9; n++){
+  KEYMAP.push({ key: String(n), alt: true, focus: 'any', action: 'jumpChip', arg: n, label: `Jump to alert ${n}` });
+  KEYMAP.push({ key: String(n), alt: true, shift: true, focus: 'any', action: 'muteMenu', arg: n, label: `Mute alert ${n}` });
+}
+for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute', action: 'muteChoice', arg: k, label: ['Mute this alert', 'Mute this kind here', 'Mute this kind everywhere'][k - 1], button: `mute${k}` });
 
-/* The dispatcher. focus is 'map', 'drawer:<id>', or 'dialog'. Returns { action, arg } or null. */
+/* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', 'dialog', or 'dialog:<name>'. Returns { action, arg } or null. */
 function keyAction(e, focus){
-  const kind = focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
+  const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
   for (const k of KEYMAP){
     if (k.focus !== 'any' && k.focus !== kind) continue;
-    if ((k.key.length === 1 ? k.key.toLowerCase() : k.key) !== key) continue;
+    const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
+    if (rowKey !== key && !(code && rowKey === code)) continue;
     if (!!k.shift !== e.shiftKey) continue;
     if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
     return { action: k.action, arg: k.arg };
@@ -3685,8 +3699,15 @@ function renderFoot(){
 
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
-function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus === 'dialog') ui.focus = 'map'; }
+function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
 function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+let muteFor = null;
+function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
+function muteChoice(k){
+  if (!muteFor) return;
+  if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
+  muteFor = null; closeDialogs(); persist(); renderUI(true);
+}
 function keyName(k){
   const key = k.key === ' ' ? 'Space' : k.key === 'Escape' ? 'Esc' : k.key === 'ArrowLeft' ? '←' : k.key === 'ArrowRight' ? '→' : k.key === 'ArrowUp' ? '↑' : k.key === 'ArrowDown' ? '↓' : k.key.length === 1 ? k.key.toUpperCase() : k.key;
   return `${k.ctrl ? 'Ctrl+' : ''}${k.alt ? 'Alt+' : ''}${k.shift && k.key.length > 1 ? 'Shift+' : ''}${key}`;
@@ -3695,6 +3716,7 @@ function openHelp(){
   closeDialogs();
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
+  $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(m)}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
   ui.focus = 'dialog'; $('help').showModal();
 }
 
@@ -3814,6 +3836,13 @@ const ACTIONS = {
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   start(){ openStart(); },
+  jumpChip(n){
+    const a = alerts()[n - 1]; if (!a) return;
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+  },
+  muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
+  muteChoice(k){ muteChoice(k); },
   popOut(){
     if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
@@ -3850,6 +3879,10 @@ function initUI(){
   $('hourBtn').addEventListener('click', ACTIONS.hour);
   $('helpBtn').addEventListener('click', ACTIONS.help);
   $('helpClose').addEventListener('click', closeDialogs);
+  $('help').addEventListener('click', e => { const b = e.target.closest('[data-unmute]'); if (b){ ui.mutes.delete(b.dataset.unmute); persist(); openHelp(); } });
+  $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
+  $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
+  for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
   $('start').addEventListener('close', () => { ui.focus = 'map'; newWorld($('seed').value.trim() || randomSeed()); });
   $('viewBtn').addEventListener('click', ACTIONS.view);
   $('nW').onclick = () => ACTIONS.nav([-1, 0]); $('nE').onclick = () => ACTIONS.nav([1, 0]); $('nN').onclick = () => ACTIONS.nav([0, -1]); $('nS').onclick = () => ACTIONS.nav([0, 1]);
@@ -3884,7 +3917,7 @@ function initUI(){
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;
-    if (anyDialogOpen()){ if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); } return; }
+    if (anyDialogOpen()){ if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; } const hit = keyAction(e, ui.focus); if (hit){ e.preventDefault(); ACTIONS[hit.action](hit.arg); } return; }
     const hit = keyAction(e, ui.focus); if (!hit) return;
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });
