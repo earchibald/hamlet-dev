@@ -38,6 +38,21 @@ test('a wolf carries a kill home to its den before eating', () => {
   assert.ok(api.chronicle.some(e => e.text.includes('drags')));
 });
 
+test('a wolf eats a kill where it fell when the den floor is unreachable', () => {
+  const { api, b, den } = denned('wolf');
+  const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
+  b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to carry the kill to */
+  for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
+  api.tick = 22 * 1000 + 100; /* night */
+  const r = api.beings.find(o => o.species === 'rabbit' && o.alive); r.x = out.x + 2; r.y = out.y; r.z = 0; r.task = null;
+  for (const t of [[out.x + 1, out.y], [out.x + 2, out.y]]){ const q = api.tileAt(...t); q.feature = null; q.struct = null; if (q.ground === 'water') q.ground = 'grass'; }
+  let killed = false;
+  for (let k = 0; k < 400 && !killed && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); killed = !r.alive; api.tick = api.tick + 1; }
+  assert.ok(killed, 'the wolf never made the kill');
+  assert.equal(b.carrying, null, 'nothing left carried when the den could not be reached');
+  assert.equal(b.needs.food, 100, 'the wolf ate the kill where it fell');
+});
+
 test('a den with two adults bears one young in spring, once a year', () => {
   const { api, den } = denned('wolf');
   const adults = api.beings.filter(b => b.alive && b.species === 'wolf' && b.den === den);

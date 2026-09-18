@@ -1427,7 +1427,7 @@ Object.assign(START, {
         if (near(a, prey) <= 1){
           if (prey.species === 'deer' && rng() > 0.45 + a.skills.hunt * 0.1){ addThought(prey, 'escaped', 'Broke free from a wolf', -8, 900); prey.hp -= 15; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); failTask(prey); START.flee(prey); return 'fail'; }
           prey.hp = 0; gainXp(a, 'hunt'); die(prey, `was caught by a ${SPECIES[a.species].label}`);
-          if (a.den && prey.species === 'rabbit' && nearAt(a, a.den.exit.x, a.den.exit.y) <= 30){ const it = itemAt(prey.x, prey.y, prey.z); if (it && it.kind === 'carcass'){ removeItem(it); a.carrying = { kind: 'carcass', count: 1 }; return chain(a, t, START.carryHome(a)) || 'done'; } }
+          if (a.den && prey.species === 'rabbit' && nearAt(a, a.den.exit.x, a.den.exit.y) <= 30){ const it = itemAt(prey.x, prey.y, prey.z); if (it && it.kind === 'carcass'){ removeItem(it); a.carrying = { kind: 'carcass', count: 1 }; const r = chain(a, t, START.carryHome(a)); if (r) return r; a.carrying = null; } }
           t.label = 'Eating'; a.needs.food = 100; addThought(a, 'fed', 'Made a kill', 8, 600); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === prey.z && dist(x, y, prey.x, prey.y) <= 1, 400, a); if (!p) return 'fail';
         t.path = p.slice(0, 3); return 'continue';
@@ -1528,6 +1528,7 @@ function denTick(){
     const grown = beings.filter(b => b.alive && b.species === c.owner && b.den === c && stage(b) === 'adult');
     if (grown.length < 2) continue;
     const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) continue;
+    /* The newborn has no id yet, so it lands on the first floor tile rather than one picked by id. */
     const t = floor[0]; const y = makeBeing(c.owner, t.x, t.y, null, 0); y.z = t.z; y.born = tick; y.den = c; beings.push(y); c.lastBirth = tick;
     log(c.owner === 'wolf' ? 'A wolf pup is born in the den under the hill.' : 'Fox kits are born in the den under the hill.', []);
   }
