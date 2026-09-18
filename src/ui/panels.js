@@ -47,7 +47,7 @@ function renderDrawers(){
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
-    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    DRAWER_RENDER[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
@@ -84,6 +84,22 @@ function renderCamp(el){
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* The creation, by age, oldest first. The sim never trims it, so it never scrolls off. It rebuilds only when a
+   line arrives, the world is new, or the cursor moves. */
+function renderLegends(el){
+  const key = seedText + ':' + legends.length + ':' + (focusedDrawer() === 'legends' ? ui.row.legends : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  const rows = drawerRows('legends');
+  const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
+  let when = null;
+  el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
+    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+  }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
+}
+/* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
+const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp, legends: renderLegends };
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;

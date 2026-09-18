@@ -8,6 +8,7 @@ const DRAWERS = [
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4' },
+  { id: 'legends',   label: 'Legends',   key: '5' },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };

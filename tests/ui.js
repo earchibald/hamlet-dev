@@ -172,7 +172,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -379,6 +379,19 @@ test('palette and chord keys', () => {
   assert.deepEqual(keyHit(api, ev('f'), 'dialog:chord'), { action: 'stage', arg: 'fire' });
   assert.deepEqual(keyHit(api, ev('ArrowDown'), 'dialog:palette'), { action: 'paletteMove', arg: 1 });
   assert.deepEqual(keyHit(api, ev('Enter'), 'dialog:palette'), { action: 'paletteRun', arg: undefined });
+});
+
+test('the legends drawer lists every line of the creation, oldest first', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...DERIVE, 'DRAWERS']);
+  api.startWorld('alpha'); api.camp = api.camps[0];
+  const rows = api.drawerRows('legends');
+  assert.equal(rows.length, api.legends.length);
+  assert.ok(rows.length > 20, `only ${rows.length} legends`);
+  assert.ok(rows.every(r => r.kind === 'legend'));
+  assert.match(rows[0].e.text, /formless/);
+  assert.deepEqual(api.DRAWERS.map(d => d.key), ['1', '2', '3', '4', '5']);
+  assert.equal(api.DRAWERS[4].id, 'legends');
+  assert.equal(api.ui.row.legends, 0);
 });
 
 module.exports = { loadUI };

@@ -109,6 +109,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #chronicle li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
 #chronicle li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 #chronicle .when{color:var(--muted);font-size:11px;font-family:"JetBrains Mono",monospace;display:inline-block;min-width:88px}
+#legends{list-style:none;margin:0;padding:0}
+#legends li{padding:3px 0;border-bottom:1px solid var(--line);font-size:13px}
+#legends li.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+#legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
@@ -3952,7 +3956,7 @@ const ui = {
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
   open: ['people', 'goals'], /* drawers open, in order */
   focus: 'map',        /* 'map', 'drawer:<id>', or 'dialog' */
-  row: { people: 0, goals: 0, chronicle: 0, camp: 0 }, /* the focused row per drawer */
+  row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
@@ -4118,6 +4122,7 @@ function drawerRows(id){
     return out;
   }
   if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
 
@@ -4213,6 +4218,7 @@ const DRAWERS = [
   { id: 'goals',     label: 'Goals',     key: '2' },
   { id: 'chronicle', label: 'Chronicle', key: '3' },
   { id: 'camp',      label: 'Camp',      key: '4' },
+  { id: 'legends',   label: 'Legends',   key: '5' },
 ];
 /* The stage chord: `g` opens a dialog with one lettered button per reached stage; the letter opens Goals on that stage. */
 const STAGE_LETTER = { fire: 'f', food: 'o', tools: 't', shelter: 's', crafts: 'c', sprites: 'p', settlement: 'e' };
@@ -4655,7 +4661,7 @@ function renderWindows(){
     el.querySelector('.title').innerHTML = winTitle(w);
     const body = el.querySelector('.body'), keep = body.scrollTop;
     body.classList.toggle('ins', w.kind === 'inspect');
-    if (w.kind === 'drawer') ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[w.target](body, w.target);
+    if (w.kind === 'drawer') DRAWER_RENDER[w.target](body, w.target);
     else body.innerHTML = w.target.being != null ? (beingById(w.target.being) ? inspectBeing(beingById(w.target.being), true) : '<div class="muted">Gone.</div>') : inspectTile(...w.target.tile);
     body.scrollTop = keep;
   }
@@ -4735,7 +4741,7 @@ function renderDrawers(){
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
-    ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
+    DRAWER_RENDER[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
@@ -4772,6 +4778,22 @@ function renderCamp(el){
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
+/* The creation, by age, oldest first. The sim never trims it, so it never scrolls off. It rebuilds only when a
+   line arrives, the world is new, or the cursor moves. */
+function renderLegends(el){
+  const key = seedText + ':' + legends.length + ':' + (focusedDrawer() === 'legends' ? ui.row.legends : -1);
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  const rows = drawerRows('legends');
+  const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
+  let when = null;
+  el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
+    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+  }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
+}
+/* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
+const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp, legends: renderLegends };
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
@@ -4911,6 +4933,8 @@ function rowOpen(){
   const id = focusedDrawer(); if (!id) return; const r = drawerRows(id)[ui.row[id]]; if (!r) return;
   if (r.kind === 'person'){ ACTIONS.inspect(r.id); }
   else if (r.kind === 'stage'){ ui.unfold[r.id] = !ui.unfold[r.id]; renderUI(true); }
+  /* A legend opens the first god it names. */
+  else if (r.kind === 'legend'){ const g = gods().find(g => r.e.text.includes(g.name)); if (g) ACTIONS.inspect(g.id); }
   /* A goal row opens nothing. A goal's priority changes only by Left and Right, the three buttons, or the palette. */
   else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => r.e.text.includes(b.name)); if (who){ cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
