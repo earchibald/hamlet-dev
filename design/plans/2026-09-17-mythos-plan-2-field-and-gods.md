@@ -17,7 +17,7 @@
 - Rules read tables. No rule checks a god's name, a pole's name, or a species' name. Poles, contrasts, bodies, scars, and makings are tables in `marks.js` and `gods.js`.
 - Everything the gods do draws from the god stream, `godRng`, seeded from `seedText + ':gods'`. Every god-era function that draws runs inside `withGodRng`. The people's stream is never touched in the gods era.
 - Every act writes a chronicle line in plain English, one idea per sentence, and every god-era line also goes to `legends`, which is never trimmed.
-- Refinements of the spec, decided by this plan: acts live in a `GOD_ACTS` table, not in `START`, because `START` entries build tick tasks with `arrive()` and an age act is instant. Freeze, hide, and show write marks of kind `freeze`, `hide`, `show`, since `cold`, `dark`, and `light` are pole values. The people are made by a mingling, and a lack of people draws every awake god toward every other by five opinion points an age, so lovers, and so people, come. Settle in this plan flips the era and paints nothing.
+- Refinements of the spec, decided by this plan: acts live in a `GOD_ACTS` table, not in `START`, because `START` entries build tick tasks with `arrive()` and an age act is instant. Freeze, hide, and show write marks of kind `freeze`, `hide`, `show`, since `cold`, `dark`, and `light` are pole values. The people are made by a mingling, and a lack of people draws every awake god toward every other by five opinion points an age, so lovers, and so people, come. Settle in this plan flips the era and paints nothing. Two refinements found in execution: level ground for the rest gate means no height or depth marks, not the absence of a height pole, since children inherit poles and a height-first creation would never have a level country; and a lack of people with every god of one contrast strains a new contrast, since a mingling needs two. Strain runs only after the Pulse.
 - Options gain `ageLimit`, default 200. Past it the backstop acts once an age. At twice the limit every awake god is put to sleep and the creation is marked failed; `tests/ages.js` asserts that never happens.
 - Commit after every task on branch `mythos`. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn`.
 - Run `node build.js` after every change to `src/` and commit `dist/hearth-sim.html` with it.
@@ -1197,3 +1197,11 @@ Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn"
 - Dead gods are filtered out of `beings` every 200 ticks by the day-era `step`. Plan 3 keeps them.
 - A god's thoughts never expire, since nothing ticks them in the ages.
 - A region may lie in two pieces after a winding cut of a ragged parent.
+- Settle is called from inside `withGodRng`, so a painter that draws would draw from the god stream. Plan 3 decides this on purpose before the golden is blessed.
+- Settle does not set `tick`; the spec says it sets today's start hour. Plan 3 owns it.
+- Nobody makes the gnomes. `MAKES` has no entry for them; today `digDens` spawns them at generation.
+- Gods sit at tile 0,0,0 in `beings`. Tile-occupancy queries in `world.js` and the page's drawing and poke do not filter by species. Plan 3 places a sleeping god at its body or keeps gods out of tile space.
+- Marks carry an anchor tile (`at`) since the final fix of plan 2; a painter uses it to place a making or a body.
+- A boundary carries the splitter's pole only. The river is the wet god's live boundary (`liveBoundaries()`); the spec's "wet-moving" wording was corrected.
+- The legends are monotonous in the middle ages, mostly "parts a country" lines. Countries have no names; the naming spec on `ui-rethink` and plan 4 should give them some so a line can say which country was parted.
+- `restGate` is recomputed several times an age; fast at the default size, but it scales with the world size option.

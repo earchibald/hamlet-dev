@@ -1,5 +1,7 @@
 /* ---------- start, tick, and god actions ---------- */
-function startWorld(seed, opts = {}){
+/* Everything a fresh world needs before either era begins. The draw order here is the old startWorld's,
+   so the golden record holds. */
+function resetState(seed, opts){
   setOptions(opts); allocSearch();
   seedText = String(seed); rng = mulberry32(hashSeed(seedText));
   tick = Math.round(DAY * 7 / 24); nextId = 1; fireCount = 0;
@@ -7,6 +9,10 @@ function startWorld(seed, opts = {}){
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: 1500 + rint(2000) };
   goalPriority = {};
   resetDoor();
+  era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
+}
+function startWorld(seed, opts = {}){
+  resetState(seed, opts);
   generate();
   const a = beings[0];
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
@@ -50,4 +56,11 @@ function updateWorld(){
   gnomeTick();
   spawnWildlife();
 }
-function step(){ tick++; updateWorld(); camp = camps[0]; for (const a of beings) if (a.alive) updateBeing(a); if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human'); }
+/* In the gods era a step is an age. In the days era it is a tick. A species with perTick false is not
+   stepped by the tick: the gods keep their own clock. */
+function step(){
+  if (era === 'gods') return ageStep();
+  tick++; updateWorld(); camp = camps[0];
+  for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
+  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human');
+}

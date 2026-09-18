@@ -49,7 +49,7 @@ A region record: `{ id, tiles (a mask over W*H), parent, by (god id), age, marks
 
 A split is an act. A god picks a region and draws a boundary through it. The god's patience sets the line: patient gods draw straight, restless gods draw winding, from noise. The two children each get a pole mark for the god's contrast. The boundary is a place: the wet god's boundary is the river. A region stops splitting at sector size. A region nobody splits stays large and reads as one wide country.
 
-A mark record: `{ kind, value, by (god id), age, why (a sentence) }`. Marks sit on regions, and after settle on tiles, hills, caves, and scars. Rules read marks. Nothing reads a god's name.
+A mark record: `{ kind, value, by (god id), age, why (a sentence), at (an anchor tile) }`. Ground marks (poles, height, depth, scars, flow, pool, freeze, hide, show) pass to both children of a split. Singular marks (a making, a rest, a twist) pass to the child that holds the anchor. A sleeping god's body is never split. Marks sit on regions, and after settle on tiles, hills, caves, and scars. Rules read marks. Nothing reads a god's name.
 
 | Mark kind | Values | Written by | Read by |
 |---|---|---|---|
@@ -70,6 +70,8 @@ A god is a being. `makeBeing('god', ...)` with the same fields. Extra fields: `p
 
 - When a god splits a region, the far pole has nobody, and the counterpart comes into being to hold it.
 - When the rest gate names what the world cannot hold, the contrast that answers it strains, and a god of that pole comes into being.
+- When the people are lacking and every awake god is of one contrast, a new contrast strains, since one difference cannot make a people. A mingling needs two.
+- Every god comes into being holding a country. The counterpart holds the far side of the split. A god born of a lack takes the largest level country, or the largest there is, and sets its pole there.
 
 So gods are made of what the world lacks. Five contrasts, ten poles, ten gods at most. A seed may have no still god.
 
@@ -98,9 +100,9 @@ An act is an operator: a name, the pole that may use it, a target region, the ma
 
 | Act | Pole | Ages | Writes | The painter makes |
 |---|---|---|---|---|
-| split | any | 1 | pole marks on two children, a boundary | the river when the splitter is wet and moving |
-| raise | above | 1 per storey | height on the region | a hill, a mountain when many |
-| dig | below | 1 per level | depth on the region | caves, chambers, a deep |
+| split | any | 1 | pole marks on two children, a boundary | the river when the splitter is the wet god |
+| raise | above | 1 per storey | height on the region | a hill, a mountain when many. Not on a level country while fewer than three remain, so nobody raises the formless whole. |
+| dig | below | 1 per level | depth on the region | caves, chambers, a deep. Not in a level country while fewer than three remain. |
 | flow | wet, moving | 1 | wet along a path across regions, above or below ground | streams, fords, underground rivers |
 | pool | wet, still | 1 | wet on a region, above or below ground | marsh, a lake, an underground lake |
 | burn | hot | 1 | a burned scar | ash, firestones in the deep |
@@ -125,7 +127,7 @@ Rules of the ages:
 
 **The rest gate.** A god may sleep only when the checker passes. The checker, on regions:
 
-1. A start region exists: dry, not above, not below, not drowned or burned, of at least a sector.
+1. A start region exists: dry, level, not drowned or burned, of at least a sector. Level means nothing raised and nothing dug: the gate reads the height and depth marks, not the height pole. The height pole alone is highland or lowland, still walkable ground.
 2. A wet region or boundary touches it or its neighbour.
 3. A region within two neighbours has a mark that grows fuel: forest, meadow, or marsh.
 4. A making mark for something eaten or that eats berries lies within two neighbours.
@@ -139,7 +141,7 @@ Settle is `generate()` taken apart into painters, one per mark kind, in a fixed 
 
 | Step | Reads | Keeps from today |
 |---|---|---|
-| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet-moving boundary; fords where flow cut them; lakes and marsh from pool |
+| 1. Ground | pole marks, `BIOME_OF`, the boundaries | the per-biome tile texture from `generate()`; the river along the wet god's live boundaries; fords where flow cut them; lakes and marsh from pool |
 | 2. Height | height marks | `uplift`, `hillShape`, `hillClimbable`, `raiseHill`, `cutSlopes`, with storeys from the mark; a snow line where cold is marked on high ground |
 | 3. Depth | depth marks, flow and pool below ground | `cutWaterCaves`, with levels from the mark; underground streams and lakes as water tiles on lower levels with a bank to walk; hollows and dens as today |
 | 4. Scars | scar marks | burned: ash that greens over seasons. cut: a chasm, a line of rock with a slope at each end. drowned: standing water with dead pines in it. broken: a boulder field. hallowed: nothing painted, the tile marked. |
