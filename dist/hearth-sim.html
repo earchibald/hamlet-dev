@@ -216,6 +216,7 @@ const FEATURES = {
   reeds:   { name: 'reeds',      solid: false, mat: 'plant', fuel: 8 },
   sapling: { name: 'pine sapling', solid: false, mat: 'plant', fuel: 5 },
   hollow:  { name: 'hollow pine, older than any camp', solid: true, mat: 'wood', fuel: 90 },
+  deadpine: { name: 'dead pine, drowned standing', solid: true, mat: 'wood', fuel: 30 },
   mushrooms: { name: 'mushroom patch', solid: false, mat: 'plant', fuel: 4 },
 };
 const ITEMS = {
@@ -247,6 +248,8 @@ const BIOMES = {
   forest:  { name: 'Pine forest' },
   rocky:   { name: 'Stony ground' },
   wetland: { name: 'Reedy marsh' },
+  river:   { name: 'Riverside' },
+  ash:     { name: 'Burnt ground' },
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140, PIT_BURN = 0.25, EMBER_LIFE = 420;
 
@@ -714,10 +717,10 @@ function digGnomeBurrow(start, avoid, sector){
   /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
      out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
      generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
-     pit (or beings[0], if no camp has a site yet) and require the new exit to sit in that region today. */
+     pit (or the first person, if no camp has a site yet) and require the new exit to sit in that region today. */
   const region = sector ? startRegion : (() => {
     const c = camps.find(k => k.site && (k.stashTile || k.pit));
-    const from = c ? (c.stashTile || c.pit) : (beings[0] ? [beings[0].x, beings[0].y] : null);
+    const a = firstPerson(); const from = c ? (c.stashTile || c.pit) : (a ? [a.x, a.y] : null);
     return from ? reachable(from[0], from[1], 0, NZ * W * H) : startRegion;
   })();
   if (s){
@@ -747,7 +750,7 @@ function digGnomeBurrow(start, avoid, sector){
   return null;
 }
 function digGnomeBurrows(){
-  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
+  const a = firstPerson(); const start = a ? [a.x, a.y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
   const want = 2 + rint(2); let made = 0;
   const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
@@ -851,85 +854,115 @@ function cutSlopes(h, z, isLow, isHigh){
   const want = 1 + rint(2), picked = [];
   for (let k = 0; k < 40 && picked.length < want; k++){ const [x, y] = rim[rint(rim.length)]; if (picked.every(([px, py]) => dist(px, py, x, y) >= 6)){ const t = tileAt(x, y, z); t.slope = true; t.feature = null; picked.push([x, y]); } }
 }
-function generate(){
-  const bn = makeNoise(38), mn = makeNoise(52), en = makeNoise(9), fn = makeNoise(5), rn = makeNoise(40);
+/* ---------- settle's ground painters ---------- */
+/* A sector takes the biome of the country that covers most of its tiles, and remembers that country. */
+function paintSectors(){
   sectors = [];
   for (let sy = 0; sy < SH; sy++) for (let sx = 0; sx < SW; sx++){
-    const [cx, cy] = secCenter({ sx, sy });
-    const v = bn(cx, cy), m = mn(cx, cy);
-    let biome = m > 0.66 ? 'wetland' : v > 0.6 ? 'forest' : v < 0.38 ? 'rocky' : 'meadow';
-    if (sx === SW >> 1 && sy === SH >> 1) biome = 'meadow';
-    sectors.push({ sx, sy, biome, name: BIOMES[biome].name });
+    const count = new Map();
+    for (let y = sy * LH; y < (sy + 1) * LH; y++) for (let x = sx * LW; x < (sx + 1) * LW; x++){ const id = regionOf[idx(x, y)]; count.set(id, (count.get(id) || 0) + 1); }
+    const top = [...count.entries()].sort((p, q) => q[1] - p[1])[0][0];
+    const r = regionById(top); const biome = biomeOf(r);
+    sectors.push({ sx, sy, biome, name: BIOMES[biome].name, country: r.id });
   }
-  const riverY = x => H * 0.5 + (rn(x, 7) - 0.5) * H * 0.7;
+}
+/* The tile texture of a biome. Noise decides where the trees stand; the biome comes from the country's marks. */
+function paintTile(t, biome, e, f){
+  let loose = null;
+  switch (biome){
+    case 'forest':
+      if (f > 0.4 && rng() < 0.55) t.feature = 'tree';
+      else if (rng() < 0.12) loose = 'stick';
+      else if (rng() < 0.02){ t.feature = 'bush'; t.berries = rint(3); }
+      break;
+    case 'meadow': case 'river':
+      if (f > 0.7 && rng() < 0.3) t.feature = 'tree';
+      else if (rng() < 0.045){ t.feature = 'bush'; t.berries = 1 + rint(4); }
+      else if (rng() < 0.02) loose = 'stick';
+      else if (rng() < 0.015) loose = 'rock';
+      else if (e < 0.3 && rng() < 0.2) t.ground = 'soil';
+      break;
+    case 'rocky':
+      if (e > 0.55 && rng() < 0.5) t.feature = 'boulder';
+      else if (rng() < 0.11) loose = 'rock';
+      else if (rng() < 0.03) t.feature = 'tree';
+      else if (rng() < 0.01){ t.feature = 'bush'; t.berries = rint(3); }
+      else if (rng() < 0.3) t.ground = 'soil';
+      break;
+    case 'wetland':
+      if (e < 0.42) t.ground = 'water';
+      else if (e < 0.5 && rng() < 0.5) t.feature = 'reeds';
+      else if (rng() < 0.03){ t.feature = 'bush'; t.berries = 1 + rint(3); }
+      else if (rng() < 0.03) loose = 'stick';
+      else if (rng() < 0.04) t.feature = 'tree';
+      break;
+    case 'ash':
+      t.ground = 'ash';
+      if (rng() < 0.05) loose = 'stick';
+      break;
+  }
+  if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
+  if (loose) t.loose = loose;
+}
+/* Every tile of the surface, from its country's biome. Levels are made fresh. */
+function paintGround(){
+  const en = makeNoise(9), fn = makeNoise(5);
   levels = []; for (let z = ZMIN; z <= ZMAX; z++) levels.push(new Array(W * H).fill(null)); world = levels[ZOFF]; raised = []; hills = []; caves = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
-    const s = sectors[secIdx(Math.floor(x / LW), Math.floor(y / LH))];
-    const e = en(x, y), f = fn(x, y), dr = Math.abs(y - riverY(x));
-    const t = makeTile(x, y, 0, 'grass');
-    let loose = null;
-    const ford = (x + 23) % 47 < 3;
-    if (dr <= 1.3) t.ground = ford ? 'sand' : 'water';
-    else if (dr <= 2.6){ t.ground = 'sand'; if (rng() < 0.08) loose = 'rock'; }
-    else switch (s.biome){
-      case 'forest':
-        if (f > 0.4 && rng() < 0.55) t.feature = 'tree';
-        else if (rng() < 0.12) loose = 'stick';
-        else if (rng() < 0.02){ t.feature = 'bush'; t.berries = rint(3); }
-        break;
-      case 'meadow':
-        if (f > 0.7 && rng() < 0.3) t.feature = 'tree';
-        else if (rng() < 0.045){ t.feature = 'bush'; t.berries = 1 + rint(4); }
-        else if (rng() < 0.02) loose = 'stick';
-        else if (rng() < 0.015) loose = 'rock';
-        else if (e < 0.3 && rng() < 0.2) t.ground = 'soil';
-        break;
-      case 'rocky':
-        if (e > 0.55 && rng() < 0.5) t.feature = 'boulder';
-        else if (rng() < 0.11) loose = 'rock';
-        else if (rng() < 0.03) t.feature = 'tree';
-        else if (rng() < 0.01){ t.feature = 'bush'; t.berries = rint(3); }
-        else if (rng() < 0.3) t.ground = 'soil';
-        break;
-      case 'wetland':
-        if (e < 0.42) t.ground = 'water';
-        else if (e < 0.5 && rng() < 0.5) t.feature = 'reeds';
-        else if (rng() < 0.03){ t.feature = 'bush'; t.berries = 1 + rint(3); }
-        else if (rng() < 0.03) loose = 'stick';
-        else if (rng() < 0.04) t.feature = 'tree';
-        break;
-    }
+    const t = makeTile(x, y, 0, 'grass'); const r = regionAt(x, y);
+    t.country = r.id;
+    paintTile(t, biomeOf(r), en(x, y), fn(x, y));
     world[idx(x, y)] = t;
-    if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
-    if (loose) t.loose = loose;
   }
-  const s0start = sectors[secIdx(SW >> 1, SH >> 1)];
-  const [cx0, cy0] = secCenter(s0start);
-  let best0 = null;
-  for (let y = s0start.sy * LH; y < (s0start.sy + 1) * LH; y++) for (let x = s0start.sx * LW; x < (s0start.sx + 1) * LW; x++){
-    if (!passable(x, y)) continue;
-    const d = dist(x, y, cx0, cy0); if (!best0 || d < best0.d) best0 = { x, y, d };
+}
+/* The river: every live boundary a wet god drew. The line and its far side are water, the next ring is sand,
+   and every forty-seventh tile along the line is a ford. */
+function paintRivers(){
+  for (const b of liveBoundaries()){
+    if (b.pole !== 'wet') continue;
+    b.tiles.forEach((i, k) => {
+      const x = i % W, y = (i - x) / W; const ford = k % 47 >= 23 && k % 47 < 26;
+      /* The line tile itself, and its neighbours on the far side of the cut. */
+      const wet = [[0, 0]].concat(DIRS.filter(([dx, dy]) => inb(x + dx, y + dy) && regionOf[idx(x + dx, y + dy)] === b.b));
+      for (const [dx, dy] of wet){ const t = world[idx(x + dx, y + dy)]; t.ground = ford ? 'sand' : 'water'; t.feature = null; t.berries = 0; t.loose = null; t.river = b.id; }
+    });
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of RING){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const t = world[idx(nx, ny)]; if (t.ground !== 'water' && !t.river){ t.ground = 'sand'; t.feature = null; t.berries = 0; if (rng() < 0.08) t.loose = 'rock'; } } }
   }
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+}
+/* A lake in the middle of a pooled country: a blob of about a seventh of its area. */
+function paintLakes(){
+  for (const r of liveRegions()){
+    if (!hasMark(r, 'pool', 'surface')) continue;
+    const { x0, y0, x1, y1 } = r.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+    const want = Math.round(r.area / 7); const jit = makeNoise(6);
+    const rad = Math.sqrt(want / Math.PI);
+    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; const d = Math.hypot(x - cx, y - cy) / rad + (jit(x, y) - 0.5) * 0.6; if (d <= 1){ const t = world[i]; t.ground = 'water'; t.feature = null; t.berries = 0; t.loose = null; t.lake = r.id; } }
+    for (const i of r.tiles){ const t = world[i]; if (t.ground === 'water') continue; if (RING.some(([dx, dy]) => inb(t.x + dx, t.y + dy) && world[idx(t.x + dx, t.y + dy)].lake)){ t.ground = 'sand'; t.feature = t.feature === 'tree' ? null : t.feature; } }
+  }
+}
+/* The first person: the start country's most central passable tile. */
+function placeFirstPerson(){
+  const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+  let best = null;
+  for (const i of s.tiles){ const x = i % W, y = (i - x) / W; if (!passable(x, y)) continue; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
+  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
+  return best;
+}
+/* Everything after the ground: the hills, the water caves, the dens, the finds, and the life.
+   It runs as it always has, from the sectors the marks painted. Tasks 3 and 4 make it read marks. */
+function generateRest(best){
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   uplift();
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   cutWaterCaves(); rockfall();
   /* Rockfall is the only later step that can take a tile back out of the walkable world (a boulder where there was
      open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just washed out. */
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   placeFinds();
-  /* First person: the centre sector, on open ground near the river if possible. */
-  const s0 = sectors[secIdx(SW >> 1, SH >> 1)];
-  const [cx, cy] = secCenter(s0);
-  let best = null;
-  for (let y = s0.sy * LH; y < (s0.sy + 1) * LH; y++) for (let x = s0.sx * LW; x < (s0.sx + 1) * LW; x++){
-    if (!passable(x, y)) continue;
-    const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d };
-  }
-  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
   /* Animals */
   const spawnAnimal = (sp, biomes, n) => {
     for (let k = 0; k < n; k++){
@@ -1262,6 +1295,8 @@ function makeBeing(species, x, y, name, hue){
 }
 const beingById = id => beings.find(b => b.id === id);
 const humans = () => beings.filter(b => b.species === 'human' && b.alive);
+/* The first person of the world. The gods come into being before the people, so beings[0] is a god. */
+const firstPerson = () => beings.find(b => b.species === 'human');
 function addThought(a, key, text, value, dur){
   const t = a.thoughts.find(t => t.key === key);
   if (t){ t.left = dur; t.value = value; t.text = text; } else a.thoughts.push({ key, text, value, left: dur });
@@ -3210,11 +3245,6 @@ function firstGod(){
   log('Before the world had time and place, all was formless.', [], 'major');
   makeGod(pole, field.root, 'Out of the formless, a difference.');
 }
-function settle(){
-  log(`The last of the gods sleeps. The world is ${age} ages old, and holds its breath.`, [], 'major');
-  creation.ages = age; creation.settled = true; creation.gate = restGate();
-  era = 'days';
-}
 /* A god whose pole is gone from the whole live field is unmade. Its death is a scar. */
 function unmake(g){
   const wasAsleep = g.status === 'asleep';
@@ -3253,6 +3283,9 @@ function outgrown(){
   const c = Object.keys(CONTRASTS).find(c => !gods().some(g => g.contrast === c));
   if (c) makeGod(CONTRASTS[c][0], null, 'The world has grown past its gods, and a new difference stirs in it.');
 }
+/* Settle paints the ground, and painting draws from the people's stream. The age that ends the creation
+   raises this flag inside the god stream; settle runs after it, outside. */
+let settleNow = false;
 function ageStep(){
   withGodRng(() => {
     age++;
@@ -3265,19 +3298,42 @@ function ageStep(){
     /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
     if (!gate.ok && pulseAge !== null) strain(gate.lack);
     if (pulseAge !== null) outgrown();
-    if (!awakeGods().length){ settle(); return; }
-    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settle(); return; }
+    if (!awakeGods().length){ settleNow = true; return; }
+    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
     if (age >= options.ageLimit) backstop();
   });
+  if (settleNow){ settleNow = false; settle(); }
 }
-function startCreation(seed, opts = {}){
-  resetState(seed, opts);
-  era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = [];
+/* The creation itself, on a world that has already been reset. */
+function beginCreation(){
+  era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
   creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null };
   withGodRng(() => initField());
 }
+function startCreation(seed, opts = {}){
+  resetState(seed, opts);
+  beginCreation();
+}
 function runAges(max = options.ageLimit * 2 + 2){ let n = 0; while (era === 'gods' && n++ < max) step(); return age; }
+
+/* ---------- settle: from marks to tiles ----------
+   When the last god sleeps, the marks become a valley. Painters run in a fixed order, each reading marks and
+   writing tiles. Settle runs outside the god stream: painting draws from the people's stream where resetState
+   left it, so a seed's valley depends on its marks and its seed, never on how many ages the gods took. */
+function settle(){
+  log(`The last of the gods sleeps. The world is ${age} ages old, and holds its breath.`, [], 'major');
+  creation.ages = age; creation.settled = true; creation.gate = restGate();
+  paintSectors();
+  paintGround();
+  paintRivers();
+  paintLakes();
+  const best = placeFirstPerson();
+  generateRest(best);
+  era = 'days';
+  const a = beings.find(b => b.species === 'human');
+  log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+}
 
 /* ---------- start, tick, and god actions ---------- */
 /* Everything a fresh world needs before either era begins. The draw order here is the old startWorld's,
@@ -3292,11 +3348,11 @@ function resetState(seed, opts){
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
+/* Every world begins with its creation. The ages run to settle, and settle paints the valley and opens the days. */
 function startWorld(seed, opts = {}){
   resetState(seed, opts);
-  generate();
-  const a = beings[0];
-  log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+  beginCreation();
+  runAges();
 }
 
 /* ---------- god actions ---------- */
@@ -3386,7 +3442,7 @@ const DOOR_ACTS = {
     if ((e.z || 0) !== 0 || !hasTile(e.x, e.y, 0)){ camp = prev; return 'The camp must be on the valley floor.'; }
     const t = tileAt(e.x, e.y);
     if (!passable(e.x, e.y) || t.feature){ camp = prev; return 'The camp site must be open ground you can stand on.'; }
-    const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || beings[0];
+    const first = beings.find(b => b.alive && b.species === 'human' && b.camp === camp) || firstPerson();
     if (!reachable(first.x, first.y, first.z, NZ * W * H).has(idx3(e.x, e.y, 0))){ camp = prev; return 'Nobody can walk there from where they stand.'; }
     setSite(e.x, e.y); camp.siteReason = 'you chose it';
     log('The camp site moves. Someone felt it was right.', humans());
@@ -3747,7 +3803,7 @@ function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern'
 function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
-function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = beings[0]; setView('loc', secOf(a.x, a.y)); }
+function newWorld(seed){ startWorld(seed, {}); viewCamp = camps[0]; $('seed').value = seedText; followId = null; lvl = 0; worldDirty = 0; acc = 0; const a = firstPerson(); setView('loc', secOf(a.x, a.y)); }
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;

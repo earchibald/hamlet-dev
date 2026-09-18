@@ -11,11 +11,11 @@ function resetState(seed, opts){
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
+/* Every world begins with its creation. The ages run to settle, and settle paints the valley and opens the days. */
 function startWorld(seed, opts = {}){
   resetState(seed, opts);
-  generate();
-  const a = beings[0];
-  log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
+  beginCreation();
+  runAges();
 }
 
 /* ---------- god actions ---------- */

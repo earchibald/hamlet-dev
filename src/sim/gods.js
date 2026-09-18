@@ -349,11 +349,6 @@ function firstGod(){
   log('Before the world had time and place, all was formless.', [], 'major');
   makeGod(pole, field.root, 'Out of the formless, a difference.');
 }
-function settle(){
-  log(`The last of the gods sleeps. The world is ${age} ages old, and holds its breath.`, [], 'major');
-  creation.ages = age; creation.settled = true; creation.gate = restGate();
-  era = 'days';
-}
 /* A god whose pole is gone from the whole live field is unmade. Its death is a scar. */
 function unmake(g){
   const wasAsleep = g.status === 'asleep';
@@ -392,6 +387,9 @@ function outgrown(){
   const c = Object.keys(CONTRASTS).find(c => !gods().some(g => g.contrast === c));
   if (c) makeGod(CONTRASTS[c][0], null, 'The world has grown past its gods, and a new difference stirs in it.');
 }
+/* Settle paints the ground, and painting draws from the people's stream. The age that ends the creation
+   raises this flag inside the god stream; settle runs after it, outside. */
+let settleNow = false;
 function ageStep(){
   withGodRng(() => {
     age++;
@@ -404,16 +402,21 @@ function ageStep(){
     /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
     if (!gate.ok && pulseAge !== null) strain(gate.lack);
     if (pulseAge !== null) outgrown();
-    if (!awakeGods().length){ settle(); return; }
-    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settle(); return; }
+    if (!awakeGods().length){ settleNow = true; return; }
+    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
     if (age >= options.ageLimit) backstop();
   });
+  if (settleNow){ settleNow = false; settle(); }
 }
-function startCreation(seed, opts = {}){
-  resetState(seed, opts);
-  era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = [];
+/* The creation itself, on a world that has already been reset. */
+function beginCreation(){
+  era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
   creation = { ages: 0, backstops: 0, settled: false, failed: false, gate: null };
   withGodRng(() => initField());
+}
+function startCreation(seed, opts = {}){
+  resetState(seed, opts);
+  beginCreation();
 }
 function runAges(max = options.ageLimit * 2 + 2){ let n = 0; while (era === 'gods' && n++ < max) step(); return age; }

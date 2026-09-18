@@ -308,10 +308,10 @@ function digGnomeBurrow(start, avoid, sector){
   /* At generation, digGnomeBurrows always passes its own candidate sector, so `sector` is only ever left
      out by a mid-game move (gnomeTick's leaving rule). The world has changed since generate() ran, so the
      generation-time startRegion can no longer be trusted: walk the live map from the first camp's stash or
-     pit (or beings[0], if no camp has a site yet) and require the new exit to sit in that region today. */
+     pit (or the first person, if no camp has a site yet) and require the new exit to sit in that region today. */
   const region = sector ? startRegion : (() => {
     const c = camps.find(k => k.site && (k.stashTile || k.pit));
-    const from = c ? (c.stashTile || c.pit) : (beings[0] ? [beings[0].x, beings[0].y] : null);
+    const a = firstPerson(); const from = c ? (c.stashTile || c.pit) : (a ? [a.x, a.y] : null);
     return from ? reachable(from[0], from[1], 0, NZ * W * H) : startRegion;
   })();
   if (s){
@@ -341,7 +341,7 @@ function digGnomeBurrow(start, avoid, sector){
   return null;
 }
 function digGnomeBurrows(){
-  const start = beings[0] ? [beings[0].x, beings[0].y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
+  const a = firstPerson(); const start = a ? [a.x, a.y] : secCenter({ sx: SW >> 1, sy: SH >> 1 });
   const want = 2 + rint(2); let made = 0;
   const cands = shuffle(sectors.filter(s => s.biome === 'meadow' && (forestBeside(s) ||
     hills.some(h => secOf(h.x, h.y).sx === s.sx && secOf(h.x, h.y).sy === s.sy))));
@@ -445,85 +445,115 @@ function cutSlopes(h, z, isLow, isHigh){
   const want = 1 + rint(2), picked = [];
   for (let k = 0; k < 40 && picked.length < want; k++){ const [x, y] = rim[rint(rim.length)]; if (picked.every(([px, py]) => dist(px, py, x, y) >= 6)){ const t = tileAt(x, y, z); t.slope = true; t.feature = null; picked.push([x, y]); } }
 }
-function generate(){
-  const bn = makeNoise(38), mn = makeNoise(52), en = makeNoise(9), fn = makeNoise(5), rn = makeNoise(40);
+/* ---------- settle's ground painters ---------- */
+/* A sector takes the biome of the country that covers most of its tiles, and remembers that country. */
+function paintSectors(){
   sectors = [];
   for (let sy = 0; sy < SH; sy++) for (let sx = 0; sx < SW; sx++){
-    const [cx, cy] = secCenter({ sx, sy });
-    const v = bn(cx, cy), m = mn(cx, cy);
-    let biome = m > 0.66 ? 'wetland' : v > 0.6 ? 'forest' : v < 0.38 ? 'rocky' : 'meadow';
-    if (sx === SW >> 1 && sy === SH >> 1) biome = 'meadow';
-    sectors.push({ sx, sy, biome, name: BIOMES[biome].name });
+    const count = new Map();
+    for (let y = sy * LH; y < (sy + 1) * LH; y++) for (let x = sx * LW; x < (sx + 1) * LW; x++){ const id = regionOf[idx(x, y)]; count.set(id, (count.get(id) || 0) + 1); }
+    const top = [...count.entries()].sort((p, q) => q[1] - p[1])[0][0];
+    const r = regionById(top); const biome = biomeOf(r);
+    sectors.push({ sx, sy, biome, name: BIOMES[biome].name, country: r.id });
   }
-  const riverY = x => H * 0.5 + (rn(x, 7) - 0.5) * H * 0.7;
+}
+/* The tile texture of a biome. Noise decides where the trees stand; the biome comes from the country's marks. */
+function paintTile(t, biome, e, f){
+  let loose = null;
+  switch (biome){
+    case 'forest':
+      if (f > 0.4 && rng() < 0.55) t.feature = 'tree';
+      else if (rng() < 0.12) loose = 'stick';
+      else if (rng() < 0.02){ t.feature = 'bush'; t.berries = rint(3); }
+      break;
+    case 'meadow': case 'river':
+      if (f > 0.7 && rng() < 0.3) t.feature = 'tree';
+      else if (rng() < 0.045){ t.feature = 'bush'; t.berries = 1 + rint(4); }
+      else if (rng() < 0.02) loose = 'stick';
+      else if (rng() < 0.015) loose = 'rock';
+      else if (e < 0.3 && rng() < 0.2) t.ground = 'soil';
+      break;
+    case 'rocky':
+      if (e > 0.55 && rng() < 0.5) t.feature = 'boulder';
+      else if (rng() < 0.11) loose = 'rock';
+      else if (rng() < 0.03) t.feature = 'tree';
+      else if (rng() < 0.01){ t.feature = 'bush'; t.berries = rint(3); }
+      else if (rng() < 0.3) t.ground = 'soil';
+      break;
+    case 'wetland':
+      if (e < 0.42) t.ground = 'water';
+      else if (e < 0.5 && rng() < 0.5) t.feature = 'reeds';
+      else if (rng() < 0.03){ t.feature = 'bush'; t.berries = 1 + rint(3); }
+      else if (rng() < 0.03) loose = 'stick';
+      else if (rng() < 0.04) t.feature = 'tree';
+      break;
+    case 'ash':
+      t.ground = 'ash';
+      if (rng() < 0.05) loose = 'stick';
+      break;
+  }
+  if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
+  if (loose) t.loose = loose;
+}
+/* Every tile of the surface, from its country's biome. Levels are made fresh. */
+function paintGround(){
+  const en = makeNoise(9), fn = makeNoise(5);
   levels = []; for (let z = ZMIN; z <= ZMAX; z++) levels.push(new Array(W * H).fill(null)); world = levels[ZOFF]; raised = []; hills = []; caves = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
-    const s = sectors[secIdx(Math.floor(x / LW), Math.floor(y / LH))];
-    const e = en(x, y), f = fn(x, y), dr = Math.abs(y - riverY(x));
-    const t = makeTile(x, y, 0, 'grass');
-    let loose = null;
-    const ford = (x + 23) % 47 < 3;
-    if (dr <= 1.3) t.ground = ford ? 'sand' : 'water';
-    else if (dr <= 2.6){ t.ground = 'sand'; if (rng() < 0.08) loose = 'rock'; }
-    else switch (s.biome){
-      case 'forest':
-        if (f > 0.4 && rng() < 0.55) t.feature = 'tree';
-        else if (rng() < 0.12) loose = 'stick';
-        else if (rng() < 0.02){ t.feature = 'bush'; t.berries = rint(3); }
-        break;
-      case 'meadow':
-        if (f > 0.7 && rng() < 0.3) t.feature = 'tree';
-        else if (rng() < 0.045){ t.feature = 'bush'; t.berries = 1 + rint(4); }
-        else if (rng() < 0.02) loose = 'stick';
-        else if (rng() < 0.015) loose = 'rock';
-        else if (e < 0.3 && rng() < 0.2) t.ground = 'soil';
-        break;
-      case 'rocky':
-        if (e > 0.55 && rng() < 0.5) t.feature = 'boulder';
-        else if (rng() < 0.11) loose = 'rock';
-        else if (rng() < 0.03) t.feature = 'tree';
-        else if (rng() < 0.01){ t.feature = 'bush'; t.berries = rint(3); }
-        else if (rng() < 0.3) t.ground = 'soil';
-        break;
-      case 'wetland':
-        if (e < 0.42) t.ground = 'water';
-        else if (e < 0.5 && rng() < 0.5) t.feature = 'reeds';
-        else if (rng() < 0.03){ t.feature = 'bush'; t.berries = 1 + rint(3); }
-        else if (rng() < 0.03) loose = 'stick';
-        else if (rng() < 0.04) t.feature = 'tree';
-        break;
-    }
+    const t = makeTile(x, y, 0, 'grass'); const r = regionAt(x, y);
+    t.country = r.id;
+    paintTile(t, biomeOf(r), en(x, y), fn(x, y));
     world[idx(x, y)] = t;
-    if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
-    if (loose) t.loose = loose;
   }
-  const s0start = sectors[secIdx(SW >> 1, SH >> 1)];
-  const [cx0, cy0] = secCenter(s0start);
-  let best0 = null;
-  for (let y = s0start.sy * LH; y < (s0start.sy + 1) * LH; y++) for (let x = s0start.sx * LW; x < (s0start.sx + 1) * LW; x++){
-    if (!passable(x, y)) continue;
-    const d = dist(x, y, cx0, cy0); if (!best0 || d < best0.d) best0 = { x, y, d };
+}
+/* The river: every live boundary a wet god drew. The line and its far side are water, the next ring is sand,
+   and every forty-seventh tile along the line is a ford. */
+function paintRivers(){
+  for (const b of liveBoundaries()){
+    if (b.pole !== 'wet') continue;
+    b.tiles.forEach((i, k) => {
+      const x = i % W, y = (i - x) / W; const ford = k % 47 >= 23 && k % 47 < 26;
+      /* The line tile itself, and its neighbours on the far side of the cut. */
+      const wet = [[0, 0]].concat(DIRS.filter(([dx, dy]) => inb(x + dx, y + dy) && regionOf[idx(x + dx, y + dy)] === b.b));
+      for (const [dx, dy] of wet){ const t = world[idx(x + dx, y + dy)]; t.ground = ford ? 'sand' : 'water'; t.feature = null; t.berries = 0; t.loose = null; t.river = b.id; }
+    });
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of RING){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const t = world[idx(nx, ny)]; if (t.ground !== 'water' && !t.river){ t.ground = 'sand'; t.feature = null; t.berries = 0; if (rng() < 0.08) t.loose = 'rock'; } } }
   }
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+}
+/* A lake in the middle of a pooled country: a blob of about a seventh of its area. */
+function paintLakes(){
+  for (const r of liveRegions()){
+    if (!hasMark(r, 'pool', 'surface')) continue;
+    const { x0, y0, x1, y1 } = r.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+    const want = Math.round(r.area / 7); const jit = makeNoise(6);
+    const rad = Math.sqrt(want / Math.PI);
+    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; const d = Math.hypot(x - cx, y - cy) / rad + (jit(x, y) - 0.5) * 0.6; if (d <= 1){ const t = world[i]; t.ground = 'water'; t.feature = null; t.berries = 0; t.loose = null; t.lake = r.id; } }
+    for (const i of r.tiles){ const t = world[i]; if (t.ground === 'water') continue; if (RING.some(([dx, dy]) => inb(t.x + dx, t.y + dy) && world[idx(t.x + dx, t.y + dy)].lake)){ t.ground = 'sand'; t.feature = t.feature === 'tree' ? null : t.feature; } }
+  }
+}
+/* The first person: the start country's most central passable tile. */
+function placeFirstPerson(){
+  const s = creation.gate.start; const { x0, y0, x1, y1 } = s.bbox; const cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+  let best = null;
+  for (const i of s.tiles){ const x = i % W, y = (i - x) / W; if (!passable(x, y)) continue; const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d }; }
+  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
+  return best;
+}
+/* Everything after the ground: the hills, the water caves, the dens, the finds, and the life.
+   It runs as it always has, from the sectors the marks painted. Tasks 3 and 4 make it read marks. */
+function generateRest(best){
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   uplift();
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   cutWaterCaves(); rockfall();
   /* Rockfall is the only later step that can take a tile back out of the walkable world (a boulder where there was
      open ground). Refresh the region it changed, so a den's door isn't fooled by a bridge that just washed out. */
-  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  startRegion = reachable(best.x, best.y, 0, NZ * W * H);
   digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
   placeFinds();
-  /* First person: the centre sector, on open ground near the river if possible. */
-  const s0 = sectors[secIdx(SW >> 1, SH >> 1)];
-  const [cx, cy] = secCenter(s0);
-  let best = null;
-  for (let y = s0.sy * LH; y < (s0.sy + 1) * LH; y++) for (let x = s0.sx * LW; x < (s0.sx + 1) * LW; x++){
-    if (!passable(x, y)) continue;
-    const d = dist(x, y, cx, cy); if (!best || d < best.d) best = { x, y, d };
-  }
-  const first = makeBeing('human', best.x, best.y, takeName(), rint(360)); first.camp = camp; beings.push(first);
   /* Animals */
   const spawnAnimal = (sp, biomes, n) => {
     for (let k = 0; k < n; k++){
