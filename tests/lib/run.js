@@ -55,6 +55,7 @@ function countEvents(api, events){
     pots: api.camps.reduce((n, c) => n + (c.stash.pot || 0), 0), quarried: ev('quarries two rocks'),
     pups: ev('is born in the den') + ev('kits are born'), dragged: ev('drags its kill'),
     deaths: byCause, alive: hs.filter(h => h.alive).length, humans: hs.length, camps: api.camps.length,
+    gnomesSeen: api.camps.filter(c => c.gnomes.known).length, gnomes: api.beings.filter(b => b.alive && b.species === 'gnome').length,
   };
 }
 

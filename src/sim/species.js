@@ -106,6 +106,23 @@ Object.assign(START, {
       cleanup(){ if (a.carrying){ addItem(a.carrying.kind, a.x, a.y, a.z); a.carrying = null; } } };
     return true;
   },
+  /* Eat mushrooms off the burrow's patch. */
+  shrooms(a){
+    const c = a.den; if (!c) return false;
+    const ripe = c.patch.filter(t => t.shrooms > 0); if (!ripe.length) return false;
+    const t = ripe[a.id % ripe.length]; const p = legPath(a, t.x, t.y, 1, 0); if (!p) return false;
+    a.task = { type: 'eat', label: 'Picking mushrooms on the patch', path: p, progress: 0,
+      arrive(a, k){ if (nearAt(a, t.x, t.y) > 1){ const q = legPath(a, t.x, t.y, 1, 0); if (!q) return 'fail'; k.path = q; return 'continue'; } if (t.shrooms <= 0) return 'fail'; if (++k.progress < 8) return 'continue'; t.shrooms--; a.needs.food = Math.min(100, a.needs.food + 35); return a.needs.food < 70 && t.shrooms > 0 ? 'continue' : 'done'; } };
+    return true;
+  },
+  /* Keep company with the burrow's kin. */
+  huddle(a){
+    const kin = beings.filter(b => b.alive && b !== a && b.species === a.species && b.den === a.den).sort((p, q) => near(p, a) - near(q, a))[0];
+    if (!kin) return false;
+    if (near(kin, a) <= 1){ a.task = { type: 'socialize', label: 'Chattering with kin', path: [], wait: 20, arrive(a){ a.needs.social = Math.min(100, a.needs.social + 30); kin.needs.social = Math.min(100, kin.needs.social + 20); return 'done'; } }; return true; }
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => z === kin.z && dist(x, y, kin.x, kin.y) <= 1, 600, a); if (!p) return false;
+    a.task = { type: 'socialize', label: 'Going to kin', path: p, arrive: () => 'done' }; return true;
+  },
 });
 
 /* Wildlife comes and goes: rabbits breed and return, fawns in spring, wolves and foxes wander in from the edges. */

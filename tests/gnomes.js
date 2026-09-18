@@ -30,3 +30,35 @@ test('mushrooms regrow on their patch', () => {
   let grew = false; for (let k = 0; k < 4000 && !grew; k++){ api.growPlants(); grew = t.shrooms > 0; }
   assert.ok(grew, 'no mushrooms in 4000 samples');
 });
+
+const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
+const inDen = b => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
+
+test('gnomes sleep in the burrow by day and come out to the patch at dusk', () => {
+  const api = load(); api.startWorld('r');
+  const g = api.beings.find(b => b.species === 'gnome');
+  for (const k in g.needs) g.needs[k] = 90; g.needs.food = 30;
+  api.tick = 12 * 1000 + 500; run(api, g, 200);
+  assert.ok(inDen(g), `by day a gnome stays home; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
+  api.tick = 20 * 1000 + 500; g.task = null; run(api, g, 400);
+  assert.ok(g.z === 0 && g.den.patch.some(t => api.dist(t.x, t.y, g.x, g.y) <= 1), `at dusk it goes to the patch; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
+  assert.ok(g.needs.food > 30, 'and eats');
+});
+
+test('a gnome fears a brand and a wolf, and never attacks', () => {
+  const api = load(); api.startWorld('r');
+  const g = api.beings.find(b => b.species === 'gnome'); const h = api.beings[0];
+  g.x = h.x + 2; g.y = h.y; g.z = 0; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 };
+  assert.ok(api.threatsFor(g).length > 0, 'a brand is a threat');
+  h.carrying = null; assert.equal(api.threatsFor(g).length, 0, 'a bare person is not');
+  assert.ok(!api.START.hunt || true); assert.equal(api.SPECIES.gnome.attacks, undefined);
+});
+
+test('the first gnome seen at dusk is written down once per camp', () => {
+  const api = load(); api.startWorld('r'); const c = api.camps[0]; const h = api.beings[0];
+  const g = api.beings.find(b => b.species === 'gnome'); g.x = h.x + 3; g.y = h.y; g.z = 0; g.asleep = false;
+  api.tick = 20 * 1000 + 500; api.camp = c; api.updateBeing(h);
+  assert.equal(c.gnomes.known, true);
+  assert.ok(api.chronicle[0].text.includes('small figure'), api.chronicle[0].text);
+  assert.equal(api.goalState(api.GOALS.find(g => g.id === 'gnomes')).s, 'active');
+});

@@ -311,7 +311,7 @@ function digGnomeBurrows(){
       const under = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).find(([ux, uy]) => inb(ux, uy) && !tileAt(ux, uy).cave && !tileAt(ux, uy).mouth && clearOfCaves(ux, uy, -1, null) && !hasTile(ux, uy, -1));
       if (!under) continue;
       const c = makeCave('burrow', null); c.owner = 'gnome'; c.patch = []; c.bench = 0; c.holding = null; c.disturbed = 0;
-      const mouth = carve(c, under[0], under[1], -1); mouth.slope = true; c.mouth = mouth; c.exit = t; t.mouth = c;
+      const mouth = carve(c, under[0], under[1], -1); if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; } mouth.slope = true; c.mouth = mouth; c.exit = t; t.mouth = c;
       let [bx, by] = under; const size = 2 + rint(3);
       for (let k = 1; k < size; k++){
         const opts = shuffle(DIRS).map(([dx, dy]) => [bx + dx, by + dy]).filter(([nx, ny]) => inb(nx, ny) && !hasTile(nx, ny, -1) && clearOfCaves(nx, ny, -1, c) && !(nx === x && ny === y));
