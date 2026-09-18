@@ -23,9 +23,10 @@ function renderUI(force){
   renderTip();
   renderDrawers();
   renderWindows();
+  const sel = document.querySelector('#drawers .sel, #windows .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
-const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
-const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
+const rowClass = (id, i) => focusedDrawer() === id && ui.row[id] === i ? 'sel' : '';
+const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
   const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button></div>`
@@ -51,7 +52,6 @@ function renderDrawers(){
     ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
-  const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){

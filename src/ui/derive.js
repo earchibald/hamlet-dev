@@ -149,7 +149,6 @@ function cursorPhrase(){
 
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
-const winKey = w => w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect';
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;

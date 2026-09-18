@@ -24,6 +24,10 @@ function renderWindows(){
     body.scrollTop = keep;
   }
   for (const el of [...box.children]) if (!seen.has(Number(el.dataset.win))) el.remove();
+  ui.windows.forEach((w, n) => {
+    const el = box.querySelector(`[data-win="${w.id}"]`);
+    if (el && box.children[n] !== el) box.insertBefore(el, box.children[n] || null);
+  });
 }
 /* Drag by the bar, resize by the grip. Positions persist per kind. */
 function wireWindows(){

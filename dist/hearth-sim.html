@@ -45,6 +45,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .btn.small{padding:1px 7px;font-size:12px}
 kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .btn.on kbd{opacity:.85}
+.btn .pin{margin-left:4px;opacity:.85}
 .app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
@@ -3140,7 +3141,6 @@ function cursorPhrase(){
 
 /* Floating windows. A drawer window's target is the drawer id. An inspector's target is { being } or { tile }. */
 const sameTarget = (a, b) => typeof a === 'string' ? a === b : a.being != null ? a.being === b.being : b.tile && a.tile.join() === b.tile.join();
-const winKey = w => w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect';
 function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && sameTarget(w.target, target)); }
 function winOpen(kind, target){
   const have = winFind(kind, target); if (have) return have;
@@ -3557,6 +3557,10 @@ function renderWindows(){
     body.scrollTop = keep;
   }
   for (const el of [...box.children]) if (!seen.has(Number(el.dataset.win))) el.remove();
+  ui.windows.forEach((w, n) => {
+    const el = box.querySelector(`[data-win="${w.id}"]`);
+    if (el && box.children[n] !== el) box.insertBefore(el, box.children[n] || null);
+  });
 }
 /* Drag by the bar, resize by the grip. Positions persist per kind. */
 function wireWindows(){
@@ -3604,9 +3608,10 @@ function renderUI(force){
   renderTip();
   renderDrawers();
   renderWindows();
+  const sel = document.querySelector('#drawers .sel, #windows .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
-const rowClass = (id, i) => ui.focus === `drawer:${id}` && ui.row[id] === i ? 'sel' : '';
-const rowNum = (id, i) => ui.focus === `drawer:${id}` && i < 9 ? i + 1 : '';
+const rowClass = (id, i) => focusedDrawer() === id && ui.row[id] === i ? 'sel' : '';
+const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
   const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button></div>`
@@ -3632,7 +3637,6 @@ function renderDrawers(){
     ({ people: renderPeople, goals: renderGoals, chronicle: renderChronicle, camp: renderCamp })[id](el);
     if (el.scrollTop !== keep) el.scrollTop = keep;
   }
-  const sel = document.querySelector('#drawers .sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
   document.querySelector('.mapbox').classList.toggle('drawers-open', docked.length > 0);
 }
 function renderPeople(el){
