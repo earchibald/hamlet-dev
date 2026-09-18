@@ -53,7 +53,9 @@ const markLine = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'b
 function markRows(x, y, z){
   if (!field || inAges() || !hasTile(x, y, z)) return [];
   const t = tileAt(x, y, z), r = regionAt(x, y), rows = [];
-  if (t.hill && t.hill.mark) rows.push(['Raised by', markLine(t.hill.mark)]);
+  /* A god raises a hill with a height mark. Settle also raises one low hill for a making that needs a den, and that
+     hill holds the making's mark. It was raised for the creatures, not by the act the mark tells of. */
+  if (t.hill && t.hill.mark) rows.push(t.hill.mark.kind === 'height' ? ['Raised by', markLine(t.hill.mark)] : ['Raised for', `the ${SPECIES[t.hill.mark.value] ? SPECIES[t.hill.mark.value].plural : 'creatures'}, so they had a den. ${t.hill.mark.why}`]);
   if (t.hill && t.hill.god != null) rows.push(['Sleeping here', godLine(t.hill.god)]);
   const c = t.cave || t.mouth;
   if (c && c.mark) rows.push(['Dug by', markLine(c.mark)]);

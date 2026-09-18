@@ -513,7 +513,10 @@ test('a hill says who raised it, a cave says who dug it, and every surface tile 
   const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'godLine']);
   api.startWorld('alpha');
   const names = api.gods().map(g => g.name);
-  const hillTile = api.world.find(t => t.hill);
+  const hillTile = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind === 'height');
+  /* Settle raises a low hill for a den where a making needs one. That hill holds the making's mark, and says so. */
+  const denHill = api.world.find(t => t.hill && t.hill.mark && t.hill.mark.kind !== 'height');
+  if (denHill){ const dr = api.markRows(denHill.x, denHill.y, 0); assert.ok(dr.some(r => r[0] === 'Raised for' && /den/.test(r[1])), JSON.stringify(dr)); assert.ok(!dr.some(r => r[0] === 'Raised by')); }
   const hr = api.markRows(hillTile.x, hillTile.y, 0);
   const raised = hr.find(r => r[0] === 'Raised by');
   assert.ok(raised && names.some(n => raised[1].includes(n)), JSON.stringify(hr));
