@@ -181,6 +181,12 @@ function digDens(){
     }
   }
 }
+/* A tile is clear of other caves if none of its four neighbours on this level, the level above, or the level below
+   belongs to another cave. Slopes join levels, so a pocket beside another cave's slope would gain a second mouth. */
+function clearOfCaves(x, y, z, c){
+  for (const dz of [-1, 0, 1]) for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (hasTile(nx, ny, z + dz)){ const t = tileAt(nx, ny, z + dz); if (t.cave && t.cave !== c) return false; } }
+  return true;
+}
 function digDen(h, owner){
   const set = new Set(h.tiles);
   const rim = shuffle(rimExits(h, set));
@@ -197,6 +203,7 @@ function digDen(h, owner){
     /* A pocket must stay off the rim except at its mouth, so its other tiles sit one tile inside the footprint. */
     const inside = i => set.has(i) && !barred.has(i) && (z === -1 || erodedBy(i, set, 1));
     if (z === 0 && tileAt(ux, uy).cave) continue;
+    if (!clearOfCaves(ux, uy, z, null)) continue;
     const c = makeCave('den', h); c.owner = owner;
     const mouth = carve(c, ux, uy, z);
     if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; }
@@ -204,7 +211,7 @@ function digDen(h, owner){
     const size = burrow ? 2 + rint(3) : 2 + rint(5);
     let x = ux, y = uy;
     for (let k = 1; k < size; k++){
-      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && inside(idx(nx, ny)) && !(hasTile(nx, ny, z) && tileAt(nx, ny, z).cave));
+      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && inside(idx(nx, ny)) && !(hasTile(nx, ny, z) && tileAt(nx, ny, z).cave) && clearOfCaves(nx, ny, z, c));
       if (!opts.length) break;
       [x, y] = opts[0]; carve(c, x, y, z);
     }
@@ -247,13 +254,14 @@ function hollowUnderHill(sc, h){
   for (const [exit, under] of rim){
     const ux = under % W, uy = (under - ux) / W;
     if (tileAt(ux, uy).cave) continue;
+    if (!clearOfCaves(ux, uy, 0, null)) continue;
     const c = makeCave('hollow', h); c.owner = 'sprite';
     const mouth = carve(c, ux, uy, 0);
     if (!mouth){ caves.splice(caves.indexOf(c), 1); continue; }
     c.mouth = mouth; c.exit = exit; exit.mouth = c;
     let x = ux, y = uy; const size = 3 + rint(3);
     for (let k = 1; k < size; k++){
-      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && set.has(idx(nx, ny)) && erodedBy(idx(nx, ny), set, 1) && !tileAt(nx, ny).cave);
+      const opts = shuffle(DIRS).map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => inb(nx, ny) && set.has(idx(nx, ny)) && erodedBy(idx(nx, ny), set, 1) && !tileAt(nx, ny).cave && clearOfCaves(nx, ny, 0, c));
       if (!opts.length) break;
       [x, y] = opts[0]; carve(c, x, y, 0);
     }
@@ -303,9 +311,11 @@ function component(list, seed){
     for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (set.has(j) && !seen.has(j)){ seen.add(j); q.push(j); } } }
   return [...seen];
 }
-/* A footprint fits if it stays off the map edge, out of the start sector, off other hills, and three tiles from any water or riverbank. */
+/* A footprint fits if it stays off the map edge, out of the start sector, off other hills, three tiles from any
+   water or riverbank, and beside ground the first person can walk to. */
 function hillFits(foot, start){
   const set = new Set(foot);
+  let opensOut = false;
   for (const i of foot){
     const x = i % W, y = (i - x) / W;
     const sc = secOf(x, y); if (sc.sx === start.sx && sc.sy === start.sy) return false;
@@ -314,8 +324,9 @@ function hillFits(foot, start){
       const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const q = world[idx(nx, ny)];
       if (q.ground === 'water' || q.ground === 'sand' || (q.hill && !set.has(idx(nx, ny)))) return false;
     }
+    for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny) || set.has(idx(nx, ny))) continue; if (passable(nx, ny) && startRegion.has(idx3(nx, ny, 0))) opensOut = true; }
   }
-  return true;
+  return opensOut;
 }
 /* A tile is inside the shape eroded by d if every tile within d of it is in the set. */
 function erodedBy(i, set, d){ const x = i % W, y = (i - x) / W; for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.abs(dx) + Math.abs(dy) <= d && (!inb(x + dx, y + dy) || !set.has(idx(x + dx, y + dy)))) return false; return true; }
@@ -404,7 +415,6 @@ function generate(){
     if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
     if (loose) t.loose = loose;
   }
-  uplift();
   const s0start = sectors[secIdx(SW >> 1, SH >> 1)];
   const [cx0, cy0] = secCenter(s0start);
   let best0 = null;
@@ -412,6 +422,8 @@ function generate(){
     if (!passable(x, y)) continue;
     const d = dist(x, y, cx0, cy0); if (!best0 || d < best0.d) best0 = { x, y, d };
   }
+  startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
+  uplift();
   startRegion = reachable(best0.x, best0.y, 0, NZ * W * H);
   cutWaterCaves(); rockfall();
   /* Rockfall is the only later step that can take a tile back out of the walkable world (a boulder where there was
