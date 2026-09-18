@@ -48,3 +48,44 @@ test('fibre is picked from the reeds and cord is twisted at the stash', () => {
   assert.equal(c.stash.cord, 2); assert.equal(c.stash.fibre, 0);
   assert.ok(api.chronicle[0].text.includes('twists'), api.chronicle[0].text);
 });
+
+test('the workshop is built by the pit, then a basket and a rod are made there', () => {
+  const { api, a, c } = readyCamp();
+  c.stash.log = 6; c.stash.stick = 10; c.stash.rock = 4; c.stash.cord = 5; c.stash.fibre = 6;
+  assert.equal(api.goalState(goal(api, 'workshop')).s, 'active');
+  assert.equal(api.goalState(goal(api, 'basket')).s, 'blocked', 'no workshop yet');
+  doOffer(api, a, 'build the workshop');
+  assert.ok(c.workshop, 'no workshop site'); assert.equal(api.tileAt(...c.workshop).struct.type, 'workshop');
+  assert.equal(c.stash.log, 0); assert.equal(c.stash.stick, 0); assert.equal(c.stash.rock, 0);
+  assert.equal(api.goalState(goal(api, 'workshop')).s, 'done');
+  assert.equal(api.goalState(goal(api, 'basket')).s, 'active');
+  doOffer(api, a, 'weave a basket');
+  assert.equal(c.tools.basket, 1); assert.equal(c.stash.cord, 2);
+  c.stash.stick = 1;
+  doOffer(api, a, 'make a fishing rod');
+  assert.equal(c.tools.rod, 1); assert.equal(c.stash.cord, 0); assert.equal(c.stash.stick, 0);
+  assert.equal(api.chronicle[0].kind, 'major');
+});
+
+test('a basket lets a gatherer carry three more', () => {
+  const { api, a, c } = readyCamp();
+  for (let k = 0; k < 12; k++) api.addItem('stick', c.stashTile[0] + 3 + (k % 4), c.stashTile[1] + 2 + Math.floor(k / 4));
+  for (const t of api.world) if (t.struct === null && Math.abs(t.x - c.stashTile[0]) <= 8 && Math.abs(t.y - c.stashTile[1]) <= 8){ t.feature = null; if (t.ground === 'water') t.ground = 'grass'; }
+  a.skills.gather = 0; c.stash.stick = 0;
+  api.startGather(a, 'stick'); for (let k = 0; k < 400 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  assert.equal(c.stash.stick, 3, 'three sticks a trip without a basket');
+  c.tools.basket = 1; c.stash.stick = 0;
+  api.startGather(a, 'stick'); for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  assert.equal(c.stash.stick, 6, 'six a trip with a basket');
+});
+
+test('startBuild speeds work by the passed skill, not just the label', () => {
+  const runs = craft => {
+    const { api, a, c } = readyCamp();
+    a.skills.craft = craft;
+    assert.ok(api.startBuild(a, c.stashTile, 30, 'twist cord', () => {}, 'craft'));
+    let n = 0; for (; n < 200 && a.task; n++) api.runTask(a);
+    return n;
+  };
+  assert.ok(runs(4) < runs(0), 'craft 4 should finish in fewer runTask calls than craft 0');
+});

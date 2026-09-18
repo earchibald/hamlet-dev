@@ -25,12 +25,12 @@ function startFetchEmber(a){
 /* ---------- task builders (humans) ---------- */
 /* Continue straight into a new task from inside an old one. */
 function chain(a, old, ok){ if (!ok) return null; a.task.started = old.started; a.task.key = old.key; return 'continue'; }
-function startBuild(a, at, work, label, done){
+function startBuild(a, at, work, label, done, skill){
   const p = legPath(a, at[0], at[1], 1); if (!p) return false;
   a.task = { type: 'work', label: `Walking to ${label.toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: at, within: 1,
     arrive(a, t){
       if (nearAt(a, at[0], at[1]) > 1){ const q = legPath(a, at[0], at[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
-      t.progress += workSpeed(a, /cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build'); t.label = `${label} (${Math.min(99, Math.floor(t.progress / work * 100))}%)`;
+      t.progress += workSpeed(a, skill || (/cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build')); t.label = `${label} (${Math.min(99, Math.floor(t.progress / work * 100))}%)`;
       if (t.progress < work) return 'continue';
       done(a); return 'done';
     } };
@@ -69,7 +69,7 @@ function startGather(a, kind){
       removeItem(it);
       if (a.carrying) a.carrying.count++; else a.carrying = { kind, count: 1 };
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
-      if (a.carrying.count < Math.min(6, 3 + Math.floor(a.skills.gather / 2))){
+      if (a.carrying.count < Math.min(9, 3 + Math.floor(a.skills.gather / 2) + (camp.tools.basket ? 3 : 0))){
         let nxt = null;
         const q = bfs(a.x, a.y, a.z, (x, y, z) => { const j = itemAt(x, y, z); if (z >= 0 && j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300, a);
         if (q && nxt) return chain(a, t, startGather(a, kind)) || chain(a, t, startDeliver(a)) || 'done';

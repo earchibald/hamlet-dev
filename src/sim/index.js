@@ -21,7 +21,7 @@ function source(){
 const API = `return {
   startWorld, step, lightTile, poke, pitLit, goalState, GOALS, START, SPECIES, GROUND, ITEMS,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre,
+  RECIPES, recipeGoal, placeFor, offersFor, setSite, startPickFibre, startGather, startBuild, addItem,
   runTask, updateBeing, dropCarried,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt,
   near, nearAt, ZMIN, ZMAX, ZOFF, NZ, W, H,

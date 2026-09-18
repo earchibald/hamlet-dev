@@ -17,13 +17,13 @@ function nearFind(x, y, pred, offs = NEAR, z = 0){
 }
 function tileFlam(t){
   let f = t.feature ? MATERIALS[matOf(t)].flam : GROUND[t.ground].flam;
-  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)) f = Math.max(f, 0.3);
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)) f = Math.max(f, 0.3);
   const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, MATERIALS[ITEMS[it.kind].mat].flam);
   return f;
 }
 function tileFuel(t){
   let f = t.feature ? FEATURES[t.feature].fuel : GROUND[t.ground].fuel;
-  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)) f = Math.max(f, 60);
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)) f = Math.max(f, 60);
   const it = itemAt(t.x, t.y, t.z); if (it) f = Math.max(f, ITEMS[it.kind].fuel);
   return f;
 }

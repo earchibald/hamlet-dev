@@ -6,7 +6,7 @@ function burnOut(t){
   if (t.feature && MATERIALS[matOf(t)].flam > 0){ t.feature = null; t.berries = 0; }
   if (!t.feature && t.ground === 'grass') t.ground = 'ash';
   if (t.struct && t.struct.type === 'snare'){ const sn = t.struct.snare, k = sn.camp.snares.indexOf(sn); if (k >= 0) sn.camp.snares.splice(k, 1); t.struct = null; }
-  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse'].includes(t.struct.type)){ const c = t.struct.camp, k = t.struct.type; if (c){ if (k === 'rack') c.rack = null; else if (k === 'leanto') c.shelter = null; else if (k === 'storehouse') c.storehouse = null; else c.huts = c.huts.filter(h => h[0] !== t.x || h[1] !== t.y); log(`The ${k === 'leanto' ? 'lean-to' : k === 'rack' ? 'drying rack' : k} burns down.`, [], 'bad'); } t.struct = null; }
+  if (t.struct && ['rack', 'leanto', 'hut', 'storehouse', 'workshop'].includes(t.struct.type)){ const c = t.struct.camp, k = t.struct.type; if (c){ if (k === 'rack') c.rack = null; else if (k === 'leanto') c.shelter = null; else if (k === 'storehouse') c.storehouse = null; else if (k === 'workshop') c.workshop = null; else c.huts = c.huts.filter(h => h[0] !== t.x || h[1] !== t.y); log(`The ${k === 'leanto' ? 'lean-to' : k === 'rack' ? 'drying rack' : k} burns down.`, [], 'bad'); } t.struct = null; }
   const before = items.length; items = items.filter(i => i.x !== t.x || i.y !== t.y || i.z !== t.z || MATERIALS[ITEMS[i.kind].mat].flam === 0); if (items.length !== before) rebuildItemGrid();
 }
 
