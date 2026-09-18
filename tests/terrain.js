@@ -281,3 +281,14 @@ test('standing in a hollow costs the camp favour and the sprites notice', () => 
   assert.ok(person.thoughts.some(t => t.key === 'inhollow'));
   assert.ok(A.beings.some(b => b.species === 'sprite' && b.grove === g && b.thoughts.some(t => t.key === 'intruder')));
 });
+
+for (const seed of SEEDS) test(`seed ${seed}: each deep chamber holds one find`, () => {
+  const api = load(); api.startWorld(seed);
+  for (const c of api.caves.filter(c => c.kind === 'water')){
+    const here = api.items.filter(i => i.x === c.deep.x && i.y === c.deep.y && i.z === -2);
+    assert.equal(here.length, 1, `deep chamber under hill ${c.hill.x},${c.hill.y} holds ${here.length} items`);
+    assert.ok(['firestones', 'moss', 'bones'].includes(here[0].kind), here[0].kind);
+    assert.equal(api.itemAt(c.deep.x, c.deep.y, -2), here[0]);
+  }
+  assert.ok(api.items.every(i => i.z >= 0 || (api.hasTile(i.x, i.y, i.z) && api.tileAt(i.x, i.y, i.z).cave)), 'no item lies in solid earth');
+});

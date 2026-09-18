@@ -276,6 +276,10 @@ function hollowUnderHill(sc, h){
   }
   return null;
 }
+/* Every deep chamber holds one thing worth the walk: firestones, glowing moss, or old bones. */
+function placeFinds(){
+  for (const c of caves) if (c.deep) addItem(['firestones', 'moss', 'bones'][rint(3)], c.deep.x, c.deep.y, c.deep.z);
+}
 /* ---------- uplift: hills ---------- */
 /* Six to ten hills on rocky and forest ground, never on the river, never in the start sector. A hill is rock at
    level 0 with a floor above it. A tall hill has a second storey: the footprint eroded inward by 2, rock at
@@ -432,6 +436,7 @@ function generate(){
   digDens();
   items = []; itemGrid = new Array(NZ * W * H).fill(null);
   for (const t of world){ if (t.loose){ addItem(t.loose, t.x, t.y); delete t.loose; } }
+  placeFinds();
   /* First person: the centre sector, on open ground near the river if possible. */
   const s0 = sectors[secIdx(SW >> 1, SH >> 1)];
   const [cx, cy] = secCenter(s0);
