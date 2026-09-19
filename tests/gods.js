@@ -3,13 +3,20 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
 
+/* The newest gesture of a kind in the age on record. The list is replaced at the head of each age. */
+function last(api, kind){
+  const rows = api.creation.gestures.filter(rec => rec.kind === kind);
+  assert.ok(rows.length, `no ${kind} gesture was recorded`);
+  return rows[rows.length - 1];
+}
+
 test('a creation opens the gods era with one formless region and no god', () => {
   const api = load(); api.startCreation('r');
   assert.equal(api.era, 'gods'); assert.equal(api.age, 0);
   assert.equal(api.liveRegions().length, 1);
   assert.equal(api.gods().length, 0);
   assert.deepEqual(api.legends, []);
-  assert.deepEqual(api.creation, { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {} });
+  assert.deepEqual(api.creation, { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1 });
   assert.ok(api.godRng);
 });
 
@@ -161,6 +168,9 @@ test('burning scars another god\'s country and offends it', () => {
   assert.equal(api.biomeOf(target), 'ash');
   assert.equal(a.needs.calm, calm - 20);
   assert.equal(a.opinions[hot.id], -10);
+  const rec = last(api, 'burn');
+  assert.equal(rec.god, hot.id); assert.equal(rec.region, target.id);
+  assert.ok(target.tiles.includes(rec.to), 'the burn ends outside the country it burned');
 });
 
 test('freeze, hide, and show write their own mark kinds', () => {
@@ -169,6 +179,9 @@ test('freeze, hide, and show write their own mark kinds', () => {
     const { g, r } = godWith(api, pole);
     api.withGodRng(() => { assert.ok(api.GOD_ACTS[act].apply(g, r)); });
     assert.ok(api.hasMark(r, act, true), `${act} left no mark`);
+    /* The three of them wash a country over, so they share one gesture kind and differ by value. */
+    const rec = last(api, 'wash');
+    assert.equal(rec.value, act); assert.equal(rec.region, r.id);
   }
 });
 
@@ -189,6 +202,11 @@ test('rivals battle, the winner marks the country, and the loser\'s mark is a sc
   assert.ok(api.legends.some(e => e.text.includes(`${winner.name} wins`)));
   assert.equal(loser.opinions[winner.id], -60);
   assert.equal(winner.opinions[loser.id], -50);
+  const rec = last(api, 'battle');
+  assert.equal(rec.god, a.id); assert.equal(rec.other, b.id);
+  assert.equal(rec.winner, winner.id); assert.equal(rec.loser, loser.id);
+  assert.equal(rec.scar, api.SCAR_OF[winner.pole]);
+  assert.ok(target.tiles.includes(rec.to));
 });
 
 test('a twist needs a scar and a making', () => {
@@ -199,6 +217,8 @@ test('a twist needs a scar and a making', () => {
   assert.ok(api.GOD_ACTS.twist.targets(g).includes(r));
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.twist.apply(g, r)); });
   assert.ok(api.hasMark(r, 'twist', 'rabbit'));
+  const rec = last(api, 'twist');
+  assert.equal(rec.species, 'rabbit'); assert.equal(rec.region, r.id);
 });
 
 test('a god whose pole is unmade from the whole field dies, and leaves a scar', () => {
@@ -213,6 +233,9 @@ test('a god whose pole is unmade from the whole field dies, and leaves a scar', 
   assert.deepEqual(api.awakeGods(), [a]);
   assert.ok(api.legends.some(e => e.text.includes(`${b.name} is no more`)));
   assert.ok(api.liveRegions().some(q => api.marksOf(q, 'scar').some(m => m.by === b.id)), 'no scar for the dead god');
+  const rec = last(api, 'unmade');
+  assert.equal(rec.god, b.id); assert.equal(rec.from, rec.to, 'an unmade god walks');
+  assert.equal(rec.weighed, null);
 });
 
 test('a country with a height pole but nothing raised or dug can be a start', () => {
@@ -299,4 +322,176 @@ test('a lack of fae strains a pole that makes fae', () => {
   api.step();
   api.withGodRng(() => api.strain('fae'));
   assert.ok(api.polesThatMake('fae').some(p => api.godOf(p)), 'no god of a fae-making pole after the strain');
+});
+
+/* ---------- the gesture record ----------
+   A gesture is what an act looked like. No rule reads one, so these tests watch the record itself:
+   that it is plain, that it holds one row an act, and that a god's anchor moves only when it should. */
+
+/* Step a creation age by age and keep every gesture, with the age it belonged to. */
+function gesturesOf(seed, api = load()){
+  api.startCreation(seed);
+  const all = [];
+  let guard = 0;
+  while (api.era === 'gods' && guard++ < api.options.ageLimit * 2 + 2){
+    api.step();
+    assert.equal(api.creation.gestureAge, api.age, 'the gesture age is not this age');
+    for (const r of api.creation.gestures) all.push(r);
+  }
+  return { api, all };
+}
+
+test('every gesture is plain data, and survives a round trip through JSON', () => {
+  for (const seed of ['r', 'x', 'alpha']){
+    const { all } = gesturesOf(seed);
+    assert.ok(all.length > 5, `${seed} recorded only ${all.length} gestures`);
+    assert.deepEqual(JSON.parse(JSON.stringify(all)), all, `${seed} lost something in a round trip`);
+    for (const rec of all){
+      assert.equal(typeof rec.kind, 'string'); assert.equal(typeof rec.god, 'number'); assert.equal(typeof rec.age, 'number');
+      assert.ok(rec.to === null || typeof rec.to === 'number');
+      assert.ok(rec.from === null || typeof rec.from === 'number');
+      assert.ok(rec.said === null || typeof rec.said === 'number');
+      for (const k in rec){
+        const v = rec[k];
+        if (k === 'weighed' && v) { assert.ok(Array.isArray(v.opts)); continue; }
+        if (Array.isArray(v)){ for (const n of v) assert.equal(typeof n, 'number', `${rec.kind}.${k} holds something that is not a number`); continue; }
+        assert.ok(v === null || typeof v !== 'object', `${rec.kind}.${k} points at an object`);
+      }
+    }
+  }
+});
+
+test('a gesture names a god, an age, and a line that exists', () => {
+  const { api, all } = gesturesOf('r');
+  for (const rec of all){
+    assert.ok(api.beings.some(b => b.id === rec.god), `gesture ${rec.kind} names no god`);
+    assert.ok(rec.age >= 1 && rec.age <= api.creation.ages);
+    if (rec.said !== null) assert.ok(api.legends[rec.said], `gesture ${rec.kind} names legend ${rec.said}, which is not there`);
+  }
+});
+
+test('one gesture an act: every god that acted in an age left exactly one row', () => {
+  const api = load(); api.startCreation('x');
+  let guard = 0;
+  while (api.era === 'gods' && guard++ < api.options.ageLimit * 2 + 2){
+    const before = new Map(api.gods().map(g => [g.id, g.acted]));
+    api.step();
+    for (const g of api.gods()){
+      if (!before.has(g.id)) continue;
+      const acted = g.acted - before.get(g.id);
+      const rows = api.creation.gestures.filter(rec => rec.god === g.id && rec.kind !== 'born' && rec.kind !== 'unmade' && rec.kind !== 'backstop');
+      if (acted) assert.equal(rows.length, 1, `${g.name} acted and left ${rows.length} gestures in age ${api.age}`);
+    }
+    /* A god born in this age leaves one birth row, and nothing is born twice. */
+    const born = api.creation.gestures.filter(rec => rec.kind === 'born');
+    assert.equal(new Set(born.map(rec => rec.god)).size, born.length);
+  }
+});
+
+test('a continuing task carries no decision, and an act that was decided carries one', () => {
+  const { all } = gesturesOf('alpha');
+  let carried = 0, stepped = 0;
+  for (const rec of all){
+    if (rec.kind === 'born' || rec.kind === 'unmade' || rec.kind === 'backstop'){ assert.equal(rec.weighed, null, `${rec.kind} carries a decision`); continue; }
+    if ((rec.kind === 'raise' || rec.kind === 'dig') && rec.step > 1){ assert.equal(rec.weighed, null, 'a task carried on from an earlier age carries a decision'); stepped++; continue; }
+    assert.ok(rec.weighed, `${rec.kind} was decided this age and carries no decision`);
+    assert.ok(rec.weighed.opts.length <= 3);
+    assert.ok(typeof rec.weighed.picked === 'string');
+    carried++;
+  }
+  assert.ok(carried > 0 && stepped > 0, `${carried} decided, ${stepped} carried on`);
+});
+
+test('a born god fades in where it stands, and nothing walks to get there', () => {
+  const { api, all } = gesturesOf('r');
+  const born = all.filter(rec => rec.kind === 'born');
+  assert.ok(born.length >= 2);
+  for (const rec of born){
+    assert.equal(rec.from, null, 'a birth walks');
+    const r = api.regionById(rec.region);
+    assert.ok(r, 'a birth names no country');
+    assert.ok(r.tiles.includes(rec.to), 'a god is born outside the country it holds');
+  }
+});
+
+test('an anchor moves only when its god acted, or when its tile left its country', () => {
+  const api = load(); api.startCreation('beta');
+  let guard = 0;
+  while (api.era === 'gods' && guard++ < api.options.ageLimit * 2 + 2){
+    const before = new Map(api.gods().map(g => [g.id, g.at]));
+    api.step();
+    if (api.era !== 'gods') break;
+    for (const g of api.gods()){
+      if (!before.has(g.id) || g.at === before.get(g.id)) continue;
+      const moved = api.creation.gestures.some(rec => rec.god === g.id);
+      const left = g.region !== null && !api.regionById(g.region).tiles.includes(before.get(g.id));
+      assert.ok(moved || left, `${g.name} moved in age ${api.age} without acting, and its tile had not left its country`);
+    }
+  }
+});
+
+test('the cut keeps its own order, and the gesture sorts a copy', () => {
+  const { api, all } = gesturesOf('r');
+  /* boundary.tiles is state: paintRivers places a ford by the index along it. It must stay as splitRegion built it. */
+  for (const b of api.boundaries){
+    for (let k = 1; k < b.tiles.length; k++) assert.ok(b.tiles[k] > b.tiles[k - 1], `boundary ${b.id} is out of ascending order at ${k}`);
+  }
+  const splits = all.filter(rec => rec.kind === 'split');
+  assert.ok(splits.length >= 2);
+  let reordered = 0;
+  for (const rec of splits){
+    const b = api.boundaries.find(q => q.a === rec.near && q.b === rec.far);
+    assert.ok(b, 'a split gesture names no boundary');
+    assert.deepEqual(rec.line.slice().sort((p, q) => p - q), b.tiles.slice(), 'the line holds other tiles than the cut');
+    assert.ok(rec.line.includes(rec.to), 'a split ends off its own line');
+    if (rec.line.some((i, k) => i !== b.tiles[k])) reordered++;
+  }
+  assert.ok(reordered > 0, 'no split gesture reordered its line, so the sort proves nothing');
+});
+
+test('the heart of a region is the tile nearest the mean, and a tie goes to the lowest index', () => {
+  const api = load(); api.startWorld('r');
+  api.initField();
+  const root = api.field.root;
+  const h = api.heartTile(root);
+  const x = h % api.W, y = Math.floor(h / api.W);
+  /* The root is the whole map, so its mean is the middle of it. */
+  assert.ok(Math.abs(x - (api.W - 1) / 2) <= 1 && Math.abs(y - (api.H - 1) / 2) <= 1, `the heart of the whole map is ${x},${y}`);
+  /* A hand-made region of four tiles around a point: every one is the same distance, so the lowest index wins. */
+  const fake = { tiles: [0, 1, api.W, api.W + 1] };
+  assert.equal(api.heartTile(fake), 0);
+  assert.equal(api.heartTile({ tiles: [] }), null);
+  assert.equal(api.heartTile(null), null);
+  const one = { tiles: [4242] };
+  assert.equal(api.heartTile(one), 4242);
+});
+
+test('the line is sorted along its wider axis, and the cut itself is untouched', () => {
+  const api = load(); api.startWorld('r');
+  api.initField();
+  const cut = api.withGodRng(() => api.splitRegion(api.field.root, { id: 901, pole: 'hot', traits: { patience: 0 } }));
+  const kept = cut.boundary.tiles.slice();
+  const line = api.sortLine(cut.boundary.tiles);
+  assert.deepEqual(cut.boundary.tiles, kept, 'sortLine changed the list it was given');
+  /* The cut runs down the map, so the line is ordered by row. */
+  const ys = line.map(i => Math.floor(i / api.W));
+  for (let k = 1; k < ys.length; k++) assert.ok(ys[k] >= ys[k - 1], `the line goes back up the map at ${k}`);
+  assert.deepEqual(line.slice().sort((p, q) => p - q), kept.slice().sort((p, q) => p - q));
+});
+
+test('the wearied god leaves a gesture like any other act', () => {
+  /* A short age limit forces the backstop, which marks the field itself. */
+  const api = load(); api.startCreation('r', { ageLimit: 3 });
+  let rec = null, guard = 0;
+  while (api.era === 'gods' && guard++ < 20){
+    api.step();
+    const rows = api.creation.gestures.filter(q => q.kind === 'backstop');
+    if (rows.length) { rec = rows[rows.length - 1]; break; }
+  }
+  assert.ok(rec, 'the backstop left no gesture');
+  assert.ok(api.creation.backstops > 0);
+  assert.ok(api.gods().some(g => g.id === rec.god), 'the backstop names no god');
+  assert.equal(typeof rec.lack, 'string');
+  assert.equal(rec.weighed, null, 'the backstop is not a decision');
+  assert.ok(api.regionById(rec.region).tiles.includes(rec.to));
 });
