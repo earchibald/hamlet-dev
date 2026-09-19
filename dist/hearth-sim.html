@@ -202,7 +202,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
-      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>Shift+4</kbd></button></span>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1" data-pace="0.25">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4" data-pace="0.5">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16" data-pace="1">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64" data-pace="2">64×<kbd>Shift+4</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
@@ -6572,10 +6572,12 @@ const ui = {
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
-/* The creation ages still tick on this ladder for now. With a beat of 1000 ms, steps 16 and 64 both
-   render as tier 'none' and cannot be told apart. A later change replaces this with PACES. */
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
+/* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
+   page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
+const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -6607,6 +6609,9 @@ const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
+/* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
+   of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
+function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -7266,8 +7271,9 @@ for (const t of TOOLS){
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
-/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows. */
-SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Speed ${v}\u00d7`, button: `speed${v}` }));
+/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
+   The label names both ladders, since the same row serves the ages and the days. */
+SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Pace ${PACE_LABEL[PACES[i]]} \u00b7 Speed ${SPEED_LABEL[v]}`, button: `speed${v}` }));
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
@@ -8297,8 +8303,16 @@ function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
-function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
+/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+   loop, since they change only when the era or the ladder changes, not every frame. */
+function relabelSpeeds(labels, key){
+  document.querySelectorAll('#speeds .btn').forEach(b => {
+    const label = labels[Number(b.dataset[key])];
+    if (label !== undefined) b.firstChild.textContent = label;
+  });
+}
+function setSpeed(s){ speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -8541,10 +8555,10 @@ const ACTIONS = {
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
   step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; step(true); ui.playing = true; } else step(); renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
-  slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
-  faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
+  slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
+  faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
-  speedStep(i){ ACTIONS.speed(SPEEDS[clamp(i, 0, SPEEDS.length - 1)]); },
+  speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
@@ -8682,7 +8696,7 @@ function initUI(){
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
-  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(b.dataset.speed)); });
+  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(inAges() ? b.dataset.pace : b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);

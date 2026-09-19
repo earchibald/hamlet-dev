@@ -5,6 +5,9 @@ const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
+/* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
+   of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
+function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;

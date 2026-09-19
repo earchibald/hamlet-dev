@@ -67,10 +67,12 @@ const ui = {
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
-/* The creation ages still tick on this ladder for now. With a beat of 1000 ms, steps 16 and 64 both
-   render as tier 'none' and cannot be told apart. A later change replaces this with PACES. */
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
+/* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
+   page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
+const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };

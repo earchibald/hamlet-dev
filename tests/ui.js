@@ -1261,6 +1261,14 @@ test('each speed button has a direct key, Shift with its place on the ladder, fr
   assert.equal(typeof api.ACTIONS.speedStep, 'function');
 });
 
+test('the ladders differ by era: a quarter, a half, single and double in the ages, the old four in the days', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'ladder', 'PACES', 'SPEEDS', 'startCreation', 'runAges']);
+  api.startCreation('gamma', {});
+  assert.deepEqual(api.ladder(), api.PACES, 'the ages run on the pace ladder');
+  api.runAges();
+  assert.deepEqual(api.ladder(), api.SPEEDS, 'the days run on the speed ladder');
+});
+
 test('a folded stage names its idle goals, and says nothing more when it is unfolded or has none', () => {
   const api = loadUI(['state', 'derive'], [...DERIVE, 'foldLine']);
   const late = day21(); late.camp.tools.rod = true; late.camp.stash.fish = 4;
