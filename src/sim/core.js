@@ -92,8 +92,13 @@ const BIOMES = {
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
 
-/* Seeded random numbers. */
-function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+/* Seeded random numbers. A stream's whole state is one 32-bit number, and a snapshot reads it and sets it. */
+function mulberry32(a){
+  const f = function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  f.state = () => a | 0; f.setState = n => { a = n | 0; };
+  return f;
+}
+const streamState = f => f.state(), setStreamState = (f, n) => f.setState(n);
 function hashSeed(s){ let h = 2166136261; for (const c of String(s)){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 let rng = Math.random;
 const rint = n => Math.floor(rng() * n);

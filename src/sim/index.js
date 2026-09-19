@@ -20,6 +20,7 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
+  mulberry32, streamState, setStreamState,
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
