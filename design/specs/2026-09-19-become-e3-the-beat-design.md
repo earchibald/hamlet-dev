@@ -210,10 +210,43 @@ The figure is drawn on the map canvas, in the palette already defined, and fades
 never a sprite sheet and never an emoji: the game draws its own marks, so the interface draws in the
 same hand.
 
-The design of those marks is a visual question and is settled by mockup, not by prose. The mockups
-decide: the shape of each figure, where the word sits relative to the figure and the ground, how a
-figure reads against a dark country and a light one, and what happens when two acts in consecutive
-beats touch the same country.
+### What the mockups settled
+
+**The mark and its word sit together on the ground that changed.** The word is set under the mark, in
+the map's ink over a struck outline, so it reads on any country colour. It is not a training wheel
+and it does not fade away once learned: eighteen marks is more than anyone learns at once, and the
+word goes on helping a player who does not want to learn eighteen marks.
+
+**The detail comes on hover, not on the map.** A plate carrying the god, the act and the place reads
+well standing still and badly in motion — chrome that appears and vanishes eighty times a creation.
+So that line becomes the mark's hover card: the sentence, the age and the act's place in it, what the
+country was and is becoming, and what the god weighed.
+
+The same card comes up from the act's cell in the timeline. So an act stays readable long after its
+mark has faded, and the transient thing on the map and the permanent record under it say the same
+thing. This is the E2 rule kept: the view derives a taken row only for a record the engine wrote, so
+the weighed line is shown for those and withheld for a `byPlayer` record until a later slice stores
+the row.
+
+**The foot is unchanged.** It goes on carrying the full sentence, as it does today.
+
+**A finished mark fades over the beat after it**, rather than vanishing when the next begins, so a
+player who looked away for one act can still see what they missed. Two marks are never at full
+strength at once.
+
+**One stroke language.** Every mark is drawn on the map canvas in a 48-unit box, one weight, round
+caps, in the palette's own ink, over a disc of the map's background at just over half strength. They
+are strokes, never sprites and never emoji: the map already draws sprites for people and creatures,
+and a god's act is not a thing on the ground but something done to it, so it reads as a stamp over
+the ground rather than an object in it. Pairs read against each other — raise and dig are one chevron
+flipped, hide and show one circle closed and radiating.
+
+**The beat has four stages**, scaled by the tier: the star walks and the weighing ring shows (to 25
+per cent), the mark draws itself stroke by stroke while the act's own effect runs with it (to 60),
+the word appears and the ground cross-fades (to 85), everything holds (to the end). A stepped beat
+holds until the player presses again.
+
+The mockups are at `https://claude.ai/artifact/BzQJ1Fi6WE3Kyi3zrGirq1`.
 
 ## Take a god
 
