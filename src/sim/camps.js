@@ -6,7 +6,9 @@ function makeCamp(name){
     tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
   /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
      gets its first name record once someone is there to give it one: at the site (`setSite`),
-     or, failing that, at the hearth (`nameCampAtHearth`). */
+     or, failing that, at the hearth (`nameCampAtHearth`). A placeholder such as "The first camp"
+     is not a name; do not give it one here, or its name history would start with a name nobody
+     gave it. */
   c.names = []; c.namedAt = 0; c.founder = null; c.villageNamed = 0;
   camps.push(c); return c;
 }
@@ -58,9 +60,11 @@ function chooseSite(a){
     if (!best || sc > best.sc) best = { x, y, sc, why };
   }
   if (!best) return false;
+  /* The actor wins the name: whoever chose the spot named it, not whoever `setSite`
+     might otherwise pick as the most sociable person standing there. */
+  nameFoundersCamp(camp, a);
   setSite(best.x, best.y);
   camp.siteReason = best.why.join(', ');
-  nameFoundersCamp(camp, a);
   log(`${a.name} picks a spot for the camp: ${best.why.join(', ')}.`, [a], 'major');
   return true;
 }
@@ -68,11 +72,12 @@ function setSite(x, y){
   camp.site = [x, y];
   const st = nearFind(x, y, t => passable(t.x, t.y) && !t.feature, RING) || tileAt(x, y);
   camp.stashTile = [st.x, st.y];
-  /* A site set from any door (the founder's own choice, or the player's) gets a founder
-     record from whoever is there to name it, so a camp raised through `inject()` is
-     never left carrying "The first camp". */
-  const founder = namerFor([x, y]);
-  if (founder) nameFoundersCamp(camp, founder);
+  /* A fallback only: when nobody has named this camp yet (the door's site act, or any
+     other path that sets a site without an actor of its own), give it a founder from
+     whoever is there to name it, so a camp raised through `inject()` is never left
+     carrying "The first camp". A caller that already named the camp (`chooseSite`) is
+     never overridden here. */
+  if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
 /* A wildfire within reach of the camp, for fetching an ember. */
 function nearbyBlaze(){

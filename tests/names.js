@@ -259,3 +259,24 @@ test('every camp line reads without "The first camp"', () => {
   const { events } = runDays('r', 12);
   assert.equal(events.filter(e => e.text.includes('The first camp')).length, 0);
 });
+
+test('the actor names the camp when a site is chosen, even when a campmate is more sociable', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(), c = api.camps[0]; api.camp = c;
+  const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0);
+  mate.camp = c; mate.homeless = false; api.beings.push(mate);
+  a.traits.sociability = 0.1; mate.traits.sociability = 0.9;
+  assert.ok(api.chooseSite(a), 'no site');
+  assert.equal(c.names.length, 1, 'setSite must not add a second record on top of the actor\'s');
+  assert.equal(c.names[0].by, a.id, 'the camp is named for whoever chose the spot, not the more sociable campmate');
+  assert.equal(c.founder, a.id);
+});
+
+test('a site set with nobody named as the actor (the door\'s path) still gets a founder', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(), c = api.camps[0]; api.camp = c;
+  api.setSite(a.x, a.y);
+  assert.equal(c.names.length, 1, 'the fallback names the camp once');
+  assert.equal(c.founder, a.id);
+  assert.equal(c.names[0].by, a.id);
+});

@@ -314,6 +314,7 @@ function landCandidates(place){
 /* How much the rest of the camp thinks of someone. */
 const liking = a => humans().filter(h => h !== a && h.camp === a.camp).reduce((n, h) => n + (h.opinions[a.id] || 0), 0);
 function notableCandidates(){
+  if (!camp) return [];
   const out = [], folk = campHumans(), picks = [];
   if (camp.founder){ const f = beingById(camp.founder); if (f) picks.push([f, 'who made the camp']); }
   const eldest = folk.slice().sort((p, q) => p.born - q.born)[0]; if (eldest) picks.push([eldest, 'the eldest here']);
@@ -332,12 +333,12 @@ function oldThingsNear(x, y, r){
   for (const c of caves) if (c.nameKnown && c.exit && dist(c.exit.x, c.exit.y, x, y) <= r) out.push(c);
   for (const g of groves) if (g.nameKnown && dist(g.x, g.y, x, y) <= r) out.push(g);
   for (const f of fords) if (f.nameKnown && dist(f.x, f.y, x, y) <= r) out.push(f);
-  const big = river || stillWater;
-  if (big && big.nameKnown && big.tiles.some(t => dist(t.x, t.y, x, y) <= r)) out.push(big);
+  /* A river and a lake are exclusive today, but a rule should not assume that stays true. */
+  for (const w of [river, stillWater]) if (w && w.nameKnown && w.tiles.some(t => dist(t.x, t.y, x, y) <= r)) out.push(w);
   return out;
 }
 function oldCandidates(place){
-  const out = []; if (!place) return out;
+  const out = []; if (!place || !lore) return out;
   for (const thing of oldThingsNear(place[0], place[1], 12)){
     const r = thing.names[0];
     out.push({ text: r.text, axis: 'old', base: 20, tongue: 'old', meaning: r.meaning, why: `for what ${lore.people} called this place` });
