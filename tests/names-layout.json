@@ -1,0 +1,68 @@
+{
+ "r": {
+  "tick0": {
+   "world": "2e63bd7a",
+   "beings": "3d293e81",
+   "items": "797b0745"
+  },
+  "day70": {
+   "beings": "4b87102b",
+   "items": "e6b1e5a8"
+  }
+ },
+ "x": {
+  "tick0": {
+   "world": "71615141",
+   "beings": "39b10349",
+   "items": "e40421dc"
+  },
+  "day70": {
+   "beings": "f040ef7",
+   "items": "ca11bd19"
+  }
+ },
+ "alpha": {
+  "tick0": {
+   "world": "fb22f3ce",
+   "beings": "621abd1a",
+   "items": "201a9ae8"
+  },
+  "day70": {
+   "beings": "36b1d461",
+   "items": "825442b2"
+  }
+ },
+ "beta": {
+  "tick0": {
+   "world": "e5459251",
+   "beings": "943bf063",
+   "items": "c98ba456"
+  },
+  "day70": {
+   "beings": "5f251815",
+   "items": "e9dfb301"
+  }
+ },
+ "gamma": {
+  "tick0": {
+   "world": "ed53c585",
+   "beings": "718a7a8e",
+   "items": "276d8232"
+  },
+  "day70": {
+   "beings": "75210750",
+   "items": "6213062d"
+  }
+ },
+ "delta": {
+  "tick0": {
+   "world": "2fb1abbc",
+   "beings": "d430810d",
+   "items": "d0e76ff6"
+  },
+  "day70": {
+   "beings": "ec8aba9f",
+   "items": "18d5ce13"
+  }
+ }
+}
