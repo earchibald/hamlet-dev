@@ -283,11 +283,19 @@ const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
 const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 };
 let options;
+/* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
+   setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
+function checkOptions(o){
+  const q = { ...DEFAULT_OPTIONS, ...o };
+  if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
+  if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
+  if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  return null;
+}
 function setOptions(o){
+  const wrong = checkOptions(o);
+  if (wrong) throw new Error(wrong);
   options = { ...DEFAULT_OPTIONS, ...o };
-  if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
-  if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
-  if (!Number.isInteger(options.ageLimit) || options.ageLimit < 1) throw new Error(`The age limit must be a whole number of ages, at least 1. Got ${options.ageLimit}.`);
   SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
   ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
 }
@@ -4876,6 +4884,159 @@ function takeSnapshot(){
       doorLog: clean(doorLog),
     };
   } finally { SNAP_IX = null; }
+}
+
+/* ---------- loading ----------
+   A save file is outside data. The loader reads it into a stage, a half-built world of its own, and
+   only replaces the state once every record is built and every id has found the record it names. A
+   save that cannot be read leaves the world exactly as it was. */
+
+/* A deep copy of parsed data. Object spread is used, never Object.assign, so a key named __proto__ in
+   a save file becomes an own key of a plain object instead of reaching the prototype setter. */
+function snapCopy(v){
+  if (Array.isArray(v)) return v.map(snapCopy);
+  if (v && typeof v === 'object'){ const o = { ...v }; for (const k of Object.keys(o)) o[k] = snapCopy(o[k]); return o; }
+  return v;
+}
+function snapNeed(ok, what){ if (!ok) throw new Error(`This save's ${what} is not what a save holds.`); }
+function snapArray(v, what){ snapNeed(Array.isArray(v), what); return v; }
+function snapObj(v, what){ snapNeed(v !== null && typeof v === 'object' && !Array.isArray(v), what); return v; }
+function snapNum(v, what){ snapNeed(typeof v === 'number' && Number.isFinite(v), what); return v; }
+function snapText(v, what){ snapNeed(typeof v === 'string', what); return v; }
+
+/* Turn every id the plan names back into the staged record it names. A key the save does not hold
+   stays missing, and a null stays null. The record's keys are written in place, so their order holds. */
+function resolvePlan(rec, plan, stage){
+  for (const k of Object.keys(plan)){
+    if (!Object.prototype.hasOwnProperty.call(rec, k)) continue;
+    const p = plan[k], v = rec[k];
+    if (typeof p === 'string'){ if (v !== null && v !== undefined) rec[k] = REF_KINDS[p].fromId(v, stage); }
+    else if (p && v && typeof v === 'object') resolvePlan(v, p, stage);
+  }
+}
+function resolveRefs(rec, type, stage){
+  resolvePlan(rec, REF_PLAN[type] || {}, stage);
+  const homes = REF_HOMES[type] || {};
+  for (const k in homes){ snapArray(rec[k], k); for (const x of rec[k]) resolveRefs(snapObj(x, k), homes[k], stage); }
+}
+function stageList(list, type, what){
+  snapArray(list, what);
+  return list.map(r => snapCopy(snapObj(r, what)));
+}
+
+/* Read the save into a stage. It reads the save and writes only the stage. Any fault throws. */
+function decodeSnapshot(snap){
+  const opts = { ...DEFAULT_OPTIONS, ...snap.options };
+  const w = opts.sw * LW, h = opts.sh * LH, area = w * h, nz = opts.zmax - opts.zmin + 1;
+  const stage = { options: opts, seed: snapText(snap.seed, 'seed') };
+
+  /* The levels first: a tile is named by its place, and everything else may name a tile. */
+  const saved = snapArray(snap.levels, 'levels');
+  snapNeed(saved.length === nz, 'levels');
+  stage.levels = saved.map((lv, li) => {
+    snapArray(lv, 'level'); snapNeed(lv.length === area, 'level');
+    const z = li + opts.zmin, out = new Array(area);
+    for (let i = 0; i < area; i++){
+      if (lv[i] === null || lv[i] === undefined){ out[i] = null; continue; }
+      const c = snapCopy(snapObj(lv[i], 'tile')), x = i % w;
+      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...c };
+    }
+    return out;
+  });
+  stage.tileAt = i => { if (!Number.isInteger(i) || i < 0 || i >= nz * area) return null; const lv = (i / area) | 0; return stage.levels[lv][i - lv * area]; };
+
+  /* Then every list of records, whole, with the ids still in place. */
+  stage.lines = stageList(snap.lines, 'line', 'lines');
+  stage.camps = stageList(snap.camps, 'camp', 'camps');
+  for (const c of stage.camps){ snapArray(c.snares, 'snares'); snapArray(c.pitfalls, 'pitfalls'); }
+  stage.hills = stageList(snap.hills, 'hill', 'hills');
+  stage.caves = stageList(snap.caves, 'cave', 'caves');
+  stage.sectors = stageList(snap.sectors, 'sector', 'sectors');
+  stage.groves = stageList(snap.groves, 'grove', 'groves');
+  stage.beings = stageList(snap.beings, 'being', 'beings');
+  stage.items = stageList(snap.items, 'item', 'items');
+  stage.boundaries = stageList(snap.boundaries, 'boundary', 'boundaries');
+  stage.corpses = snapCopy(snapArray(snap.corpses, 'corpses'));
+  stage.field = snap.field === null ? null : { regions: stageList(snapObj(snap.field, 'field').regions, 'region', 'regions'), root: snap.field.root, byId: new Map() };
+  stage.regionById = new Map();
+  if (stage.field) for (const r of stage.field.regions){ snapArray(r.marks, 'marks'); snapNum(r.id, 'region id'); stage.regionById.set(r.id, r); }
+  stage.creation = snap.creation === null ? null : snapCopy(snapObj(snap.creation, 'creation'));
+
+  /* Then every id becomes the one record it names. fromId throws on an id that names nothing. */
+  for (const level of stage.levels) for (const t of level) if (t) resolveRefs(t, 'tile', stage);
+  for (const c of stage.camps) resolveRefs(c, 'camp', stage);
+  for (const c of stage.caves) resolveRefs(c, 'cave', stage);
+  for (const hl of stage.hills) resolveRefs(hl, 'hill', stage);
+  for (const g of stage.groves) resolveRefs(g, 'grove', stage);
+  for (const s of stage.sectors) resolveRefs(s, 'sector', stage);
+  for (const a of stage.beings) resolveRefs(a, 'being', stage);
+  for (const it of stage.items) resolveRefs(it, 'item', stage);
+  for (const b of stage.boundaries) resolveRefs(b, 'boundary', stage);
+  if (stage.creation) resolveRefs(stage.creation, 'creation', stage);
+  if (stage.field){ resolveRefs(stage.field, 'field', stage); for (const r of stage.field.regions) stage.field.byId.set(r.id, r); }
+
+  stage.raised = REF_KINDS.tiles.fromId(snapArray(snap.raised, 'raised'), stage);
+  stage.camp = snap.campNow === null ? null : REF_KINDS.camp.fromId(snap.campNow, stage);
+  stage.chronicle = REF_KINDS.lines.fromId(snapArray(snap.chronicle, 'chronicle'), stage);
+  stage.legends = REF_KINDS.lines.fromId(snapArray(snap.legends, 'legends'), stage);
+  stage.resCache = new Map(snapArray(snap.resCache, 'resCache').map(p => { snapArray(p, 'cache entry'); return [p[0], snapCopy(p[1])]; }));
+  stage.startRegion = snap.startRegion === null ? null : new Set(snapArray(snap.startRegion, 'startRegion'));
+  stage.doorLog = snapCopy(snapArray(snap.doorLog, 'doorLog'));
+
+  /* Last the plain values. */
+  stage.tick = snapNum(snap.tick, 'tick'); stage.nextId = snapNum(snap.nextId, 'nextId');
+  stage.fireCount = snapNum(snap.fireCount, 'fireCount');
+  stage.wanderAt = snapNum(snap.wanderAt, 'wanderAt'); stage.doomAt = snapNum(snap.doomAt, 'doomAt');
+  stage.age = snapNum(snap.age, 'age');
+  stage.pulseAge = snap.pulseAge === null ? null : snapNum(snap.pulseAge, 'pulseAge');
+  stage.rng = snapNum(snap.rng, 'rng'); stage.godRng = snap.godRng === null ? null : snapNum(snap.godRng, 'godRng');
+  stage.weather = snapCopy(snapObj(snap.weather, 'weather'));
+  stage.goalPriority = snapCopy(snapObj(snap.goalPriority, 'goalPriority'));
+  stage.namePool = snapCopy(snapArray(snap.namePool, 'namePool'));
+  stage.godNamePool = snapCopy(snapArray(snap.godNamePool, 'godNamePool'));
+  stage.gestureFallbacks = snapCopy(snapObj(snap.gestureFallbacks, 'gestureFallbacks'));
+  return stage;
+}
+
+/* Put the stage in place of the state. Everything here is an assignment or a rebuild that cannot fail. */
+function commitSnapshot(s){
+  setOptions(s.options); allocSearch();
+  seedText = s.seed; tick = s.tick; nextId = s.nextId; fireCount = s.fireCount;
+  wanderAt = s.wanderAt; doomAt = s.doomAt;
+  era = 'days'; age = s.age; pulseAge = s.pulseAge;
+  levels = s.levels; world = levels[ZOFF]; raised = s.raised;
+  hills = s.hills; caves = s.caves; sectors = s.sectors; groves = s.groves;
+  camps = s.camps; camp = s.camp;
+  beings = s.beings; items = s.items; corpses = s.corpses;
+  chronicle = s.chronicle; legends = s.legends;
+  weather = s.weather; goalPriority = s.goalPriority;
+  namePool = s.namePool; godNamePool = s.godNamePool; gestureFallbacks = s.gestureFallbacks;
+  creation = s.creation; field = s.field; boundaries = s.boundaries;
+  resCache = s.resCache; startRegion = s.startRegion;
+  /* The derived state, rebuilt as the makers of each build it. */
+  rebuildItemGrid();
+  regionOf = new Int32Array(W * H);
+  if (field) for (const r of field.regions) for (const i of r.tiles) regionOf[i] = r.id;
+  rng = mulberry32(0); setStreamState(rng, s.rng);
+  godRng = s.godRng === null ? null : mulberry32(0);
+  if (godRng) setStreamState(godRng, s.godRng);
+  /* These three live inside one step and start a step as beginCreation leaves them. */
+  deciding = null; saidFrom = 0; settleNow = false;
+  resetDoor(); doorLog = s.doorLog;
+}
+
+/* Load a whole world from a snapshot. Returns null when it loaded, or the sentence that says why not. */
+function loadSnapshot(snap){
+  if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return 'This save cannot be read.';
+  if (snap.version !== SNAPSHOT_VERSION) return `This save is version ${snap.version}. This world reads version ${SNAPSHOT_VERSION}.`;
+  if (snap.era !== 'days') return 'This save was taken before the world was made. Only a made world can be loaded.';
+  const wrong = checkOptions(snap.options);
+  if (wrong) return wrong;
+  let stage;
+  try { stage = decodeSnapshot(snap); }
+  catch (e){ return 'This save cannot be read.'; }
+  commitSnapshot(stage);
+  return null;
 }
 
 /* ---------- the guard ---------- */

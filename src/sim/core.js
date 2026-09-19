@@ -23,11 +23,19 @@ const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
 const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 };
 let options;
+/* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
+   setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
+function checkOptions(o){
+  const q = { ...DEFAULT_OPTIONS, ...o };
+  if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
+  if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
+  if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  return null;
+}
 function setOptions(o){
+  const wrong = checkOptions(o);
+  if (wrong) throw new Error(wrong);
   options = { ...DEFAULT_OPTIONS, ...o };
-  if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
-  if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
-  if (!Number.isInteger(options.ageLimit) || options.ageLimit < 1) throw new Error(`The age limit must be a whole number of ages, at least 1. Got ${options.ageLimit}.`);
   SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
   ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
 }
