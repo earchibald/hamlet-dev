@@ -27,6 +27,11 @@ const KEYMAP = [
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
+  { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
+  /* The same two keys as the levels. A focused row beats an `any` row, so they zoom the timeline's
+     own time axis while the timeline holds focus, and change level everywhere else. */
+  { key: '[',          focus: 'timeline', action: 'zoomTimelineOut', label: 'Timeline: more ages', button: 'tlOut' },
+  { key: ']',          focus: 'timeline', action: 'zoomTimelineIn',  label: 'Timeline: fewer ages', button: 'tlIn' },
   { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
   { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
   { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
@@ -101,8 +106,9 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>'.
-   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
-function keyAction(e, focus){
+   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one.
+   focus defaults to the live ui.focus, so a caller that already holds the current focus need not pass it. */
+function keyAction(e, focus = ui.focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
@@ -111,8 +117,8 @@ function keyAction(e, focus){
     if (k.focus !== want) continue;
     const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
     if (rowKey !== key && !(code && rowKey === code)) continue;
-    if (!!k.shift !== e.shiftKey) continue;
-    if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
+    if (!!k.shift !== !!e.shiftKey) continue;
+    if (!!k.ctrl !== !!e.ctrlKey || !!k.alt !== !!e.altKey || !!k.meta !== !!e.metaKey) continue;
     return { action: k.action, arg: k.arg, focus: k.focus };
   }
   return null;

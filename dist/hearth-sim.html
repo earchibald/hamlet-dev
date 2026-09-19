@@ -223,6 +223,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
+  <p class="muted">[ and ] show more or fewer ages while the timeline is focused. Elsewhere they change level.</p>
   <h2>Muted</h2>
   <div id="helpMuted"></div>
   <h2>The map</h2>
@@ -6002,7 +6003,11 @@ function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.
 /* Where Tab goes: the map, each docked drawer in order, then each window in order. */
 function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
-  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+  /* The timeline is out of the ring once a world is settled: `creation` is still set, but the ages are over
+     and the band has nothing live to show. Before any world is made there is no `creation` yet either, and
+     Tab may still reach it, the way it reaches the map before a camp exists. */
+  const showTimeline = inAges() || !creation;
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`), ...(showTimeline ? ['timeline'] : [])];
 }
 
 /* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
@@ -6074,6 +6079,11 @@ const KEYMAP = [
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
+  { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
+  /* The same two keys as the levels. A focused row beats an `any` row, so they zoom the timeline's
+     own time axis while the timeline holds focus, and change level everywhere else. */
+  { key: '[',          focus: 'timeline', action: 'zoomTimelineOut', label: 'Timeline: more ages', button: 'tlOut' },
+  { key: ']',          focus: 'timeline', action: 'zoomTimelineIn',  label: 'Timeline: fewer ages', button: 'tlIn' },
   { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
   { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
   { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
@@ -6148,8 +6158,9 @@ for (let k = 1; k <= 3; k++) KEYMAP.push({ key: String(k), focus: 'dialog:mute',
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'dialog:palette', action: 'palettePick', arg: n, label: `Alt+${n}` });
 
 /* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>'.
-   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one. */
-function keyAction(e, focus){
+   Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one.
+   focus defaults to the live ui.focus, so a caller that already holds the current focus need not pass it. */
+function keyAction(e, focus = ui.focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
@@ -6158,8 +6169,8 @@ function keyAction(e, focus){
     if (k.focus !== want) continue;
     const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
     if (rowKey !== key && !(code && rowKey === code)) continue;
-    if (!!k.shift !== e.shiftKey) continue;
-    if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
+    if (!!k.shift !== !!e.shiftKey) continue;
+    if (!!k.ctrl !== !!e.ctrlKey || !!k.alt !== !!e.altKey || !!k.meta !== !!e.metaKey) continue;
     return { action: k.action, arg: k.arg, focus: k.focus };
   }
   return null;
@@ -7048,6 +7059,9 @@ function openChord(){
 
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
+/* renderUI lives in panels.js, which the pure Node tests for derive.js, keys.js, and actions.js do not join.
+   This guard lets focusStep and back run there, the way uiNow already guards performance. */
+const renderIfReady = force => { if (typeof renderUI === 'function') renderUI(force); };
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
@@ -7284,7 +7298,7 @@ function rowOpen(){
   else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ if (!inAges()) cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
+function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderIfReady(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -7314,7 +7328,7 @@ const ACTIONS = {
   focusPrev(){ focusStep(-1); },
   back(){
     if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
-    if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
+    if (ui.focus !== 'map'){ ui.focus = 'map'; renderIfReady(true); return; }
     /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
     if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
     hideTip();

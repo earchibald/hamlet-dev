@@ -176,7 +176,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -250,7 +250,7 @@ test('the palette lists every static action', () => {
 
 test('every key map row has a focus the dispatcher knows', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog'].includes(k.focus) || k.focus.startsWith('dialog:'), `${k.key} has focus ${k.focus}`);
+  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog', 'timeline'].includes(k.focus) || k.focus.startsWith('dialog:'), `${k.key} has focus ${k.focus}`);
 });
 
 test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {
@@ -299,6 +299,36 @@ test('the timeline actions stay inside their bounds, and the same chip twice clo
   assert.equal(api.ui.timelineChip, '4:3');
   api.ACTIONS.openChip('4:3');
   assert.equal(api.ui.timelineChip, null, 'the same chip twice closes it');
+});
+
+test('the timeline keys change meaning by focus, and do not take the level keys away', () => {
+  const api = loadUI(['state', 'keys'], ['keyAction', 'KEYMAP', 'ui']);
+  api.ui.focus = 'map';
+  assert.equal(api.keyAction({ key: '[' }).action, 'levelDown', 'the map keeps its levels');
+  assert.equal(api.keyAction({ key: ']' }).action, 'levelUp');
+  api.ui.focus = 'timeline';
+  assert.equal(api.keyAction({ key: '[' }).action, 'zoomTimelineOut', 'the timeline zooms while it holds focus');
+  assert.equal(api.keyAction({ key: ']' }).action, 'zoomTimelineIn');
+  assert.equal(api.keyAction({ key: 't' }).action, 'foldTimeline', 'T folds from anywhere');
+  api.ui.focus = 'map';
+  assert.equal(api.keyAction({ key: 't' }).action, 'foldTimeline');
+});
+
+test('the timeline joins the focus cycle and Escape leaves it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui', 'focusStep']);
+  api.ui.focus = 'timeline';
+  api.ACTIONS.back();
+  assert.equal(api.ui.focus, 'map', 'Escape returns focus to the map');
+  const seen = new Set();
+  api.ui.focus = 'map';
+  for (let n = 0; n < 12; n++){ api.focusStep(1); seen.add(api.ui.focus); }
+  assert.ok(seen.has('timeline'), 'Tab reaches the timeline');
+});
+
+test('every timeline button has a key', () => {
+  const api = loadUI(['state', 'keys'], ['KEYMAP']);
+  for (const id of ['foldTl', 'tlOut', 'tlIn'])
+    assert.ok(api.KEYMAP.some(r => r.button === id), `${id} has no key`);
 });
 
 const CURSOR = [...DERIVE, 'cursor', 'cursorAfter', 'cursorPhrase', 'W', 'H', 'LW', 'LH'];

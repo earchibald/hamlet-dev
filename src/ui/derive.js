@@ -396,7 +396,11 @@ function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.
 /* Where Tab goes: the map, each docked drawer in order, then each window in order. */
 function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
-  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+  /* The timeline is out of the ring once a world is settled: `creation` is still set, but the ages are over
+     and the band has nothing live to show. Before any world is made there is no `creation` yet either, and
+     Tab may still reach it, the way it reaches the map before a camp exists. */
+  const showTimeline = inAges() || !creation;
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`), ...(showTimeline ? ['timeline'] : [])];
 }
 
 /* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
