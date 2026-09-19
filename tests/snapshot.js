@@ -274,6 +274,76 @@ test('a world whose hollow pine burned out under its sprites saves, loads, and r
   sameStory(o);
 });
 
+/* A stray grove carries an old name: `nameTheLand` names every grove there is. The index must still
+   hold that text after a load, and hold it against the one object the sprites share, or a later
+   naming would hand the dead grove's name to something else. */
+test('a grove that burnt out under its sprites keeps its name, held against the grove the sprites share', t => {
+  const o = oracle('r', 4000, 1500, SMALL, burnAHollow);
+  const strays = w => [...new Set(w.beings.filter(b => b.grove && !w.groves.includes(b.grove)).map(b => b.grove))];
+  const was = o.a, api = o.b, sa = strays(was), sb = strays(api);
+  const texts = sa.flatMap(g => (g.names || []).map(r => r.text));
+  t.diagnostic(`${sa.length} stray grove(s), named ${texts.join(', ') || 'nothing'}`);
+  assert.ok(texts.length > 0, 'the stray grove was meant to carry an old name');
+  assert.equal(sb.length, sa.length);
+  for (const text of texts){
+    assert.equal(api.nameTaken(text), true, text);
+    assert.deepEqual(api.nameRecordOf(text), was.nameRecordOf(text), text);
+    assert.ok(sb.includes(api.nameIndex.get(text.toLowerCase())), `${text} must still name the grove the sprites share`);
+    /* And so a later naming cannot take it: a candidate another thing owns scores zero. */
+    const score = w => w.scoreCandidates([{ text, axis: 'land', base: 30 }], null, w.camps[0])[0].score;
+    assert.equal(score(api), 0, text); assert.equal(score(was), 0, text);
+  }
+});
+/* The end of that grove: the last sprite of it dies, the prune drops the dead from `beings`, and then
+   no list and no being holds the grove at all. Only the name index still points at it, and the text
+   stays taken. The grove itself holds its cave, and the cave holds its tiles, which point back at the
+   cave, so a snapshot that saved the thing would walk a cycle. */
+function burnAndEmptyAGrove(a, ca, N){
+  let at = burnAHollow(a, ca, N);
+  const stray = a.beings.filter(b => b.alive && b.grove && !a.groves.includes(b.grove))[0].grove;
+  for (const b of a.beings) if (b.alive && b.grove === stray) a.die(b, 'went out with the grove');
+  for (let i = 0; i < 4000 && a.beings.some(b => b.grove === stray); i++){ runOn(a, at, 1, ca); at++; }
+  assert.ok(!a.beings.some(b => b.grove === stray), 'the dead sprites were meant to be pruned out of beings');
+  assert.ok(!a.groves.includes(stray), 'the grove was meant to be in no list');
+  assert.ok(a.nameOf(stray), 'the grove was meant to carry a name');
+  return at;
+}
+test('a named grove that no list and no being holds any more saves, loads, and keeps its text taken', t => {
+  const o = oracle('r', 4000, 1200, SMALL, burnAndEmptyAGrove);
+  const was = o.a, api = o.b;
+  const lost = o.snap.lostNames.flatMap(h => h.names.map(r => r.text));
+  t.diagnostic(`${o.snap.lostNames.length} name(s) the index alone holds: ${lost.join(', ')}`);
+  assert.ok(lost.length > 0, 'the save was meant to hold a name no thing of it accounts for');
+  assert.equal(o.snap.strayGroves.length, 0, 'no being holds the grove any more, so no stray is saved');
+  assert.deepEqual(o.snap.lostNames.map(h => Object.keys(h)), o.snap.lostNames.map(() => ['names']),
+    'a name the index alone holds is saved as its records, never as the thing');
+  for (const text of lost){
+    assert.equal(api.nameTaken(text), true, text);
+    assert.deepEqual(api.nameRecordOf(text), was.nameRecordOf(text), text);
+    const score = w => w.scoreCandidates([{ text, axis: 'land', base: 30 }], null, w.camps[0])[0].score;
+    assert.equal(score(api), 0, text); assert.equal(score(was), 0, text);
+  }
+  sameStory(o);
+});
+/* The grove of the run above holds no cave, so the worst of saving the thing did not show there. A
+   grove that holds one drags in a cycle: the cave holds its tiles, and each tile points back at the
+   cave. This hangs that shape on a world by hand, as the guard tests above hang a Map on a being. */
+test('a name the index alone holds is saved as its name records, never as the thing', () => {
+  const a = load(); a.startWorld('r', SMALL); for (let i = 0; i < 200; i++) a.step();
+  const g = a.groves[0];
+  assert.ok(g && a.nameOf(g), 'a grove was meant to carry an old name');
+  assert.ok(a.caves.length, 'this world was meant to have a cave');
+  g.cave = a.caves[0];
+  a.groves.splice(a.groves.indexOf(g), 1);
+  for (const b of a.beings) if (b.grove === g) b.grove = null;
+  const snap = through(a.takeSnapshot());
+  assert.deepEqual(snap.lostNames.map(h => Object.keys(h)), [['names']]);
+  const api = load();
+  assert.equal(api.loadSnapshot(snap), null);
+  assert.equal(api.nameTaken(a.nameOf(g)), true);
+  assert.deepStrictEqual(through(api.takeSnapshot()), snap);
+});
+
 /* ---------- the names ----------
    The naming work hung state on the world the snapshot had to learn: the name stream, the lore, the
    valley, the water, the ponds, the crossings, a name record on every thing that has a name, and an
@@ -351,9 +421,11 @@ test('a world saved before anybody living has named a thing round-trips whole', 
   for (const p of api.ponds){ assert.ok(p.tiles.length); for (const t of p.tiles) assert.equal(t.pond, p); }
   for (const f of api.fords) assert.equal(api.world[f.y * api.W + f.x].ford, f);
   /* And it names things from there as the straight run does. */
+  const named = w => w.nameThings().filter(x => w.nameOf(x)).length;
+  const before = named(api);
   for (let i = 0; i < 4000; i++){ was.step(); api.step(); }
   assert.deepEqual(nameState(api), nameState(was));
-  assert.ok(nameState(api).things.some(s => s.split(' / ')[0] !== 'null'), 'nothing was named after the load');
+  assert.ok(named(api) > before, `nothing was named after the load: ${named(api)} things named, as before`);
 });
 /* The versioning policy again: a save written before the naming work holds none of these fields, and
    the loader seeds the name stream as a fresh world does. Such a save names no water, no pond, and no
@@ -518,6 +590,8 @@ test('a save that would kill the page a step later is refused, and the world sta
     'a tick that is no integer': s => { s.tick = 1.5; },
     'a tick past what adds up':  s => { s.tick = 1e18; },
     'a nextId below zero':       s => { s.nextId = -3; },
+    'a name stream that is no number': s => { s.nrng = null; },
+    'a lost name that is no list': s => { s.lostNames = [{ names: 'no' }]; },
   };
   for (const name in spoil){
     const api = load(); api.startWorld('x', { sw: 8, sh: 5 });

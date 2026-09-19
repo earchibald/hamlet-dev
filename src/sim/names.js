@@ -68,14 +68,25 @@ function nameThings(){
    Within one tick the order of two records never decides anything: no two things ever carry one
    text, because `scoreCandidates` scores a text another thing owns at zero and `newOldName` tries
    again on a taken one. A meaning is used when an old name carries it, so the land words on the
-   saved records are exactly the meanings `takeMeaning` handed out and kept. `lost` holds the named
-   lines the chronicle has dropped, which the index alone still reaches; the snapshot saves them. */
+   saved records are exactly the meanings `takeMeaning` handed out and kept. `lost` holds the names
+   of the things no list and no being reaches any more, which the index alone still holds. */
 function rebuildNames(lost = []){
   nameIndex = new Map(); usedMeanings = new Set();
-  const all = [];
-  const add = thing => { if (thing && thing.names) for (let i = thing.names.length - 1; i >= 0; i--) all.push([thing.names[i], thing]); };
+  const all = [], done = new Set();
+  /* A record with no text is not a name. A save is outside data, and this runs inside the commit,
+     which cannot fail, so a forged record is passed over rather than read. */
+  const add = thing => {
+    if (!thing || !thing.names || done.has(thing)) return;
+    done.add(thing);
+    for (let i = thing.names.length - 1; i >= 0; i--){ const r = thing.names[i]; if (r && typeof r.text === 'string') all.push([r, thing]); }
+  };
   for (const thing of nameThings()) add(thing);
   for (const e of lineList()) add(e);
+  /* `nameTheLand` names every grove, and `burnOut` takes a grove out of `groves` while its sprites
+     still point at it. `nameThings` reads the global, so a stray grove is in no list it gives. The
+     sprites are the way to one, and they are the way on both sides of a load: the snapshot writes a
+     stray whole into `strayGroves`, and the loader hands every sprite of it the one staged object. */
+  for (const a of beings) if (a.grove && !groves.includes(a.grove)) add(a.grove);
   for (const e of lost) add(e);
   all.sort((p, q) => p[0].since - q[0].since);
   for (const [rec, thing] of all){
