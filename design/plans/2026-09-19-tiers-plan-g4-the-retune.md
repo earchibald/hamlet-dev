@@ -462,6 +462,35 @@ This task is ruling 1's substance. Read "The watch list" first.
 - [ ] Walk "The prose that states a duration" for rows 7, 8 and 9, which are this task's interface strings. Re-run the sweep command there and report anything it finds that the list does not hold.
 - [ ] Gates: `tests/door.js`, `tests/ui.js`, `tests/skip.js`, `tests/snapshot.js`. Commit.
 
+### The gate between the tasks, and why the tests cannot wait for task 10
+
+**Found while running task 1, and it changes the order of the plan.** Task 1 rebased the clock, and
+about forty tests across the fast suite went red at once. Not one of them is a fault in the rules:
+they count steps in old ticks, a day is now 86.4 times longer, and they stop before the state they
+assert on. As written, task 10 fixes them. That leaves tasks 2 to 9 running against a suite that is
+already red.
+
+That is not a delay, it is the loss of the gate. This plan's own between-task gates are a seed run
+twice giving the same fingerprint, the snapshot oracle holding, and no death but old age. All three
+live in the suite. A suite that is red before a task starts cannot go red because of it, so each of
+those nine tasks would report against a net that was already down, and each report would be able to
+say truthfully that the failures were not its own. Nine tasks would change the rules core with
+nothing able to fail.
+
+It is this plan's own fault shape a fourth time: a gate whose scope is narrower than its name, and
+the narrowing invisible from inside it. **So the mechanical half of task 10 moves into task 1.** A
+test that fails only because a day got longer is converted by the task that made the day longer.
+
+**What stays in task 10.** A test whose assertion needs a reading — one that cannot hold at real
+units inside a test's time, or that measures a rule's own behaviour rather than waiting on it — is
+reported and left, exactly as task 10 already says. The split is: if the fix is "this count was in
+old ticks, write it in world units", task 1 does it. If the fix needs somebody to decide what the
+test should now assert, it waits.
+
+**The gate on the gate.** Task 1 reports the suite's pass count before and after, and names every
+test it left red with the reason. A task that leaves a test red and does not name it has removed a
+gate silently, which is the thing this section exists to stop.
+
 ### Task 10: The rest of the tests in world units
 
 **Files:** `tests/crafts.js`, `tests/closing.js`, `tests/gnomes.js`, `tests/dwellers.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/door.js`, `tests/tasks.js`, `tests/terrain.js`, `tests/settle.js`.
