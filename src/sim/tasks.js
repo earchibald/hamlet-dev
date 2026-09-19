@@ -93,93 +93,108 @@ function startBuild(a, at, work, label, done, skill){
     } };
   return true;
 }
-function startDeliver(a){
-  if (!camp.stashTile || !a.carrying) return false;
-  if (a.carrying.kind === 'ember') return false;
-  const [sx, sy] = camp.stashTile;
-  const p = pathToStop(a, sx, sy, 1); if (!p) return false;
-  const c = a.carrying;
-  a.task = { type: 'deliver', label: `Carrying ${c.count} ${c.count > 1 ? ITEMS[c.kind].plural : ITEMS[c.kind].name} to camp`, path: p,
-    arrive(a, t){
-      if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+Object.assign(TASKS, {
+  deliver: { type: 'deliver',
+    begin(a, args){
+      if (!camp.stashTile || !a.carrying) return false;
+      if (a.carrying.kind === 'ember') return false;
+      const [sx, sy] = camp.stashTile;
+      const p = pathToStop(a, sx, sy, 1); if (!p) return false;
+      const c = a.carrying;
+      args.at = [sx, sy];
+      return { label: `Carrying ${c.count} ${c.count > 1 ? ITEMS[c.kind].plural : ITEMS[c.kind].name} to camp`, path: p };
+    },
+    stops: [(a, t) => {
+      const [sx, sy] = t.args.at;
+      const g = goTo(a, t, sx, sy, 1); if (g) return g;
+      const c = a.carrying;
       if (c.kind === 'firestones'){ camp.tools.firestones = 1; a.carrying = null; log(`${a.name} lays two firestones by the pit. ${ITEMS.firestones.find} The camp can make its own fire now.`, campHumans(), 'major'); addThought(a, 'find', 'Brought firestones up from the dark', 10, CLOCK.thought.find); return 'done'; }
       if (c.kind === 'bones'){ a.carrying = null; log(`${a.name} brings old bones up from the dark, and nobody is sure whose they were. ${ITEMS.bones.find}`, campHumans(), 'major'); addThought(a, 'find', 'Found old bones in the dark', -3, CLOCK.thought.find); for (const h of campHumans()) if (h !== a) addThought(h, 'bones', 'There were bones under the hill', -2, CLOCK.thought.bones); return 'done'; }
       stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); return 'done';
-    } };
-  return true;
-}
-function startGather(a, kind){
-  if (!camp.stashTile) return false;
-  if (a.carrying && a.carrying.kind !== kind) return startDeliver(a);
-  let found = null;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => { const it = itemAt(x, y, z); if (z >= 0 && it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500, a);
-  if (!p){
-    if (a.carrying) return startDeliver(a);
-    const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
-    const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
-    log(`${a.name} heads to the ${s.name.toLowerCase()} to look for ${ITEMS[kind].plural}.`, [a]);
-    a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for ${ITEMS[kind].plural}`, path: q,
-      arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = pathToStop(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
-    return true;
-  }
-  const it = found; it.reservedBy = a.id;
-  a.task = { type: 'gather', label: `Looking for ${ITEMS[kind].plural}`, path: p,
-    arrive(a, t){
-      if (!items.includes(it) || it.x !== a.x || it.y !== a.y || it.z !== a.z) return 'fail';
+    }] },
+  gather: { type: 'gather',
+    begin(a, args){
+      if (!camp.stashTile) return false;
+      const kind = args.item;
+      if (a.carrying && a.carrying.kind !== kind) return startTask(a, 'deliver');
+      let found = null;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => { const it = itemAt(x, y, z); if (z >= 0 && it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500, a);
+      if (!p){
+        if (a.carrying) return startTask(a, 'deliver');
+        const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
+        const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
+        log(`${a.name} heads to the ${s.name.toLowerCase()} to look for ${ITEMS[kind].plural}.`, [a]);
+        setTask(a, 'walkTo', { at: [cx, cy, 0], within: 6 }, { label: `Walking to the ${s.name.toLowerCase()} for ${ITEMS[kind].plural}`, path: q });
+        return true;
+      }
+      const it = found; it.reservedBy = a.id; args.id = it.id;
+      return { label: `Looking for ${ITEMS[kind].plural}`, path: p };
+    },
+    stops: [(a, t) => {
+      const kind = t.args.item;
+      const it = items.find(i => i.id === t.args.id);
+      if (!it || it.x !== a.x || it.y !== a.y || it.z !== a.z) return 'fail';
       removeItem(it);
       if (a.carrying) a.carrying.count++; else a.carrying = { kind, count: 1 };
       t.label = `Gathering ${ITEMS[kind].plural} (${a.carrying.count})`;
       if (a.carrying.count < Math.min(9, 3 + Math.floor(a.skills.gather / 2) + (camp.tools.basket ? 3 : 0))){
         let nxt = null;
         const q = bfs(a.x, a.y, a.z, (x, y, z) => { const j = itemAt(x, y, z); if (z >= 0 && j && j.kind === kind && !j.reservedBy && dist(x, y, a.x, a.y) <= 8){ nxt = j; return true; } return false; }, 300, a);
-        if (q && nxt) return chain(a, t, startGather(a, kind)) || chain(a, t, startDeliver(a)) || 'done';
+        if (q && nxt) return chain(a, t, startTask(a, 'gather', { item: kind })) || chain(a, t, startTask(a, 'deliver')) || 'done';
       }
-      return chain(a, t, startDeliver(a)) || 'done';
+      return chain(a, t, startTask(a, 'deliver')) || 'done';
+    }],
+    release(a, t){ const it = items.find(i => i.id === t.args.id); if (it && it.reservedBy === a.id) it.reservedBy = null; } },
+  pickBerries: { type: 'gather',
+    begin(a, args){
+      if (a.carrying && a.carrying.kind !== 'berries') return startTask(a, 'deliver');
+      const hasFood = tl => tl.feature === 'bush' && tl.berries > 0;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
+      if (!p){
+        if (a.carrying) return startTask(a, 'deliver');
+        const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false;
+        const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
+        setTask(a, 'walkTo', { at: [cx, cy, 0], within: 6 }, { label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q });
+        return true;
+      }
+      return { label: 'Going to pick berries', path: p, progress: 0 };
     },
-    cleanup(){ if (it.reservedBy === a.id) it.reservedBy = null; } };
-  return true;
-}
-function startPickBerries(a){
-  if (a.carrying && a.carrying.kind !== 'berries') return startDeliver(a);
-  const hasFood = t => t.feature === 'bush' && t.berries > 0;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
-  if (!p){ if (a.carrying) return startDeliver(a); const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false; const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
-    a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = pathToStop(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
-    return true; }
-  a.task = { type: 'gather', label: 'Going to pick berries', path: p, progress: 0,
-    arrive(a, t){
+    stops: [(a, t) => {
+      const hasFood = tl => tl.feature === 'bush' && tl.berries > 0;
       const b = nearFind(a.x, a.y, hasFood, NEAR, a.z);
-      if (!b){ return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail'; }
+      if (!b) return a.carrying ? (chain(a, t, startTask(a, 'deliver')) || 'done') : 'fail';
       t.label = 'Picking berries';
       if (++t.progress % CLOCK.work.berryEvery === 0){ b.berries--; if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'berries', count: 1 }; }
-      if (a.carrying && a.carrying.count >= 3) return chain(a, t, startDeliver(a)) || 'done';
+      if (a.carrying && a.carrying.count >= 3) return chain(a, t, startTask(a, 'deliver')) || 'done';
       return 'continue';
-    } };
-  return true;
-}
-/* Fibre comes from reeds. Reeds are not used up. */
-function startPickFibre(a){
-  if (a.carrying && a.carrying.kind !== 'fibre') return startDeliver(a);
-  const hasReeds = t => t.feature === 'reeds';
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasReeds, NEAR, z), 2500, a);
-  if (!p){ if (a.carrying) return startDeliver(a); return false; }
-  a.task = { type: 'gather', label: 'Going to the reeds for fibre', path: p, progress: 0,
-    arrive(a, t){
-      if (!nearFind(a.x, a.y, hasReeds, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+    }] },
+  /* Fibre comes from reeds. Reeds are not used up. */
+  pickFibre: { type: 'gather',
+    begin(a, args){
+      if (a.carrying && a.carrying.kind !== 'fibre') return startTask(a, 'deliver');
+      const hasReeds = tl => tl.feature === 'reeds';
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasReeds, NEAR, z), 2500, a);
+      if (!p) return a.carrying ? startTask(a, 'deliver') : false;
+      return { label: 'Going to the reeds for fibre', path: p, progress: 0 };
+    },
+    stops: [(a, t) => {
+      const hasReeds = tl => tl.feature === 'reeds';
+      if (!nearFind(a.x, a.y, hasReeds, NEAR, a.z)) return a.carrying ? (chain(a, t, startTask(a, 'deliver')) || 'done') : 'fail';
       t.label = 'Pulling fibre from the reeds';
       if (++t.progress % CLOCK.work.fibreEvery === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'fibre', count: 1 }; }
-      if (a.carrying && a.carrying.count >= 3){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      if (a.carrying && a.carrying.count >= 3){ gainXp(a, 'gather'); return chain(a, t, startTask(a, 'deliver')) || 'done'; }
       return 'continue';
-    } };
-  return true;
-}
-/* Fishing: stand by the water, cast for a while, and land a fish by hunting skill and patience. */
-function startFish(a){
-  if (a.carrying && a.carrying.kind !== 'fish') return startDeliver(a);
-  const water = t => t.ground === 'water';
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, water, DIRS, z), 3000, a); if (!p) return false;
-  a.task = { type: 'work', label: 'Going to the water with the rod', path: p, progress: 0,
-    arrive(a, t){
+    }] },
+  /* Fishing: stand by the water, cast for a while, and land a fish by hunting skill and patience. */
+  fish: { type: 'work',
+    begin(a, args){
+      if (a.carrying && a.carrying.kind !== 'fish') return startTask(a, 'deliver');
+      const water = tl => tl.ground === 'water';
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, water, DIRS, z), 3000, a); if (!p) return false;
+      return { label: 'Going to the water with the rod', path: p, progress: 0 };
+    },
+    stops: [(a, t) => {
+      const water = tl => tl.ground === 'water';
       if (!nearFind(a.x, a.y, water, DIRS, a.z)) return 'fail';
       t.label = 'Casting from the bank'; t.progress += workSpeed(a, 'hunt');
       if (t.progress < CLOCK.work.fish) return 'continue';
@@ -187,43 +202,51 @@ function startFish(a){
         a.carrying = { kind: 'fish', count: 1 }; gainXp(a, 'hunt'); camp.fished++;
         if (camp.fished === 1) log(`${a.name} lands a fish.`, [a], 'good');
         else if (camp.fished === 10 || camp.fished === 50 || camp.fished % 100 === 0) log(`${a.name} lands the camp's ${camp.fished}th fish.`, [a], 'good');
-        addThought(a, 'fish', 'Caught a fish', 3, CLOCK.thought.fish); return chain(a, t, startDeliver(a)) || 'done'; }
+        addThought(a, 'fish', 'Caught a fish', 3, CLOCK.thought.fish); return chain(a, t, startTask(a, 'deliver')) || 'done'; }
       addThought(a, 'nofish', 'Nothing bit', -1, CLOCK.thought.nofish); return 'done';
-    } };
-  return true;
-}
-/* Clay comes from the riverbank: any tile whose ground flags clay (sand). The bank is not used up. */
-function startDigClay(a){
-  if (a.carrying && a.carrying.kind !== 'clay') return startDeliver(a);
-  const bank = t => !!GROUND[t.ground].clay;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, bank, NEAR, z), 3000, a);
-  if (!p){ if (a.carrying) return startDeliver(a); return false; }
-  a.task = { type: 'gather', label: 'Going to the bank for clay', path: p, progress: 0,
-    arrive(a, t){
-      if (!nearFind(a.x, a.y, bank, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+    }] },
+  /* Clay comes from the riverbank: any tile whose ground flags clay (sand). The bank is not used up. */
+  digClay: { type: 'gather',
+    begin(a, args){
+      if (a.carrying && a.carrying.kind !== 'clay') return startTask(a, 'deliver');
+      const bank = tl => !!GROUND[tl.ground].clay;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, bank, NEAR, z), 3000, a);
+      if (!p) return a.carrying ? startTask(a, 'deliver') : false;
+      return { label: 'Going to the bank for clay', path: p, progress: 0 };
+    },
+    stops: [(a, t) => {
+      const bank = tl => !!GROUND[tl.ground].clay;
+      if (!nearFind(a.x, a.y, bank, NEAR, a.z)) return a.carrying ? (chain(a, t, startTask(a, 'deliver')) || 'done') : 'fail';
       t.label = 'Digging clay from the bank';
       if (++t.progress % CLOCK.work.clayEvery === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'clay', count: 1 }; }
-      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startTask(a, 'deliver')) || 'done'; }
       return 'continue';
-    } };
-  return true;
-}
-/* Cuttings come from wild bushes. The bush keeps growing. */
-function startTakeCuttings(a){
-  if (a.carrying && a.carrying.kind !== 'cuttings') return startDeliver(a);
-  const wild = t => t.feature === 'bush' && !t.garden;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, wild, NEAR, z), 2500, a);
-  if (!p){ if (a.carrying) return startDeliver(a); return false; }
-  a.task = { type: 'gather', label: 'Going to a bush for cuttings', path: p, progress: 0,
-    arrive(a, t){
-      if (!nearFind(a.x, a.y, wild, NEAR, a.z)) return a.carrying ? (chain(a, t, startDeliver(a)) || 'done') : 'fail';
+    }] },
+  /* Cuttings come from wild bushes. The bush keeps growing. */
+  takeCuttings: { type: 'gather',
+    begin(a, args){
+      if (a.carrying && a.carrying.kind !== 'cuttings') return startTask(a, 'deliver');
+      const wild = tl => tl.feature === 'bush' && !tl.garden;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, wild, NEAR, z), 2500, a);
+      if (!p) return a.carrying ? startTask(a, 'deliver') : false;
+      return { label: 'Going to a bush for cuttings', path: p, progress: 0 };
+    },
+    stops: [(a, t) => {
+      const wild = tl => tl.feature === 'bush' && !tl.garden;
+      if (!nearFind(a.x, a.y, wild, NEAR, a.z)) return a.carrying ? (chain(a, t, startTask(a, 'deliver')) || 'done') : 'fail';
       t.label = 'Taking cuttings';
       if (++t.progress % CLOCK.work.cuttingsEvery === 0){ if (a.carrying) a.carrying.count++; else a.carrying = { kind: 'cuttings', count: 1 }; }
-      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startDeliver(a)) || 'done'; }
+      if (a.carrying && a.carrying.count >= 2){ gainXp(a, 'gather'); return chain(a, t, startTask(a, 'deliver')) || 'done'; }
       return 'continue';
-    } };
-  return true;
-}
+    }] },
+});
+function startDeliver(a){ return startTask(a, 'deliver'); }
+function startGather(a, kind){ return startTask(a, 'gather', { item: kind }); }
+function startPickBerries(a){ return startTask(a, 'pickBerries'); }
+function startPickFibre(a){ return startTask(a, 'pickFibre'); }
+function startFish(a){ return startTask(a, 'fish'); }
+function startDigClay(a){ return startTask(a, 'digClay'); }
+function startTakeCuttings(a){ return startTask(a, 'takeCuttings'); }
 /* A garden goes on open soil or grass within eight of the pit, with room for four bushes around it. */
 function gardenSpot(){
   if (!camp.pit) return null; const [px, py] = camp.pit; let best = null;
@@ -285,26 +308,29 @@ function startHaulPit(a, p){
 }
 
 /* Quarry rocks from a rock face: a walkable tile beside ground that can be quarried, within thirty tiles of the site. */
-function startQuarry(a){
-  if (a.carrying && a.carrying.kind !== 'rock') return startDeliver(a);
-  const [sx, sy] = camp.site; let face = null;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => { if (dist(x, y, sx, sy) > 30) return false; for (const [dx, dy] of DIRS){ const q = hasTile(x + dx, y + dy, z) ? tileAt(x + dx, y + dy, z) : null; if (q && GROUND[q.ground].quarry){ face = q; return true; } } return false; }, 3500, a);
-  if (!p) return false;
-  a.task = { type: 'work', label: 'Walking to the rock face', path: p, progress: 0,
-    arrive(a, t){
-      if (!face || !GROUND[face.ground].quarry) return 'fail';
-      t.label = 'Quarrying rocks'; t.progress += workSpeed(a, 'build');
-      if (t.progress < CLOCK.work.quarry) return 'continue';
-      a.carrying = { kind: 'rock', count: 2 }; gainXp(a, 'build');
-      face.quarried = true;
-      /* The first quarry to strike a hollowed hill pays favour, once per hill, however often it is opened before or after. */
-      if (face.hill && !face.hill.hollowPaid){ const hollow = caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
-        if (hollow){ face.hill.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, CLOCK.thought.quarryfae); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
-      log(`${a.name} quarries two rocks from the face.`, [a]);
-      return chain(a, t, startDeliver(a)) || 'done';
-    } };
-  return true;
-}
+TASKS.quarry = { type: 'work',
+  begin(a, args){
+    if (a.carrying && a.carrying.kind !== 'rock') return startTask(a, 'deliver');
+    const [sx, sy] = camp.site; let face = null;
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => { if (dist(x, y, sx, sy) > 30) return false; for (const [dx, dy] of DIRS){ const q = hasTile(x + dx, y + dy, z) ? tileAt(x + dx, y + dy, z) : null; if (q && GROUND[q.ground].quarry){ face = q; return true; } } return false; }, 3500, a);
+    if (!p) return false;
+    args.face = [face.x, face.y, face.z];
+    return { label: 'Walking to the rock face', path: p, progress: 0 };
+  },
+  stops: [(a, t) => {
+    const [fx, fy, fz] = t.args.face; const face = tileAt(fx, fy, fz);
+    if (!face || !GROUND[face.ground].quarry) return 'fail';
+    t.label = 'Quarrying rocks'; t.progress += workSpeed(a, 'build');
+    if (t.progress < CLOCK.work.quarry) return 'continue';
+    a.carrying = { kind: 'rock', count: 2 }; gainXp(a, 'build');
+    face.quarried = true;
+    /* The first quarry to strike a hollowed hill pays favour, once per hill, however often it is opened before or after. */
+    if (face.hill && !face.hill.hollowPaid){ const hollow = caves.find(c => c.kind === 'hollow' && c.hill === face.hill);
+      if (hollow){ face.hill.hollowPaid = true; camp.fae.favor = Math.max(-100, camp.fae.favor - 10); addThought(a, 'quarryfae', 'Broke stone from the sprites\' hill. The rock rang wrong', -4, CLOCK.thought.quarryfae); log(`${a.name} opens a rock face on the sprites' hill. The grove will not like it.`, campHumans(), 'bad'); } }
+    log(`${a.name} quarries two rocks from the face.`, [a]);
+    return chain(a, t, startTask(a, 'deliver')) || 'done';
+  }] };
+function startQuarry(a){ return startTask(a, 'quarry'); }
 
 function deerNear(){ if (!camp.site) return null; return beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, ...camp.site) <= 34).sort((p, q) => nearAt(p, ...camp.site) - nearAt(q, ...camp.site))[0] || null; }
 function startHuntDeer(a, d){
@@ -438,29 +464,33 @@ function startClearDen(a, c){
   });
 }
 
-function startCutTree(a){
-  const [cx, cy] = camp.site; let tree = null;
-  const shy = camp.fae.known && camp.fae.favor < 30 ? new Set(groves.map(g => g.sector)) : null;
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => { for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (hasTile(nx, ny, z)){ const t = tileAt(nx, ny, z); if (t.feature === 'tree' && t.fire <= 0 && dist(nx, ny, cx, cy) >= 4 && !t.claimed && !(shy && shy.has(sectorOfTile(t)))){ tree = t; return true; } } } return false; }, 2500, a);
-  if (!p) return false;
-  tree.claimed = a.id;
-  a.task = { type: 'work', label: 'Walking to a tree with the axe', path: p, progress: 0,
-    arrive(a, t){
-      if (tree.feature !== 'tree') return 'fail';
-      t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
-      if (t.progress < CLOCK.work.cutTree) return 'continue';
-      tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-      gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
-      const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
-      return chain(a, t, startGather(a, 'log')) || 'done';
-    },
-    cleanup(){ if (tree.claimed === a.id) tree.claimed = null; } };
-  return true;
-}
-function startFillWater(a){
-  if (a.carrying && a.carrying.kind !== 'water') return startDeliver(a);
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-  a.task = { type: 'gather', label: 'Going to fill the waterskin', path: p, progress: 0,
-    arrive(a, t){ t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startDeliver(a)) || 'done'; } };
-  return true;
-}
+TASKS.cutTree = { type: 'work',
+  begin(a, args){
+    const [cx, cy] = camp.site; let tree = null;
+    const shy = camp.fae.known && camp.fae.favor < 30 ? new Set(groves.map(g => g.sector)) : null;
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => { for (const [dx, dy] of DIRS){ const nx = x + dx, ny = y + dy; if (hasTile(nx, ny, z)){ const tl = tileAt(nx, ny, z); if (tl.feature === 'tree' && tl.fire <= 0 && dist(nx, ny, cx, cy) >= 4 && !tl.claimed && !(shy && shy.has(sectorOfTile(tl)))){ tree = tl; return true; } } } return false; }, 2500, a);
+    if (!p) return false;
+    tree.claimed = a.id;
+    args.tree = [tree.x, tree.y, tree.z];
+    return { label: 'Walking to a tree with the axe', path: p, progress: 0 };
+  },
+  stops: [(a, t) => {
+    const [tx, ty, tz] = t.args.tree; const tree = tileAt(tx, ty, tz);
+    if (tree.feature !== 'tree') return 'fail';
+    t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
+    if (t.progress < CLOCK.work.cutTree) return 'continue';
+    tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
+    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
+    return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
+  }],
+  release(a, t){ const [tx, ty, tz] = t.args.tree; const tree = tileAt(tx, ty, tz); if (tree.claimed === a.id) tree.claimed = null; } };
+function startCutTree(a){ return startTask(a, 'cutTree'); }
+TASKS.fillWater = { type: 'gather',
+  begin(a, args){
+    if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, tl => tl.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
+    return { label: 'Going to fill the waterskin', path: p, progress: 0 };
+  },
+  stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
+function startFillWater(a){ return startTask(a, 'fillWater'); }
