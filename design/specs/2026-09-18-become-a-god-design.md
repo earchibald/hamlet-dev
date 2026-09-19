@@ -183,12 +183,14 @@ The determinism contract of the mythos spec, section 0, stands. The engine step 
 
 **A creation the player steered is a different story, and an equally lawful one.** It replays exactly from its seed and its log.
 
+**A player's act is a chronicle line and never a legend.** In the gods era every logged line joins the legends, and the legends are the creation's own story. A hand reaching in is not part of that story, and a legend that differed would break the equality autopilot rests on. The door log is the record of what the player did.
+
 **The gate for the whole slice.** `tests/ui.js` already asserts that a watched creation equals an unwatched one. That assertion is restated: an **autopiloted** creation equals an unwatched one. `tests/ages.js` runs twenty-four seeds from creation to settle; it gains the same equality, fingerprint for fingerprint, on all twenty-four.
 
 | Test | What it gains |
 |---|---|
 | `tests/ages.js` | Twenty-four autopiloted creations equal twenty-four unwatched ones. A resumed `ageStep` draws what an unbroken one drew. |
-| `tests/door.js` | The four acts, landing and refused: a `become` on a being that is not a god, a `choose` with no turn open, a `choose` outside the open matrix, a forced `choose` with the setting off. |
+| `tests/become.js` | The four acts, landing and refused: a `become` on a being that is not a god, a `choose` with no turn open, a `choose` outside the open matrix, a forced `choose` with the setting off. |
 | `tests/ui.js` | The timeline view model folded, unfolded, and zoomed. The marks ahead of now. The matrix rows, including a barred one with its reason. A key on every new button. |
 
 ## 12. What this slice does not build
