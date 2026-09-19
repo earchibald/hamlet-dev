@@ -190,9 +190,12 @@ function stages(showAll){
       const hidden = !showAll && (st.s === 'done' || st.s === 'idle' || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
-    return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
+    const idleTitles = goals.filter(x => x.st.s === 'idle' && x.hidden).map(x => x.g.title);
+    return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: idleTitles.length, idleTitles, goals };
   }).filter(s => showAll || (stageReached(s.id) && (s.done > 0 || s.goals.some(x => !x.hidden))));
 }
+/* What a folded stage says under its header: its idle goals by name. An unfolded stage shows the rows themselves. */
+const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle: ${s.idleTitles.join(', ')}`;
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 

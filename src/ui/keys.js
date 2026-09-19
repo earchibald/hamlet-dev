@@ -83,6 +83,8 @@ for (const t of TOOLS){
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows. */
+SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Speed ${v}\u00d7`, button: `speed${v}` }));
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
