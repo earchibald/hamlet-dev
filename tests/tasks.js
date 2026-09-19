@@ -61,12 +61,20 @@ test('flee, wander, and sleep go through the table', () => {
   assert.ok(a.asleep || (a.task && a.task.kind === 'sleep'));
 });
 
+test('the base kinds of a person are in the table', () => {
+  const api = load(); api.startWorld('r');
+  for (const k of ['drink', 'eat', 'socialize', 'shelter', 'sit', 'rest', 'wander', 'flee', 'sleep']) assert.ok(api.TASKS[k], k);
+  const a = api.firstPerson(); api.failTask(a); a.needs.water = 5;
+  assert.ok(api.startTask(a, 'drink')); assert.equal(a.task.kind, 'drink'); assert.equal(a.task.type, 'drink');
+  assert.deepEqual(plain(a.task), []);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 const OLD = /\barrive\b|\bcleanup\b|\bstart: |\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 1, tasks: 40, beings: 12, species: 17, fae: 8, goals: 54, recipes: 4, gods: 4,
+  camps: 1, tasks: 40, beings: 5, species: 17, fae: 8, goals: 54, recipes: 4, gods: 4,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];
