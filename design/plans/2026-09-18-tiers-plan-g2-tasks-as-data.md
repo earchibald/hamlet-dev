@@ -704,7 +704,7 @@ git commit -m "Tasks as data: deliver, the gathering family, fishing, quarrying,
 
 **Interfaces:**
 - Consumes: `TASKS`, `startTask`, `goTo`, `pathToStop`.
-- Produces: `workKind({ label, amount, skill, effect, type })`, the kinds `setSnare`, `checkSnare`, `haulPit`, `fetchEmber`, `join`, and `build`, a kind that keeps today's `startBuild` alive for `goals.js` and `recipes.js` until task 8.
+- Produces: `workKind({ label, amount, skill, effect, type })`, the kinds `setSnare`, `checkSnare`, `haulPit`, `fetchEmber`, and `join`. `startBuild` stays as a closure task for `goals.js` and `recipes.js` until task 8, written on top of `workKind`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -733,7 +733,7 @@ test('a skilled worker ends a job in fewer strides', () => {
 
 test('the snare jobs, the ember, and joining are in the table', () => {
   const api = load(); api.startWorld('r');
-  for (const k of ['setSnare', 'checkSnare', 'haulPit', 'fetchEmber', 'join', 'build']) assert.ok(api.TASKS[k], k);
+  for (const k of ['setSnare', 'checkSnare', 'haulPit', 'fetchEmber', 'join']) assert.ok(api.TASKS[k], k);
 });
 ```
 
@@ -786,7 +786,7 @@ function startBuild(a, at, work, label, done, skill){
 }
 ```
 
-This keeps one copy of the work loop. The record still holds `arrive`, so the ratchet still counts it. The test above names a kind `build`; do not add it. Delete `'build'` from that test's list instead, and say so in your report. `tests/crafts.js` has a test of `startBuild` and skill; leave it as it is until task 8.
+This keeps one copy of the work loop. The record still holds `arrive`, so the ratchet still counts it. `tests/crafts.js` has a test of `startBuild` and skill; leave it as it is until task 8.
 
 - [ ] **Step 5: Convert the five kinds**
 
@@ -965,7 +965,7 @@ The other offers name a kind that exists: `start: a => startGather(a, 'stick')` 
 
 An offer whose start did work before the task (`startHuntDeer` sets `a.carrying` first) keeps that work in the kind's `begin`.
 
-The founding party (`lead a party`) calls a function in `camps.js` that founds the new camp and then joins it. It becomes a kind, `leadParty`, whose `begin` is that function's body and ends with `return startTask(leader, 'join')`.
+The founding party (`lead a party`) calls `startFoundCamp(leader)` in `camps.js`, which founds the new camp and then joins it. It becomes a kind, `leadParty`, whose `begin` is that function's body and ends with `return startTask(leader, 'join')`. Another session will soon edit `updateCamps` and `makeCamp` in `camps.js`; stay out of those two functions.
 
 - [ ] **Step 4: Recipes**
 
@@ -977,6 +977,8 @@ In `recipes.js`:
 - Each offer carries `task`, not `start`. An offer takes a copy of the `GATHERERS` entry (`{ ...g, args: { ...g.args } }`), so two offers do not share one `args`.
 
 - [ ] **Step 5: `chooseTask`, the wrappers, and `startBuild`**
+
+`offersFor` in `goals.js` puts the whole goal object on each offer (`goal: g`), and the goal holds functions. It becomes the goal's id: `goal: g.id`. Nothing in `src/` reads the field; `tests/crafts.js` reads `o.goal.id`, which becomes `o.goal`.
 
 In `chooseTask`, a work option is `{ type: 'work', label: o.label, goal: o.goal, task: o.task, score: ... }`, and it starts with `startTask(a, o.task.kind, o.task.args)`. `join` starts with `startTask(a, 'join')`, and `deliver` with `startTask(a, 'deliver')`. The `START` fallback goes: `TASKS[o.type]` is always there now.
 
@@ -1029,12 +1031,12 @@ In `tests/tasks.js`, delete `PENDING`, and the ratchet test becomes:
 
 ```js
 test('no file holds a closure task', () => {
-  const held = FILES.filter(f => OLD.test(fs.readFileSync(path.join(SIM, f + '.js'), 'utf8')) || (OLD.lastIndex = 0));
+  const held = FILES.filter(f => new RegExp(OLD.source).test(fs.readFileSync(path.join(SIM, f + '.js'), 'utf8')));
   assert.deepEqual(held, []);
 });
 ```
 
-`OLD` is a global regular expression, so reset `lastIndex` between files, or build a fresh one for each file. Write it so that the test fails when you put the word `cleanup` into a sim file, and check that once by hand.
+`OLD` is a global regular expression and keeps its place between calls, so the test builds a fresh one for each file. Check once by hand that the test fails when you put the word `cleanup` into a sim file, and take the word out again.
 
 The plain-data test loses its `b.task.kind` filter and gains two checks: every task has a `kind` that is in `TASKS`, and the record without its path is small.
 
