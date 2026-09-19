@@ -61,6 +61,7 @@ const API = `return {
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
+  get nextId(){ return nextId; }, get doomAt(){ return doomAt; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
   get goalPriority(){ return goalPriority; },
   get doorLog(){ return doorLog; }, get replay(){ return { ...replayHead, log: doorLog }; },

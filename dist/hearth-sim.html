@@ -2604,7 +2604,20 @@ function theLoneFounder(){
     log(`${b.name} comes over the hills into the ${s.name.toLowerCase()} and stops there. No smoke called them. They do not know that ${last.name} keeps a cold hearth on the far side of the valley.`, [b], 'major');
     return;
   }
-  camps.pop();   // no ground the world's edge can reach; the camp record goes with it
+  /* No ground the world's edge can reach, so the camp record goes with it. Take it out by identity,
+     not by position: `camps` is a global array, and the loop above called `setSite` and
+     `comeOverTheHills`, so the new camp being last is an assumption, not a guarantee. A `pop` that
+     is ever wrong removes somebody else's camp and says nothing. */
+  camps.splice(camps.indexOf(nc), 1);
+  /* Wait the whole stretch out again before the next attempt, rather than trying every tick. Restart
+     the wait; do not clear it. `doomAt` carries two meanings and has no third. Zero means the wait is
+     over and a founder arrived. A tick ahead means the wait is running. Nothing in it says "the wait
+     ran out and nothing could be done", so this path has to borrow the second meaning. Clearing a
+     variable on a failure path looks obviously right, and here it is wrong: zero sends the next tick
+     back into the branch above, where the hermit is still alone beside a cold hearth, so the wait is
+     set afresh and "This line ends with them" is said again, and again every ten days after. The
+     chronicle says it once. */
+  doomAt = tick + CLOCK.arrival.afterTheLast;
 }
 
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
