@@ -450,3 +450,32 @@ test('a discarded valley does not cost the player the run they set', () => {
     assert.ok(api.era === 'days' || api.runUntil === 900, `the run was lost at age ${api.age}`);
   }
 });
+
+/* The creation can end on two paths: an age that runs to its end in ageStep, and an age that runs to
+   its end inside the player's own turn, in takeTurn. Both must end the ages the same way. The second
+   path is the one a player on a short creation actually takes, and it once left the stops behind. */
+test('a creation that settles inside the player\'s own turn takes the stops with it', () => {
+  for (const seed of ['r', 'x', 'alpha', 'beta']){
+    const api = load(); api.startCreation(seed, { ageLimit: 4 });
+    api.step();
+    api.inject({ source: 'player', act: 'become', id: api.awakeGods()[0].id });
+    assert.equal(api.inject({ source: 'player', act: 'watch', what: 'age', at: 100 }), 'A stop is set at age 100.');
+    let n = 0;
+    while (api.era === 'gods' && n++ < 200){
+      if (api.pending){
+        const row = api.pending.opts.find(o => !o.failed);
+        if (!row){ api.inject({ source: 'player', act: 'become', id: null }); api.step(); continue; }
+        api.inject({ source: 'player', act: 'choose', id: api.pending.god, opt: { type: row.type, region: row.region } });
+        continue;
+      }
+      /* While the ages last the stop stands, discard or no discard. */
+      assert.deepEqual(api.stops, [{ what: 'age', at: 100 }], `${seed}: the stop was lost at age ${api.age}`);
+      api.step();
+    }
+    assert.equal(api.era, 'days', `${seed}: the valley never settled`);
+    assert.deepEqual(api.stops, [], `${seed}: a stop outlived the ages`);
+    assert.equal(api.runUntil, null, `${seed}: a run outlived the ages`);
+    assert.equal(api.agePos, null);
+    assert.equal(api.pending, null);
+  }
+});
