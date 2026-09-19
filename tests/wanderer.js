@@ -92,11 +92,14 @@ test('the wait is a duration in the table, not a number in the rule', () => {
   assert.equal(load().CLOCK.arrival.afterTheLast, WAIT * DAY);
 });
 
-/* ---------- the line that cannot go on ---------- */
-/* One person alive and a hearth long cold. A birth needs two adults, so that valley is finished, and
-   no smoke can call anyone to it. The case is built by hand: no soak seed ever comes near it. */
-const DOOMED = /is the only person left in the valley/;
-const CAME_TO_THE_LAST = /is not the last of the people now/;
+/* ---------- the line that ends, and the valley that goes on ---------- */
+/* One person alive and their own hearth long cold. A birth needs two adults, so that line is
+   finished, and no smoke can call anyone to it. Nobody is sent to rescue them: they keep their
+   hermitage, and a founder starts a camp of their own far off instead. The case is built by hand:
+   no soak seed ever comes near it. */
+const ENDS = /This line ends with them/;
+const NEW_LINE = /comes over the hills into the/;
+const RESCUED = /is not the last of the people now/;   // the old free stranger, which must never come back
 const STALE = 10;   // CLOCK.arrival.afterTheDoomed, in days
 
 /* Run a seed, then thin the valley to one person on the given day. `cold` decides what happens to the
@@ -125,57 +128,144 @@ function downToOne(seed, thinDay, days, cold = 'always', after){
   return { api, events, thinned };
 }
 
-test('one person and a cold hearth: the chronicle says the line is doomed, and one stranger comes', () => {
-  const { api, events, thinned } = downToOne('r', 3, 26);
-  const doomed = linesLike(events, DOOMED);
-  assert.equal(doomed.length, 1, 'the chronicle says the line is doomed exactly once');
-  assert.equal(doomed[0].kind, 'major');
-  assert.equal(dayOfLine(doomed[0]), thinned + STALE, 'the line comes once the hearth is stale, not the moment it goes out');
-  assert.ok(/cold/.test(doomed[0].text), 'the line does not say the hearth is cold');
-  assert.ok(!/dead/.test(doomed[0].text), 'the line calls a living person dead');
+const hermitOf = api => api.beings.filter(b => b.alive && b.species === 'human').sort((p, q) => p.id - q.id)[0];
+const newCamps = api => api.camps.filter(c => c.overTheHills);
 
-  const came = linesLike(events, CAME_TO_THE_LAST);
-  assert.equal(came.length, 1, 'exactly one stranger');
+test('one person and a cold hearth: the line ends with them, and a new camp is founded elsewhere', () => {
+  const { api, events, thinned } = downToOne('r', 3, 30);
+  const ended = linesLike(events, ENDS);
+  assert.equal(ended.length, 1, 'the chronicle says the line ends exactly once');
+  assert.equal(ended[0].kind, 'major');
+  assert.equal(dayOfLine(ended[0]), thinned + STALE, 'the line comes once the hearth is stale, not the moment it goes out');
+  assert.ok(/cold/.test(ended[0].text), 'the line does not say the hearth is cold');
+  assert.ok(!/dead/.test(ended[0].text), 'the line calls a living person dead');
+  /* The false claim this rule was raised over. Nobody was lost, and once the new camp stands they are
+     not the only person in the valley either. */
+  assert.ok(!/only person left in the valley/.test(ended[0].text), 'the line still says the old false thing');
+
+  const came = linesLike(events, NEW_LINE);
+  assert.equal(came.length, 1, 'exactly one founder');
   assert.equal(came[0].kind, 'major');
-  assert.equal(dayOfLine(came[0]), thinned + STALE + WAIT, 'the stranger comes after the wait');
-  assert.deepEqual(linesLike(events, WANDERER).map(e => e.text), [], 'the stranger reuses the line meant for a valley of bones');
+  assert.equal(dayOfLine(came[0]), thinned + STALE + WAIT, 'the founder comes after the wait');
+  assert.deepEqual(linesLike(events, RESCUED).map(e => e.text), [], 'the hermit was handed a free stranger');
+  assert.deepEqual(linesLike(events, WANDERER).map(e => e.text), [], 'the founder reused the line meant for a valley of bones');
   assert.deepEqual(linesLike(events, EMPTY).map(e => e.text), [], 'the valley was never empty');
   assert.equal(alive(api), 2, 'the valley holds two people');
+
+  /* The hermit keeps their hermitage: nobody joined them, and their own camp is theirs alone. */
+  const hermit = hermitOf(api);
+  assert.ok(came[0].text.includes(hermit.name), 'the line does not say who the founder is far from');
+  const withHermit = api.beings.filter(b => b.alive && b.species === 'human' && b.camp === hermit.camp);
+  assert.deepEqual(withHermit.map(b => b.name), [hermit.name], 'somebody moved in with the hermit');
+
+  /* The valley goes on through a new line: its own camp, its own founder, its own name. */
+  const made = newCamps(api);
+  assert.equal(made.length, 1, 'exactly one camp came out of the hills');
+  const nc = made[0];
+  assert.notEqual(nc, hermit.camp, 'the new camp is the hermit\'s own');
+  assert.ok(nc.site, 'the new camp has no site');
+  assert.ok(nc.founder && nc.founder !== hermit.id, 'the new camp has no founder of its own');
+  const founder = api.beingById(nc.founder);
+  assert.ok(founder && founder.alive && founder.camp === nc, 'the founder does not belong to the camp they founded');
+  assert.ok(came[0].text.includes(founder.name), 'the line does not name the founder');
+  assert.ok(api.nameOf(nc), 'the new camp never got a name record');
+  assert.equal(nc.name, `${founder.name}'s camp`, 'the camp is not named for its founder');
 });
 
-test('one person with the fire lit is not a doomed line', () => {
+test('the new camp keeps its distance, and takes the farthest ground rather than the nearest', () => {
+  /* Record the ground on offer while the valley still holds one camp. The last record is the tick
+     before the founder walks in, which is the choice the rule made. */
+  let offer = null;
+  const { api, thinned } = downToOne('r', 3, 30, 'always', api => {
+    if (api.camps.length !== 1) return;
+    const h = hermitOf(api); if (!h) return;
+    offer = { here: api.secOf(h.x, h.y), cands: api.campSites().map(s => ({ sx: s.sx, sy: s.sy })) };
+  });
+  assert.ok(thinned && offer && offer.cands.length > 1, 'the run never offered a choice of ground');
+
+  const nc = newCamps(api)[0];
+  assert.ok(nc, 'no camp came out of the hills');
+  const there = api.secOf(nc.site[0], nc.site[1]);
+  const reach = s => api.dist(s.sx, s.sy, offer.here.sx, offer.here.sy);
+  const far = Math.max(...offer.cands.map(reach));
+  assert.ok(far > Math.min(...offer.cands.map(reach)), 'every candidate stood the same distance away');
+  assert.equal(reach(there), far, 'the rule took ground that was not the farthest on offer');
+
+  /* The separation the founding party keeps, kept here too, and read from one place. */
+  const apart = api.CAMPS_APART;
+  assert.equal(typeof apart, 'number');
+  for (const c of api.camps) if (c !== nc && c.site){
+    const s = api.secOf(c.site[0], c.site[1]);
+    assert.ok(api.dist(s.sx, s.sy, there.sx, there.sy) >= apart, 'the new camp stands on top of an old one');
+  }
+});
+
+test('nobody welcomes the founder into an empty camp', () => {
+  const { events } = downToOne('r', 3, 30);
+  const welcomed = linesLike(events, /is welcomed by the fire/);
+  const met = linesLike(events, /Nobody is there to meet them/);
+  assert.equal(met.length, 1, 'the founder was not told they arrived alone');
+  assert.deepEqual(welcomed.filter(e => met.length && dayOfLine(e) >= dayOfLine(met[0])).map(e => e.text), [],
+    'a camp with nobody in it welcomed somebody by a fire it does not have');
+});
+
+test('one person with the fire lit is not an ended line', () => {
   const { api, events } = downToOne('r', 3, 26, 'lit');
-  assert.deepEqual(linesLike(events, DOOMED).concat(linesLike(events, CAME_TO_THE_LAST)).map(e => e.text), []);
+  assert.deepEqual(linesLike(events, ENDS).concat(linesLike(events, NEW_LINE)).map(e => e.text), []);
   assert.ok(alive(api) >= 1, 'the test killed the survivor');
 });
 
 test('a fire that is only momentarily out is not a cold hearth', () => {
   const { events } = downToOne('r', 3, 26, STALE - 2);
-  assert.deepEqual(linesLike(events, DOOMED).concat(linesLike(events, CAME_TO_THE_LAST)).map(e => e.text), []);
+  assert.deepEqual(linesLike(events, ENDS).concat(linesLike(events, NEW_LINE)).map(e => e.text), []);
 });
 
-/* Winter holds this stranger back too. The hearth goes cold in summer, the wait ends in winter, and
+/* Winter holds this founder back too. The hearth goes cold in summer, the wait ends in winter, and
    nobody comes until spring. Days 25 to 32 are winter. */
-test('winter blocks the stranger until spring', () => {
+test('winter blocks the founder until spring', () => {
   const { api, events, thinned } = downToOne('r', 7, 36);
-  const doomed = linesLike(events, DOOMED);
-  assert.equal(doomed.length, 1, 'the chronicle never said the line was doomed');
-  const came = linesLike(events, CAME_TO_THE_LAST);
-  assert.equal(came.length, 1, 'no stranger came at all');
+  const ended = linesLike(events, ENDS);
+  assert.equal(ended.length, 1, 'the chronicle never said the line ends');
+  const came = linesLike(events, NEW_LINE);
+  assert.equal(came.length, 1, 'no founder came at all');
   const day = dayOfLine(came[0]);
-  assert.ok(day > thinned + STALE + WAIT, `the stranger came on day ${day}, inside the wait`);
-  assert.equal(day, 33, `the stranger came on day ${day}, not on the first day of spring`);
+  assert.ok(day > thinned + STALE + WAIT, `the founder came on day ${day}, inside the wait`);
+  assert.equal(day, 33, `the founder came on day ${day}, not on the first day of spring`);
   assert.equal(alive(api), 2, 'the valley holds two people');
 });
 
-test('two people alive never call the stranger', () => {
+test('two people alive never start a new line', () => {
   const { events } = runDays('r', 24);
-  assert.deepEqual(linesLike(events, DOOMED).concat(linesLike(events, CAME_TO_THE_LAST)).map(e => e.text), []);
+  assert.deepEqual(linesLike(events, ENDS).concat(linesLike(events, NEW_LINE)).map(e => e.text), []);
 });
 
-/* The two rules share a valley and must not both run. If the last one dies while the doomed wait is
-   open, the doomed wait drops, and the rule for an empty valley takes the valley over from the top:
-   its own line, its own wait, its own wanderer among the bones. */
+/* One new line at a time. Kill the hermit once the new camp stands and hold every pit cold, and the
+   founder is then the one person alive beside a hearth of their own going cold. The chronicle says
+   their line ends too, and that is true. No third camp comes out of the hills for it. */
+test('a line begun out of the hills does not start another while it lives', () => {
+  let killed = 0;
+  const { api, events, thinned } = downToOne('r', 3, 48, 'always', (api, i, thin) => {
+    if (killed || !newCamps(api).length) return;
+    const nc = newCamps(api)[0];
+    if (!nc.pit) return;   // wait until the new line keeps a hearth of its own
+    const hermit = hermitOf(api);
+    if (hermit && hermit.camp !== nc){ hermit.alive = false; killed = api.dayOf(); }
+  });
+  assert.ok(killed > thinned + STALE + WAIT, 'the test never killed the hermit after the new camp stood');
+  assert.equal(alive(api), 1, 'the founder did not outlive the run, so the guard was never tested');
+  /* The rule says the founder's own line ends too, and that is true and worth saying. What it must
+     not do is answer it with a third camp. */
+  const ended = linesLike(events, ENDS);
+  assert.equal(ended.length, 2, 'the rule said nothing about the founder left alone');
+  assert.ok(dayOfLine(ended[1]) > killed, 'the second line came before the hermit died');
+  assert.equal(newCamps(api).length, 1, 'a second camp came out of the hills while the first still lived');
+  assert.equal(linesLike(events, NEW_LINE).length, 1, 'a second founder walked in');
+  assert.deepEqual(linesLike(events, EMPTY).map(e => e.text), [], 'the valley was never empty');
+});
+
+/* The two rules share a valley and must not both run. If the last one dies while the wait is open,
+   that wait drops, and the rule for an empty valley takes the valley over from the top: its own line,
+   its own wait, its own wanderer among the bones. */
 test('the survivor dying mid-wait hands the valley to the empty-valley rule', () => {
   let killed = 0;
   const { api, events, thinned } = downToOne('r', 12, 48, 'always', (api, i, thin) => {
@@ -183,10 +273,10 @@ test('the survivor dying mid-wait hands the valley to the empty-valley rule', ()
     for (const b of api.beings) if (b.species === 'human' && b.alive) b.alive = false;
     killed = api.dayOf();
   });
-  const doomed = linesLike(events, DOOMED);
-  assert.ok(killed > thinned + STALE, 'the test killed the survivor before the doomed line');
-  assert.equal(doomed.filter(e => dayOfLine(e) <= killed).length, 1, 'the doomed line came more than once before the death');
-  assert.equal(dayOfLine(doomed[0]), thinned + STALE, 'the doomed line came at the wrong time');
+  const ended = linesLike(events, ENDS);
+  assert.ok(killed > thinned + STALE, 'the test killed the survivor before the line was said to end');
+  assert.equal(ended.filter(e => dayOfLine(e) <= killed).length, 1, 'the line came more than once before the death');
+  assert.equal(dayOfLine(ended[0]), thinned + STALE, 'the line came at the wrong time');
 
   const gone = linesLike(events, EMPTY);
   assert.equal(gone.length, 1, 'the empty valley says so exactly once');
@@ -194,16 +284,10 @@ test('the survivor dying mid-wait hands the valley to the empty-valley rule', ()
   const came = linesLike(events, WANDERER);
   assert.equal(came.length, 1, 'exactly one wanderer, and it is the one for a valley of bones');
   assert.equal(dayOfLine(came[0]), killed + WAIT, 'the wanderer comes a full wait after the last death');
-  /* The doomed wait was dropped the day the survivor died. Nothing came to meet an empty valley but
-     the wanderer who belongs there. */
-  assert.deepEqual(linesLike(events, CAME_TO_THE_LAST).filter(e => dayOfLine(e) <= dayOfLine(came[0])).map(e => e.text), [], 'a stranger came to meet a dead valley');
+  /* The wait was dropped the day the survivor died. Nothing came to meet an empty valley but the
+     wanderer who belongs there. */
+  assert.deepEqual(linesLike(events, NEW_LINE).filter(e => dayOfLine(e) <= dayOfLine(came[0])).map(e => e.text), [], 'a founder came to meet a dead valley');
   assert.ok(alive(api) >= 1, 'the valley holds people again');
-  /* That wanderer is then one person beside a cold hearth, so the doomed line says so again, and a
-     second stranger follows. That is the two rules taking turns, not fighting: the valley really is
-     down to one again. */
-  assert.equal(doomed.filter(e => dayOfLine(e) > killed).length, 1, 'the rule said nothing about the wanderer left alone');
-  assert.equal(linesLike(events, CAME_TO_THE_LAST).length, 1, 'the doomed line brought more than one stranger');
-  assert.equal(alive(api), 2, 'the valley holds two people');
 });
 
 test('the stale wait is a duration in the table, not a number in the rule', () => {
