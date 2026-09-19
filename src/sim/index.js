@@ -43,7 +43,7 @@ const API = `return {
   get lore(){ return lore; }, get valley(){ return valley; }, get river(){ return river; }, get stillWater(){ return stillWater; }, get ponds(){ return ponds; }, get fords(){ return fords; },
   initField, splitRegion, regionById, liveRegions, regionAt, canSplit, neighboursOf, SECTOR_AREA, liveBoundaries, heartTile,
   CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
-  startCreation, runAges, ageStep, ageBegin, ageDecide, ageEnd, get agePos(){ return agePos; }, get pending(){ return pending; }, get inhabited(){ return inhabited; }, takeTurn, releaseTurn,
+  startCreation, runAges, ageStep, ageBegin, ageDecide, ageEnd, endAges, settleIfDue, get agePos(){ return agePos; }, get pending(){ return pending; }, get inhabited(){ return inhabited; }, takeTurn, releaseTurn,
   GOD_BARS, barFor, openTurn, get runUntil(){ return runUntil; }, get stops(){ return stops; }, note, restGate, isStart, isLevel, startCandidates, strain, godOptions, decideGod, godNeeds, settleHome, unmake, GOD_ACTS, GOD_NAMES, EPITHET, BODY, LEAVES, SCAR_OF, MAKES, STRAIN, KINDS, polesThatMake, outgrown, REGIONS_PER_GOD,
   gods, awakeGods, godOf, makeGod, withGodRng, rint, sortLine,
   get gestureFallbacks(){ return gestureFallbacks; },
