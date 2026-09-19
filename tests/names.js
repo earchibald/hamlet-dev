@@ -322,3 +322,39 @@ test('the lines the event table reads carry their tags in a real run', () => {
     if (e.text.includes('Something is burning')) assert.equal(e.tag, 'fire', e.text);
   }
 });
+
+test('the event table names a tagged major line at the fire, and the name reads back through eventName', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
+  const line = api.chronicle[0];
+  api.nameEvents(c);
+  assert.ok(line.names && line.names.length, 'the line was not named');
+  assert.equal(api.eventName(line), line.names[0].text);
+  assert.equal(api.chronicle[0].text, `They will call it ${api.eventName(line)}.`);
+  const n = api.chronicle.length; api.nameEvents(c);
+  assert.equal(api.chronicle.length, n, 'an event is named once');
+});
+
+test('a line with no tag, a line of another camp, and a quiet line are not events', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  api.log('Someone is getting better at gathering.', [], 'good');
+  api.log('A wolf slips into the dark camp.', [], 'bad', 'wolf');
+  api.chronicle[0].camp = c.id + 99;
+  api.nameEvents(c);
+  assert.equal(api.chronicle.filter(e => e.names).length, 0);
+});
+
+test('a fresher event outscores an older one on recency alone', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('An old wolf night.', [a], 'bad', 'wolf');
+  api.chronicle[0].tick = api.tick - 10 * api.DAY;
+  api.log('Last night the fire ran.', [a], 'bad', 'fire');
+  const cands = api.eventCandidates(c);
+  const fire = cands.find(x => x.text === api.EVENT_NAMES.fire.phrase);
+  const wolf = cands.find(x => x.text === api.EVENT_NAMES.wolf.phrase);
+  assert.ok(fire && wolf, 'both events should be candidates');
+  assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
+});

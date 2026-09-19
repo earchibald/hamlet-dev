@@ -460,6 +460,7 @@ const CLOCK = {
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
+    eventMemory: days(16),             // an event line older than this is no longer a candidate
   },
   /* Warmth a person loses each tick, by where and when. */
   cold: { under: tickRate(0.012), winterNight: tickRate(0.06), winterDay: tickRate(0.025), summer: tickRate(0), night: tickRate(0.012), day: tickRate(0.003) },
@@ -957,9 +958,52 @@ function loreCandidates(base){
     { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.text}, ${lore.sprites.meaning}` },
   ];
 }
-/* Every axis, for the current camp. The event axis joins in a later task. */
+/* ---------- events ----------
+   A chronicle line whose tag is in this table, and whose kind is major, bad, or a
+   death, is an event. The table is keyed on the tag and gives two shapes: a word for
+   a joined name, and a whole phrase. A line without a tag is never a candidate, and
+   old age carries the tag 'old', which is not in the table, so nobody names it. */
+const EVENT_NAMES = {
+  wolf:   { word: 'wolf',    phrase: 'the Night of the Wolf' },
+  fire:   { word: 'ash',     phrase: 'the Night the Fire Ran' },
+  frost:  { word: 'frost',   phrase: 'the Long Frost' },
+  sprite: { word: 'light',   phrase: 'the Night of Lights' },
+  found:  { word: 'parting', phrase: 'the Day They Left' },
+  death:  { word: 'grave',   phrase: 'the Day We Lost One' },
+  birth:  { word: 'cradle',  phrase: 'the Day a Child Came' },
+};
+const EVENT_KINDS = ['major', 'bad', 'death'];
+const isEventLine = (e, c) => !!e.tag && !!EVENT_NAMES[e.tag] && EVENT_KINDS.includes(e.kind) && e.camp === c.id;
+/* The camp's own events of the last `eventMemory`, worth 20 and 3 a day of freshness. */
+function eventCandidates(c){
+  const out = [];
+  if (!c) return out;
+  const memoryDays = CLOCK.names.eventMemory / DAY;
+  for (const e of chronicle){
+    const sinceDays = (tick - e.tick) / DAY;
+    if (sinceDays > memoryDays) continue;
+    if (!isEventLine(e, c)) continue;
+    const t = EVENT_NAMES[e.tag], recency = Math.round((memoryDays - sinceDays) * 3 * 10) / 10;
+    out.push({ text: t.phrase, axis: 'event', base: 20, recency, why: `for ${t.phrase}` });
+    if (WORD_TAIL[t.word]) out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
+  }
+  return out;
+}
+/* The camp names last night's events at its fire. */
+function nameEvents(c){
+  if (!c.site) return;
+  const by = namerFor(c.site); if (!by) return;
+  for (const e of chronicle.slice()){
+    if (tick - e.tick > DAY) break;
+    if (e.names || !isEventLine(e, c)) continue;
+    const rec = nameThing(e, 'event', by, c.site);
+    if (rec) log(`They will call it ${rec.text}.`, campHumans(), 'major');
+  }
+}
+const eventName = entry => nameOf(entry);
+/* Every axis, for the current camp. */
 function candidatesFor(kind, by, place){
-  return [...landCandidates(place), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
+  return [...landCandidates(place), ...eventCandidates(camp), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
 /* Score, drop duplicates, and sort. A text another thing already owns scores zero. */
 function scoreCandidates(cands, by, thing){
@@ -1018,7 +1062,7 @@ function nameCampAtHearth(c){
 function nameTick(){
   if (tick % DAY !== CLOCK.names.nameHour) return;
   const prev = camp;
-  for (const c of camps){ camp = c; nameCampAtHearth(c); }
+  for (const c of camps){ camp = c; nameCampAtHearth(c); nameEvents(c); }
   camp = prev;
 }
 
