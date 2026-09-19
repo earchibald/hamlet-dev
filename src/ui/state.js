@@ -47,6 +47,8 @@ const ui = {
   overlay: false,      /* the countries drawn over the world map in the days */
 };
 const WIN_MAX = 6;
+/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
+const SPEEDS = [1, 4, 16, 64];
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -63,7 +65,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
-    if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }

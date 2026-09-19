@@ -103,6 +103,8 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .row.trouble .st{color:var(--bad)}
 .stage{margin:8px 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:2px}
 .gs{color:var(--muted);font-size:12px;grid-column:2/4}
+/* A folded stage's idle goals: two lines at most, the rest behind the title. */
+.row.stage .fold{grid-column:2/4;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tag{font-size:10px;border:1px solid var(--line);border-radius:10px;padding:0 5px;color:var(--muted);margin-left:5px;vertical-align:middle}
 .pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
 .pbtn{font-size:11px;padding:1px 6px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
@@ -182,7 +184,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
-      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>Shift+4</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
@@ -4172,6 +4174,8 @@ const ui = {
   overlay: false,      /* the countries drawn over the world map in the days */
 };
 const WIN_MAX = 6;
+/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
+const SPEEDS = [1, 4, 16, 64];
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -4188,7 +4192,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
-    if ([1, 4, 16, 64].includes(s.speed)) ui.savedSpeed = s.speed;
+    if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
@@ -4386,9 +4390,12 @@ function stages(showAll){
       const hidden = !showAll && (st.s === 'done' || st.s === 'idle' || (st.s === 'blocked' && preq && goalState(preq).s !== 'done'));
       return { g, st, pr, hidden };
     });
-    return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: goals.filter(x => x.st.s === 'idle' && x.hidden).length, goals };
+    const idleTitles = goals.filter(x => x.st.s === 'idle' && x.hidden).map(x => x.g.title);
+    return { id: s.id, label: s.label, done: goals.filter(x => x.st.s === 'done').length, idle: idleTitles.length, idleTitles, goals };
   }).filter(s => showAll || (stageReached(s.id) && (s.done > 0 || s.goals.some(x => !x.hidden))));
 }
+/* What a folded stage says under its header: its idle goals by name. An unfolded stage shows the rows themselves. */
+const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle: ${s.idleTitles.join(', ')}`;
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
@@ -4617,6 +4624,8 @@ for (const t of TOOLS){
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows. */
+SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Speed ${v}\u00d7`, button: `speed${v}` }));
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
@@ -5160,7 +5169,7 @@ function renderGoals(el){
   const c = $('count-goals'); if (c) c.textContent = '';
   if (inAges()){ el.innerHTML = '<div class="muted">No goals yet. The valley is not made.</div>'; return; }
   el.innerHTML = rows.map((r, i) => {
-    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span></div>`; }
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); const line = foldLine(s, ui.unfold[s.id] || ui.showAll); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span>${line ? `<span class="fold" title="${esc(line)}">${line}</span>` : ''}</div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
     const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
     return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
@@ -5370,8 +5379,10 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
-  slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
+  faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
+  /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
+  speedStep(i){ ACTIONS.speed(SPEEDS[clamp(i, 0, SPEEDS.length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },

@@ -758,4 +758,37 @@ test('a mark keeps a reason that is not the stock one, and a country names the g
   assert.ok(api.countryLine(r).includes(g.name));
 });
 
+/* The feedback pass, round three. */
+test('each speed button has a direct key, Shift with its place on the ladder, from every focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS']);
+  assert.deepEqual(api.SPEEDS, [1, 4, 16, 64]);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  api.SPEEDS.forEach((v, i) => {
+    for (const focus of ['map', 'drawer:goals', 'window:2']){
+      assert.deepEqual(keyHit(api, { key: '!@#$'[i], code: `Digit${i + 1}`, shiftKey: true, ctrlKey: false, altKey: false, metaKey: false }, focus), { action: 'speedStep', arg: i }, `Shift+${i + 1} from ${focus}`);
+    }
+    const row = api.KEYMAP.find(k => k.action === 'speedStep' && k.arg === i);
+    assert.equal(row.button, `speed${v}`); assert.equal(api.keyName(row), `Shift+${i + 1}`);
+    const m = html.match(new RegExp(`id="speed${v}"[^>]*>[^<]*<kbd>([^<]*)</kbd>`));
+    assert.equal(m && m[1], `Shift+${i + 1}`, `button speed${v} prints its key`);
+  });
+  assert.deepEqual(keyHit(api, ev('1'), 'map'), { action: 'drawer', arg: 'people' }, 'a plain digit still toggles a drawer');
+  assert.deepEqual(keyHit(api, ev('2'), 'drawer:goals'), { action: 'rowPick', arg: 2 }, 'and still picks a row in a drawer');
+  assert.equal(typeof api.ACTIONS.speedStep, 'function');
+});
+
+test('a folded stage names its idle goals, and says nothing more when it is unfolded or has none', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'foldLine']);
+  const late = day21(); late.camp.tools.rod = true; late.camp.stash.fish = 4;
+  const st = late.stages(false);
+  for (const s of st){
+    const idle = s.goals.filter(x => x.st.s === 'idle' && x.hidden).map(x => x.g.title);
+    assert.deepEqual(s.idleTitles, idle, `${s.id} lists its folded idle goals by title`);
+  }
+  assert.ok(st.some(s => s.idleTitles.length > 0), 'day 21 has an idle goal somewhere');
+  assert.equal(api.foldLine({ idleTitles: [] }, false), '');
+  assert.equal(api.foldLine({ idleTitles: ['Stock food', 'Hunt deer'] }, false), 'Idle: Stock food, Hunt deer');
+  assert.equal(api.foldLine({ idleTitles: ['Stock food'] }, true), '', 'an unfolded stage shows the rows themselves');
+});
+
 module.exports = { loadUI };
