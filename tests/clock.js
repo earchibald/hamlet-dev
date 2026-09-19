@@ -170,12 +170,13 @@ test('every entry of the table is read by a rule', () => {
   assert.deepEqual(unread, []);
 });
 
-test('every event chance names a roll the lint finds', () => {
+/* An entry is dead when no roll has its text, or when the roll holds no number and the lint never asks. */
+test('every event chance names a roll the lint would flag', () => {
   const found = new Set();
   for (const f of ROLL_FILES){
     const src = fs.readFileSync(path.join(SIM, f + '.js'), 'utf8');
     const r = RULES.find(r => r.rolls);
-    for (const m of src.matchAll(r.re)) found.add(m[0].trim());
+    for (const m of src.matchAll(r.re)) if (hasNumber(m[0])) found.add(m[0].trim());
   }
   const dead = EVENT_CHANCES.filter(s => !found.has(s));
   assert.deepEqual(dead, []);
