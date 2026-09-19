@@ -579,6 +579,20 @@ test('a fresher event outscores an older one on recency alone', () => {
   assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
 });
 
+test('the phrase of a night names a night only: a place takes the joined word, never the phrase', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('Last night the fire ran.', [a], 'bad', 'fire');
+  const phrase = api.EVENT_NAMES.fire.phrase;
+  assert.ok(api.eventCandidates(c, 'event').some(x => x.text === phrase), 'a night can take the phrase');
+  for (const kind of ['camp', 'sector', 'pond']){
+    const cands = api.eventCandidates(c, kind);
+    assert.ok(cands.length > 0, `a ${kind} gets no word from the event at all`);
+    assert.ok(!cands.some(x => x.text === phrase), `a ${kind} can be called ${phrase}`);
+  }
+  assert.ok(!api.candidatesFor('camp', a, c.site).some(x => x.text === phrase), 'the camp pool holds the phrase');
+});
+
 test('a finished snare names the ground the work was done on, from the work and the land', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;

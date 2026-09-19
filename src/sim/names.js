@@ -452,7 +452,9 @@ const EVENT_NAMES = {
 const EVENT_KINDS = ['major', 'bad', 'death'];
 const isEventLine = (e, c) => !!e.tag && !!EVENT_NAMES[e.tag] && EVENT_KINDS.includes(e.kind) && e.camp === c.id;
 /* The camp's own events of the last `eventMemory`, worth 20 and 3 a day of freshness. */
-function eventCandidates(c){
+/* What a camp's recent events offer. The phrase is a night's name ("the Night of the Wolf"), so only
+   an event may take it. A place takes the joined word ("Wolfhill"), which reads as a place. */
+function eventCandidates(c, kind = 'event'){
   const out = [];
   if (!c) return out;
   const memoryDays = CLOCK.names.eventMemory / DAY;
@@ -461,7 +463,7 @@ function eventCandidates(c){
     if (sinceDays > memoryDays) continue;
     if (!isEventLine(e, c)) continue;
     const t = EVENT_NAMES[e.tag], recency = Math.round((memoryDays - sinceDays) * 3 * 10) / 10;
-    out.push({ text: t.phrase, axis: 'event', base: 20, recency, why: `for ${t.phrase}` });
+    if (kind === 'event') out.push({ text: t.phrase, axis: 'event', base: 20, recency, why: `for ${t.phrase}` });
     if (WORD_TAIL[t.word]) out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
   }
   return out;
@@ -483,7 +485,7 @@ function nameEvents(c){
 const eventName = entry => nameOf(entry);
 /* Every axis, for the current camp. */
 function candidatesFor(kind, by, place){
-  return [...landCandidates(place), ...eventCandidates(camp), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
+  return [...landCandidates(place), ...eventCandidates(camp, kind), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
 /* Score, drop duplicates, and sort. A text another thing already owns scores zero. */
 function scoreCandidates(cands, by, thing){
@@ -514,7 +516,7 @@ function namerFor(place){
    table has no text left the night keeps no name. */
 function nameThing(thing, kind, by, place, extra = []){
   const pool = kind === 'valley' ? extra
-    : kind === 'event' ? [...extra, ...eventCandidates(camp)]
+    : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event')]
     : [...extra, ...candidatesFor(kind, by, place)];
   const scored = scoreCandidates(pool, by, thing);
   const top = scored[0];
