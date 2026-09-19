@@ -75,13 +75,19 @@ test('the animals and the gnomes are in the table', () => {
   assert.equal(Object.keys(api.START).filter(k => ['hunt', 'raid', 'stalk', 'herd', 'scavenge', 'home', 'carryHome', 'shrooms', 'huddle', 'borrow', 'repay'].includes(k)).length, 0);
 });
 
+test('the sprites are in the table, and START is empty', () => {
+  const api = load(); api.startWorld('r');
+  for (const k of ['dance', 'forage', 'watch', 'collect', 'prank', 'fightSprite']) assert.ok(api.TASKS[k], k);
+  assert.deepEqual(Object.keys(api.START), []);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
 const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 1, tasks: 40, beings: 5, species: 0, fae: 8, goals: 54, recipes: 4,
+  camps: 1, tasks: 40, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];
