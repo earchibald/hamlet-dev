@@ -2,19 +2,30 @@
 
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
+  /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
+     every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
   if (!paused){
-    /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-    if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
-    else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+    try {
+      /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
+      if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+    } catch (e){ onFault(e); }
   }
-  if (lastEra === 'gods' && !inAges()) onSettle();
-  lastEra = era;
-  if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
-  camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  draw();
-  /* Pulses read every goal's state. Once a render, not once a frame. */
-  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
-  requestAnimationFrame(frame);
+  /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
+  try {
+    if (lastEra === 'gods' && !inAges()) onSettle();
+    lastEra = era;
+    /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
+       take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
+    if (!inAges() && dayOf() > ui.autosaveDay) autosave();
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    draw();
+    /* Pulses read every goal's state. Once a render, not once a frame. */
+    if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
+  } finally {
+    requestAnimationFrame(frame);
+  }
 }
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -43,6 +54,9 @@ function initUI(){
     ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
+  /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
+  $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
+  $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
@@ -80,7 +94,9 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
+       that is how Alt+C continues the last world while the cursor sits in the seed box. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput' && !(e.ctrlKey || e.altKey || e.metaKey)) return;
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
@@ -93,6 +109,8 @@ function initUI(){
   setTool('inspect');
   newWorld(randomSeed());
   if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
+  offerContinue();
   openStart();
   requestAnimationFrame(frame);
 }

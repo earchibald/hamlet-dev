@@ -5,13 +5,15 @@
 // later files are written in its units. tasks.js declares TASKS before beings.js,
 // species.js, and fae.js add their kinds to it. Function calls between files are
 // free, because function declarations hoist across the joined script.
+// snapshot.js comes after main.js and before door.js, because the door's load act
+// calls it and it reads no other file's tables at load time.
 //
 // build.js inlines source() into the page. Tests call load() to run the sim
 // in Node, where the same script runs inside one function.
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
+const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -20,6 +22,9 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
+  mulberry32, streamState, setStreamState,
+  SNAPSHOT_VERSION, REFS, REF_KINDS, TILE_DEFAULTS, SAVED_STATE, NOT_SAVED, savedValues, takeSnapshot, unnamedRefs, loadSnapshot, checkOptions,
+  get lastLoadFault(){ return lastLoadFault; }, get inhabitedTold(){ return inhabitedTold; },
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
@@ -35,7 +40,8 @@ const API = `return {
   gods, awakeGods, godOf, makeGod, withGodRng, rint, sortLine,
   get gestureFallbacks(){ return gestureFallbacks; },
   settle, beginCreation, paintSectors, paintGround, paintRivers, paintLakes, paintScars, paintHeights, paintDepths, placeFirstPerson, placeFirstPersonAnywhere, uplift, cutWaterCaves, rockfall, BIOMES, FEATURES, paintCreatures, wasMade, placeBodies, tileCheck, setTileCheck, discardSettle, MAX_DISCARDS, placeGrove, spawnAnimal, placeFinds, digGnomeBurrows, godsTick, SPAWN,
-  get godRng(){ return godRng; },
+  get rng(){ return rng; }, get godRng(){ return godRng; },
+  get resCache(){ return resCache; }, get startRegion(){ return startRegion; },
   get era(){ return era; }, get age(){ return age; }, get pulseAge(){ return pulseAge; }, get legends(){ return legends; }, get creation(){ return creation; },
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },

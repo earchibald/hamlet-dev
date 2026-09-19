@@ -25,11 +25,19 @@ let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
    only where the player chooses. No rule reads it, so it cannot move the creation. */
 const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false };
 let options;
+/* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
+   setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
+function checkOptions(o){
+  const q = { ...DEFAULT_OPTIONS, ...o };
+  if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
+  if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
+  if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  return null;
+}
 function setOptions(o){
+  const wrong = checkOptions(o);
+  if (wrong) throw new Error(wrong);
   options = { ...DEFAULT_OPTIONS, ...o };
-  if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
-  if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
-  if (!Number.isInteger(options.ageLimit) || options.ageLimit < 1) throw new Error(`The age limit must be a whole number of ages, at least 1. Got ${options.ageLimit}.`);
   SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
   ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
 }
@@ -93,9 +101,18 @@ const BIOMES = {
   ash:     { name: 'Burnt ground' },
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
+/* Every field a fresh tile has besides x, y, z, and ground, with the value it starts at. makeTile spreads
+   this table, and a snapshot leaves out a field that still equals its default. The two read one table, so
+   they cannot drift. The key order is the order makeTile gave these fields. */
+const TILE_DEFAULTS = { feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null };
 
-/* Seeded random numbers. */
-function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+/* Seeded random numbers. A stream's whole state is one 32-bit number, and a snapshot reads it and sets it. */
+function mulberry32(a){
+  const f = function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  f.state = () => a | 0; f.setState = n => { a = n | 0; };
+  return f;
+}
+const streamState = f => f.state(), setStreamState = (f, n) => f.setState(n);
 function hashSeed(s){ let h = 2166136261; for (const c of String(s)){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 let rng = Math.random;
 const rint = n => Math.floor(rng() * n);

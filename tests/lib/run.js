@@ -13,10 +13,11 @@ function scriptGod(api, i){
 }
 /* A god that replays a log: every event goes through the door at its own tick, in order, and nothing
    else happens. The door refuses an event that arrives at the wrong tick, so an event this god has
-   let slip past is an error here, never a silent drop. */
+   let slip past is an error here, never a silent drop. A `load` entry is passed over: it carries no
+   snapshot of its own, and a replay tells the saved world's story by stepping through, not by loading. */
 function logGod(log){
   let k = 0;
-  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
+  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.act === 'load') continue; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
 }
 /* A god built from a replay record ({ seed, options, log }): replays its log. Meant to be used with
    runDays(replay.seed, days, onTick, replayGod(replay), replay.options), so a seed, its options,
@@ -25,17 +26,33 @@ function replayGod(replay){
   return logGod(replay.log);
 }
 
+/* The event collector. The chronicle keeps only its last 300 lines, so a run that wants them all must
+   take each line as it appears. `drain()` walks the chronicle, newest first, until it meets a line it
+   has already taken, then pushes the new ones, oldest first. It knows a line by its object. A world
+   loaded from a snapshot holds new objects for the same lines, so its whole window would be taken
+   again: `skipPresent()` marks every line now in the chronicle as seen, and the collector goes on
+   from the load as if it had been there all along. */
+function collect(api){
+  const events = []; const seen = new WeakSet();
+  const drain = () => { const ch = api.chronicle; let n = 0; while (n < ch.length && !seen.has(ch[n])) n++; for (let j = n - 1; j >= 0; j--){ seen.add(ch[j]); events.push(ch[j]); } };
+  const skipPresent = () => { for (const e of api.chronicle) seen.add(e); };
+  return { events, drain, skipPresent };
+}
+/* Step a world on. The loop index starts at `fromStep`, not at 0, so a world that carries on from a
+   snapshot gives the script god the same numbers an unbroken run gives it. */
+function runOn(api, fromStep, steps, collector, god = scriptGod){
+  for (let i = fromStep; i < fromStep + steps; i++){ api.step(); god(api, i); collector.drain(); }
+  return collector;
+}
+
 /* Run one seed. Returns the api and the full list of chronicle events in order. */
 function runDays(seed, days, onTick, god = scriptGod, opts = {}){
   const api = load(); api.startWorld(seed, opts);
-  const events = []; const seen = new WeakSet();
-  const drain = () => { const ch = api.chronicle; let n = 0; while (n < ch.length && !seen.has(ch[n])) n++; for (let j = n - 1; j >= 0; j--){ seen.add(ch[j]); events.push(ch[j]); } };
-  drain();
-  for (let i = 0; i < days * DAY; i++){
-    api.step(); god(api, i); drain();
-    if (onTick) onTick(api, i, events);
-  }
-  return { api, events };
+  const c = collect(api); c.drain();
+  const n = days * DAY;
+  if (!onTick) runOn(api, 0, n, c, god);
+  else for (let i = 0; i < n; i++){ runOn(api, i, 1, c, god); onTick(api, i, c.events); }
+  return { api, events: c.events };
 }
 
 const OLD_AGE = /died of old age|old and warm/;
@@ -117,4 +134,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, runDays, collect, runOn, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };

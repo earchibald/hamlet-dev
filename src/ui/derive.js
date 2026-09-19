@@ -372,3 +372,10 @@ function paletteMatch(query, rows){
   const score = r => (r.label.toLowerCase().startsWith(words[0]) ? 0 : 1) * 1000 + r.label.length;
   return hit.sort((a, b) => score(a) - score(b));
 }
+
+/* The name of a save file. The seed goes to lower case, and each run of anything else becomes one
+   dash. A seed of nothing but punctuation leaves no name, so it is called the world. */
+function saveName(seed, t){
+  const s = String(seed == null ? '' : seed).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'world';
+  return `hearth-${s}-day-${Math.floor(t / DAY) + 1}.json`;
+}
