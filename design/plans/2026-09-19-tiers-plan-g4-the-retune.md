@@ -99,7 +99,7 @@ So: do not drop the floors and do not promise to keep them. Task 4 measures seco
 
 ## Global Constraints
 
-- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at cb903eb. Two things land in dev before task 1 starts, and task 1 merges dev rather than waiting on them idly: issue 25's `theLoneFounder` fix, and the collector fix of "The instrument". Neither is G4's work. If either is still open when task 1 is ready, say so and do not work around it. Never check out, stash, or commit in `~/Code/hamlet`.
+- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at cb903eb and behind it. **Merge dev before task 1 starts.** The collector fix of "The instrument" is already in dev at 6a7e427. Issue 25's `theLoneFounder` fix is the one thing still outstanding; neither is G4's work, and if it is still open when task 1 is ready, say so and do not work around it. Never check out, stash, or commit in `~/Code/hamlet`.
 - G4 merges into dev through dev-coordinator, which is the only session that merges. A merge into dev publishes the built page to GitHub Pages within about three minutes, so the merge is a release to the public site. There is no staging step and nobody looks at it in between. Ruling 1 means dev must be playable at that merge, and so must the published page one minute later.
 - **G4 lands as one merge.** Build it on the branch, in as many commits as it takes, and merge once. A retune that reaches dev in pieces publishes every piece, and an intermediate state of this plan is exactly the state that can hold neither the golden nor the playability. This reverses the usual preference for landing early: for inert work early is cheap, and for this work every intermediate landing is a public release of a half-retuned world.
 - **The playability gate is a gate, not a report.** "The player's gate" below says what playable means in numbers a person can check on the built page. Task 9 measures it and task 11 repeats it. A task that cannot meet it says so and does not open the pull request.
@@ -191,7 +191,7 @@ This is what lets a player reach winter. A ladder cannot: at an hour a wall seco
 
 ### The instrument
 
-**This is a present defect, it lands before task 1, and it is not G4's to carry.** It is written here because G4 makes it worse and because every gate in this plan reads through it. It is fixed on branch `chronicle-sink` in PR 50, which is dev's and not this plan's; task 1 merges dev to pick it up.
+**Fixed in dev at 6a7e427, by PR 50, issue 49.** It was a present defect and not G4's to carry; it is recorded here because G4 would have made it worse, because every gate in this plan reads through it, and because task 4 depends on it. The seed prohibition below is lifted: a long creation now fingerprints in full. Read the rest of this section as the reason the instrument is trustworthy, not as work owed.
 
 `log()` at `src/sim/core.js:165` trims: `chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();`. The live chronicle holds the last 300 lines. The collector in `tests/lib/run.js` takes lines by scraping that window, and its own comment at line 29 states the condition it depends on: "a run that wants them all must take each line as it appears."
 
@@ -204,7 +204,7 @@ Two callers do not honour it.
 
 Both are the same fault: a gap between when a line is written and when the harness looks. One fix closes both.
 
-The creation case is the more dangerous of the two, because nothing is red. The six soak seeds are short enough that the record is honest, so the fingerprint silently covers less than it claims only for whoever next picks a long-creation seed. **So until this is fixed, do not add a soak seed**: a seed with a long creation gives a truncated chronicle fingerprint and a weaker gate that reports itself as a pass.
+The creation case is the more dangerous of the two, because nothing is red. The six soak seeds are short enough that the record is honest, so the fingerprint silently covers less than it claims only for whoever next picks a long-creation seed. **That was an argument against adding a soak seed until it was fixed**, because a seed with a long creation gave a truncated fingerprint and a weaker gate that reported itself as a pass. Fixed at 6a7e427, so a seed may now be added on its merits.
 
 For task 4 the same fault threatens the skip's gate in both directions. The stepped side keeps everything and the skipped side can drop lines, so the fingerprints differ for a reason that is the harness and not the skip, and the task hunts a horizon fault that is not there. Worse, a real defect that suppressed lines could be masked by a trim that dropped the same region, and the gate passes a broken skip. That is the stored-record problem one level down: a comparison is sound only if the instrument sees everything on both sides.
 
