@@ -714,6 +714,29 @@ test('a source word that would have won bare wins in its distinct form, measured
   assert.equal(n, `Vale of ${api.lore.sky.text}`, `seed r's valley took ${n}, not the sky's compound`);
 });
 
+/* Important review finding on task 2's fix, second pass: `lore.sky.text` and `lore.sprites.text`
+   come from `oldWord()` in `nameTheLand` and are never put in `nameIndex`, so `nameTaken()` does
+   not know them. A land candidate made later by `newOldName` can carry the same text by chance,
+   with no relation to the sky or the sprites at all. Before this fix, scoreCandidates matched
+   that candidate by text alone and rewrote it into "Vale of <the sky's word>", keeping the land
+   candidate's own reason clause, so the chronicle credited the wrong origin (a reed by the water,
+   not the sky). The fix marks the sky's and sprites' own rows with a `source` field in
+   `loreCandidates` and rewrites only a candidate that carries it. This candidate is built by hand,
+   not drawn from a seed that happens to collide, and carries no `source` field. */
+test('a candidate that only collides with a source\'s text, and is not that source\'s own, is never rewritten into its distinct form', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  const cands = [
+    { text: api.lore.sky.text, axis: 'land', base: 20, why: 'for the reed by the water' },
+  ];
+  const scored = api.scoreCandidates(cands, null, api.valley, 'valley');
+  assert.equal(scored.length, 1, 'the candidate must not be dropped from the list, only zeroed');
+  const cand = scored[0];
+  assert.equal(cand.text, api.lore.sky.text, `the land candidate was rewritten into ${cand.text}`);
+  assert.equal(cand.why, 'for the reed by the water', 'the land candidate\'s own reason was overwritten');
+  assert.equal(cand.score, 0, 'a text a source already owns must still never be shown bare');
+});
+
 test('the first camp that is a village names the valley, even when it is not the first camp in the list', () => {
   const { api, a, c } = hearthCamp();
   const c2 = api.makeCamp('The second camp');

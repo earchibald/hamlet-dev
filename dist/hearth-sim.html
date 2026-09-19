@@ -1088,15 +1088,17 @@ function loreCandidates(base){
   const b = base !== undefined ? base : (camp && camp.fae.known ? 30 : 10);
   return [
     { text: titleCase(lore.people.replace(/^the /, '')), axis: 'lore', base: b, why: 'for the people who were here first' },
-    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
-    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
+    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky`, source: lore.sky },
+    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites`, source: lore.sprites },
   ];
 }
 /* The one shape a source's own word may take once `scoreCandidates` will not let it score
    above zero bare, keyed by the kind of thing being named. A kind with no row here has no
    distinct form, so a source's bare word is dropped for it, exactly as it always was: a hill
    cannot be a "Vale of". A source added later to `lore.sources` gets this shape at every kind
-   listed here with no other change. */
+   listed here with no other change. The rewrite follows provenance, not text: a candidate
+   is only rewritten when it carries the `source` field `loreCandidates` put on it, never by
+   matching its text against a source's word (see `scoreCandidates`). */
 const DISTINCT_FORM = {
   valley: source => `Vale of ${source.text}`,
 };
@@ -1165,13 +1167,18 @@ function candidatesFor(kind, by, place){
   return [...landCandidates(place), ...eventCandidates(camp, kind), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
 /* Score, drop duplicates, and sort. A text another thing already owns scores zero. A source's
-   own bare word (`lore.sources`) is never offered as itself: where this kind has a distinct
-   form (`DISTINCT_FORM`), the candidate is rewritten into that form and keeps the score its
-   bare text would have had, so it competes exactly as the bare text would have; where the
-   kind has none, the candidate is dropped, as before. The people are not a source here, so
-   their own name still scores, and sorts, bare. The tie-break sorts on `sortText`, the text
-   the candidate would have shown bare, so a source's word that would have won bare still wins
-   once it is rewritten into its distinct form. */
+   own candidate (`c.source`, set by `loreCandidates`) is never offered as itself: where this
+   kind has a distinct form (`DISTINCT_FORM`), the candidate is rewritten into that form and
+   keeps the score its bare text would have had, so it competes exactly as the bare text would
+   have; where the kind has none, the candidate is dropped, as before. The rewrite follows
+   provenance, not text: a source's word (`lore.sky`, `lore.sprites`) is never put in
+   `nameIndex`, so a land name made later can carry the same text by chance, and matching that
+   collision by text would rewrite the wrong candidate and credit the wrong origin. A
+   candidate that only collides in text, but carries no `source` field, still scores zero and
+   is dropped bare, so a source's bare word is still never shown bare from any candidate. The
+   people are not a source here, so their own name still scores, and sorts, bare. The
+   tie-break sorts on `sortText`, the text the candidate would have shown bare, so a source's
+   word that would have won bare still wins once it is rewritten into its distinct form. */
 function scoreCandidates(cands, by, thing, kind){
   const seen = new Set(), out = [];
   const owned = lore && lore.sources ? new Set(lore.sources.map(s => s.text.toLowerCase())) : null;
@@ -1179,9 +1186,11 @@ function scoreCandidates(cands, by, thing, kind){
   for (const c of cands){
     const bareKey = c.text.toLowerCase();
     let cand = c, bareOwnedNoForm = false;
-    if (owned && owned.has(bareKey)){
-      if (form){ const source = lore.sources.find(s => s.text.toLowerCase() === bareKey); cand = { ...c, text: form(source), sortText: c.text }; }
+    if (c.source){
+      if (form) cand = { ...c, text: form(c.source), sortText: c.text };
       else bareOwnedNoForm = true;
+    } else if (owned && owned.has(bareKey)){
+      bareOwnedNoForm = true;
     }
     const key = cand.text.toLowerCase();
     if (seen.has(key)) continue;
