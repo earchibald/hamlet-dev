@@ -840,6 +840,41 @@ test('unfolded, the timeline is a row for each god and a row for the gate', () =
   assert.ok(m.rows.length > 1);
 });
 
+test('unfolded, every row has one cell per age in the span, so a column names one age down every lane', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const m = api.timelineModel();
+  const span = m.to - m.from + 1;
+  for (const r of m.rows){
+    assert.equal(r.cells.length, span, `row ${r.id} has one cell per age`);
+    assert.deepEqual(r.cells.map(c => c.age), Array.from({ length: span }, (_, i) => m.from + i), `row ${r.id} runs from age ${m.from} to ${m.to}`);
+  }
+  /* Two rows read at the same index are the same age, so a column means something: reading down it
+     shows what several gods did in that one age. */
+  for (let i = 0; i < span; i++){
+    const ages = m.rows.map(r => r.cells[i].age);
+    assert.ok(ages.every(a => a === ages[0]), `index ${i} names one age across every row`);
+  }
+  /* Where a god did nothing that age, the cell is a blank placeholder, not a missing one. */
+  const someBlank = m.rows.slice(0, -1).some(r => r.cells.some(c => c.blank));
+  assert.ok(someBlank, 'at least one god has a blank age somewhere in an eight-age creation');
+});
+
+test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  const before = api.timelineModel();
+  assert.equal(before.now, 0, 'no age has run yet');
+  assert.equal(before.from, 1); assert.equal(before.to, 1);
+  for (let n = 0; n < 8; n++) api.step();
+  const after = api.timelineModel();
+  assert.equal(after.to, after.now, 'to is the live age once the creation has run');
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  assert.match(src, /m\.now === 0 \? 'Before the first age' : `Age \$\{m\.from\} to \$\{m\.to\}`/, 'the head prints the span, and says so plainly before the first age');
+});
+
 test('a chip opens the matrix that produced it, unsorted and unscored by the view', () => {
   const api = loadUI(['state', 'derive'], TL_API);
   api.startCreation('gamma', {});

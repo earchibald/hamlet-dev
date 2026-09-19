@@ -60,6 +60,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
 #timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
 #timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* The unfolded lanes carry one cell per age, so every cell takes the same width and a column
+   lines up. The folded row is one stream in age order and keeps its own natural width. */
+#timeline .lane.fixed .cell{flex:none;width:84px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#timeline .cell.blank{cursor:default;border-color:transparent}
 #timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
@@ -5916,27 +5920,42 @@ function tlCellText(rec, withWho){
   return `${who}${rec.picked}`;
 }
 
+/* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
+   cell, blank so timeline.js can draw it and give it the filled cell's own width. */
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+
 function timelineModel(){
   const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
-  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}` });
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
+  /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
+     where the row has something to show and blank where it does not. That is the whole point of the
+     unfolded view, so a player can read down a column and see what several gods did at once. */
   const rows = [];
   for (const g of gods()){
     const mine = inSpan.filter(c => c.god === g.id);
     if (!mine.length && g.status !== 'awake') continue;
-    rows.push({ id: g.id, label: g.name, cells: mine.map(r => cell(r, false)) });
+    const byAge = new Map(mine.map(r => [r.age, r]));
+    const cells = [];
+    for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
+    rows.push({ id: g.id, label: g.name, cells });
   }
   /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
-     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. */
+     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
+     about now, so it sits under the now-line, in the last cell of the span; every earlier age is blank. */
   const gate = creation.gate;
-  rows.push({ id: 'gate', label: 'The gate', cells: [{ age: now, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null }] });
+  const gateCells = [];
+  for (let a = from; a <= to; a++){
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+  }
+  rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
   return { shown: true, folded: false, from, to, now, rows, marks: [] };
 }
 
@@ -6683,10 +6702,16 @@ function tlButton(id, text, key){
   return b;
 }
 function tlCell(c){
-  if (!c.chip){ const s = document.createElement('span'); s.className = 'cell'; s.textContent = c.text; return s; }
+  if (!c.chip){
+    const s = document.createElement('span');
+    s.className = 'cell' + (c.blank ? ' blank' : '');
+    s.textContent = c.text;
+    if (c.text) s.title = c.text;
+    return s;
+  }
   const b = document.createElement('button');
   b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
-  b.dataset.chip = c.chip; b.textContent = c.text;
+  b.dataset.chip = c.chip; b.textContent = c.text; b.title = c.text;
   return b;
 }
 function drawTimeline(){
@@ -6696,13 +6721,13 @@ function drawTimeline(){
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
-  const span = document.createElement('span'); span.textContent = `Age ${m.from} to ${m.now}`;
+  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
   const sp = document.createElement('span'); sp.className = 'sp';
   sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
             tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
-    const lane = document.createElement('div'); lane.className = 'lane';
+    const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
     const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));

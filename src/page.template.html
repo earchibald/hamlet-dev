@@ -60,6 +60,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
 #timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
 #timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* The unfolded lanes carry one cell per age, so every cell takes the same width and a column
+   lines up. The folded row is one stream in age order and keeps its own natural width. */
+#timeline .lane.fixed .cell{flex:none;width:84px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#timeline .cell.blank{cursor:default;border-color:transparent}
 #timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}

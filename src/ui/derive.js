@@ -297,27 +297,42 @@ function tlCellText(rec, withWho){
   return `${who}${rec.picked}`;
 }
 
+/* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
+   cell, blank so timeline.js can draw it and give it the filled cell's own width. */
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+
 function timelineModel(){
   const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
-  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}` });
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
+  /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
+     where the row has something to show and blank where it does not. That is the whole point of the
+     unfolded view, so a player can read down a column and see what several gods did at once. */
   const rows = [];
   for (const g of gods()){
     const mine = inSpan.filter(c => c.god === g.id);
     if (!mine.length && g.status !== 'awake') continue;
-    rows.push({ id: g.id, label: g.name, cells: mine.map(r => cell(r, false)) });
+    const byAge = new Map(mine.map(r => [r.age, r]));
+    const cells = [];
+    for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
+    rows.push({ id: g.id, label: g.name, cells });
   }
   /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
-     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. */
+     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
+     about now, so it sits under the now-line, in the last cell of the span; every earlier age is blank. */
   const gate = creation.gate;
-  rows.push({ id: 'gate', label: 'The gate', cells: [{ age: now, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null }] });
+  const gateCells = [];
+  for (let a = from; a <= to; a++){
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+  }
+  rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
   return { shown: true, folded: false, from, to, now, rows, marks: [] };
 }
 

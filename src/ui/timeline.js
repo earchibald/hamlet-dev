@@ -8,10 +8,16 @@ function tlButton(id, text, key){
   return b;
 }
 function tlCell(c){
-  if (!c.chip){ const s = document.createElement('span'); s.className = 'cell'; s.textContent = c.text; return s; }
+  if (!c.chip){
+    const s = document.createElement('span');
+    s.className = 'cell' + (c.blank ? ' blank' : '');
+    s.textContent = c.text;
+    if (c.text) s.title = c.text;
+    return s;
+  }
   const b = document.createElement('button');
   b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
-  b.dataset.chip = c.chip; b.textContent = c.text;
+  b.dataset.chip = c.chip; b.textContent = c.text; b.title = c.text;
   return b;
 }
 function drawTimeline(){
@@ -21,13 +27,13 @@ function drawTimeline(){
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
-  const span = document.createElement('span'); span.textContent = `Age ${m.from} to ${m.now}`;
+  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
   const sp = document.createElement('span'); sp.className = 'sp';
   sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
             tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
-    const lane = document.createElement('div'); lane.className = 'lane';
+    const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
     const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));
