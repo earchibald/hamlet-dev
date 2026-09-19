@@ -354,6 +354,19 @@ const GOD_ACTS = {
   },
 };
 
+/* What a god will not do. Each bar names the trait its act's score already reads, and a floor under
+   which the player is told no. A bar is a lens on the matrix the player is shown; the autonomous
+   chooser never reads it, so a bar cannot move the creation. Force Actions takes a barred option
+   anyway, and it costs the god nothing. */
+const GOD_BARS = {
+  battle: { trait: 'bravery', floor: 0.35, why: 'is not bold enough to make war' },
+  burn: { trait: 'temper', floor: 0.3, why: 'is too calm to set anything alight' },
+  mingle: { trait: 'sociability', floor: 0.25, why: 'keeps too much to itself for that' },
+};
+function barFor(g, type){
+  const bar = GOD_BARS[type];
+  return bar && g.traits[bar.trait] < bar.floor ? bar : null;
+}
 /* godOptions and decideGod draw from rng; call them inside withGodRng, as ageStep does. */
 function godOptions(g){
   const opts = [];
@@ -362,16 +375,29 @@ function godOptions(g){
   opts.sort((p, q) => q.score - p.score);
   return opts;
 }
-function decideGod(g){
+/* A god with too little calm or too little expression drops the act it carries. This runs in the
+   once-per-god preparation in `ageDecide`, for every god, before any turn can open: a god that
+   abandons its act has a free choice, and the player must be shown it. `decideGod` therefore keeps
+   only the continue branch. Nothing here draws a random number. */
+function abandonUnfinished(g){
+  if (!g.task) return;
+  if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${g.task.type} unfinished.`, [g]); g.task = null; }
+}
+
+/* The decision is kept, not only the last one. `lastChoice` is what the god's card reads now; the
+   record in `creation.choices` is what the timeline reads, age by age, and what the annals inherit.
+   Nothing here draws a random number, so the creation is unmoved. */
+function decideGod(g, given){
   if (g.task){ const t = g.task;
-    if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${t.type} unfinished.`, [g]); g.task = null; }
-    else { beginAct(); GOD_ACTS[t.type].continue(g, t); return; } }
-  const opts = godOptions(g); g.lastChoice = { opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })), picked: null };
+    beginAct(); creation.choices.push({ age, god: g.id, continued: true, type: t.type }); GOD_ACTS[t.type].continue(g, t); return; }
+  const opts = given || godOptions(g); g.lastChoice = { opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })), picked: null };
+  const rec = { age, god: g.id, opts: g.lastChoice.opts, picked: null };
+  creation.choices.push(rec);
   for (let k = 0; k < opts.length; k++){ const o = opts[k];
     beginAct(); deciding = { g, type: o.type };
     const ok = GOD_ACTS[o.type].apply(g, o.region);
     deciding = null;
-    if (ok){ g.lastChoice.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
+    if (ok){ g.lastChoice.picked = o.type; rec.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
     g.lastChoice.opts[k].failed = true; }
 }
 
@@ -482,23 +508,161 @@ function outgrown(){
 /* Settle paints the ground, and painting draws from the people's stream. The age that ends the creation
    raises this flag inside the god stream; settle runs after it, outside. */
 let settleNow = false;
+
+/* Where the age stands. Null between ages. `{ i }` is the index of the next god to decide in the
+   list `ageDecide` took at the head of this age. An age is split so a player's turn can suspend in
+   the middle of it; the parts run in the order the one closure ran them, and the god stream is
+   drawn from identically. */
+let agePos = null;
+
+/* A line the player is owed but the world does not remember. In the gods era every logged line joins
+   the legends, and the legends are the creation's own story: a hand reaching in is not part of it, and
+   a legend that differed would break the equality that autopilot rests on. The door log is the record
+   of what the player did. This is only so they can see it happen. */
+function note(text){ chronicle.unshift({ tick, when: stamp(), text, kind: 'info' }); if (chronicle.length > 300) chronicle.pop(); }
+
+/* Who the player is, and the turn that is open. `inhabited` is null, or `{ id, mode }`: the being the
+   player is and how they hold it. `mode` is `become` here, and the other three modes name themselves
+   the day each is built, so no read site has to change again. `pending` is null, or the god whose turn
+   it is with the matrix it was given. The engine will not step while `pending` is set: this is the
+   locked clock the mythos spec reserved. */
+let inhabited = null;
+let pending = null;
+
+/* Whether the player has been told their god can act no more. One line, not one an age. */
+let inhabitedTold = false;
+
+/* The age the autopilot runs to. Null when the player is choosing. Task 6 gives it its act. */
+let runUntil = null;
+
+/* The stops the player set. A stop on an age is what this slice builds; a stop on an event needs an
+   event kind on every chronicle line, which is G's watch list and is not written. The act is shaped
+   to take that kind the day it exists. */
+let stops = [];
+
+/* Fill the open turn. The once-per-god preparation (settleHome, godNeeds) runs in ageDecide, not
+   here, so it happens exactly once however many times the turn is opened. The matrix is drawn once
+   and kept on `agePos.opts`; re-opening the same god's turn, after the player left and came back,
+   reuses it and draws nothing. */
+function openTurn(g){
+  if (!agePos.opts) agePos.opts = godOptions(g);
+  pending = { god: g.id, age, opts: agePos.opts.map(o => {
+    const row = { type: o.type, label: o.label, score: o.score, region: o.region.id };
+    const bar = barFor(g, o.type); if (bar) row.bar = bar;
+    return row;
+  }) };
+}
+
+/* The age moves past the god at `agePos.i`. The preparation and the drawn matrix belong to that god
+   alone, so they are dropped with it. Both paths that advance the age call this, and there is one
+   copy of the invariant. */
+function agePass(){ agePos.i++; agePos.prepared = false; agePos.opts = null; }
+
+/* Apply one option for the god whose turn is open. An option that does not land leaves the turn open
+   with its row marked failed, because the player is owed the reason; the autonomous god falls to the
+   next option in silence. */
+function takeTurn(opt){
+  const g = beingById(pending.god);
+  const k = pending.opts.findIndex(o => o.type === opt.type && o.region === opt.region);
+  if (k < 0) return 'That is not on the table.';
+  const row = pending.opts[k];
+  if (row.bar && !options.force) return `${beingById(pending.god).name} ${row.bar.why}.`;
+  const r = regionById(row.region);
+  let landed = false;
+  withGodRng(() => {
+    g.lastChoice = { opts: pending.opts, picked: null };
+    beginAct(); deciding = { g, type: row.type };
+    landed = !!(r && GOD_ACTS[row.type].apply(g, r));
+    deciding = null;
+    if (landed){ g.lastChoice.picked = row.type; g.acted++; gainGodXp(g, row.type); noteBeside(g, r); }
+    else row.failed = true;
+  });
+  if (!landed) return `The ground refuses it. ${g.name} cannot ${row.type} there.`;
+  creation.choices.push({ age: pending.age, god: g.id, opts: pending.opts, picked: row.type, byPlayer: true });
+  pending = null;
+  agePass();
+  withGodRng(() => { if (ageDecide()) ageEnd(); });
+  if (settleNow){ settleNow = false; settle(); }
+  return `You ${row.type}. ${g.name} acts.`;
+}
+
+/* The player leaves, or the god whose turn was open is gone. This only closes the open turn: it does
+   not resume the age. `takeTurn` is the one path that resumes, so there is no second copy of that
+   logic to keep in step with it. The engine's own next `step()` finds `agePos` still standing and
+   carries the age on from where it stood, through `ageDecide`. */
+function releaseTurn(){
+  pending = null;
+}
+
+function ageBegin(){
+  age++;
+  /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
+  creation.gestures = []; creation.gestureAge = age;
+  if (age === 1) firstGod();
+  /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
+  if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
+  agePos = { i: 0, list: gods(), prepared: false, opts: null };
+  /* A run ends at the age it named, or at the first stop that names this age. The line says why, so
+     the player is never stopped without a reason. */
+  if (runUntil !== null){
+    const stop = stops.find(s => s.what === 'age' && s.at === age);
+    /* A stop that fired is spent. It is taken off the list, so a later run past this age is not
+       stopped again by a mark the player already saw reached. */
+    if (stop){ runUntil = null; stops.splice(stops.indexOf(stop), 1); note(`Age ${age}. The stop you set is reached.`); }
+    else if (age >= runUntil){ runUntil = null; note(`Age ${age}. The run you set is over.`); }
+  }
+}
+
+/* A god that sleeps, dies, or is unmade decides nothing, so no turn opens for it ever again. The
+   player is told once, and is told nothing more until they take another god. */
+function tellIfGone(){
+  if (!inhabited || inhabitedTold) return;
+  const me = beingById(inhabited.id);
+  if (me && me.status === 'awake') return;
+  inhabitedTold = true;
+  note(`${me ? me.name : 'The god you took'} acts no more. Take another god, or watch.`);
+}
+
+/* The gods of this age, as they stood when it began, and where we are among them. The list is taken
+   once an age and never retaken, so a suspended age resumes through the same gods the age started
+   with, and a god born mid-age waits for the next age exactly as it always did.
+   `agePos.prepared` and `agePos.opts` belong to the god at `agePos.i` alone: settleHome, godNeeds,
+   and the drawn matrix run or are drawn once for that god, however many times its turn is opened
+   and abandoned before the age moves past it. */
+function ageDecide(){
+  tellIfGone();
+  const list = agePos.list;
+  while (agePos.i < list.length){
+    const g = list[agePos.i];
+    if (g.status === 'awake'){
+      if (!agePos.prepared){ settleHome(g); godNeeds(g); abandonUnfinished(g); agePos.prepared = true; }
+      /* The player's god with a free choice stops the age here. A god carrying an act has no choice
+         to make, so it carries on and the turn does not open. */
+      if (inhabited && g.id === inhabited.id && !g.task && runUntil === null){ openTurn(g); return false; }
+      decideGod(g, agePos.opts);
+    }
+    agePass();
+  }
+  return true;
+}
+
+function ageEnd(){
+  agePos = null;
+  for (const g of gods()) if (g.status !== 'dead' && g.acted > 0 && poleShare(g.pole) === 0) unmake(g);
+  const gate = restGate(); creation.gate = gate;
+  /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
+  if (!gate.ok && pulseAge !== null) strain(gate.lack);
+  if (pulseAge !== null) outgrown();
+  if (!awakeGods().length){ settleNow = true; return; }
+  if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
+  if (age >= options.ageLimit) backstop();
+}
+
 function ageStep(){
   withGodRng(() => {
-    age++;
-    /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
-    creation.gestures = []; creation.gestureAge = age;
-    if (age === 1) firstGod();
-    /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
-    if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
-    for (const g of gods()) if (g.status === 'awake'){ settleHome(g); godNeeds(g); decideGod(g); }
-    for (const g of gods()) if (g.status !== 'dead' && g.acted > 0 && poleShare(g.pole) === 0) unmake(g);
-    const gate = restGate(); creation.gate = gate;
-    /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
-    if (!gate.ok && pulseAge !== null) strain(gate.lack);
-    if (pulseAge !== null) outgrown();
-    if (!awakeGods().length){ settleNow = true; return; }
-    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
-    if (age >= options.ageLimit) backstop();
+    if (!agePos) ageBegin();
+    if (!ageDecide()) return;
+    ageEnd();
   });
   if (settleNow){ settleNow = false; settle(); }
 }
@@ -506,8 +670,9 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1 };
+  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [] };
   deciding = null; saidFrom = 0; gestureFallbacks = {};
+  agePos = null; pending = null; inhabited = null; inhabitedTold = false; runUntil = null; stops = [];
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){

@@ -52,6 +52,57 @@ const DOOR_ACTS = {
      `doorLog` from the save, so this act's own return value is that function's raw result: `null` on
      success, or the sentence to show when it is not. */
   load(e){ return loadSnapshot(e.snapshot); },
+  /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
+     until each is built. An id of null leaves, and the open turn closes with it. */
+  become(e){
+    if (e.mode !== undefined && e.mode !== 'become') return 'Only Become is built. Possess, Vessel, and Manifestation wait for their own specs.';
+    if (e.id === null || e.id === undefined){
+      if (inhabited === null) return 'You are nobody already.';
+      inhabited = null; inhabitedTold = false; releaseTurn();
+      note('The hand above lifts. Whatever was moving falls still, and goes on by itself.');
+      return 'You are nobody again. The creation goes on without you.';
+    }
+    /* Only a god can be taken in this slice, and a god acts only in the ages. Without this guard a
+       god-era become replayed in the days era would land on a sleeping god and open nothing. */
+    if (era !== 'gods') return 'The ages are over. A god cannot be taken now.';
+    const g = beingById(e.id);
+    if (!g || !g.alive || g.species !== 'god') return 'Only a god can be taken, and only while it lives.';
+    if (inhabited !== null && inhabited.id !== g.id) releaseTurn();
+    inhabited = { id: g.id, mode: 'become' }; inhabitedTold = false;
+    note(`Something older than the gods looks out through ${g.name}.`);
+    return `You are ${g.name}, ${g.epithet}.`;
+  },
+  /* Choose: take one option from the open matrix. The option is named, never numbered, because a list
+     sorted by score is not stable across a replay. */
+  choose(e){
+    if (!pending) return 'It is nobody\'s turn.';
+    if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    return takeTurn(e.opt);
+  },
+  /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the
+     engine's own chooser and nothing else, so a creation run on autopilot is an unwatched creation.
+     A run names a mark ahead of now in the same shape a stop does: `{ what, at }`. */
+  run(e){
+    if (e.what !== 'age') return 'Only a run to an age is built. A run to an event waits for the watch list.';
+    if (era !== 'gods') return 'There are no ages to run.';
+    if (inhabited === null) return 'You are nobody. There is nothing to hand over.';
+    if (!Number.isInteger(e.at) || e.at <= age) return 'A run goes to an age still ahead.';
+    runUntil = e.at; releaseTurn();
+    note(`${beingById(inhabited.id).name} goes on alone a while.`);
+    return `Running to age ${e.at}.`;
+  },
+  /* Watch: set or clear a stop. The same stop twice clears it. A stop is a mark ahead of now, so an
+     age already passed cannot carry one: it would never fire. */
+  watch(e){
+    if (e.what !== 'age') return 'Only a stop on an age is built. A stop on an event waits for the watch list.';
+    if (!Number.isInteger(e.at)) return 'A stop on an age names a whole age.';
+    if (e.at <= age) return 'That age is already past. A stop goes on an age still ahead.';
+    const k = stops.findIndex(s => s.what === 'age' && s.at === e.at);
+    if (k >= 0){ stops.splice(k, 1); return `The stop at age ${e.at} is cleared.`; }
+    stops.push({ what: 'age', at: e.at });
+    return `A stop is set at age ${e.at}.`;
+  },
 };
 DOOR_ACTS.load.replacesWorld = true;
 function inject(event){
@@ -64,7 +115,10 @@ function inject(event){
     return `The world is as it was on day ${dayOf()}.`;
   }
   if (event.tick !== undefined && event.tick !== tick) return 'Not now.';
-  doorLog.push({ ...event, tick });
+  /* In the gods era an age is the step and the tick stands still, so the age is the stamp that
+     tells one act from another. In the days era nothing changes: the tick is the stamp. */
+  if (era === 'gods' && event.age !== undefined && event.age !== age) return 'Not now.';
+  doorLog.push(era === 'gods' ? { ...event, tick, age } : { ...event, tick });
   return act(event);
 }
 function resetDoor(){ doorLog = []; replayHead = { seed: seedText, options }; }
