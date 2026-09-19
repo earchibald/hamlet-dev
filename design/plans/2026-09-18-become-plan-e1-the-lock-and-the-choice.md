@@ -21,7 +21,7 @@
 - Every act from outside the engine enters by `inject()` in `src/sim/door.js` and is logged, applied or not.
 - Write the game's text in plain English. One idea per sentence.
 - Run `node build.js` after every change to `src/`.
-- **The gate, every task:** `npm run fast` passes, and `npm run soak:quick` shows an unchanged fingerprint. Any task that moves the golden record has a bug, except where the task says otherwise (only Task 2 may add to state that the fingerprint does not read).
+- **The gate, every task:** `npm run fast` passes, and `npm run soak` passes including `the run matches the golden record` (about ninety seconds). `npm run soak:quick` is not a gate: it runs ten days against seventy-day assertions and checks no golden record. Any task that moves the golden record has a bug, except where the task says otherwise (only Task 2 may add to state that the fingerprint does not read).
 - Anything exposed to tests goes in the `API` string in `src/sim/index.js`.
 
 ---
@@ -138,8 +138,8 @@ Expected: PASS, every file.
 
 - [ ] **Step 7: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record.
 
 - [ ] **Step 8: Build and commit**
 
@@ -252,8 +252,8 @@ Expected: PASS.
 
 - [ ] **Step 6: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record.
 
 - [ ] **Step 7: Build and commit**
 
@@ -390,8 +390,8 @@ Expected: PASS. `tests/ages.js` and `tests/gods.js` are the real check here; the
 
 - [ ] **Step 6: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record.
 
 - [ ] **Step 7: Build and commit**
 
@@ -669,8 +669,8 @@ Expected: PASS. The equality test is the one that matters: a creation driven by 
 
 - [ ] **Step 9: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record.
 
 - [ ] **Step 10: Build and commit**
 
@@ -856,8 +856,8 @@ Expected: PASS.
 
 - [ ] **Step 8: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure. A bar that moved the fingerprint would mean the autonomous chooser read it, which is the bug this task must not have.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record. A bar that moved the fingerprint would mean the autonomous chooser read it, which is the bug this task must not have.
 
 - [ ] **Step 9: Write the register line**
 
@@ -1077,8 +1077,8 @@ Expected: PASS, all twenty-four seeds.
 
 - [ ] **Step 9: The fingerprint has not moved**
 
-Run: `npm run soak:quick`
-Expected: no golden-record failure.
+Run: `npm run soak`
+Expected: PASS, including `the run matches the golden record`. It takes about ninety seconds. Do not use `npm run soak:quick`: it runs ten days against assertions written for seventy, so it fails on camp growth whatever you changed, and it does not check the golden record.
 
 - [ ] **Step 10: Move the register line for the inhabit modes**
 
