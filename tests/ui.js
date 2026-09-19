@@ -532,7 +532,7 @@ test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter a
 const WIN = [...DERIVE, 'winOpen', 'winClose', 'winFind', 'focusRing', 'WIN_MAX'];
 
 test('windows: open reuses a window for the same target, the seventh inspector closes the oldest, and the focus ring lists map, docked drawers, then windows', () => {
-  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
   const w1 = api.winOpen('inspect', { being: 1 });
   assert.equal(api.winOpen('inspect', { being: 1 }), w1, 'same target, same window');
   const w2 = api.winOpen('inspect', { being: 2 });
@@ -551,6 +551,14 @@ test('windows: open reuses a window for the same target, the seventh inspector c
   assert.equal(ring[0], 'map'); assert.ok(ring.includes('drawer:people')); assert.ok(!ring.includes('drawer:goals'), 'a popped-out drawer is a window now');
   assert.ok(ring.filter(f => f.startsWith('window:')).length === api.ui.windows.length);
   api.winClose(api.ui.windows[0].id); assert.equal(api.ui.windows.length, api.WIN_MAX);
+});
+
+test('windows: closing the focused window sends focus back to the map', () => {
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const w1 = api.winOpen('inspect', { being: 1 });
+  api.ui.focus = `window:${w1.id}`;
+  api.winClose(w1.id);
+  assert.equal(api.ui.focus, 'map');
 });
 
 test('window keys: O pops out or docks, Esc closes a focused window, Tab walks the ring', () => {
@@ -627,7 +635,7 @@ test('the one-shot tool hints say Enter', () => {
 });
 
 test('windows: a reopened inspector takes the first free slot', () => {
-  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
   const w1 = api.winOpen('inspect', { being: 1 }); api.winOpen('inspect', { being: 2 }); api.winOpen('inspect', { being: 3 });
   const slot = { x: w1.x, y: w1.y };
   api.winClose(w1.id);
