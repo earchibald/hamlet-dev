@@ -33,7 +33,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
-- Load-time order matters only twice: `core.js` first, and `beings.js` before `species.js` and `fae.js`, which add actions to `START`.
+- Load-time order matters three times: `core.js` first, `clock.js` directly after it, and `tasks.js` before `beings.js`, `species.js`, and `fae.js`, which add kinds to `TASKS`. `beings.js` also comes before `species.js` and `fae.js`, which add actions to `START`.
 - `updateWorld()` in `main.js` calls the per-tick steps in a fixed order. The order fixes the random number stream. Do not reorder it.
 - Passability, search, and fire read levels. A tile has a z. Use `tileAt(x, y, z)`, `passable(x, y, z)`, and `near(a, b)` for beings. Do not index `world` for anything that can be off the surface.
 

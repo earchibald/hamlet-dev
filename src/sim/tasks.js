@@ -1,3 +1,55 @@
+/* ---------- tasks as data: the table and the tick executor ---------- */
+/* A task is a plain record: { kind, type, args, stop, path, label, ... }. It holds numbers and strings,
+   never a function, and never a reference to a being, a tile, or an item. TASKS[kind] holds what the
+   task does:
+     type            the category that rules read (a.task.type). begin may return another.
+     begin(a, args)  the checks and the search that start the task. It returns the record's other
+                     fields, or false when the task cannot start, or true when it handed over to
+                     another kind.
+     stops           functions (a, t). The executor calls stops[t.stop] on each stride once the path
+                     is walked. Each returns 'continue', 'done', or 'fail'.
+     release(a, t)   what the task lets go of when it ends or fails.
+     work, effect    declared by workKind for a job done at one place. */
+const TASKS = {};
+
+function setTask(a, kind, args, fields){
+  a.task = { kind, type: TASKS[kind].type, args, stop: 0, path: [], ...fields };
+  return true;
+}
+function startTask(a, kind, args = {}){
+  const K = TASKS[kind]; if (!K) throw new Error(`No task kind '${kind}'.`);
+  const own = { ...args }, f = K.begin(a, own); if (!f) return false;
+  return f === true ? true : setTask(a, kind, own, f);
+}
+/* Run the current stop once. */
+function taskStop(a){ const t = a.task; return t.arrive ? t.arrive(a, t) : TASKS[t.kind].stops[t.stop](a, t); }
+/* Walk on toward a stop. Null when the being is within reach. Otherwise the stride's result:
+   'continue' with a new path, or 'fail' when there is no way. */
+function goTo(a, t, x, y, within, z = 0){
+  if (nearAt(a, x, y, z) <= within) return null;
+  const q = pathToStop(a, x, y, within, z); if (!q) return 'fail';
+  t.path = q; return 'continue';
+}
+function letGo(a, t){ if (t.cleanup) t.cleanup(t); else if (t.kind && TASKS[t.kind].release) TASKS[t.kind].release(a, t); }
+function endTask(a){ const t = a.task; if (!t) return; letGo(a, t); a.task = null; }
+function failTask(a){ const t = a.task; if (!t) return; letGo(a, t); dropCarried(a); a.task = null; }
+function runTask(a){
+  const t = a.task; a.status = t.label;
+  if (t.wait > 0){ t.wait--; return; }
+  if (t.path.length){
+    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
+    const [nx, ny, nz] = t.path[0];
+    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
+    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
+    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    return;
+  }
+  const r = taskStop(a);
+  if (r === 'done') endTask(a);
+  else if (r === 'fail'){ a.cooldown[t.key] = tick + CLOCK.cooldown.taskFailed; failTask(a); }
+  if (a.task) a.status = a.task.label;
+}
+
 /* ---------- human work tasks ---------- */
 function startFetchEmber(a){
   const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
@@ -7,10 +59,10 @@ function startFetchEmber(a){
         if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
         a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, CLOCK.thought.ember);
         log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
-        const [px, py] = camp.pit; const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
+        const [px, py] = camp.pit; const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
       }
       const [px, py] = camp.pit;
-      if (nearAt(a, px, py) > 1){ const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      if (nearAt(a, px, py) > 1){ const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
       const pit = pitTile().struct; a.carrying = null;
       if (pit.fuel <= 0) return 'fail';
       if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
@@ -26,10 +78,10 @@ function startFetchEmber(a){
 /* Continue straight into a new task from inside an old one. */
 function chain(a, old, ok){ if (!ok) return null; a.task.started = old.started; a.task.key = old.key; return 'continue'; }
 function startBuild(a, at, work, label, done, skill){
-  const p = legPath(a, at[0], at[1], 1); if (!p) return false;
+  const p = pathToStop(a, at[0], at[1], 1); if (!p) return false;
   a.task = { type: 'work', label: `Walking to ${label.toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: at, within: 1,
     arrive(a, t){
-      if (nearAt(a, at[0], at[1]) > 1){ const q = legPath(a, at[0], at[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      if (nearAt(a, at[0], at[1]) > 1){ const q = pathToStop(a, at[0], at[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
       t.progress += workSpeed(a, skill || (/cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build')); t.label = `${label} (${Math.min(99, Math.floor(t.progress / work * 100))}%)`;
       if (t.progress < work) return 'continue';
       done(a); return 'done';
@@ -40,11 +92,11 @@ function startDeliver(a){
   if (!camp.stashTile || !a.carrying) return false;
   if (a.carrying.kind === 'ember') return false;
   const [sx, sy] = camp.stashTile;
-  const p = legPath(a, sx, sy, 1); if (!p) return false;
+  const p = pathToStop(a, sx, sy, 1); if (!p) return false;
   const c = a.carrying;
   a.task = { type: 'deliver', label: `Carrying ${c.count} ${c.count > 1 ? ITEMS[c.kind].plural : ITEMS[c.kind].name} to camp`, path: p,
     arrive(a, t){
-      if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
       if (c.kind === 'firestones'){ camp.tools.firestones = 1; a.carrying = null; log(`${a.name} lays two firestones by the pit. ${ITEMS.firestones.find} The camp can make its own fire now.`, campHumans(), 'major'); addThought(a, 'find', 'Brought firestones up from the dark', 10, CLOCK.thought.find); return 'done'; }
       if (c.kind === 'bones'){ a.carrying = null; log(`${a.name} brings old bones up from the dark, and nobody is sure whose they were. ${ITEMS.bones.find}`, campHumans(), 'major'); addThought(a, 'find', 'Found old bones in the dark', -3, CLOCK.thought.find); for (const h of campHumans()) if (h !== a) addThought(h, 'bones', 'There were bones under the hill', -2, CLOCK.thought.bones); return 'done'; }
       stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); return 'done';
@@ -59,10 +111,10 @@ function startGather(a, kind){
   if (!p){
     if (a.carrying) return startDeliver(a);
     const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
-    const [cx, cy] = secCenter(s); const q = legPath(a, cx, cy, 6); if (!q) return false;
+    const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
     log(`${a.name} heads to the ${s.name.toLowerCase()} to look for ${ITEMS[kind].plural}.`, [a]);
     a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for ${ITEMS[kind].plural}`, path: q,
-      arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = legPath(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
+      arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = pathToStop(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
     return true;
   }
   const it = found; it.reservedBy = a.id;
@@ -86,8 +138,8 @@ function startPickBerries(a){
   if (a.carrying && a.carrying.kind !== 'berries') return startDeliver(a);
   const hasFood = t => t.feature === 'bush' && t.berries > 0;
   const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
-  if (!p){ if (a.carrying) return startDeliver(a); const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false; const [cx, cy] = secCenter(s); const q = legPath(a, cx, cy, 6); if (!q) return false;
-    a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = legPath(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
+  if (!p){ if (a.carrying) return startDeliver(a); const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false; const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
+    a.task = { type: 'travel', label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, arrive(a, t){ if (nearAt(a, cx, cy) > 6){ const r = pathToStop(a, cx, cy, 6); if (!r) return 'fail'; t.path = r; return 'continue'; } return 'done'; } };
     return true; }
   a.task = { type: 'gather', label: 'Going to pick berries', path: p, progress: 0,
     arrive(a, t){
@@ -258,7 +310,7 @@ function startHuntDeer(a, d){
       if (near(a, d) <= 2){
         if (rng() < 0.3 + a.skills.hunt * 0.12){ d.hp = 0; die(d, 'was speared'); a.carrying = null; gainXp(a, 'hunt'); addThought(a, 'kill', 'Brought down a deer', 12, CLOCK.thought.kill); drift(a, 'bravery', 0.02); log(`${a.name} brings down a deer with the spear.`, campHumans(), 'major');
           const it = items.find(i => i.kind === 'venison' && i.x === d.x && i.y === d.y); if (it){ removeItem(it); a.carrying = { kind: 'venison', count: 1 }; return chain(a, t, startDeliver(a)) || 'done'; } return 'done'; }
-        d.skills.wary = Math.min(3, (d.skills.wary || 0) + 1); addThought(d, 'escaped', 'A hunter missed', -6, CLOCK.thought.escaped); failTask(d); START.flee(d); t.progress += CLOCK.chase.deerMissed;
+        d.skills.wary = Math.min(3, (d.skills.wary || 0) + 1); addThought(d, 'escaped', 'A hunter missed', -6, CLOCK.thought.escaped); failTask(d); startTask(d, 'flee'); t.progress += CLOCK.chase.deerMissed;
       }
       const p = bfs(a.x, a.y, a.z, (x, y, z) => z === d.z && dist(x, y, d.x, d.y) <= 2, 700, a); if (!p) return 'fail'; t.path = p.slice(0, 4); t.fast = near(a, d) <= 8; return 'continue';
     },
@@ -269,12 +321,12 @@ function startHuntDeer(a, d){
    cooldown runs. Chasing it with fire again is a livelock: skip it until the cooldown lifts. */
 function wolfNear(){ if (!camp.pit) return null; return beings.filter(b => b.alive && b.species === 'wolf' && nearAt(b, ...camp.pit) <= 11 && !(b.oldDen && b.oldDen.cleared === camp && (b.cooldown.raid || 0) > tick)).sort((p, q) => nearAt(p, ...camp.pit) - nearAt(q, ...camp.pit))[0] || null; }
 function startDriveOff(a, w){
-  const [px, py] = camp.pit; const p = legPath(a, px, py, 1); if (!p) return false;
+  const [px, py] = camp.pit; const p = pathToStop(a, px, py, 1); if (!p) return false;
   a.task = { type: 'guard', label: 'Grabbing a firebrand', path: p, fast: true, progress: 0,
     arrive(a, t){
       if (!a.carrying){ if (nearAt(a, px, py) > 1) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.guardEmber }; t.label = 'Running at the wolf with fire'; }
       if (!w.alive || nearAt(w, ...camp.pit) > 22 || ++t.progress > CLOCK.chase.guard){ a.carrying = null; if (w.alive && nearAt(w, ...camp.pit) > 22){ if (tick - camp.guardLogged > CLOCK.cooldown.guardLine){ camp.guardLogged = tick; log(`${a.name} chases the wolf off into the dark with a burning branch.`, campHumans(), 'good'); } addThought(a, 'brave', 'Drove off a wolf', 8, CLOCK.thought.brave); drift(a, 'bravery', 0.03); for (const h of campHumans()) if (h !== a) addThought(h, 'guarded', `${a.name} drove off a wolf`, 4, CLOCK.thought.guarded); } return 'done'; }
-      if (near(a, w) <= 2){ addThought(w, 'burned', 'A human came at me with fire', -20, CLOCK.thought.burnedWolf); w.cooldown.raid = tick + CLOCK.cooldown.wolfBurned; w.cooldown.wander = tick + CLOCK.cooldown.wolfWanders; w.shyOf = camp; failTask(w); START.flee(w); }
+      if (near(a, w) <= 2){ addThought(w, 'burned', 'A human came at me with fire', -20, CLOCK.thought.burnedWolf); w.cooldown.raid = tick + CLOCK.cooldown.wolfBurned; w.cooldown.wander = tick + CLOCK.cooldown.wolfWanders; w.shyOf = camp; failTask(w); startTask(w, 'flee'); }
       const q = bfs(a.x, a.y, a.z, (x, y, z) => z === w.z && dist(x, y, w.x, w.y) <= 2, 500, a); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
     },
     cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
@@ -283,7 +335,7 @@ function startDriveOff(a, w){
 
 /* Take a brand from the pit, then go. Shared by the cave search and the den clearing. */
 function withBrand(a, label, then){
-  const [px, py] = camp.pit; const p = legPath(a, px, py, 1); if (!p) return false;
+  const [px, py] = camp.pit; const p = pathToStop(a, px, py, 1); if (!p) return false;
   a.task = { type: 'work', label: `Going to the fire for a brand`, path: p, fast: false,
     arrive(a, t){ if (nearAt(a, px, py) > 1) return 'fail'; if (!pitLit()) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; t.label = label; const r = chain(a, t, then(a)); if (r) return r; a.carrying = null; return 'fail'; },
     cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
@@ -295,18 +347,18 @@ function withBrand(a, label, then){
    dies. It counts as searched only once the find (or empty hands) reaches the stash. */
 function startSearchCave(a, c){
   return withBrand(a, 'Going into the dark', a => {
-    const d = c.deep; const p = legPath(a, d.x, d.y, 0, d.z); if (!p) return false;
+    const d = c.deep; const p = pathToStop(a, d.x, d.y, 0, d.z); if (!p) return false;
     log(`${a.name} goes into the dark under the hill with a brand.`, campHumans(), 'major');
     c.claimed = a.id;
     a.task = { type: 'search', label: 'Searching the cave by brandlight', path: p, cave: c,
       arrive(a, t){
-        if (nearAt(a, d.x, d.y, d.z) > 0){ const q = legPath(a, d.x, d.y, 0, d.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, d.x, d.y, d.z) > 0){ const q = pathToStop(a, d.x, d.y, 0, d.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const it = itemAt(d.x, d.y, d.z); a.carrying = null;
         if (it){ removeItem(it); a.carrying = { kind: it.kind, count: 1 }; }
         addThought(a, 'searched', 'Went into the dark and came back', 8, CLOCK.thought.searched); drift(a, 'bravery', 0.03);
-        const [sx, sy] = camp.stashTile; const q = legPath(a, sx, sy, 1); if (!q) return 'fail';
+        const [sx, sy] = camp.stashTile; const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail';
         t.path = q; t.label = it ? `Carrying the ${ITEMS[it.kind].name} up out of the dark` : 'Coming up out of the dark, empty-handed';
-        t.arrive = (a, t) => { if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } c.searched = camp; return chain(a, t, startDeliver(a)) || 'done'; };
+        t.arrive = (a, t) => { if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } c.searched = camp; return chain(a, t, startDeliver(a)) || 'done'; };
         return 'continue';
       },
       cleanup(){ if (c.claimed === a.id) c.claimed = null; if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
@@ -321,14 +373,14 @@ function startClearRock(a, c){
        while the rock still blocks the passage. Try each candidate and keep the one with a path. */
     const spots = DIRS.map(([dx, dy]) => hasTile(b.x + dx, b.y + dy, b.z) ? tileAt(b.x + dx, b.y + dy, b.z) : null).filter(t => t && passable(t.x, t.y, t.z));
     let spot = null, p = null;
-    for (const s of spots){ const q = legPath(a, s.x, s.y, 0, s.z); if (q){ spot = s; p = q; break; } }
+    for (const s of spots){ const q = pathToStop(a, s.x, s.y, 0, s.z); if (q){ spot = s; p = q; break; } }
     if (!spot) return false;
     a.task = { type: 'work', label: 'Going down to the fallen rock', path: p, progress: 0,
-      arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = legPath(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = pathToStop(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
         t.label = `Breaking the fallen rock (${Math.min(99, Math.floor(t.progress / CLOCK.work.breakRockfall * 100))}%)`; t.progress += workSpeed(a, 'build'); if (t.progress < CLOCK.work.breakRockfall) return 'continue';
         b.ground = 'stone'; c.blocked = null; c.story.push(`${a.name} cleared the rock.`); gainXp(a, 'build'); addItem('rock', spot.x, spot.y, spot.z);
         log(`${a.name} breaks through the fallen rock. The passage runs on into the dark.`, campHumans(), 'good'); a.carrying = null;
-        const [sx, sy] = camp.stashTile; const q = legPath(a, sx, sy, 1); if (!q) return 'done'; t.path = q; t.label = 'Coming up out of the dark'; t.arrive = () => 'done'; return 'continue'; },
+        const [sx, sy] = camp.stashTile; const q = pathToStop(a, sx, sy, 1); if (!q) return 'done'; t.path = q; t.label = 'Coming up out of the dark'; t.arrive = () => 'done'; return 'continue'; },
       cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
     return true;
   });
@@ -344,19 +396,19 @@ const denReady = h => h.traits.bravery >= 0.5 && stage(h) !== 'young' && !h.home
 function startClearDen(a, c){
   const mate = campHumans().find(h => h !== a && denReady(h)); if (!mate) return false;
   return withBrand(a, 'Going to the den with fire and the spear', a => {
-    const m = c.mouth; const p = legPath(a, m.x, m.y, 0, m.z); if (!p) return false;
+    const m = c.mouth; const p = pathToStop(a, m.x, m.y, 0, m.z); if (!p) return false;
     failTask(mate);
-    const mp = legPath(mate, m.x, m.y, 1, m.z); if (!mp) return false;
+    const mp = pathToStop(mate, m.x, m.y, 1, m.z); if (!mp) return false;
     mate.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember };
     mate.task = { type: 'guard', label: 'Following with a brand', path: mp, arrive: () => 'continue', cleanup(){ if (mate.carrying && mate.carrying.kind === 'ember') mate.carrying = null; } };
     a.task = { type: 'guard', label: 'Going to the den with fire and the spear', path: p, fast: true,
       arrive(a, t){
-        if (nearAt(a, m.x, m.y, m.z) > 0){ const q = legPath(a, m.x, m.y, 0, m.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, m.x, m.y, m.z) > 0){ const q = pathToStop(a, m.x, m.y, 0, m.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const owners = beings.filter(b => b.alive && b.den === c);
         for (const w of owners){
           w.den = null; w.oldDen = c; w.cooldown.raid = tick + CLOCK.cooldown.wolfDriven; w.shyOf = camp; failTask(w);
           addThought(w, 'driven', 'Driven from the den by fire', -20, CLOCK.thought.driven);
-          if (!START.flee(w)){
+          if (!startTask(w, 'flee')){
             const away = (x, y, z) => z === 0 && passable(x, y, 0) && dist(x, y, c.exit.x, c.exit.y) >= 20 && !tileAt(x, y, 0).cave && !tileAt(x, y, 0).mouth;
             const sp = bfs(w.x, w.y, w.z, away, 2000, w);
             if (sp) w.task = { type: 'wander', label: 'Slinking off', path: sp, arrive: () => 'done' };
@@ -366,14 +418,14 @@ function startClearDen(a, c){
         log(`${a.name} and ${mate.name} drive the ${c.owner === 'wolf' ? 'wolves' : 'foxes'} from the den with fire and the spear.`, campHumans(), 'major');
         addThought(a, 'cleared', 'Drove the beasts out of their den', 10, CLOCK.thought.cleared); addThought(mate, 'cleared', 'Stood with a brand at the den', 8, CLOCK.thought.cleared); drift(a, 'bravery', 0.04); drift(mate, 'bravery', 0.02);
         const [sx, sy] = camp.stashTile;
-        const mq = legPath(mate, sx, sy, 1);
+        const mq = pathToStop(mate, sx, sy, 1);
         if (mq) mate.task = { type: 'travel', label: 'Coming back from the den', path: mq,
-          arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const r = legPath(a, sx, sy, 1); if (!r) return 'fail'; t.path = r; return 'continue'; } if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; return 'done'; },
+          arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const r = pathToStop(a, sx, sy, 1); if (!r) return 'fail'; t.path = r; return 'continue'; } if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; return 'done'; },
           cleanup(){ if (mate.carrying && mate.carrying.kind === 'ember') mate.carrying = null; } };
         else { if (mate.carrying && mate.carrying.kind === 'ember') mate.carrying = null; mate.task = null; }
-        const q = legPath(a, sx, sy, 1); if (!q) return 'fail';
+        const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail';
         t.path = q; t.label = 'Coming back from the den';
-        t.arrive = (a, t) => { if (nearAt(a, sx, sy) > 1){ const r = legPath(a, sx, sy, 1); if (!r) return 'fail'; t.path = r; return 'continue'; } if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; return 'done'; };
+        t.arrive = (a, t) => { if (nearAt(a, sx, sy) > 1){ const r = pathToStop(a, sx, sy, 1); if (!r) return 'fail'; t.path = r; return 'continue'; } if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; return 'done'; };
         return 'continue';
       },
       cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };

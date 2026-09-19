@@ -54,8 +54,8 @@ test('a slope joins the ground to the floor above, and a cliff does not', () => 
   assert.ok(up, 'no path up the slope');
   assert.deepEqual(up[0], [x0 - 1, y0 + 1, 0]);
   assert.deepEqual(up[1], [x0, y0 + 1, 1]);
-  const leg = api.legPath(walker, x0 + 1, y0 + 1, 0, 1);
-  assert.ok(leg && leg.length === up.length, 'legPath should climb too');
+  const leg = api.pathToStop(walker, x0 + 1, y0 + 1, 0, 1);
+  assert.ok(leg && leg.length === up.length, 'pathToStop should climb too');
   api.tileAt(x0 - 1, y0 + 1).slope = false;
   assert.equal(api.bfs(walker.x, walker.y, 0, (x, y, z) => z === 1, 500, walker), null, 'a cliff should block');
   const region = api.reachable(walker.x, walker.y, 0, 200);

@@ -31,14 +31,14 @@ Object.assign(START, {
       .sort((p, q) => (near(p, a) - (p.species === 'deer' ? 15 : 0)) - (near(q, a) - (q.species === 'deer' ? 15 : 0)))[0];
     if (!prey) return false;
     if (near(a, prey) > 9){
-      const p = legPath(a, prey.x, prey.y, 8); if (!p) return false;
+      const p = pathToStop(a, prey.x, prey.y, 8); if (!p) return false;
       a.task = { type: 'travel', label: 'Prowling toward the meadow', path: p, arrive: () => 'done' }; return true;
     }
     a.task = { type: 'hunt', label: `Stalking a ${prey.species}`, path: [], fast: true, progress: 0,
       arrive(a, t){
         if (!prey.alive || ++t.progress > CLOCK.chase.wolf + a.skills.hunt * CLOCK.chase.wolfPerSkill){ if (prey.alive && near(a, prey) <= 4){ prey.xp.wary = (prey.xp.wary || 0) + 1; if (prey.xp.wary >= 2){ prey.xp.wary = 0; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); } addThought(prey, 'chased', 'Was nearly caught', -6, CLOCK.thought.chased); } return 'fail'; }
         if (near(a, prey) <= 1){
-          if (prey.species === 'deer' && rng() > 0.45 + a.skills.hunt * 0.1){ addThought(prey, 'escaped', 'Broke free from a wolf', -8, CLOCK.thought.escaped); prey.hp -= 15; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); failTask(prey); START.flee(prey); return 'fail'; }
+          if (prey.species === 'deer' && rng() > 0.45 + a.skills.hunt * 0.1){ addThought(prey, 'escaped', 'Broke free from a wolf', -8, CLOCK.thought.escaped); prey.hp -= 15; prey.skills.wary = Math.min(3, (prey.skills.wary || 0) + 1); failTask(prey); startTask(prey, 'flee'); return 'fail'; }
           prey.hp = 0; gainXp(a, 'hunt'); die(prey, `was caught by a ${SPECIES[a.species].label}`);
           if (a.den && prey.species === 'rabbit' && nearAt(a, a.den.exit.x, a.den.exit.y) <= 30){ const it = itemAt(prey.x, prey.y, prey.z); if (it && it.kind === 'carcass'){ a.carrying = { kind: 'carcass', count: 1 }; const r = chain(a, t, START.carryHome(a)); if (r){ removeItem(it); return r; } a.carrying = null; } }
           t.label = 'Eating'; a.needs.food = 100; addThought(a, 'fed', 'Made a kill', 8, CLOCK.thought.fed); return 'done'; }
@@ -50,10 +50,10 @@ Object.assign(START, {
   raid(a){
     const c = campNear(a, 45); if (!c || !c.pit || c.storehouse || tileAt(...c.pit).struct.lit || (a.cooldown.raid || 0) > tick) return false;
     if (c.stash.carcass + c.stash.fish + c.stash.cooked + c.stash.smoked <= 0) return false;
-    const [sx, sy] = c.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
+    const [sx, sy] = c.stashTile; const p = pathToStop(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'raid', label: 'Slinking toward the dark camp', path: p, fast: true,
       arrive(a, t){
-        if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const prev = camp; camp = c;
         const k = c.stash.carcass > 0 ? 'carcass' : c.stash.fish > 0 ? 'fish' : c.stash.cooked > 0 ? 'cooked' : c.stash.smoked > 0 ? 'smoked' : null;
         if (k){ stashTake(k); a.needs.food = 100; a.cooldown.raid = tick + CLOCK.cooldown.raid; if (tick - c.wolfLogged > CLOCK.cooldown.wolfLine){ c.wolfLogged = tick; log(`A wolf slips into the dark camp and takes the ${ITEMS[k].name} from the stash.`, campHumans(), 'bad'); } for (const h of campHumans()) addThought(h, 'wolf', 'A wolf came into camp in the night', -12, CLOCK.thought.wolf); }
@@ -68,7 +68,7 @@ Object.assign(START, {
     a.task = { type: 'stalk', label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0,
       arrive(a, t){
         if (!h.alive || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-        if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); START.flee(h); return 'done'; }
+        if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
         const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
       } };
     return true;
@@ -87,11 +87,11 @@ Object.assign(START, {
   /* Go home to the den and rest there. */
   home(a){
     const c = a.den; if (!c) return false;
-    const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) return START.rest(a);
+    const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) return startTask(a, 'rest');
     const spot = floor[a.id % floor.length];
     if (a.x === spot.x && a.y === spot.y && a.z === spot.z){ a.task = { type: 'rest', label: 'Resting in the den', path: [], wait: CLOCK.task.denRest, arrive(a){ a.needs.rest = Math.min(100, a.needs.rest + 40); return 'done'; } }; return true; }
-    const p = legPath(a, spot.x, spot.y, 0, spot.z); if (!p) return START.rest(a);
-    a.task = { type: 'travel', label: 'Going home to the den', path: p, arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = legPath(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; } return 'done'; } };
+    const p = pathToStop(a, spot.x, spot.y, 0, spot.z); if (!p) return startTask(a, 'rest');
+    a.task = { type: 'travel', label: 'Going home to the den', path: p, arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = pathToStop(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; } return 'done'; } };
     return true;
   },
   /* Carry a kill home and eat it there. */
@@ -99,9 +99,9 @@ Object.assign(START, {
     const c = a.den; if (!c || !a.carrying) return false;
     const floor = c.tiles.filter(t => passable(t.x, t.y, t.z)); if (!floor.length) return false;
     const spot = floor[a.id % floor.length];
-    const p = legPath(a, spot.x, spot.y, 0, spot.z); if (!p) return false;
+    const p = pathToStop(a, spot.x, spot.y, 0, spot.z); if (!p) return false;
     a.task = { type: 'travel', label: 'Carrying the kill home', path: p, fast: false,
-      arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = legPath(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, spot.x, spot.y, spot.z) > 0){ const q = pathToStop(a, spot.x, spot.y, 0, spot.z); if (!q) return 'fail'; t.path = q; return 'continue'; }
         a.carrying = null; a.needs.food = 100; addThought(a, 'fed', 'Ate at home', 8, CLOCK.thought.fed); log(`A ${SPECIES[a.species].label} drags its kill into the den.`, []); return 'done'; },
       cleanup(){ if (a.carrying){ addItem(a.carrying.kind, a.x, a.y, a.z); a.carrying = null; } } };
     return true;
@@ -110,9 +110,9 @@ Object.assign(START, {
   shrooms(a){
     const c = a.den; if (!c) return false;
     const ripe = c.patch.filter(t => t.feature === 'mushrooms' && t.shrooms > 0); if (!ripe.length) return false;
-    const t = ripe[a.id % ripe.length]; const p = legPath(a, t.x, t.y, 1, 0); if (!p) return false;
+    const t = ripe[a.id % ripe.length]; const p = pathToStop(a, t.x, t.y, 1, 0); if (!p) return false;
     a.task = { type: 'eat', label: 'Picking mushrooms on the patch', path: p, progress: 0,
-      arrive(a, k){ if (nearAt(a, t.x, t.y) > 1){ const q = legPath(a, t.x, t.y, 1, 0); if (!q) return 'fail'; k.path = q; return 'continue'; } if (t.shrooms <= 0) return 'fail'; if (++k.progress < CLOCK.task.eatShrooms) return 'continue'; t.shrooms--; a.needs.food = Math.min(100, a.needs.food + 35); return a.needs.food < 70 && t.shrooms > 0 ? 'continue' : 'done'; } };
+      arrive(a, k){ if (nearAt(a, t.x, t.y) > 1){ const q = pathToStop(a, t.x, t.y, 1, 0); if (!q) return 'fail'; k.path = q; return 'continue'; } if (t.shrooms <= 0) return 'fail'; if (++k.progress < CLOCK.task.eatShrooms) return 'continue'; t.shrooms--; a.needs.food = Math.min(100, a.needs.food + 35); return a.needs.food < 70 && t.shrooms > 0 ? 'continue' : 'done'; } };
     return true;
   },
   /* Keep company with the burrow's kin. */
@@ -129,9 +129,9 @@ Object.assign(START, {
     if (c.lastRepaid && tick - c.lastRepaid < CLOCK.gnome.repayGap) return false;
     const cands = camps.filter(k => k.stashTile && !k.ward && dist(k.stashTile[0], k.stashTile[1], c.exit.x, c.exit.y) <= 40 && (k.stash.pot > 0 || k.stash.cord > 0 || k.tools.basket));
     const k = cands.sort((p, q) => dist(p.stashTile[0], p.stashTile[1], c.exit.x, c.exit.y) - dist(q.stashTile[0], q.stashTile[1], c.exit.x, c.exit.y))[0]; if (!k) return false;
-    const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
+    const [sx, sy] = k.stashTile; const p = pathToStop(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'borrow', label: 'Slipping over to the camp for something useful', path: p, fast: true,
-      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         if (c.holding) return 'fail';
         const kind = k.stash.pot > 0 ? 'pot' : k.stash.cord > 0 ? 'cord' : k.tools.basket ? 'basket' : null; if (!kind) return 'fail';
         const prev = camp; camp = k; c.holding = { kind, camp: k, since: tick };
@@ -146,9 +146,9 @@ Object.assign(START, {
   repay(a){
     const c = a.den; if (!c || !c.holding || tick - c.holding.since < CLOCK.limit.gnomeHolds) return false;
     const k = c.holding.camp; if (!k.stashTile) return false;
-    const [sx, sy] = k.stashTile; const p = legPath(a, sx, sy, 1); if (!p) return false;
+    const [sx, sy] = k.stashTile; const p = pathToStop(a, sx, sy, 1); if (!p) return false;
     a.task = { type: 'repay', label: 'Carrying the thing back, with a gift', path: p,
-      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+      arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         const h = c.holding; if (!h) return 'fail'; const prev = camp; camp = k; if (h.kind === 'basket') k.tools.basket = 1; else stashAdd(h.kind, 1);
         const gift = ['cord', 'clay', 'pot'][rint(3)]; stashAdd(gift, 1); c.holding = null; c.lastRepaid = tick;
         addThought(a, 'repaid', 'Paid a debt', 5, CLOCK.thought.repaid); for (const o of campHumans()) addThought(o, 'gnomegift', 'The neighbours brought something back, and more', 5, CLOCK.thought.gnomegift);
@@ -240,7 +240,7 @@ function defendDen(a){
   addThought(h, 'denbite', `Bitten by a ${label} in its den`, bite.mood, CLOCK.thought.denbite); drift(h, 'bravery', -0.02);
   log(`A ${label} comes at ${h.name} in its den.`, [h], 'bad');
   c.lastBite = tick; addThought(a, 'defend', 'Drove an intruder from the den', 6, CLOCK.thought.defend);
-  failTask(h); START.flee(h);
+  failTask(h); startTask(h, 'flee');
 }
 
 /* Once each CLOCK.gnome.every ticks the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */

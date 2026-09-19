@@ -45,8 +45,6 @@ function gainXp(a, sk){
   a.xp[sk] = (a.xp[sk] || 0) + 0.7 + a.traits.curiosity * 0.6;
   if (a.xp[sk] >= (a.skills[sk] + 1) * 3){ a.xp[sk] = 0; a.skills[sk]++; drift(a, 'diligence', 0.01); if (a.species === 'human') log(`${a.name} is getting better at ${sk === 'trap' ? 'trapping' : sk + 'ing'} (level ${a.skills[sk]}).`, [a], 'good'); }
 }
-function endTask(a){ const t = a.task; if (!t) return; if (t.cleanup) t.cleanup(t); a.task = null; }
-function failTask(a){ const t = a.task; if (!t) return; if (t.cleanup) t.cleanup(t); dropCarried(a); a.task = null; }
 function dropCarried(a){
   if (!a.carrying) return;
   const c = a.carrying; a.carrying = null;
@@ -93,11 +91,11 @@ function chat(a, b){
 const START = {
   drink(a){
     if (a.species === 'human' && !a.homeless && camp.stash.water > 0 && camp.stashTile){
-      const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1);
-      if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done'; } }; return true; }
+      const [sx, sy] = camp.stashTile; const p = pathToStop(a, sx, sy, 1);
+      if (p){ a.task = { type: 'drink', label: 'Going to drink at camp', path: p, arrive(a, t){ if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } if (camp.stash.water <= 0) return 'fail'; camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done'; } }; return true; }
     }
     /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
-       world once and covers the first stretch, the same way legPath does. Thirst must never have no answer. */
+       world once and covers the first stretch, the same way pathToStop does. Thirst must never have no answer. */
     const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
     const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
     let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
@@ -114,9 +112,9 @@ const START = {
   },
   eat(a){
     if (a.species === 'human' && !a.homeless && camp.stashTile && stashFood() > 0){
-      const [sx, sy] = camp.stashTile; const p = legPath(a, sx, sy, 1); if (p){
+      const [sx, sy] = camp.stashTile; const p = pathToStop(a, sx, sy, 1); if (p){
         a.task = { type: 'eat', label: 'Going to eat at camp', path: p, arrive(a, t){
-          if (nearAt(a, sx, sy) > 1){ const q = legPath(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+          if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
           if (camp.stash.cooked > 0){ stashTake('cooked'); a.needs.food = Math.min(100, a.needs.food + 55); addThought(a, 'ate', camp.bestCook > 1 ? 'Ate a meal cooked with real skill' : 'Ate a hot meal of rabbit', 7 + Math.min(4, camp.bestCook || 0), CLOCK.thought.ateCooked); }
           else if (camp.stash.smoked > 0){ stashTake('smoked'); a.needs.food = Math.min(100, a.needs.food + 45); addThought(a, 'ate', 'Chewed smoked meat by the fire', 4, CLOCK.thought.ateSmoked); }
           else if (camp.stash.berries > 0){ stashTake('berries'); a.needs.food = Math.min(100, a.needs.food + 28); addThought(a, 'ate', 'Ate berries from the stash', 2, CLOCK.thought.ateBerries); }
@@ -137,13 +135,6 @@ const START = {
       } };
     return true;
   },
-  sleep(a){
-    const place = a.species === 'human' && !a.homeless && sleepPlaces().filter(pl => beings.filter(b => b.alive && b.asleep && nearAt(b, ...pl) <= 1).length < 3).sort((p, q) => nearAt(a, ...p) - nearAt(a, ...q))[0];
-    if (place && nearAt(a, ...place) > 1){
-      const p = legPath(a, place[0], place[1], 1);
-      if (p){ a.task = { type: 'sleep', label: 'Going to the lean-to', path: p, arrive(a){ a.asleep = true; a.task = null; return 'done'; } }; return true; }
-    }
-    a.asleep = true; a.task = null; a.status = 'Sleeping'; return true; },
   socialize(a){
     const others = humans().filter(o => o !== a && !o.asleep && o.camp === a.camp);
     if (!others.length) return false;
@@ -154,16 +145,16 @@ const START = {
     return true;
   },
   shelter(a){
-    if (!camp.shelter || a.homeless) return false; const [hx, hy] = camp.shelter; const p = legPath(a, hx, hy, 1); if (!p) return false;
-    a.task = { type: 'shelter', label: 'Waiting out the rain under the roof', path: p, progress: 0, arrive(a, t){ if (nearAt(a, hx, hy) > 1){ const q = legPath(a, hx, hy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } return ++t.progress < CLOCK.task.shelterWait && weather.storm ? 'continue' : 'done'; } };
+    if (!camp.shelter || a.homeless) return false; const [hx, hy] = camp.shelter; const p = pathToStop(a, hx, hy, 1); if (!p) return false;
+    a.task = { type: 'shelter', label: 'Waiting out the rain under the roof', path: p, progress: 0, arrive(a, t){ if (nearAt(a, hx, hy) > 1){ const q = pathToStop(a, hx, hy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; } return ++t.progress < CLOCK.task.shelterWait && weather.storm ? 'continue' : 'done'; } };
     return true;
   },
   sit(a){
     if (!pitLit() || a.homeless) return false;
-    const [px, py] = camp.pit; const p = legPath(a, px, py, 1); if (!p) return false;
+    const [px, py] = camp.pit; const p = pathToStop(a, px, py, 1); if (!p) return false;
     a.task = { type: 'sit', label: 'Going to sit by the fire', path: p, progress: 0,
       arrive(a, t){
-        if (nearAt(a, px, py) > 1){ const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+        if (nearAt(a, px, py) > 1){ const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
         t.label = 'Sitting by the fire'; a.needs.rest = Math.min(100, a.needs.rest + CLOCK.rate.sitRests);
         if (t.progress % CLOCK.task.sitChat === 0){ const o = humans().find(o => o !== a && near(o, a) <= 2 && o.task && o.task.type === 'sit'); if (o) chat(a, o); }
         if (a.needs.warmth !== undefined) a.needs.warmth = Math.min(100, a.needs.warmth + CLOCK.rate.sitWarms);
@@ -175,28 +166,48 @@ const START = {
       } };
     return true;
   },
-  wander(a){
-    for (let k = 0; k < 6; k++){
-      const tx = a.x + rint(11) - 5, ty = a.y + rint(11) - 5; if (!passable(tx, ty, a.z)) continue;
-      const p = bfs(a.x, a.y, a.z, (x, y, z) => x === tx && y === ty && z === a.z, 250, a);
-      if (p){ a.task = { type: 'wander', label: a.species === 'human' ? 'Wandering' : 'Roaming', path: p, arrive: () => 'done' }; return true; }
-    }
-    a.task = { type: 'wander', label: 'Standing still', path: [], wait: CLOCK.task.standStill, arrive: () => 'done' }; return true;
-  },
-  rest(a){ a.task = { type: 'rest', label: a.species === 'rabbit' ? 'Resting in the grass' : 'Dozing', path: [], wait: CLOCK.task.doze, arrive(a){ a.needs.rest = Math.min(100, a.needs.rest + 40); return 'done'; } }; return true; },
-  flee(a){
-    const threats = threatsFor(a); if (!threats.length) return false;
-    let best = null;
-    for (let k = 0; k < 14; k++){
-      const tx = a.x + rint(13) - 6, ty = a.y + rint(13) - 6; if (!passable(tx, ty, a.z)) continue;
-      const md = Math.min(...threats.map(([x, y]) => dist(tx, ty, x, y)));
-      if (!best || md > best.md) best = { tx, ty, md };
-    }
-    if (!best) return false;
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => x === best.tx && y === best.ty && z === a.z, 250, a); if (!p) return false;
-    a.task = { type: 'flee', label: a.species === 'human' ? 'Running from the fire' : 'Bolting', path: p, fast: true, arrive: () => 'done' }; return true;
-  },
 };
+
+/* The base kinds. Each begin is what START did before it built the task. */
+Object.assign(TASKS, {
+  rest: { type: 'rest',
+    begin(a){ return { label: a.species === 'rabbit' ? 'Resting in the grass' : 'Dozing', wait: CLOCK.task.doze }; },
+    stops: [a => { a.needs.rest = Math.min(100, a.needs.rest + 40); return 'done'; }] },
+  wander: { type: 'wander',
+    begin(a){
+      for (let k = 0; k < 6; k++){
+        const tx = a.x + rint(11) - 5, ty = a.y + rint(11) - 5; if (!passable(tx, ty, a.z)) continue;
+        const p = bfs(a.x, a.y, a.z, (x, y, z) => x === tx && y === ty && z === a.z, 250, a);
+        if (p) return { label: a.species === 'human' ? 'Wandering' : 'Roaming', path: p };
+      }
+      return { label: 'Standing still', wait: CLOCK.task.standStill };
+    },
+    stops: [() => 'done'] },
+  flee: { type: 'flee',
+    begin(a){
+      const threats = threatsFor(a); if (!threats.length) return false;
+      let best = null;
+      for (let k = 0; k < 14; k++){
+        const tx = a.x + rint(13) - 6, ty = a.y + rint(13) - 6; if (!passable(tx, ty, a.z)) continue;
+        const md = Math.min(...threats.map(([x, y]) => dist(tx, ty, x, y)));
+        if (!best || md > best.md) best = { tx, ty, md };
+      }
+      if (!best) return false;
+      const p = bfs(a.x, a.y, a.z, (x, y, z) => x === best.tx && y === best.ty && z === a.z, 250, a); if (!p) return false;
+      return { label: a.species === 'human' ? 'Running from the fire' : 'Bolting', path: p, fast: true };
+    },
+    stops: [() => 'done'] },
+  sleep: { type: 'sleep',
+    begin(a){
+      const place = a.species === 'human' && !a.homeless && sleepPlaces().filter(pl => beings.filter(b => b.alive && b.asleep && nearAt(b, ...pl) <= 1).length < 3).sort((p, q) => nearAt(a, ...p) - nearAt(a, ...q))[0];
+      if (place && nearAt(a, ...place) > 1){
+        const p = pathToStop(a, place[0], place[1], 1);
+        if (p) return { label: 'Going to the lean-to', path: p };
+      }
+      a.asleep = true; a.task = null; a.status = 'Sleeping'; return true;
+    },
+    stops: [a => { a.asleep = true; a.task = null; return 'done'; }] },
+});
 
 function threatsFor(a){
   const out = [];
@@ -275,26 +286,10 @@ function chooseTask(a){
     if (o.score <= 0 && o.type !== 'wander') continue;
     const key = o.label || o.type;
     if ((a.cooldown[key] || 0) > tick){ o.failed = true; continue; }
-    const ok = o.type === 'work' ? o.start(a) : o.type === 'join' ? startJoin(a) : o.type === 'deliver' ? startDeliver(a) : START[o.type](a);
+    const ok = o.type === 'work' ? o.start(a) : o.type === 'join' ? startJoin(a) : o.type === 'deliver' ? startDeliver(a) : TASKS[o.type] ? startTask(a, o.type) : START[o.type](a);
     if (ok){ a.lastChoice.picked = key; if (a.task){ a.task.started = tick; a.task.key = key; } return; }
     o.failed = true; a.cooldown[key] = tick + CLOCK.cooldown.offerFailed;
   }
-}
-function runTask(a){
-  const t = a.task; a.status = t.label;
-  if (t.wait > 0){ t.wait--; return; }
-  if (t.path.length){
-    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
-    const [nx, ny, nz] = t.path[0];
-    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
-    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
-    return;
-  }
-  const r = t.arrive(a, t);
-  if (r === 'done') endTask(a);
-  else if (r === 'fail'){ a.cooldown[t.key] = tick + CLOCK.cooldown.taskFailed; failTask(a); }
-  if (a.task) a.status = a.task.label;
 }
 function checkSnare(r){
   const t = tileAt(r.x, r.y, r.z);
@@ -342,7 +337,7 @@ function updateBeing(a){
     die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age'); return;
   }
   const here = tileAt(a.x, a.y, a.z);
-  if (here.fire > 0){ a.hp -= CLOCK.rate.fireHurts; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, CLOCK.thought.burned); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); START.flee(a); } }
+  if (here.fire > 0){ a.hp -= CLOCK.rate.fireHurts; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, CLOCK.thought.burned); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); startTask(a, 'flee'); } }
   if (a.hp <= 0){ die(a, here.fire > 0 ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : n.warmth !== undefined && n.warmth < 20 ? 'froze in the cold' : (a.lastHurt || 'died')); return; }
   if (a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, CLOCK.thought.warm);
   if (a.asleep){
@@ -361,9 +356,9 @@ function updateBeing(a){
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, CLOCK.thought.emberlost); }
   if (a.species === 'human' && fireCount > 0 && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'ember' && a.task.type !== 'guard'))){
     const d = nearestFire(a.x, a.y, 5, a.z);
-    if (d >= 0){ addThought(a, 'sawfire', 'Saw a wildfire close by', -Math.round(4 + 10 * (1 - a.traits.bravery)), CLOCK.thought.sawfire); if (d <= 2){ failTask(a); START.flee(a); } }
+    if (d >= 0){ addThought(a, 'sawfire', 'Saw a wildfire close by', -Math.round(4 + 10 * (1 - a.traits.bravery)), CLOCK.thought.sawfire); if (d <= 2){ failTask(a); startTask(a, 'flee'); } }
   }
-  if (a.species === 'human' && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'guard')) && threatsFor(a).some(([x, y]) => beings.some(b => b.alive && b.species === 'wolf' && b.x === x && b.y === y))){ addThought(a, 'sawwolf', 'A wolf came too close', -8, CLOCK.thought.sawwolf); failTask(a); START.flee(a); a.task && (a.task.label = 'Running from a wolf'); }
+  if (a.species === 'human' && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'guard')) && threatsFor(a).some(([x, y]) => beings.some(b => b.alive && b.species === 'wolf' && b.x === x && b.y === y))){ addThought(a, 'sawwolf', 'A wolf came too close', -8, CLOCK.thought.sawwolf); failTask(a); startTask(a, 'flee'); a.task && (a.task.label = 'Running from a wolf'); }
   if (a.species !== 'human' && a.task && a.task.type !== 'flee' && a.task.type !== 'hunt' && a.task.type !== 'stalk' && threatsFor(a).length){ failTask(a); }
   if (a.task && a.task.type !== 'flee'){
     if (a.species === 'human'){
@@ -373,7 +368,7 @@ function updateBeing(a){
       const force = busy ? null : (n.water < 15 && !(a.cooldown.drink > tick)) ? 'drink'
         : (n.food < 15 && !(a.cooldown.eat > tick)) ? 'eat'
         : (a.task.type !== 'sit' && n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
-      if (force){ failTask(a); if (START[force](a)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
+      if (force){ failTask(a); if (TASKS[force] ? startTask(a, force) : START[force](a)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
     }
     if (a.task && tick - (a.task.started || tick) > CLOCK.limit.task) failTask(a);
   }
