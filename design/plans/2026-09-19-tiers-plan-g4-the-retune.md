@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status: ready to start.** The user has ruled on questions 1, 2, and 7. Questions 3 to 6 are read as their defaults, and the tasks are written for them. See "The rulings". One question is deliberately left open: whether the soak keeps its floors. Task 4 measures it and takes a number to the user. No task removes a floor before that.
+**Status: ready to start.** The user has ruled on all seven questions. See "The rulings". Two of the four late rulings name work this plan must not do: pack hunting, and child mortality. Both are recorded there and both are somebody else's. One question is deliberately left open: whether the soak keeps its floors. Task 4 measures it and takes a number to the user. No task removes a floor before that.
 
 **Goal:** Move the engine to real units, and keep the game playable at real units. A tick is one world second, a day is 86,400 ticks, a year is 365 days, a person lives about 70 years, and a walking person moves one tile a tick. The golden is blessed once, at the end, by the user.
 
@@ -54,6 +54,10 @@ The 26 to 52 seconds has a second measurement behind it, taken a different way. 
 | 1 | When does G4 reach dev? | Build it, and fix the playability inside G4. |
 | 2 | May the soak drop its floors, because 800 world days a seed is too slow? | The premise is rejected. Make the simulation fast. Variable tick speed is an engine requirement. |
 | 7 | How much of the retuned table does the pull request show? | Big movers are enough. |
+| 3 | How long is a wolf chase? | A short opportunistic sprint, measured as distance. Pack hunting is real and is **not** G4's. |
+| 4 | How fast does the forest change in a life? | Visibly, within one life. Plants scale to years as animals do. |
+| 5 | How fast does a camp grow? | A child every two years as a base, not as a metronome. |
+| 6 | How often is danger checked? | Every world second. Today's rule exactly. |
 
 The user's words, because the gloss is not the ruling.
 
@@ -76,16 +80,31 @@ Playability is not a task at the end. It is three things, and they are spread th
 
 **What ruling 2 changes.** Variable tick speed is a property of the engine, not a setting of the view. The demand is not that the page draws faster. It is that a world second costs nothing when nothing happens in it, whether a player or an agent asks for it. Task 4 is that work, and it is why the floors question is not answered yet.
 
-### Read as defaults, not blessed in writing
+### Rulings 3 to 6, now ruled
 
-The user answered the three questions patcher flagged as theirs, after patcher advised taking the defaults on 3 to 6. patcher reads the silence as assent and has told the user so, which gives the user room to correct it. The tasks below are written for these defaults. If the user corrects one, its task changes and nothing before it does.
+The user has ruled on all four. Two confirmed the default. Two answered past the question, and those two are written out in full below, because in both cases the answer names work this plan must **not** do.
 
-| # | Question | Default, in force | Why it is the user's |
-|---|---|---|---|
-| 3 | **The chases.** A chase is a count of strides today. Kept as a count, a wolf chase becomes a sprint of 2.3 world minutes. Kept as world time, it becomes a pursuit of 6.7 hours over a map a person crosses in 5 minutes. | A chase is a distance. Write each as tiles run: the hunter gives up after it has run `CLOCK.chase.*` tiles. The numbers start at today's stride counts, which are today's tiles. | It decides how dangerous a wolf is and how a hunt feels. |
-| 4 | **Plant lives.** The spec scales animal lives to real years and says nothing of plants. A bush dies at 60 of today's days, which is about two of today's years. | Plants scale as animals do: by the year. A bush lives about 2 years, a pine about 100 years, and `grove.oldPine` is 40 years. Berry growth stays seasonal. | It sets how a valley changes over a lifetime, and the sprites' births hang on old pines. |
-| 5 | **Birth intervals.** `birth.gap` is 16 of today's days. Scaled by the life it would be 13 years. | Real intervals: 2 years between a mother's children, a den's litter once a year in spring, a grove's sprite once in 5 years. | It sets how fast a camp grows, which H builds on. |
-| 6 | **The proximity beat.** Fire on a tile, a wolf within 5 tiles, and a den's bite cannot be computed from elapsed time. A check once a world minute can miss a wolf that walks 60 tiles in that minute. | A cheap pass every tick checks only proximity and fire, for beings that are awake or on a burning tile's level. Everything else about a being is computed when it next acts. | It trades cost against the chance that a threat goes unseen. The default keeps today's rule exactly. |
+| # | Question | The ruling |
+|---|---|---|
+| 4 | **Plant lives.** A bush dies at 60 of today's days, about two of today's years. | Confirmed: plants scale as animals do, by the year. A bush about 2 years, a pine about 100, `grove.oldPine` 40 years. Berry growth stays seasonal. The user's aim, in their words, is that change is visible within one life. |
+| 6 | **The proximity beat.** A check once a world minute can miss a wolf that walks 60 tiles in that minute. | Confirmed: every world second, which is today's rule exactly. The user took this knowing the cost, which is that the engine cannot skip while a predator is near, so tense stretches play slowest. |
+
+**Ruling 3, the chases.** The user rejected both options offered and described the animal instead:
+
+> "Wolves run in packs. A single wilf will chase something for an opportunistic short sprint if it comes across one, but otherwise wolves will take a longer group preparation, using little energy, and then do a short attack in concert."
+
+That is two behaviours, and only the first exists in the code. Every wolf in `src/sim/species.js` hunts alone; `chase.stalk` is one wolf stalking one person, and nothing anywhere coordinates two.
+
+- **G4 converts the first and only the first.** A lone wolf's opportunistic chase is a distance: it gives up after it has run `CLOCK.chase.*` tiles, and the numbers start at today's stride counts, which are today's tiles. That is a short sprint, which is what the ruling asks for.
+- **Pack hunting is new behaviour and is not G4's.** A long group preparation at low energy, then a short attack in concert, is a design for how wolves decide and act together. It is not a unit conversion and no retune produces it. Task 7 must not reach for it. If a task finds itself tempted, the rule above applies: report it and leave it alone.
+
+**Ruling 5, births.** The user confirmed two years and then qualified it:
+
+> "a child every two years is a good start. some people will have no children, others will miss intervals, some children will die early. this is the wilderness, practically."
+
+So two years is a floor between children and not a schedule. Task 6 writes it that way and says so: `birth.gap` is the earliest a mother may have another child, and `birth.chance` is what decides whether she does. Those two together already give "some people will have no children, others will miss intervals" without a new rule — the chance is rolled, not a metronome. Task 6 reports the spread it actually produces over the long run, so the user can see whether it reads as the wilderness or as a queue.
+
+**Child mortality is flagged, not built.** "Some children will die early" conflicts with a standing rule of this repository: any death in a soak that is not old age is a bug until proven otherwise. That rule is what has caught real faults. Adding a death cause inside G4 would blunt the plan's own safety net at the moment the clock moves under it, and it is not a unit conversion. It needs its own decision and its own piece of work. Task 6 names it in its report and does not build it.
 
 Ruling 6 and task 4 meet, and task 4 says how. A pass that must run every tick is a pass that forbids a jump. The resolution is in "The skip" below, and it does not weaken ruling 6.
 
