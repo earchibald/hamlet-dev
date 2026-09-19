@@ -20,8 +20,13 @@ function source(){
 }
 
 /* The names the tests reach into. State is exposed with getters, because the
-   sim reassigns `beings`, `items`, and `camp` as it runs. */
+   sim reassigns `beings`, `items`, and `camp` as it runs.
+
+   This whole object is a template literal. So nothing inside it may hold a backtick or a `${`:
+   either ends the string, and the parse error is then reported somewhere else entirely, often in
+   another file's line. Write comments inside it in plain words, with no code quoting. */
 const API = `return {
+  /* A template literal: no backticks and no dollar-brace below this line. */
   mulberry32, streamState, setStreamState,
   SNAPSHOT_VERSION, REFS, REF_KINDS, TILE_DEFAULTS, SAVED_STATE, NOT_SAVED, savedValues, takeSnapshot, unnamedRefs, loadSnapshot, checkOptions,
   get lastLoadFault(){ return lastLoadFault; }, get inhabitedTold(){ return inhabitedTold; },
