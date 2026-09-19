@@ -13,6 +13,21 @@ function loadUI(files, names, extra = {}){
   return new Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 
+/* Some actions paint the page as well as change the state. These tests have no browser, so the few
+   page entry points those actions reach are stubbed for the length of one call, then taken away.
+   The stubs are free names in the joined scope, so the global object is where they go. */
+function withPage(fn){
+  const el = { hidden: false, innerHTML: '', textContent: '', dataset: {}, style: {},
+    classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
+    setAttribute(){}, appendChild(){}, replaceChildren(){}, scrollIntoView(){},
+    querySelector(){ return null; }, querySelectorAll(){ return []; } };
+  global.document = { getElementById: () => el, querySelector: () => el, querySelectorAll: () => [], createElement: () => el, body: el };
+  const page = { paints: 0 };
+  global.renderUI = () => { page.paints++; }; global.renderFoot = () => {}; global.hideTip = () => {};
+  try { return fn(page); }
+  finally { delete global.document; delete global.renderUI; delete global.renderFoot; delete global.hideTip; }
+}
+
 test('every UI file joins with the sim into one script that compiles', () => {
   assert.doesNotThrow(() => new Function(sim.source() + '\n' + ui.source()));
 });
@@ -283,22 +298,80 @@ test('the fold and the zoom are remembered, and the opened chip is not', () => {
   assert.doesNotMatch(src, /timelineChip/, 'the opened chip names one act of one creation and is not remembered');
 });
 
+/* A real round trip through the stored shape. Storage is the one input the page does not control:
+   another version, another tab, or a hand-edited store can hold anything. */
+test('a stored zoom in range comes back, and one out of range is refused', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['ui', 'persist', 'restore', 'TL_ZOOM_MAX', 'STORE_KEY']);
+  const store = {};
+  global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  try {
+    api.ui.timelineZoom = 3; api.persist();
+    api.ui.timelineZoom = 0; api.restore();
+    assert.equal(api.ui.timelineZoom, 3, 'a stored zoom in range comes back');
+    for (const bad of [api.TL_ZOOM_MAX + 1, -1, 1.5, '2', null, NaN]){
+      const s = JSON.parse(store[api.STORE_KEY]); s.timelineZoom = bad;
+      store[api.STORE_KEY] = JSON.stringify(s);
+      api.ui.timelineZoom = 2; api.restore();
+      assert.equal(api.ui.timelineZoom, 2, `a stored zoom of ${bad} is refused`);
+    }
+  } finally { delete global.localStorage; }
+});
+
 test('the timeline actions stay inside their bounds, and the same chip twice closes it', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui', 'TL_ZOOM_MAX']);
-  api.ui.timelineFold = true;
-  api.ACTIONS.foldTimeline();
-  assert.equal(api.ui.timelineFold, false);
-  api.ACTIONS.foldTimeline();
-  assert.equal(api.ui.timelineFold, true);
-  api.ui.timelineZoom = 0;
-  api.ACTIONS.zoomTimelineIn();
-  assert.equal(api.ui.timelineZoom, 0, 'it never goes below the default');
-  for (let n = 0; n < 40; n++) api.ACTIONS.zoomTimelineOut();
-  assert.equal(api.ui.timelineZoom, api.TL_ZOOM_MAX, 'it never goes past the widest');
+  withPage(() => {
+    api.ui.timelineFold = true;
+    api.ACTIONS.foldTimeline();
+    assert.equal(api.ui.timelineFold, false);
+    api.ACTIONS.foldTimeline();
+    assert.equal(api.ui.timelineFold, true);
+    api.ui.timelineZoom = 0;
+    api.ACTIONS.zoomTimelineIn();
+    assert.equal(api.ui.timelineZoom, 0, 'it never goes below the default');
+    for (let n = 0; n < 40; n++) api.ACTIONS.zoomTimelineOut();
+    assert.equal(api.ui.timelineZoom, api.TL_ZOOM_MAX, 'it never goes past the widest');
+  });
   api.ACTIONS.openChip('4:3');
   assert.equal(api.ui.timelineChip, '4:3');
   api.ACTIONS.openChip('4:3');
   assert.equal(api.ui.timelineChip, null, 'the same chip twice closes it');
+});
+
+test('the three timeline actions paint at once, as their neighbours do', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui']);
+  withPage(page => {
+    for (const name of ['foldTimeline', 'zoomTimelineOut', 'zoomTimelineIn']){
+      const before = page.paints;
+      api.ACTIONS[name]();
+      assert.ok(page.paints > before, `${name} leaves the band for the next frame tick`);
+    }
+  });
+});
+
+/* The band's own map from a button id to an action is a plain string table. A renamed action would
+   leave it pointing at nothing, and the band's buttons would go quiet with no error. */
+test('every timeline button names an action that exists', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions', 'timeline'], ['TL_BUTTONS', 'ACTIONS']);
+  const ids = Object.keys(api.TL_BUTTONS);
+  assert.deepEqual(ids, ['foldTl', 'tlOut', 'tlIn'], 'the band has three buttons');
+  for (const id of ids) assert.equal(typeof api.ACTIONS[api.TL_BUTTONS[id]], 'function', `${id} names ${api.TL_BUTTONS[id]}`);
+});
+
+test('a click in the band takes its focus through an action, not by hand', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui']);
+  api.ui.focus = 'map';
+  api.ACTIONS.focusTimeline();
+  assert.equal(api.ui.focus, 'timeline');
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  /* An assignment, not a comparison: drawTimeline reads ui.focus to mark the band. */
+  assert.doesNotMatch(src, /ui\.focus\s*=[^=]/, 'the band changes the focus through ACTIONS');
+});
+
+test('the band shows its own focus, since ui.focus is not the browser’s', () => {
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  assert.match(src, /classList\.toggle\('focus'/, 'drawTimeline marks the focused band as a drawer is marked');
+  const page = fs.readFileSync('src/page.template.html', 'utf8');
+  assert.match(page, /#timeline\.focus\{/, 'the page has a rule for the focused band');
 });
 
 test('the timeline keys change meaning by focus, and do not take the level keys away', () => {
@@ -977,6 +1050,78 @@ test('the band is not shown once the valley is made', () => {
   let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
   assert.equal(api.era, 'days');
   assert.equal(api.timelineModel().shown, false, 'the creation is over');
+});
+
+/* The gate is the one thing on the band that reads `creation.gate`, and it is the whole point of the
+   creation, so its words are held here and not only its place. */
+test('the gate row says whether the world will hold, and what it still wants', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const gateRow = () => { const rows = api.timelineModel().rows; const r = rows[rows.length - 1]; assert.equal(r.id, 'gate'); return r; };
+  api.creation.gate = { ok: true, lack: null };
+  assert.equal(gateRow().cells[gateRow().cells.length - 1].text, 'the world will hold');
+  api.creation.gate = { ok: false, lack: 'a country that is wet' };
+  assert.equal(gateRow().cells[gateRow().cells.length - 1].text, 'wants a country that is wet');
+  api.creation.gate = null;
+  const r = gateRow();
+  assert.equal(r.cells[r.cells.length - 1].text, 'not weighed yet');
+  assert.ok(r.cells.length > 1, 'an eight-age creation spans more than one age');
+  assert.ok(r.cells.slice(0, -1).every(c => c.blank), 'the gate is about now, so every earlier age is blank');
+  assert.ok(r.cells.every(c => c.chip === null), 'no cell of the gate row opens a matrix');
+});
+
+test('a cell says what the god did, and only the folded row says who', () => {
+  const api = loadUI(['state', 'derive'], [...TL_API, 'tlCellText']);
+  api.startCreation('gamma', {});
+  api.step();
+  const g = api.gods()[0];
+  assert.equal(api.tlCellText({ age: 1, god: g.id, continued: true }, false), 'carries on');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: 'split' }, false), 'split');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: null }, false), 'finds nothing it can do');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, continued: true }, true), `${g.name}: carries on`);
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: 'split' }, true), `${g.name}: split`);
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: null }, true), `${g.name}: finds nothing it can do`);
+  assert.equal(api.tlCellText({ age: 1, god: -1, picked: 'split' }, true), 'split', 'a god that is gone is not named');
+});
+
+/* The two the settle must undo. `creation.choices` outlives the ages, so nothing in the chip or the
+   focus falls away on its own. Both are held here across the era boundary, where they slipped. */
+const SETTLE_API = ['ui', 'onSettle', 'startCreation', 'step', 'era', 'footChip', 'creation', 'chronicle', 'focusRing', 'keyAction', 'ACTIONS'];
+function agesRun(){
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], SETTLE_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  return api;
+}
+function runToDays(api){
+  let n = 0; while (api.era === 'gods' && n++ < 4000) api.step();
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+}
+
+test('a chip opened in the ages is closed by the settle, and the foot goes back to the chronicle', () => {
+  const api = agesRun();
+  const rec = api.creation.choices.find(c => !c.continued && c.picked);
+  api.ui.timelineChip = `${rec.age}:${rec.god}`;
+  assert.ok(api.footChip(), 'the chip prints in the foot during the ages');
+  runToDays(api);
+  assert.ok(api.footChip(), 'the record outlives the ages, so only the settle can close the chip');
+  withPage(() => api.onSettle());
+  assert.equal(api.ui.timelineChip, null, 'the settle closes the chip');
+  assert.equal(api.footChip(), null, 'the foot has no chip left to print');
+  assert.ok(api.chronicle.length, 'so the newest chronicle line is what the foot prints');
+});
+
+test('a focus left on the band does not outlive the settle, and [ changes the level again', () => {
+  const api = agesRun();
+  api.ui.focus = 'timeline';
+  runToDays(api);
+  assert.ok(!api.focusRing().includes('timeline'), 'the band has left the focus ring');
+  assert.equal(keyHit(api, ev('['), 'timeline').action, 'zoomTimelineOut', 'a focus left on the band still zooms it');
+  withPage(() => api.onSettle());
+  assert.equal(api.ui.focus, 'map', 'the settle puts the focus back on the map');
+  assert.equal(keyHit(api, ev('['), api.ui.focus).action, 'levelDown', 'the level keys are the map’s again');
 });
 
 /* The feedback pass, round three. */

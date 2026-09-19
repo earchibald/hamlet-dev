@@ -117,13 +117,13 @@ No new scoring. No new rules. The decision the engine already makes is kept inst
 
 ## 6. The screen
 
-Down the screen: **the strip**, **the map**, **the timeline**, **the foot**. Each part keeps one job.
+Down the screen: **the strip**, **the map**, **the foot**, **the timeline**. Each part keeps one job.
 
 **The map never gives width to a panel.** The world map is 280 by 120 tiles, which is 7:3, wider than any screen. A sector is 28 by 20, which is 7:5. A right-hand column steals from the one dimension the world map cannot spare. So the ledger lies flat under the map and ages run left to right.
 
-**The strip gains one readout: the rest gate, as `4/7`.** The gate is the condition the whole creation is steering toward, and nothing on screen says so today.
+**The strip gains no readout.** The gate is the condition the whole creation is steering toward, and nothing on screen said so. It was built as a row of the timeline instead: the last row, under the now-line, which reads "the world will hold" when the gate is met and `wants <lack>` when it is not.
 
-**The foot is unchanged and stays below the timeline.** It names what the cursor is on, and it shows the matrix of any chip the player opens on the timeline.
+**The foot is unchanged and sits above the timeline.** It names what the cursor is on, and it shows the matrix of any chip the player opens on the timeline.
 
 ## 7. The timeline
 

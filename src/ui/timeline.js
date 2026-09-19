@@ -24,6 +24,8 @@ function drawTimeline(){
   const el = $('timeline'); if (!el) return;
   const m = timelineModel();
   el.classList.toggle('on', m.shown);
+  /* `ui.focus` is not DOM focus, so the band must show its own. `[` and `]` change meaning with it. */
+  el.classList.toggle('focus', m.shown && ui.focus === 'timeline');
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
@@ -49,7 +51,7 @@ const TL_BUTTONS = { foldTl: 'foldTimeline', tlOut: 'zoomTimelineOut', tlIn: 'zo
 function initTimeline(){
   const el = $('timeline'); if (!el) return;
   el.addEventListener('click', e => {
-    ui.focus = 'timeline';
+    ACTIONS.focusTimeline();
     const cell = e.target.closest('[data-chip]');
     const btn = e.target.closest('button');
     if (cell) ACTIONS.openChip(cell.dataset.chip);

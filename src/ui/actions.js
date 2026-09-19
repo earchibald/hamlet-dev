@@ -191,6 +191,11 @@ function onSettle(){
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
+     could close it again, and the foot would print that act in place of the newest chronicle line. */
+  ui.timelineChip = null;
+  /* The band leaves the focus ring at settle. A focus left on it sends `[` and `]` to a hidden band. */
+  if (ui.focus === 'timeline') ui.focus = 'map';
   const a = firstPerson();
   if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
   say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
@@ -282,9 +287,11 @@ const ACTIONS = {
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
-  foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); },
-  zoomTimelineOut(){ ui.timelineZoom = Math.min(TL_ZOOM_MAX, (ui.timelineZoom | 0) + 1); persist(); },
-  zoomTimelineIn(){ ui.timelineZoom = Math.max(0, (ui.timelineZoom | 0) - 1); persist(); },
+  foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },
+  zoomTimelineOut(){ ui.timelineZoom = Math.min(TL_ZOOM_MAX, (ui.timelineZoom | 0) + 1); persist(); renderUI(true); },
+  zoomTimelineIn(){ ui.timelineZoom = Math.max(0, (ui.timelineZoom | 0) - 1); persist(); renderUI(true); },
+  /* A click anywhere in the band gives it the focus, so `[` and `]` zoom instead of changing level. */
+  focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
