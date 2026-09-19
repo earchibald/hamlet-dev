@@ -398,6 +398,21 @@ A lookup that comes back empty now ends a task the way the old code ended it for
 
 The soak's six-seed fingerprint did not move through the whole plan. Every task of G2, from the first kind converted in task 1 to the executor's last mode removed in task 9, is a pure refactor: the golden record is the one written before G2 began.
 
+### What the later plans must answer
+
+The whole-branch review of G2 left these for the snapshots (G3) and the day tier (G5).
+
+| Plan | Point |
+|---|---|
+| G3 | The global `camp` is a hidden input of every stride. `updateBeing` sets it from `a.camp`. A loader that calls a stop or an effect outside `updateBeing` must set `camp` first. |
+| G3 | A record names a cave or a camp by its index. A snapshot must keep the order of `caves` and of `camps`. |
+| G3 | The reference table still owes the edges that are not tasks: `tile.struct.snare` and `camp.snares[i]`, `tile.struct.pit` and `camp.pitfalls[i]`, `tile.struct.camp`, `being.den`, `being.grove`, `cave.from`, `cave.cleared`, `cave.searched`, `grove.sector`, `grove.cave`, `sprite.target`, `being.shyOf`, `tile.garden`, and `den.holding.camp`. |
+| G3 | A JSON snapshot splits some shared arrays, and no rule minds. `workKind`'s `target` is the same array as `args.at`. A finished build sets `camp.shelter`, `camp.rack`, and their like to the task's own `args.at`. Every rule compares them by value. |
+| G5 | No `effect` reads its third argument or a field the stride loop sets. The day tier can pick the site and call `effect`. It must set `camp` first, as `updateBeing` does. |
+| G5 | `workKind`'s `begin` returns false when no path exists. The day tier wants a reach test and a distance, not a path. Split the two there. |
+| G5 | Six kinds write another being's task from inside a stop: `hunt`, `stalk`, `huntDeer`, `driveOff`, `fightSprite`, and `defendDen`. `clearDen` hands the mate a whole task. A queue for each being must cope with an entry that another being's turn replaced. |
+| G5 | A chain starts the next task in the same step: `gather` to `deliver`, `cutTree` to `gather`, and `brand` to the kind in `args.next`. `brand` is the one record that carries another kind's whole offer. |
+
 ## 18. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
