@@ -37,7 +37,7 @@ function openHelp(){
     <li>What they built: ${esc(lore.built)}.</li>
     <li>What took them: ${esc(lore.took)}.</li>
     <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
-    <li>The small lights: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
+    <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
     <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   ui.focus = 'dialog:help'; $('help').showModal();

@@ -1,11 +1,15 @@
 // Names: the record, the tongue, the namer, and the guard on the layout. Fast.
-//   node tests/names.js                    the fast checks
-//   SLOW=1 node tests/names.js             also the six 70-day layout runs, about 90 seconds
-//   UPDATE_LAYOUT=1 node tests/names.js    write the baseline. Run once, before any naming work.
+//   node --test tests/names.js                    the fast checks
+//   SLOW=1 node --test tests/names.js             also the six 70-day layout runs, about 90 seconds
+//   UPDATE_LAYOUT=1 node --test tests/names.js    write the baseline. Run once, before any naming work.
 //
 // tests/names-layout.json is the frozen record of the land, the beings, and the items
 // as they stood before the naming work. Naming adds chronicle lines and nothing else,
 // so those three hashes must never move. Do not bless this file a second time.
+//
+// UPDATE_LAYOUT measures day 70 with six real runs and then exits, so a bless can never be
+// read as a passing suite. It once copied day 70 out of the golden record, which made the
+// unskipped check below compare the golden against itself.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -34,11 +38,15 @@ function layoutOf(api){
 function tick0(seed){ const api = load(); api.startWorld(seed); return layoutOf(api); }
 
 if (process.env.UPDATE_LAYOUT){
-  const g = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
   const out = {};
-  for (const seed of SEEDS) out[seed] = { tick0: tick0(seed), day70: { beings: g[seed].beings, items: g[seed].items } };
+  for (const seed of SEEDS){
+    const { api, events } = runDays(seed, 70);
+    const fp = fingerprint(api, events);
+    out[seed] = { tick0: tick0(seed), day70: { beings: fp.beings, items: fp.items } };
+  }
   fs.writeFileSync(LAYOUT, JSON.stringify(out, null, 1) + '\n');
   console.log(`wrote ${LAYOUT}`);
+  process.exit(0);
 }
 const layout = JSON.parse(fs.readFileSync(LAYOUT, 'utf8'));
 
@@ -128,6 +136,7 @@ test('every hill, cave, and grove carries an old name with a meaning, and no mea
   for (const seed of SEEDS){
     const api = world(seed);
     const things = [...api.hills, ...api.caves.filter(c => api.OLD_CAVE_KINDS.includes(c.kind)), ...api.groves];
+    assert.ok(things.length >= 3, `${seed}: only ${things.length} landmarks, so the loop below proves nothing`);
     const seen = new Set();
     for (const t of things){
       const r = t.names && t.names[0];
@@ -144,6 +153,19 @@ test('every hill, cave, and grove carries an old name with a meaning, and no mea
     assert.ok(api.ponds.length >= 1, `${seed}: no ponds found`);
     assert.ok(api.ponds.every(p => !api.nameOf(p)), 'ponds wait for the living');
     assert.equal(api.nameOf(api.valley), null, 'the valley waits for the living');
+  }
+});
+
+/* Minor 20: `LAND_WORDS` holds forty meanings, and a landmark with no meaning left keeps no old
+   name at all. A bigger world has more landmarks. This is the alarm for the day one runs out. */
+test('a bigger world still has a meaning for every landmark', () => {
+  for (const seed of ['r', 'alpha', 'beta']){
+    const api = load(); api.startWorld(seed, { sw: 12, sh: 8 });
+    const things = [...api.hills, ...api.caves.filter(c => api.OLD_CAVE_KINDS.includes(c.kind)), ...api.groves];
+    assert.ok(things.length >= 15, `${seed}: only ${things.length} landmarks on a big world`);
+    const unnamed = things.filter(t => !api.nameOf(t));
+    assert.equal(unnamed.length, 0, `${seed}: ${unnamed.length} of ${things.length} landmarks got no old name; LAND_WORDS holds ${api.LAND_WORDS.length}`);
+    assert.ok(things.length <= api.LAND_WORDS.length, `${seed}: ${things.length} landmarks against ${api.LAND_WORDS.length} meanings, with no room left`);
   }
 });
 
@@ -165,6 +187,7 @@ test('no two things in a world share a name', () => {
   for (const seed of SEEDS){
     const api = world(seed);
     const texts = api.nameThings().flatMap(t => (t.names || []).map(r => r.text.toLowerCase()));
+    assert.ok(texts.length >= 5, `${seed}: only ${texts.length} names, so no clash could show`);
     assert.equal(new Set(texts).size, texts.length, `${seed}: a name is used twice`);
   }
 });
@@ -188,13 +211,57 @@ test('standing on a hill learns its old name once, and the line says what it mea
 test('drawing water learns the name of the water, and a burrow keeps no old name', () => {
   const api = world();
   const big = api.stillWater;
+  assert.ok(big && big.tiles.length > 0, 'seed r has no still water to stand beside');
   const wet = big.tiles.find(t => api.nearFind(t.x, t.y, q => q.ground !== 'water' && api.passable(q.x, q.y, 0)));
+  assert.ok(wet, 'no water tile with dry ground beside it');
   const dry = api.nearFind(wet.x, wet.y, q => q.ground !== 'water' && api.passable(q.x, q.y, 0));
   const a = api.firstPerson();
   a.x = dry.x; a.y = dry.y; a.z = 0;
   api.learnNamesHere(a);
   assert.equal(big.nameKnown, true, 'the water is still unknown');
-  for (const c of api.caves) if (c.kind === 'burrow') assert.equal(api.nameOf(c), null, 'a burrow carries no old name');
+  const burrows = api.caves.filter(c => c.kind === 'burrow');
+  assert.ok(burrows.length > 0, 'seed r dug no burrow, so the branch below proves nothing');
+  for (const c of burrows) assert.equal(api.nameOf(c), null, 'a burrow carries no old name');
+});
+
+/* The other four branches of `learnNamesHere`: a cave, its mouth, a grove, and a ford. Each is
+   reached by standing in the right place, and each writes the one line with the meaning in it. */
+test('a cave, its mouth, a grove, and a ford each give up their old name to somebody standing there', () => {
+  const api = world();
+  const a = api.firstPerson();
+  const stand = (x, y, z) => { a.x = x; a.y = y; a.z = z; api.learnNamesHere(a); };
+  const cave = api.caves.find(c => api.OLD_CAVE_KINDS.includes(c.kind) && c.nameKnown === false && c.exit);
+  assert.ok(cave, 'seed r has no unlearned cave with an exit');
+  const mouthTile = api.world.find(t => t.mouth === cave);
+  assert.ok(mouthTile, 'the cave has no mouth tile');
+  stand(mouthTile.x, mouthTile.y, 0);
+  assert.equal(cave.nameKnown, true, 'standing at the mouth read nothing');
+  /* A grove is read from the ring around its hollow, never from the hollow tile itself. */
+  const grove = api.groves.find(g => g.nameKnown === false);
+  assert.ok(grove, 'seed r has no unlearned grove');
+  stand(grove.x + 1, grove.y, 0);
+  assert.equal(grove.nameKnown, true, 'standing beside the grove read nothing');
+  const alpha = world('alpha');
+  const ford = alpha.fords.find(f => f.nameKnown === false);
+  assert.ok(ford, 'alpha has no unlearned ford');
+  const b = alpha.firstPerson();
+  b.x = ford.x; b.y = ford.y; b.z = 0;
+  alpha.learnNamesHere(b);
+  assert.equal(ford.nameKnown, true, 'standing at the crossing read nothing');
+  const line = alpha.chronicle.find(l => l.text.includes(alpha.nameOf(ford)));
+  assert.ok(line && line.text.includes('this crossing'), 'the ford line does not say what was read');
+});
+
+/* Every pond tile points back at its record, as every water tile points at the great water. */
+test('a pond tile carries its pond, and a pond is smaller than the water', () => {
+  const api = world();
+  assert.ok(api.ponds.length >= 1, 'no pond on seed r');
+  for (const p of api.ponds){
+    assert.ok(p.tiles.length >= 1, 'a pond with no tiles');
+    assert.ok(p.tiles.length <= 12, `a pond of ${p.tiles.length} tiles is a water`);
+    for (const t of p.tiles) assert.equal(t.pond, p, 'a pond tile does not point at its pond');
+  }
+  for (const t of api.stillWater.tiles) assert.equal(t.water, api.stillWater, 'a water tile does not point at its water');
 });
 
 /* A camp that has kept its hearth three days, with a person standing at the site. */
@@ -218,6 +285,26 @@ test('the camp takes the founder\'s name when the site is chosen, with a reason'
   assert.equal(c.names[0].why, `the camp ${a.name} made`);
   assert.equal(c.names[0].by, a.id);
   assert.equal(c.founder, a.id);
+});
+
+/* Minor 9: the name pool is recycled, so two living people can share a name. Two camps founded
+   by two Ullas both read "Ulla's camp", and the index then answers for the second only. */
+test('a second camp whose founder shares a name does not take the name the first camp holds', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.nameFoundersCamp(c, a);
+  const held = api.nameOf(c);
+  assert.equal(held, `${a.name}'s camp`);
+  const c2 = api.makeCamp('The second camp');
+  c2.site = c.site.slice();
+  const twin = api.makeBeing('human', a.x, a.y, a.name, 0);
+  twin.camp = c2; twin.homeless = false; twin.asleep = false; api.beings.push(twin);
+  api.camp = c2;
+  api.nameFoundersCamp(c2, twin);
+  assert.equal(c2.founder, twin.id, 'the second camp still has its founder');
+  assert.notEqual(api.nameOf(c2), held, 'two camps hold one name');
+  assert.ok(api.nameOf(c2), 'the second camp has no name at all');
+  assert.equal(api.nameRecordOf(held) && api.nameIndex.get(held.toLowerCase()), c, 'the index answers for the wrong camp');
 });
 
 test('a hearth that has burned three days gets the camp a plain name, kept with its scores', () => {
@@ -329,7 +416,28 @@ test('the two work rows give two different reasons', () => {
 
 test('every camp line reads without "The first camp"', () => {
   const { events } = runDays('r', 12);
+  assert.ok(events.length > 0, 'twelve days logged nothing');
   assert.equal(events.filter(e => e.text.includes('The first camp')).length, 0);
+});
+
+/* Minor 10: two places read a camp's placeholder text to decide what to print. A rule reads
+   data, so both ask whether the camp has a name record at all. */
+test('a camp with no name record is called "the camp", and one with a record is called by it', () => {
+  const api = world();
+  const c = api.makeCamp('The first camp');
+  c.site = api.camps[0].site ? api.camps[0].site.slice() : [api.firstPerson().x, api.firstPerson().y];
+  api.camp = c;
+  assert.equal(api.nameOf(c), null, 'a fresh camp holds no name record');
+  assert.equal(api.campName(), 'the camp');
+  assert.equal(api.campNameOf(c), 'the camp');
+  /* A camp still called "The first camp" but named by the founder reads by its name. */
+  api.rename(c, api.nameRecord('Reedwater', { why: 'for the reeds', by: null }));
+  assert.equal(api.campName(), 'Reedwater');
+  assert.equal(api.campNameOf(c), 'Reedwater');
+  /* And a camp whose text happens to be the placeholder, but which holds a record, is not hidden. */
+  api.rename(c, api.nameRecord('The first camp', { why: 'the people kept the old word', by: null }));
+  assert.equal(api.campName(), 'The first camp');
+  assert.equal(api.campNameOf(c), 'The first camp');
 });
 
 test('the actor names the camp when a site is chosen, even when a campmate is more sociable', () => {
@@ -389,10 +497,10 @@ test('the lines the event table reads carry their tags in a real run', () => {
   const tags = new Set(events.filter(e => e.tag).map(e => e.tag));
   assert.ok(tags.size >= 2, `only ${[...tags].join(', ')}`);
   for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'oldCold', 'deer', 'fish', 'pot'].includes(e.tag), `${e.tag}: ${e.text}`);
-  for (const e of events){
-    if (e.text.includes(' is born to ')) assert.equal(e.tag, 'birth', e.text);
-    if (e.text.includes('Something is burning')) assert.equal(e.tag, 'fire', e.text);
-  }
+  const births = events.filter(e => e.text.includes(' is born to '));
+  assert.ok(births.length > 0, 'nobody was born in forty days, so the birth tag is untested');
+  for (const e of births) assert.equal(e.tag, 'birth', e.text);
+  for (const e of events) if (e.text.includes('Something is burning')) assert.equal(e.tag, 'fire', e.text);
 });
 
 test('the event table names a tagged major line at the fire, and the name reads back through eventName', () => {
@@ -435,7 +543,7 @@ test('a night is named from the event table alone, and a night with no text left
 });
 
 test('a night is never named after a place', () => {
-  const { api, events } = run70();
+  const { events } = run70(), api = run70world();
   const named = events.filter(e => e.names && e.names.length);
   assert.ok(named.length > 0, 'no night was named in 70 days');
   const texts = new Set();
@@ -471,7 +579,7 @@ test('a fresher event outscores an older one on recency alone', () => {
   assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
 });
 
-test('a finished snare names the ground it stands on, from the work and the land', () => {
+test('a finished snare names the ground the work was done on, from the work and the land', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   const s = api.sectors[api.secIdx(...Object.values(api.secOf(a.x, a.y)))];
@@ -521,6 +629,22 @@ test('the valley takes its name from the lore, at forty', () => {
   assert.ok(r, 'the valley has no name');
   assert.equal(r.scores[0].axis, 'lore', `the top candidate came from ${r.scores[0].axis}`);
   assert.ok(api.chronicle.some(e => e.text.includes(`the whole valley a name: ${r.text}`)), api.chronicle[0].text);
+});
+
+/* Minor 13: the line reads "${text}, ${why}", and every lore reason began by saying the text
+   again: "gives the whole valley a name: Sadrumo, for Sadrumo, the eye that does not close." */
+test('the valley line never says the name twice', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  api.nameValley(c);
+  const rec = api.valley.names[0];
+  const line = api.chronicle.find(e => e.text.includes('gives the whole valley a name'));
+  assert.ok(line, 'the valley was not named');
+  assert.equal(line.text.split(rec.text).length - 1, 1, `${line.text} says ${rec.text} twice`);
+  /* Every lore reason, and every fallback, reads without its own text in it. */
+  const rows = [...api.loreCandidates(40), ...api.valleyFallbacks()];
+  assert.equal(rows.length, 6, 'the lore offers three texts and three fallbacks');
+  for (const r of rows) assert.equal(r.why.includes(r.text), false, `${r.text}: ${r.why}`);
 });
 
 /* The three texts loreCandidates offers, in the same shapes the namer builds them. */
@@ -594,7 +718,12 @@ test('an old name with no giver still waits to be found, and a person\'s name sp
    six that reaches every tag: it drives wolves off, it meets the sprites, it spears deer, it
    fishes, and it fires pots. Seed r never sees a wolf in seventy days. */
 let RUN70 = null;
-const run70 = () => RUN70 || (RUN70 = runDays('alpha', 70));
+const run70raw = () => RUN70 || (RUN70 = runDays('alpha', 70));
+/* The lines of the shared run, copied. A test that reads them cannot reach the live world, so
+   nothing added below can step it out from under the tests that come after. */
+const run70 = () => ({ events: run70raw().events.slice() });
+/* The live world of the shared run, for the four tests that must read it. Read it; never step it. */
+const run70world = () => run70raw().api;
 
 test('a death stamps the tick and carries a tag the event table can read', () => {
   const api = world();
@@ -612,9 +741,10 @@ test('old age is tagged old or oldCold, not death, and every other cause about a
   const oldAge = events.filter(e => e.kind === 'death' && /old age|old and warm by the fire/.test(e.text));
   assert.ok(oldAge.length > 0, 'no old-age death in 70 days');
   for (const e of oldAge) assert.ok(['old', 'oldCold'].includes(e.tag), `${e.tag}: ${e.text}`);
+  /* Project policy: a death in a soak that is not old age is a bug. So this list is empty, and
+     the check is that it is empty, not a loop that passes by running zero times. */
   const otherDeaths = events.filter(e => e.kind === 'death' && !/old age|old and warm by the fire/.test(e.text));
-  assert.ok(otherDeaths.length === 0 || otherDeaths.every(e => ['fire', 'frost', 'death'].includes(e.tag)), 'a death carried a tag outside the table');
-  for (const e of otherDeaths) assert.ok(['fire', 'frost', 'death'].includes(e.tag), `${e.tag}: ${e.text}`);
+  assert.deepEqual(otherDeaths.map(e => `${e.tag}: ${e.text}`), [], 'somebody died of something other than old age');
 });
 
 test('the wolf, sprite, deer, and fish tags all appear once tasks, species, and fae are tagged', () => {
@@ -634,7 +764,7 @@ test('every founding line in a real run carries the found tag', () => {
 });
 
 test('a person walking the land reads the marks and learns the old names', () => {
-  const { api, events } = run70();
+  const { events } = run70(), api = run70world();
   const learned = events.filter(e => e.text.includes('finds marks cut in the rock'));
   assert.ok(learned.length > 0, 'nobody learned an old name in 70 days');
   assert.ok(api.hills.some(h => h.nameKnown), 'no hill is known by its old name');
@@ -678,7 +808,11 @@ test('a founded camp carries its founder and its name from the moment the party 
   assert.equal(api.camps.length, before + 1);
   const nc = api.camps[before];
   assert.equal(nc.founder, a.id);
-  assert.equal(api.nameOf(nc), `${a.name}'s camp`);
+  /* The camp Hal already holds is "Hal's camp", so the new one cannot take that text again. It
+     is named all the same, and by the namer, from the moment the party leaves. */
+  assert.ok(api.nameOf(nc), 'the new camp has no name');
+  assert.notEqual(api.nameOf(nc), api.nameOf(c), 'two camps hold one name');
+  assert.equal(nc.name, api.nameOf(nc));
   const line = api.chronicle.find(e => e.text.includes('carrying coals in a bundle of bark'));
   assert.ok(line, 'no line said the party set out');
   assert.equal(line.tag, 'found');
@@ -691,7 +825,7 @@ function freeGround(api, c){
   return t;
 }
 
-test('a finished job names the ground it stands on, through the real stop', () => {
+test('a finished job names the ground the work was done on, through the real stop', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   c.stash.stick = 6;
@@ -777,6 +911,32 @@ test('a delivery to the stash names the ground it lands on, through the real sto
   assert.ok(api.nameOf(s), 'the sector was not named by the delivery');
 });
 
+/* Minor 11: the delivery named the worker's own sector. A carrier stands within one tile of the
+   stash, which can be the sector next door, so the ground named is the stash tile's. */
+test('a delivery names the stash tile\'s sector, not the carrier\'s, across a sector boundary', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  let stash = null, stand = null;
+  for (const t of api.world){
+    if (t.z !== 0 || !api.passable(t.x, t.y, 0)) continue;
+    const q = api.hasTile(t.x - 1, t.y, 0) ? api.tileAt(t.x - 1, t.y) : null;
+    if (!q || !api.passable(q.x, q.y, 0)) continue;
+    if (api.sectorOfTile(t) === api.sectorOfTile(q)) continue;
+    if (api.nameOf(api.sectorOfTile(t)) || api.nameOf(api.sectorOfTile(q))) continue;
+    stash = t; stand = q; break;
+  }
+  assert.ok(stash, 'no passable pair straddling a sector boundary');
+  const ss = api.sectorOfTile(stash), sw = api.sectorOfTile(stand);
+  c.stashTile = [stash.x, stash.y];
+  a.x = stand.x; a.y = stand.y; a.z = 0;
+  a.carrying = { kind: 'log', count: 2 };
+  api.setTask(a, 'deliver', { at: [stash.x, stash.y] }, { label: 'Carrying 2 logs to camp', path: [] });
+  api.runTask(a);
+  assert.equal(a.carrying, null, 'the delivery did not land');
+  assert.ok(api.nameOf(ss), 'the stash tile\'s sector was not named');
+  assert.equal(api.nameOf(sw), null, 'the carrier\'s own sector was named instead');
+});
+
 test('the first drink at a pool names it, through the real stop', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
@@ -846,7 +1006,14 @@ test('a candidate below the bar does not replace the epithet, and one above it d
   api.epithetPass(c);
   assert.equal(a.epithet, 'fisher');
   assert.deepEqual(a.epithets.map(r => r.text), ['fisher', 'wolfdriver']);
-  assert.ok(api.chronicle.some(e => e.text === `Nobody calls ${a.name} wolfdriver any more. Now it is ${a.name} fisher.`), api.chronicle[0].text);
+  const change = api.chronicle.find(e => e.text === `Nobody calls ${a.name} wolfdriver any more. Now it is ${a.name} fisher.`);
+  assert.ok(change, api.chronicle[0].text);
+  /* Minor 24: a change is as quiet as the first epithet. A major line pulses a chip in the strip,
+     and seed r changed fifty-two epithets in a hundred days. */
+  assert.equal(change.kind, 'info', 'an epithet change pulses an alert chip');
+  const first = api.chronicle.find(e => e.text === `The camp has started to call ${a.name} wolfdriver.`);
+  assert.ok(first, 'the first epithet was not logged');
+  assert.equal(first.kind, 'info');
 });
 
 /* Important 4: the deed count came from `a.history`, which `log` caps at 40 lines, so camp
@@ -867,7 +1034,7 @@ test('a deed is counted on the person, so it survives the forty-line cap on thei
 });
 
 test('a deed epithet is earned in a real run, past the day the history cap bites', () => {
-  const { api } = run70();
+  const api = run70world();
   const folk = api.beings.filter(b => b.species === 'human' && b.alive);
   const deeds = new Set(Object.values(api.DEED_EPITHETS));
   const earned = folk.filter(b => deeds.has(b.epithet));

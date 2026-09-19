@@ -145,8 +145,11 @@ function shelterSite(){
   return best ? [best.x, best.y] : null;
 }
 
-/* The camp's name as the chronicle says it. The first camp has no name of its own yet. */
-const campName = () => camp.name === 'The first camp' ? 'the camp' : camp.name;
+/* The camp's name as the chronicle says it. A camp with no name record has no name of its own
+   yet, and is just "the camp". The test is the record, never the placeholder text: a rule reads
+   data, not a name. */
+const campNameOf = c => c && nameOf(c) ? c.name : 'the camp';
+const campName = () => campNameOf(camp);
 
 /* A stranger walks in from a reachable edge of the world and makes for `camp`. Returns the person,
    or null when no edge of the world can reach the camp's site. */

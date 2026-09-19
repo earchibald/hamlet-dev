@@ -409,14 +409,16 @@ function oldCandidates(place){
   }
   return out;
 }
-/* The lost people, the sky, and the sprites. Worth more once the camp has met the sprites. */
+/* The lost people, the sky, and the sprites. Worth more once the camp has met the sprites.
+   A reason never says the text again: the chronicle prints "${text}, ${why}", and a reason that
+   opened with the text read "Sadrumo, for Sadrumo, the eye that does not close." */
 function loreCandidates(base){
   if (!lore) return [];
   const b = base !== undefined ? base : (camp && camp.fae.known ? 30 : 10);
   return [
-    { text: titleCase(lore.people.replace(/^the /, '')), axis: 'lore', base: b, why: `for ${lore.people}, who were here first` },
-    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.text}, ${lore.sky.meaning}` },
-    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.text}, ${lore.sprites.meaning}` },
+    { text: titleCase(lore.people.replace(/^the /, '')), axis: 'lore', base: b, why: 'for the people who were here first' },
+    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
+    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
   ];
 }
 /* The valley's last resort. A lore text another thing already holds scores zero, and three texts
@@ -428,9 +430,9 @@ function valleyFallbacks(){
   if (!lore) return [];
   const b = VALLEY_FALLBACK_BASE;
   return [
-    { text: `Vale of ${lore.sky.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for the vale of ${lore.sky.text}, ${lore.sky.meaning}` },
-    { text: `Vale of ${lore.sprites.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for the vale of ${lore.sprites.text}, ${lore.sprites.meaning}` },
-    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: b, why: `for the vale of ${lore.people}, who were here first` },
+    { text: `Vale of ${lore.sky.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
+    { text: `Vale of ${lore.sprites.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
+    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: b, why: 'for the vale of the people who were here first' },
   ];
 }
 /* ---------- events ----------
@@ -527,11 +529,14 @@ function nameThing(thing, kind, by, place, extra = []){
 function rename(c, rec){ giveName(c, rec); c.name = rec.text; return rec; }
 
 /* ---------- the camp moments ---------- */
-/* The camp the founder made. Its first record, with the reason. */
+/* The camp the founder made. Its first record, with the reason. The name pool is recycled, so
+   two living people can carry one name; when another camp already holds "Ulla's camp" this one
+   asks the namer instead, and the index keeps pointing at the camp that holds the text. */
 function nameFoundersCamp(c, a){
   c.founder = a.id;
   const text = `${a.name}'s camp`;
   if (nameOf(c) === text) return;
+  if (nameTaken(text)){ nameThing(c, 'camp', a, c.site); return; }
   rename(c, nameRecord(text, { why: `the camp ${a.name} made`, by: a.id }));
 }
 /* The hearth has burned three days, so the place has a name. */
@@ -696,7 +701,9 @@ function epithetPass(c){
     const old = a.epithet;
     a.epithets.unshift(nameRecord(top.text, { why: top.why, by: null, scores: keep }));
     a.epithet = top.text;
-    log(`Nobody calls ${a.name} ${old} any more. Now it is ${a.name} ${top.text}.`, campHumans(), 'major');
+    /* As quiet as the first epithet. A major line pulses a chip, and a camp changes an epithet
+       often enough that the strip would do little else. */
+    log(`Nobody calls ${a.name} ${old} any more. Now it is ${a.name} ${top.text}.`, campHumans(), 'info');
   }
 }
 /* Fate gives the last epithet. It is always applied, on top of whatever was held. Guarded to

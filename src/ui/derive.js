@@ -299,7 +299,11 @@ function drawerRows(id){
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
-  if (id === 'chronicle') return chronicle.filter(e => (ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death') && chronicleMatches(e, ui.chronSearch)).map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  /* The search's thing list is built once for the whole pass, not once for each of 300 lines. */
+  if (id === 'chronicle'){
+    const set = ui.chronSearch ? nameMatchSet() : null;
+    return chronicle.filter(e => (ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death') && chronicleMatches(e, ui.chronSearch, set)).map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  }
   if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
@@ -421,15 +425,25 @@ function learnedNames(){
 }
 /* The chronicle search. A query that matches a thing's name, now or before, matches every line
    that used either, so an old line still answers to the new name. A thing whose name nobody has
-   read is skipped: the search must not give away what the marks have not told. */
-function chronicleMatches(e, q){
+   read is skipped: the search must not give away what the marks have not told.
+   A pass over the whole chronicle builds the list of things once, with `nameMatchSet`, and hands
+   it in. Built per line it cost a spread of every named thing for each of three hundred rows, on
+   every keystroke. With no set given the function builds its own, so one call still answers. */
+function nameMatchSet(){
+  const out = [];
+  for (const t of nameThings()){
+    if (t.nameKnown === false) continue;
+    const texts = (t.names || []).map(r => r.text);
+    if (texts.length) out.push(texts);
+  }
+  return out;
+}
+function chronicleMatches(e, q, set){
   if (!q) return true;
   const needle = String(q).trim().toLowerCase();
   if (!needle) return true;
   if (e.text.toLowerCase().includes(needle)) return true;
-  for (const t of nameThings()){
-    if (t.nameKnown === false) continue;
-    const list = (t.names || []).map(r => r.text);
+  for (const list of (set || nameMatchSet())){
     if (!list.some(x => x.toLowerCase().includes(needle))) continue;
     if (list.some(x => e.text.includes(x))) return true;
   }

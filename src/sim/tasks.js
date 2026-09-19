@@ -128,8 +128,10 @@ Object.assign(TASKS, {
       const c = a.carrying;
       if (c.kind === 'firestones'){ camp.tools.firestones = 1; a.carrying = null; log(`${a.name} lays two firestones by the pit. ${ITEMS.firestones.find} The camp can make its own fire now.`, campHumans(), 'major'); addThought(a, 'find', 'Brought firestones up from the dark', 10, CLOCK.thought.find); return 'done'; }
       if (c.kind === 'bones'){ a.carrying = null; log(`${a.name} brings old bones up from the dark, and nobody is sure whose they were. ${ITEMS.bones.find}`, campHumans(), 'major'); addThought(a, 'find', 'Found old bones in the dark', -3, CLOCK.thought.find); for (const h of campHumans()) if (h !== a) addThought(h, 'bones', 'There were bones under the hill', -2, CLOCK.thought.bones); return 'done'; }
-      /* The ground a delivery lands on takes its name from what the camp carries home to it. */
-      stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); nameSectorForWork(a, WORK_WORDS[c.kind]); return 'done';
+      /* The ground a delivery lands on takes its name from what the camp carries home to it. The
+         ground is the stash tile's, not the carrier's: a carrier stops within one tile of the
+         stash, which can lie in the sector next door. */
+      stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); nameSectorForWork(a, WORK_WORDS[c.kind], camp.stashTile); return 'done';
     }] },
   gather: { type: 'gather',
     begin(a, args){
@@ -338,7 +340,8 @@ TASKS.join = { type: 'travel',
     const at = t.args.at, r = goTo(a, t, at[0], at[1], t.args.within); if (r) return r;
     const c = a.camp;
     a.homeless = false;
-    if (c.site){ log(`${a.name} arrives at ${c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
+    /* A camp with no name record yet is "the camp". The test is the record, not its text. */
+    if (c.site){ log(`${a.name} arrives at ${campNameOf(c)} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
     else log(`${a.name} reaches the new valley.`, [a]);
     return 'done';
   }] };

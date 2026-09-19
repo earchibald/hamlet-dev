@@ -445,7 +445,27 @@ test('a version 1 save written before the names loads, and the world starts its 
   assert.equal(api.nameIndex.size, 0);
   assert.equal(api.usedMeanings.size, 0);
   assert.equal(typeof api.streamState(api.nrng), 'number');
+  /* Minor 22: two hundred steps say that a world loaded with no names runs on and names again.
+     The index starts empty above and holds something here, so the run is doing the work. */
   for (let i = 0; i < 200; i++) api.step();
+  assert.ok(api.nameIndex.size > 0, 'the loaded world named nothing in two hundred steps');
+});
+
+/* Minor 15: TILE_DEFAULTS is the shape every fresh tile starts in, and `makeTile` and the decoder
+   both read it. The naming work gave a tile three new fields and left them out, so a water tile
+   carried a different shape from a dry one. The fields listed here are the ones a painter or a
+   rule hangs on some tiles only, and never on a fresh one; anything else must join the table. */
+const TILE_EXTRAS = ['country', 'river', 'planted', 'loose', 'shrooms'];
+test('TILE_DEFAULTS names every field a fresh tile has, the three naming fields among them', () => {
+  const api = load(); api.startWorld('alpha');
+  const base = new Set(['x', 'y', 'z', 'ground', ...Object.keys(api.TILE_DEFAULTS), ...TILE_EXTRAS]);
+  const seen = new Set();
+  for (const t of api.world) for (const k in t) seen.add(k);
+  assert.ok(seen.size > 8, `a tile carries only ${[...seen].join(', ')}`);
+  for (const k of seen) assert.ok(base.has(k), `a tile carries ${k}, which TILE_DEFAULTS does not name`);
+  for (const k of ['water', 'pond', 'ford']) assert.ok(k in api.TILE_DEFAULTS, `TILE_DEFAULTS omits ${k}`);
+  /* Every tile of a fresh seed carries the whole table, so no two tiles differ in shape. */
+  for (const t of api.world) for (const k in api.TILE_DEFAULTS) assert.ok(k in t, `a tile has no ${k}`);
 });
 
 /* ---------- Become ----------

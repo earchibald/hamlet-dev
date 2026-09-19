@@ -1032,10 +1032,12 @@ test('a person with an epithet is shown by their full name, and a god keeps its 
   assert.equal(api.fullName(a), a.name);
   a.epithet = 'firekeeper';
   assert.equal(api.fullName(a), `${a.name} firekeeper`);
-  /* Gods carry their own epithet from creation. fullName must not be asked to draw a god row: the
-     god card and the People drawer's god rows read a.name and a.epithet directly, unchanged. */
+  /* Gods carry their own epithet from creation. fullName joins a god's name to it the same way,
+     but no row asks it to: the god card and the People drawer's god rows read a.name and
+     a.epithet directly, unchanged. This says what fullName does with one, not only that it has one. */
   const g = api.beings.find(b => b.species === 'god');
   assert.ok(g && g.epithet, 'a god carries its own epithet');
+  assert.equal(api.fullName(g), `${g.name} ${g.epithet}`);
 });
 
 /* Review fix 1: the People drawer's row label is a field of the row itself, chosen once in
@@ -1289,7 +1291,9 @@ test('the view key reads the chronicle search in both eras, and the search stays
   assert.notEqual(api.viewKey(), daysWas, 'the days branch reads it');
   api.ui.chronSearch = '';
   const state = fs.readFileSync('src/ui/state.js', 'utf8');
-  const saved = state.slice(state.indexOf('function persist'));
+  const at = state.indexOf('function persist');
+  assert.ok(at >= 0, 'state.js has no function persist: the two checks below would pass on one character');
+  const saved = state.slice(at);
   assert.ok(!/chronSearch: ui\.chronSearch/.test(saved), 'the search is not written to storage');
   assert.ok(!/s\.chronSearch/.test(saved), 'the search is not read back from storage');
 });
