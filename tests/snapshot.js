@@ -767,7 +767,7 @@ const KNOWN_CONSTS = {
 };
 /* The containers nothing writes into after load time. Each was checked by the same grep, and none of
    them was hit. A table needs no reason beyond being a table, so this is a list of names. */
-const FROZEN_TABLES = new Set(['DIRS', 'RING', 'NEAR', 'AROUND', 'DEFAULT_OPTIONS', 'MATERIALS', 'GROUND', 'FEATURES',
+const FROZEN_TABLES = new Set(['SEASON_LENGTHS', 'DIRS', 'RING', 'NEAR', 'AROUND', 'DEFAULT_OPTIONS', 'MATERIALS', 'GROUND', 'FEATURES',
   'ITEMS', 'BIOMES', 'TILE_DEFAULTS', 'STAGES', 'SEASONS', 'CLOCK', 'CONTRASTS', 'INHERITED', 'BIOME_OF', 'GROWS',
   'NAMES', 'GATHERERS', 'RECIPES', 'PLACES', 'MAKERS', 'GOD_NAMES', 'EPITHET', 'BODY', 'LEAVES', 'SCAR_OF', 'MAKES',
   'KINDS', 'STRAIN', 'GOD_ACTS', 'GOD_BARS', 'SCAR_PAINTERS', 'SPAWN', 'REFS', 'REF_HOMES', 'REF_DERIVED', 'REF_KINDS',

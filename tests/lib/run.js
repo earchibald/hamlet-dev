@@ -1,7 +1,12 @@
 // Shared test runner. Loads the sim in Node, runs it for a number of days
 // with a script god, and keeps every chronicle line, not only the last 300.
 const { load } = require('../../src/sim');
-const DAY = 1000;
+/* The day comes from the sim and is never written down here. A second copy of a constant in a test
+   is not a check on the first: it agrees with whatever it was last set to, and when the real one
+   moves the test keeps measuring the old world while still reporting in days. This file held
+   `const DAY = 1000` and plan G4 made the day 86,400, so every test that asked for seventy days
+   would quietly have run for a fifth of one. */
+const DAY = load().DAY;
 
 /* The script god lights each camp's pit once, the first time it stands laid
    and cold, through the door, so the run leaves a log. A founding party carries
