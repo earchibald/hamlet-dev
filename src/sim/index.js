@@ -33,7 +33,7 @@ const API = `return {
   runTask, updateBeing, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,
   pathToStop, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
-  seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
+  seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, LAND_WORD_KINDS, OLD_FORBID,
   nameTheLand, learnName, learnNamesHere, LORE_BUILT, LORE_TOOK, SKY_MEANINGS, SPRITE_MEANINGS, OLD_CAVE_KINDS,
   loreCandidates, valleyFallbacks, nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick,
   WORD_TAIL, WORD_PHRASE, joinedWord, phraseWord, landRows, landCandidates, workRows,

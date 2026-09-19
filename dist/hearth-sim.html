@@ -815,16 +815,59 @@ const LAND_WORDS = [
   'the red clay', 'the thin path', 'the high seat', 'the wet hollow',
   'the still pool', 'the burnt slope', 'where the wind rests', 'the grey face',
   'the salt ground', 'the small light', 'the heavy rock', 'the last watch',
+  'the dry hole', 'where the cold sits', 'the stone mouth', 'the low crawl',
+  'where the bats sleep', 'the high ridge', 'the slow rise', 'the crooked trees',
+  'where the branches tangle', 'the slow current',
+  'where the fish gather', 'the place we drink', 'the green shallows', 'where the reeds thicken',
+  'the stepping stones', 'the low bank', 'the sure footing', 'the sunless side',
+  'the side the wind takes', 'the three stones', 'the long climb', 'where the roof drips',
+  'the still air', 'the crack in the rock', 'where the echo lives', 'the trees no one has cut',
+  'where the nuts fall', 'the fallen trunks', 'where the sap runs', 'where winter shows first',
 ];
-function takeMeaning(){
-  const free = LAND_WORDS.filter(w => !usedMeanings.has(w));
+/* The kinds a meaning suits: `water`, `hill`, `cave`, `grove`, `ford`, the five `nameTheLand`
+   names. A phrase that says nothing about the shape of the place suits all five. Approved
+   wording and kind tags, in `.superpowers/sdd/land-word-kinds.md`; read those, do not re-derive. */
+const LAND_WORD_KINDS = {
+  'the sleeping hill': ['hill'], 'where the water turns': ['water', 'ford'], 'the pines that watch': ['grove'],
+  'the stone that does not move': ['hill', 'cave'], 'the cold spring': ['water', 'cave'],
+  'the place of many birds': ['water', 'hill', 'cave', 'grove', 'ford'], 'the long shadow': ['hill', 'cave', 'grove'],
+  'the first light': ['water', 'hill', 'grove', 'ford'], 'the hollow under the rock': ['cave'],
+  'where the deer cross': ['grove', 'ford'], 'the quiet ground': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the wind from the north': ['hill', 'grove'], 'the black earth': ['hill', 'cave', 'grove'],
+  'the old fire': ['water', 'hill', 'cave', 'grove', 'ford'], 'where the river forgets': ['water', 'ford'],
+  'the bones of the hill': ['hill', 'cave'], 'the bright water': ['water', 'ford'], 'the last tree': ['grove'],
+  'the low mist': ['water', 'hill', 'grove'], 'the broken rim': ['hill', 'cave'], 'where the ice stays': ['water', 'cave'],
+  'the round stone': ['hill', 'cave', 'ford'], 'the deep dark': ['cave'], 'the loud water': ['water', 'ford'],
+  'the bare crown': ['hill'], 'the green step': ['hill', 'grove'], 'the hidden mouth': ['cave'],
+  'where the wolves sing': ['hill', 'cave', 'grove'], 'the red clay': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the thin path': ['hill', 'cave', 'grove', 'ford'], 'the high seat': ['hill'], 'the wet hollow': ['water', 'cave'],
+  'the still pool': ['water'], 'the burnt slope': ['hill', 'grove'], 'where the wind rests': ['hill', 'grove'],
+  'the grey face': ['hill', 'cave'], 'the salt ground': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the small light': ['water', 'hill', 'cave', 'grove', 'ford'], 'the heavy rock': ['cave', 'ford'],
+  'the last watch': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the dry hole': ['cave'], 'where the cold sits': ['cave'], 'the stone mouth': ['cave'], 'the low crawl': ['cave'],
+  'where the bats sleep': ['cave'], 'the high ridge': ['hill'], 'the slow rise': ['hill'], 'the crooked trees': ['grove'],
+  'where the branches tangle': ['grove'], 'the slow current': ['water', 'ford'],
+  'where the fish gather': ['water', 'ford'], 'the place we drink': ['water', 'ford'], 'the green shallows': ['water', 'ford'],
+  'where the reeds thicken': ['water'], 'the stepping stones': ['ford'], 'the low bank': ['water', 'ford'],
+  'the sure footing': ['ford'], 'the sunless side': ['hill'], 'the side the wind takes': ['hill'],
+  'the three stones': ['hill', 'cave'], 'the long climb': ['hill'], 'where the roof drips': ['cave'],
+  'the still air': ['cave'], 'the crack in the rock': ['cave'], 'where the echo lives': ['cave'],
+  'the trees no one has cut': ['grove'], 'where the nuts fall': ['grove'], 'the fallen trunks': ['grove'],
+  'where the sap runs': ['grove'], 'where winter shows first': ['water', 'hill', 'cave', 'grove', 'ford'],
+};
+/* `kind` narrows the draw to the phrases that suit the thing being named. With no kind, every
+   free phrase is in play, which is the one pool this was before kinds existed. */
+function takeMeaning(kind){
+  const free = LAND_WORDS.filter(w => !usedMeanings.has(w) && (!kind || LAND_WORD_KINDS[w].includes(kind)));
   if (!free.length) return '';
   const w = npick(free); usedMeanings.add(w); return w;
 }
 /* One old name with its meaning, or null when the world has run out of either. A name with
-   no meaning is not a name, so the meaning is taken first and given back on failure. */
-function newOldName(why){
-  const meaning = takeMeaning(); if (!meaning) return null;
+   no meaning is not a name, so the meaning is taken first and given back on failure. `kind`
+   is the thing being named (`water`, `hill`, `cave`, `grove`, `ford`); every caller passes one. */
+function newOldName(why, kind){
+  const meaning = takeMeaning(kind); if (!meaning) return null;
   for (let k = 0; k < 10; k++){
     const text = oldName();
     if (!nameTaken(text)) return nameRecord(text, { tongue: 'old', meaning, why: why || `the old people called it ${meaning}` });
@@ -928,14 +971,14 @@ function findWaters(){
    holds runs out, and the rest of the land keeps no old name at all. */
 function oldNamesOnTheLand(){
   const big = river || stillWater;
-  if (big){ const r = newOldName('the old people named the water'); if (r) giveName(big, r); }
-  for (const h of hills){ const x = newOldName('the old people named the hill'); if (x) giveName(h, x); }
+  if (big){ const r = newOldName('the old people named the water', 'water'); if (r) giveName(big, r); }
+  for (const h of hills){ const x = newOldName('the old people named the hill', 'hill'); if (x) giveName(h, x); }
   for (const c of caves){
     if (!OLD_CAVE_KINDS.includes(c.kind)) continue;
-    const x = newOldName('the old people named the hollow under the hill'); if (x) giveName(c, x);
+    const x = newOldName('the old people named the hollow under the hill', 'cave'); if (x) giveName(c, x);
   }
-  for (const g of groves){ const x = newOldName('the old people named the grove'); if (x) giveName(g, x); }
-  for (let k = 0; k < fords.length; k += 3){ const x = newOldName('the old people named the crossing'); if (x) giveName(fords[k], x); }
+  for (const g of groves){ const x = newOldName('the old people named the grove', 'grove'); if (x) giveName(g, x); }
+  for (let k = 0; k < fords.length; k += 3){ const x = newOldName('the old people named the crossing', 'ford'); if (x) giveName(fords[k], x); }
   /* How many old names are still unread. `learnNamesHere` runs for every awake person on every
      tick, so it needs one number to look at before it scans the ground. It counts only the things
      that pass can learn; a name given later to anything else never enters it. */

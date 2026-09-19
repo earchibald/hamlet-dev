@@ -156,6 +156,36 @@ test('every hill, cave, and grove carries an old name with a meaning, and no mea
   }
 });
 
+test('a meaning is never offered to a kind it does not suit', () => {
+  const api = world();
+  for (const w of api.LAND_WORDS) assert.ok(api.LAND_WORD_KINDS[w] && api.LAND_WORD_KINDS[w].length, `${w} has no kinds`);
+  for (const kind of ['water', 'hill', 'cave', 'grove', 'ford']){
+    for (let k = 0; k < 60; k++){
+      const r = api.newOldName('test', kind);
+      if (!r) break;
+      assert.ok(api.LAND_WORD_KINDS[r.meaning].includes(kind), `${r.meaning} does not suit ${kind}`);
+    }
+  }
+});
+
+test('every kind can still name as many things as the heaviest seed asks of it', () => {
+  const DEMAND = { water: 9, hill: 3, cave: 10, grove: 8, ford: 1 };
+  for (const kind in DEMAND){
+    const api = world();
+    let named = 0;
+    for (let k = 0; k < DEMAND[kind]; k++){ if (api.newOldName('test', kind)) named++; }
+    assert.equal(named, DEMAND[kind], `${kind}: only named ${named} of ${DEMAND[kind]} asked for`);
+  }
+});
+
+test('the six soak seeds all still name their land', () => {
+  for (const seed of SEEDS){
+    const api = world(seed);
+    const big = api.river || api.stillWater;
+    assert.ok(big && api.nameOf(big), `${seed}: the water has no name`);
+  }
+});
+
 /* Minor 20: `LAND_WORDS` holds forty meanings, and a landmark with no meaning left keeps no old
    name at all. A bigger world has more landmarks. This is the alarm for the day one runs out. */
 test('a bigger world still has a meaning for every landmark', () => {
