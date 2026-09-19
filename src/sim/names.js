@@ -353,15 +353,26 @@ function landWords(x, y){
   if (bw && !words.includes(bw)) words.push(bw);
   return words;
 }
-function landCandidates(place){
-  const out = []; if (!place) return out;
-  const words = landWords(place[0], place[1]).slice(0, 3);
+/* The two shapes, each with the guard that stops a name saying one word twice. A tail that is the
+   first word again gives Fordford, and a phrase that is its own word gives the Water Water; both
+   reached the player. A dropped row costs nothing: the other words at the same place still offer
+   a name, and a word with no row left falls through to the ordinary axes. */
+const joinedWord = (a, b) => WORD_TAIL[b] && WORD_TAIL[b] !== a ? cap(a) + WORD_TAIL[b] : null;
+const phraseWord = a => WORD_PHRASE[a] && WORD_PHRASE[a].toLowerCase() !== a ? `the ${cap(a)} ${WORD_PHRASE[a]}` : null;
+/* The land rows for a list of words, nearest first. Kept apart from the place so a test can walk
+   every word of the tables through the same builder the game uses. */
+function landRows(words){
+  const out = [];
   for (const a of words) for (const b of words){
-    if (a === b || !WORD_TAIL[b]) continue;
-    out.push({ text: cap(a) + WORD_TAIL[b], axis: 'land', base: 30, why: `for the ${a} by the ${b}` });
+    if (a === b) continue;
+    const t = joinedWord(a, b); if (t) out.push({ text: t, axis: 'land', base: 30, why: `for the ${a} by the ${b}` });
   }
-  for (const a of words) if (WORD_PHRASE[a]) out.push({ text: `the ${cap(a)} ${WORD_PHRASE[a]}`, axis: 'land', base: 30, why: `for the ${a} here` });
+  for (const a of words){ const t = phraseWord(a); if (t) out.push({ text: t, axis: 'land', base: 30, why: `for the ${a} here` }); }
   return out;
+}
+function landCandidates(place){
+  if (!place) return [];
+  return landRows(landWords(place[0], place[1]).slice(0, 3));
 }
 /* How much the rest of the camp thinks of someone. */
 const liking = a => humans().filter(h => h !== a && h.camp === a.camp).reduce((n, h) => n + (h.opinions[a.id] || 0), 0);
@@ -575,6 +586,15 @@ function workWordAt(at){
   const t = hasTile(at[0], at[1], z) ? tileAt(at[0], at[1], z) : null;
   return t && t.struct ? (WORK_WORDS[t.struct.type] || null) : null;
 }
+/* What one work word offers the ground it was left on: the joined shape and the phrase, each with
+   its own reason. The word stands on both sides of the join, so the guard in `joinedWord` is what
+   stops Waterwater, and `phraseWord` is what stops the Hearth Hearth. */
+function workRows(word){
+  const out = [];
+  const j = joinedWord(word, word); if (j) out.push({ text: j, axis: 'work', base: 25, why: `for the ${word} work done here` });
+  const p = phraseWord(word); if (p) out.push({ text: p, axis: 'work', base: 25, why: `for the ${word} brought here` });
+  return out;
+}
 /* A sector is named by the first camp member to finish work in it. `at` is where the work was
    done, which is not always where the worker stands: a job at the far edge of a sector is worked
    from the tile next to it, which can lie in the sector next door. With no `at` the worker's own
@@ -586,11 +606,7 @@ function nameSectorForWork(a, word, at){
   const s = sectorOfTile(world[idx(x, y)]);
   if (!s || nameOf(s)) return;
   const prev = camp; camp = a.camp;
-  const extra = [
-    { text: cap(word) + (WORD_TAIL[word] || 'ground'), axis: 'work', base: 25, why: `for the ${word} work done here` },
-    { text: `the ${cap(word)} ${WORD_PHRASE[word] || 'Ground'}`, axis: 'work', base: 25, why: `for the ${word} work done here` },
-  ];
-  const rec = nameThing(s, 'sector', a, [x, y], extra);
+  const rec = nameThing(s, 'sector', a, [x, y], workRows(word));
   if (rec) log(`${a.name} calls this ground ${rec.text}, ${rec.why}.`, campHumans(), 'info');
   camp = prev;
 }
@@ -618,8 +634,11 @@ function nameValley(c){
    hold and from shared history. The camp is the namer, not a person, so no trait
    weight applies. An epithet is not a place, so it never joins the name index:
    two camps may both have a firekeeper. */
-const DEED_EPITHETS = { fire: 'firekeeper', wolf: 'wolfdriver', found: 'founder', sprite: 'spritefriend', deer: 'deer-slayer', fish: 'fisher', pot: 'potter' };
-const FATE_EPITHETS = { frost: 'the frozen', fire: 'the burnt', death: 'the lost', old: 'who died warm by the fire' };
+const DEED_EPITHETS = { fire: 'firekeeper', wolf: 'wolfdriver', found: 'founder', sprite: 'spritefriend', deer: 'deerslayer', fish: 'fisher', pot: 'potter' };
+/* Old age has two tags, because it has two deaths: one by the fire and one away from it. A fate
+   must say what the chronicle line says, so each has its own row. Neither tag sits in
+   `EVENT_NAMES`, so neither names a night. */
+const FATE_EPITHETS = { frost: 'the frozen', fire: 'the burnt', death: 'the lost', old: 'who died warm by the fire', oldCold: 'who died of old age' };
 
 function epithetCandidates(a){
   const out = [], folk = humans().filter(h => h.camp === a.camp && h !== a);
@@ -633,19 +652,21 @@ function epithetCandidates(a){
   if (down >= 40 && down > up) out.push({ text: 'the sour', score: 40 + Math.round(down / 10), why: 'arguments follow them' });
   if ((a.taught || 0) >= 5) out.push({ text: 'the teacher', score: 40 + a.taught, why: `taught ${a.taught} times by the fire` });
   if (rivals >= 3) out.push({ text: 'the one everyone argues with', score: 40 + rivals * 5, why: `${rivals} rivals in one camp` });
-  /* Deeds, from the tags on the person's own history. */
-  const tags = {};
-  for (const e of a.history) if (e.tag) tags[e.tag] = (tags[e.tag] || 0) + 1;
+  /* Deeds, from the count `log` keeps on the person. The history holds forty lines, which camp
+     chatter fills in a day, so a deed read back out of it was never earned. */
+  const tags = a.deeds || {};
   for (const k in DEED_EPITHETS) if (tags[k]) out.push({ text: DEED_EPITHETS[k], score: 30 + 5 * (tags[k] - 1), why: `for what they did, ${tags[k]} time${tags[k] > 1 ? 's' : ''}` });
   /* Life events and birth, from the lineage record. */
   const L = a.lineage || {};
   const kids = beings.filter(b => b.parents && b.parents.includes(a.id)).length;
-  if (L.roof) out.push({ text: 'born under a roof', score: 20, why: 'born in a camp that had a roof' });
+  /* Every epithet is a byname, so it follows a name in every template: "Tam the roofborn", and
+     "Now it is Tam out of the north". A clause here read as a sentence run into the next one. */
+  if (L.roof) out.push({ text: 'the roofborn', score: 20, why: 'born in a camp that had a roof' });
   if (kids >= 2) out.push({ text: 'twice a parent', score: 20 + kids, why: `${kids} children` });
-  if (L.edge) out.push({ text: `walked in from the ${L.edge}`, score: 20, why: `came in from the ${L.edge}` });
-  if (L.village) out.push({ text: 'born in a village', score: 20, why: 'born in a village' });
-  if (L.foundersChild) out.push({ text: 'child of founders', score: 20, why: 'both parents founded a camp' });
-  if (L.firstBorn) out.push({ text: 'first born here', score: 20, why: 'the first child born in this camp' });
+  if (L.edge) out.push({ text: `out of the ${L.edge}`, score: 20, why: `came in from the ${L.edge}` });
+  if (L.village) out.push({ text: 'the village-born', score: 20, why: 'born in a village' });
+  if (L.foundersChild) out.push({ text: "the founders' child", score: 20, why: 'both parents founded a camp' });
+  if (L.firstBorn) out.push({ text: 'the firstborn', score: 20, why: 'the first child born in this camp' });
   return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));
 }
 /* Once a day at the fire. `CLOCK.names.epithetAfter` days in a camp for the first. Half again as

@@ -294,6 +294,39 @@ test('a trait bends its axis from 0.7 to 1.3, and no other', () => {
   assert.equal(api.axisMult('work', a), 1, 'the work axis is not a trait axis');
 });
 
+/* A text says one word twice when two of its words match, or when one word is a stem doubled:
+   "the Water Water" and "Fordford". Both came out of the builders before the guard went in. */
+function saysTwice(text){
+  const words = text.toLowerCase().replace(/^the /, '').split(' ');
+  if (new Set(words).size !== words.length) return true;
+  return words.some(w => w.length % 2 === 0 && w.slice(0, w.length / 2) === w.slice(w.length / 2));
+}
+
+test('no name either builder makes says the same word twice', () => {
+  const api = world();
+  assert.equal(saysTwice('the Water Water'), true, 'the check must catch a doubled phrase');
+  assert.equal(saysTwice('Fordford'), true, 'the check must catch a doubled join');
+  assert.equal(saysTwice('Reedwater'), false, 'the check must pass a good name');
+  const words = [...new Set([...Object.keys(api.WORD_TAIL), ...Object.keys(api.WORD_PHRASE), ...Object.values(api.WORK_WORDS)])];
+  assert.ok(words.length >= 30, `only ${words.length} words in the tables`);
+  const texts = api.landRows(words).map(r => r.text);
+  for (const w of words) for (const r of api.workRows(w)) texts.push(r.text);
+  assert.ok(texts.length >= 100, `the builders made only ${texts.length} names`);
+  for (const t of texts) assert.equal(saysTwice(t), false, `${t} says one word twice`);
+  /* The guard drops a row, never a word: a word with a doubling tail still has a phrase or a join
+     with another word, and the work rows of a plain word are both still there. */
+  assert.equal(api.workRows('snare').length, 2, 'a plain work word lost a row');
+  assert.ok(texts.includes('Reedwater'), 'the joined shape is gone');
+  assert.ok(texts.includes('the Reed Marsh'), 'the phrase shape is gone');
+});
+
+test('the two work rows give two different reasons', () => {
+  const api = world();
+  const rows = api.workRows('snare');
+  assert.equal(rows.length, 2);
+  assert.notEqual(rows[0].why, rows[1].why, 'the hover shows the same sentence twice');
+});
+
 test('every camp line reads without "The first camp"', () => {
   const { events } = runDays('r', 12);
   assert.equal(events.filter(e => e.text.includes('The first camp')).length, 0);
@@ -355,7 +388,7 @@ test('the lines the event table reads carry their tags in a real run', () => {
   const { events } = runDays('r', 40);
   const tags = new Set(events.filter(e => e.tag).map(e => e.tag));
   assert.ok(tags.size >= 2, `only ${[...tags].join(', ')}`);
-  for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'deer', 'fish', 'pot'].includes(e.tag), `${e.tag}: ${e.text}`);
+  for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'oldCold', 'deer', 'fish', 'pot'].includes(e.tag), `${e.tag}: ${e.text}`);
   for (const e of events){
     if (e.text.includes(' is born to ')) assert.equal(e.tag, 'birth', e.text);
     if (e.text.includes('Something is burning')) assert.equal(e.tag, 'fire', e.text);
@@ -534,12 +567,13 @@ test('a death stamps the tick and carries a tag the event table can read', () =>
   assert.match(api.chronicle[0].text, /froze in the cold/);
 });
 
-test('old age is tagged old, not death, and every other cause about a person carries a tag from the table', () => {
+test('old age is tagged old or oldCold, not death, and every other cause about a person carries a tag from the table', () => {
   const { events } = run70();
   const oldAge = events.filter(e => e.kind === 'death' && /old age|old and warm by the fire/.test(e.text));
   assert.ok(oldAge.length > 0, 'no old-age death in 70 days');
-  for (const e of oldAge) assert.equal(e.tag, 'old', e.text);
+  for (const e of oldAge) assert.ok(['old', 'oldCold'].includes(e.tag), `${e.tag}: ${e.text}`);
   const otherDeaths = events.filter(e => e.kind === 'death' && !/old age|old and warm by the fire/.test(e.text));
+  assert.ok(otherDeaths.length === 0 || otherDeaths.every(e => ['fire', 'frost', 'death'].includes(e.tag)), 'a death carried a tag outside the table');
   for (const e of otherDeaths) assert.ok(['fire', 'frost', 'death'].includes(e.tag), `${e.tag}: ${e.text}`);
 });
 
@@ -725,7 +759,7 @@ test('ten days in a camp earns an epithet, and the chronicle says so', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   a.campSince = api.tick - 11 * api.DAY;
-  a.history.unshift({ tick: api.tick, when: '', text: 'set the ember in the pit', kind: 'major', tag: 'fire', camp: c.id });
+  api.log('set the ember in the pit', [a], 'major', 'fire');
   api.epithetPass(c);
   assert.equal(a.epithet, 'firekeeper');
   assert.equal(api.fullName(a), `${a.name} firekeeper`);
@@ -738,32 +772,113 @@ test('a candidate below the bar does not replace the epithet, and one above it d
   const { api, a, c } = hearthCamp();
   api.camp = c;
   a.campSince = api.tick - 11 * api.DAY;
-  for (let k = 0; k < 4; k++) a.history.unshift({ tick: api.tick, when: '', text: 'a wolf driven off', kind: 'good', tag: 'wolf', camp: c.id });
+  for (let k = 0; k < 4; k++) api.log('a wolf driven off', [a], 'good', 'wolf');
   api.epithetPass(c);
   assert.equal(a.epithet, 'wolfdriver');
   const held = api.epithetCandidates(a).find(x => x.text === 'wolfdriver').score;
   /* One deed of another kind scores 30, which is under 1.5 times the held score. */
-  a.history.unshift({ tick: api.tick, when: '', text: 'a fish', kind: 'good', tag: 'fish', camp: c.id });
+  api.log('a fish', [a], 'good', 'fish');
   api.epithetPass(c);
   assert.equal(a.epithet, 'wolfdriver', `30 should not beat ${held} times 1.5`);
-  for (let k = 0; k < 12; k++) a.history.unshift({ tick: api.tick, when: '', text: 'a fish', kind: 'good', tag: 'fish', camp: c.id });
+  for (let k = 0; k < 12; k++) api.log('a fish', [a], 'good', 'fish');
   api.epithetPass(c);
   assert.equal(a.epithet, 'fisher');
   assert.deepEqual(a.epithets.map(r => r.text), ['fisher', 'wolfdriver']);
   assert.ok(api.chronicle.some(e => e.text === `Nobody calls ${a.name} wolfdriver any more. Now it is ${a.name} fisher.`), api.chronicle[0].text);
 });
 
+/* Important 4: the deed count came from `a.history`, which `log` caps at 40 lines, so camp
+   chatter evicted every tagged line within a day or two and no deed epithet was ever earned. */
+test('a deed is counted on the person, so it survives the forty-line cap on their history', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  assert.deepEqual(a.deeds, {}, 'a fresh person carries an empty deed count');
+  api.log('a wolf driven off', [a], 'good', 'wolf');
+  assert.equal(a.deeds.wolf, 1);
+  /* Fifty untagged lines push the tagged one out of the history, as a day of camp chatter does. */
+  for (let k = 0; k < 50; k++) api.log(`chatter ${k}`, [a], 'info');
+  assert.equal(a.history.filter(e => e.tag).length, 0, 'the tagged line is still in the history');
+  assert.equal(a.deeds.wolf, 1, 'the deed count did not survive the cap');
+  a.campSince = api.tick - 11 * api.DAY;
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'wolfdriver');
+});
+
+test('a deed epithet is earned in a real run, past the day the history cap bites', () => {
+  const { api } = run70();
+  const folk = api.beings.filter(b => b.species === 'human' && b.alive);
+  const deeds = new Set(Object.values(api.DEED_EPITHETS));
+  const earned = folk.filter(b => deeds.has(b.epithet));
+  assert.ok(earned.length > 0, `no deed epithet among ${folk.map(b => b.epithet).join(', ')}`);
+});
+
+/* Important 3: five lineage rows were clauses, so the templates read "Now it is Tam walked in
+   from the north." Every epithet a camp gives must be a byname that follows a name. */
+test('every lineage epithet is a byname, and every template reads as a sentence', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  a.campSince = api.tick - 11 * api.DAY;
+  a.lineage = { parents: null, camp: c.id, day: 1, roof: true, village: true, edge: 'north', foundersChild: true, firstBorn: true };
+  const texts = api.epithetCandidates(a).map(x => x.text);
+  for (const want of ['the roofborn', 'the village-born', 'out of the north', "the founders' child", 'the firstborn']){
+    assert.ok(texts.includes(want), `${want} is not among ${texts.join(', ')}`);
+  }
+  /* No epithet may start with a verb: that is what made the clauses read wrongly. */
+  for (const t of texts) assert.ok(!/^(born|walked|child|first) /.test(t), `${t} is a clause, not a byname`);
+  /* Read both templates and the full name aloud with each byname. */
+  for (const t of texts){
+    assert.match(`The camp has started to call ${a.name} ${t}.`, /^The camp has started to call \w+ [a-z']+/);
+    assert.match(`Nobody calls ${a.name} the talker any more. Now it is ${a.name} ${t}.`, /Now it is \w+ [a-z']+/);
+    a.epithet = t;
+    assert.equal(api.fullName(a), `${a.name} ${t}`);
+  }
+});
+
+test('the deed epithets are one word each', () => {
+  const api = world();
+  for (const k in api.DEED_EPITHETS) assert.ok(/^[a-z]+$/.test(api.DEED_EPITHETS[k]), `${api.DEED_EPITHETS[k]} is not one plain word`);
+});
+
 test('fate gives the last epithet, and it replaces the one held', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   a.campSince = api.tick - 11 * api.DAY;
-  a.history.unshift({ tick: api.tick, when: '', text: 'the ember', kind: 'major', tag: 'fire', camp: c.id });
+  api.log('the ember', [a], 'major', 'fire');
   api.epithetPass(c);
   assert.equal(a.epithet, 'firekeeper');
   api.die(a, 'froze in the cold', 'frost');
   assert.equal(a.epithet, 'the frozen');
   assert.equal(a.epithets.length, 2);
   assert.equal(a.diedAt, api.tick);
+});
+
+/* Important 2: one tag said both old-age deaths, so a person who died cold in the snow was
+   called "who died warm by the fire" on the same screen as the line saying otherwise. */
+test('the two old-age deaths carry two tags and two fates, and neither one names a night', () => {
+  const api = world();
+  api.camp = api.camps[0];
+  const warm = api.beings.filter(b => b.species === 'human')[0];
+  api.die(warm, 'died in their sleep, old and warm by the fire', 'old');
+  assert.equal(api.chronicle[0].tag, 'old');
+  assert.equal(warm.epithet, 'who died warm by the fire');
+  const cold = api.makeBeing('human', warm.x, warm.y, 'Cold', 0);
+  cold.camp = api.camps[0]; api.beings.push(cold);
+  api.die(cold, 'died of old age', 'oldCold');
+  assert.equal(api.chronicle[0].tag, 'oldCold');
+  assert.equal(cold.epithet, 'who died of old age');
+  /* Both tags stay out of the event table, so neither death names a night. */
+  for (const t of ['old', 'oldCold']) assert.equal(api.EVENT_NAMES[t], undefined, `${t} names a night`);
+  const c = api.camps[0];
+  for (const e of api.chronicle) if (e.tag === 'old' || e.tag === 'oldCold') assert.equal(api.isEventLine(e, c), false, e.text);
+});
+
+test('a cold old-age death in a real run is tagged oldCold, and a warm one old', () => {
+  const { events } = run70();
+  const cold = events.filter(e => e.kind === 'death' && /died of old age/.test(e.text));
+  const warm = events.filter(e => e.kind === 'death' && /old and warm by the fire/.test(e.text));
+  assert.ok(cold.length + warm.length > 0, 'no old-age death in 70 days');
+  for (const e of cold) assert.equal(e.tag, 'oldCold', e.text);
+  for (const e of warm) assert.equal(e.tag, 'old', e.text);
 });
 
 test('everyone gets a lineage record, and the birth source reads it', () => {

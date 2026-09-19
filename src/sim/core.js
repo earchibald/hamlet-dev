@@ -163,5 +163,10 @@ function log(text, who = [], kind = 'info', tag = null){
   const e = { tick, when: stamp(), text, kind, tag, camp: camp ? camp.id : null };
   if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
-  for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
+  /* The history keeps the last forty lines only. A deed must outlast that, so a tagged line also
+     adds one to the person's own count. Nothing but an epithet reads it. */
+  for (const a of who){
+    a.history.unshift(e); if (a.history.length > 40) a.history.pop();
+    if (tag && a.deeds) a.deeds[tag] = (a.deeds[tag] || 0) + 1;
+  }
 }

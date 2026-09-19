@@ -36,6 +36,7 @@ const API = `return {
   seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
   nameTheLand, learnName, learnNamesHere, LORE_BUILT, LORE_TOOK, SKY_MEANINGS, SPRITE_MEANINGS, OLD_CAVE_KINDS,
   nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick,
+  WORD_TAIL, WORD_PHRASE, joinedWord, phraseWord, landRows, landCandidates, workRows,
   EVENT_NAMES, eventCandidates, nameEvents, eventName, isEventLine,
   WORK_WORDS, workWordAt, nameSectorForWork, namePondHere, nameValley, describe, compass, thingSpot, placePhrase, DESCRIBE_KIND,
   DEED_EPITHETS, FATE_EPITHETS, epithetCandidates, epithetPass, giveFate, fullName, lineageFor,

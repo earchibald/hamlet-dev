@@ -13,6 +13,10 @@ function makeBeing(species, x, y, name, hue){
     skills: { gather: 0, build: 0, cook: 0, trap: 0, craft: 0, woodcut: 0, hunt: 0, wary: 0 }, xp: {},
     thoughts: [], opinions: {}, rel: {}, task: null, carrying: null, status: 'Arriving', asleep: false,
     cooldown: {}, history: [], lastChoice: null, lastHurt: null, homeless: false, pokedUntil: 0, camp: null,
+    /* How many tagged lines this person stands in, by tag. `log` counts them. The history holds
+       only the last forty lines, so a deed read back out of it is gone within a day or two; this
+       count is what an epithet reads. Plain numbers, and nothing but an epithet reads it. */
+    deeds: {},
   };
   if (species === 'human') b.needs.warmth = 80 + rint(20);
   if (species === 'human') b.clothes = false;
@@ -364,7 +368,8 @@ function updateBeing(a){
   /* The life clock. Past the usual span, each day is a gift. */
   if (ageDays(a) > LIFE[a.species].life && rng() < CLOCK.rate.oldAgeDeath / (0.5 + a.traits.hardiness)){
     const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
-    die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age', 'old'); return;
+    /* Two tags for the one cause, so the fate epithet says what the line says. */
+    die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age', warm ? 'old' : 'oldCold'); return;
   }
   const here = tileAt(a.x, a.y, a.z);
   if (here.fire > 0){ a.hp -= CLOCK.rate.fireHurts; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, CLOCK.thought.burned); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); startTask(a, 'flee'); } }
