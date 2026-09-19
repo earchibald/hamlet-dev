@@ -21,7 +21,9 @@ const NEAR = [[0,0], ...DIRS];
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
-const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 };
+/* `force` is the Force Actions setting: a barred option may be taken, with no penalty. It is read
+   only where the player chooses. No rule reads it, so it cannot move the creation. */
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false };
 let options;
 function setOptions(o){
   options = { ...DEFAULT_OPTIONS, ...o };

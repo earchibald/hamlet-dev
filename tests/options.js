@@ -5,7 +5,7 @@ const { load } = require('../src/sim');
 
 test('the defaults are today\'s numbers', () => {
   const api = load(); api.startWorld('r');
-  assert.deepEqual(api.options, { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 });
+  assert.deepEqual(api.options, { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false });
   assert.equal(api.W, 280); assert.equal(api.H, 120); assert.equal(api.levels.length, 5); assert.equal(api.ZOFF, 2);
 });
 
