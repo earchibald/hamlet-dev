@@ -4485,8 +4485,13 @@ const SCAR_PAINTERS = { burned: scarBurned, cut: scarCut, drowned: scarDrowned, 
 function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r, 'scar')){ const p = SCAR_PAINTERS[m.value]; if (p) p(r); } }
 
 /* ---------- the creatures of the makings, and the gods' bodies ---------- */
-/* Who is spawned for a making, and how. Read by paintCreatures. */
-const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true }, wolf: { n: 2, den: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
+/* Who is spawned for a making, and how. Read by paintCreatures. `n` is how many one making puts down. `most` is
+   how many the whole valley may hold, over every making of that species. The making act is built to repeat: it
+   makes what no country has, then fills every country of the god's pole that lacks a species of it. A long
+   creation therefore marks the hunters country after country, and without `most` a valley took two wolves for
+   each of twenty-six makings. The hunters are capped at the pair and the three the day era's own stray rule
+   already keeps them near. The prey and the fae are not capped here. */
+const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true, most: 3 }, wolf: { n: 2, den: true, most: 2 }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
 /* What the makings named. `creation.made` is written at settle from the same marks the painters read, and it is
    the whole roll of what may live in this world. Nothing the gods did not make wanders in later. */
 function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]); }
@@ -4494,6 +4499,9 @@ function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]);
    could not hold is put out on the open ground. */
 function paintCreatures(first){
   groves = [];
+  /* The species the cap turned away, and how many of each did come down. The order of `liveRegions()` and of
+     `marksOf` fixes which countries get the hunters, so a seed always keeps the same ones. */
+  const short = {}, came = {};
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
     /* The roll records what the gods made. SPAWN decides only who a painter puts on the ground, so a making
        with no painter of its own, such as the people, still goes on the roll. */
@@ -4502,11 +4510,21 @@ function paintCreatures(first){
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
     if (how.burrows){ digGnomeBurrows(within); continue; }
+    /* What the valley still has room for. A table with no `most` has no cap, and every making spawns in full. */
+    const here = how.most === undefined ? how.n : Math.min(how.n, how.most - liveOf(m.value));
+    /* The cap has bitten. Dig no den: nothing would live in it. */
+    if (here <= 0){ short[m.value] = true; continue; }
     let placed = 0;
-    if (how.den){ const c = digDens(within, m.value); if (c) placed = spawnInDens(m.value, how.n, c); }
-    if (placed < how.n) spawnAnimal(m.value, within, how.n - placed, first);
+    if (how.den){ const c = digDens(within, m.value); if (c) placed = spawnInDens(m.value, here, c); }
+    if (placed < here) spawnAnimal(m.value, within, here - placed, first);
+    came[m.value] = liveOf(m.value);
   }
+  /* One line a species, not one a making. The legends still tell of every making; this says what the valley got. */
+  for (const sp in short) log(`The ${SPECIES[sp].plural} were made in country after country. Only ${came[sp] || 0} of them came down into the valley.`, [], 'major');
 }
+/* How many of a species stand in the world now. The cap reads it, so a making that could not place its own
+   creatures leaves room for the next one. */
+function liveOf(sp){ let n = 0; for (const b of beings) if (b.alive && b.species === sp) n++; return n; }
 /* A sleeping god stands at its body: a hill, a cave's deep, the river, a lake, or the ground where it lay down.
    One body holds one god, so every candidate already claimed is passed over, and two gods who slept in the same
    country take the two tiles their own rest marks name. */
