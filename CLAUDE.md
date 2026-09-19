@@ -42,6 +42,14 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Naming moves no being and no item, adds no thought, and changes no need; only `chronicle` and `chronicleLines` may move for naming work.
 - A rule never reads a name's text to decide anything. It reads data tables instead.
 
+- Execute a plan with subagent-driven development. A fresh implementer per task, a task review after
+  each, and a broad review of the whole branch at the end. Do not ask which mode to use, and do not
+  execute a plan inline: the per-task review is what caught the two Criticals in Become E1 task 4 and
+  the four production changes made to satisfy bad tests in E2 task 3.
+- Name a file by its absolute worktree path in chat, in a report, in a review finding, in a PR body,
+  and in a message to another session. A bare relative path opens the primary clone, which is the
+  wrong copy. Inside these documents, repo-relative paths are correct and stay.
+
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
 - Load-time order matters three times: `core.js` first, `clock.js` directly after it, and `tasks.js` before `beings.js`, `species.js`, and `fae.js`, which add kinds to `TASKS`.

@@ -655,6 +655,78 @@ So the timeline is not a convenience. It is the only thing in the interface that
 
 **Not built, and named so nobody assumes it.** God-era replay. `doorLog` carries the age, but `replayGod` in `tests/lib/run.js` selects by tick, every god-era act shares one tick, and `runDays` starts after settle. A steered creation is logged; nothing replays it yet. Also not built: a stop on an event, which needs an `event` kind on every chronicle line, and that is G section 7.
 
+### The beat (E3)
+
+E2 said the ages were never held still. E3 holds them. The unit of playback is **one god's act**, not one
+age: `BEAT_MS` is 1000 ms, and an act is drawn over its beat with the act before it fading underneath.
+
+**Why Step cut.** Step advanced the world and redrew it. Between one frame and the next the field changed
+shape, a country divided, and nothing carried the eye from the old picture to the new one. A stepped age
+was a slideshow, and a running one at the old speeds was far too fast to read. Neither end of that range
+was watchable, and the fault was the same at both ends: no motion in between.
+
+**The pace ladder is its own.** The ages run on `PACES = [0.25, 0.5, 1, 2]`; the days keep
+`SPEEDS = [1, 4, 16, 64]`. Nothing above double, because a creation is minutes of a game measured in
+hours, and the question in the ages is always whether the player can read what just happened, never
+whether they can get through it faster. `H` hurries to the valley and now **asks first**: it is the one
+irreversible thing in the ages, and it used to happen on one keystroke.
+
+**Pacing is view state and never passes the door.** `beatsDue(acc, dt, pace)` is the only place the ladder
+is consulted, and it is in the frame path. A door log must replay the same story at whatever rate it was
+drawn at. The gate for this is a door log replayed at `PACES[0]` and at `PACES[3]` with the same
+fingerprint, and it has to be driven in the browser: a `step()` loop in Node never calls `beatsDue`, so
+both runs would be the same run twice and the match would be guaranteed by the method rather than the code.
+
+**The four conditions `gods.js` set**, which are requirements and not preferences:
+
+| Condition | The reason |
+|---|---|
+| A flag on `ageDecide`, not a second entry point | A second entry point is a second copy of the `while (agePos.i < list.length)` loop and of the `prepared`/`opts` invariant |
+| The return goes after `agePass()`, inside the awake branch | Return before the position advances and the resume re-enters the same god with `prepared` already true, so `decideGod` runs twice against a matrix drawn once. That moves the stream |
+| `ageDecide`'s `false` is now ambiguous, and the file says so | It used to mean only that a turn is open; it now means that *or* that one act is done. `pending` tells them apart |
+| `takeTurn` stops resuming the age at all | A flag on `takeTurn` would ride the event through `inject` and be logged, and then pacing passes the door |
+
+The fourth is the one the whole slice rests on. Because a step is the only thing that carries an age on,
+whoever asked for the act, **the view never needs to know whether an act came from the player or from a
+god**. A branch on `byPlayer` anywhere in the playback path is a fault in the engine, not in the view.
+
+**Each act shows its face.** `MARKS` in `src/ui/marks.js` gives every act kind a drawn mark and a word:
+data and path strings only, no canvas calls. The mark is drawn on the ground that changed and fades with
+the act it belongs to, and the word is the line the act itself wrote. An act that wrote no line is silent
+rather than captioned with something borrowed. Hovering the mark, or clicking the act's cell in the
+timeline, opens the same card.
+
+**The timeline lights the act being played**, so what the player watches and what the player reads name
+the same act at the same moment. The lit cell is the turn on stage. Two things make that harder than it
+sounds. A decision can write more than one gesture — a split that also gives birth writes a `split` and a
+`born`, and the birth is credited to the newborn, who has no row of its own — so the lit cell follows the
+turn and not the newest gesture. And `unmake` and `backstop` run from `ageEnd`, after every god in the age
+has finished, and write no turn at all: on those beats nothing is lit, because nothing is on stage.
+
+**How long a creation is.** Measured on 32 seeds, by stepping `startCreation` to settle and counting
+the beats: **78 to 229 beats**, median 105, from 15 to 32 ages and 63 to 197 decisions. The E3 plan
+said 43 to 110, and neither end holds — the floor is nearly twice the claim and the ceiling is more
+than double it. At pace 1 the median creation is about a minute and three quarters and the longest is
+near four minutes; at a quarter pace the longest is a quarter of an hour. That is the argument for
+nothing above double on the ladder, and it is also the reason `H` exists and has to ask first.
+
+**Take a god** is on the start dialog, and `Alt+G`. It adds no power: it is E1's `become` through the door.
+A slice about what the player experiences has to be reachable by a player, and the ages could not be tested
+by hand without a way in.
+
+**Two limits, named so nobody assumes otherwise.** The act card comes up from a timeline cell only for the
+age still playing: `creation.gestures` is replaced at the head of every age and is one age deep, not
+history. An older cell keeps the chip card E2 gave it. And `Take a god` begins the first age by calling
+`ageBegin()` from the view, because no god exists until an age begins — that call does not pass the door
+and is not in the door log. Nothing depends on it today, because god-era replay is still not built, but
+`nextId` is one counter for beings, camps, regions, boundaries, items and caves alike, so a replay that
+skipped the call would shift every later id and not merely fail one lookup. The fix is a door act that
+begins the ages, so god-making and the take happen inside one logged act.
+
+**A background tab runs no frames.** `requestAnimationFrame` stops in a background Safari tab, so the beat
+loop stops with it and `onSettle()` is never called. Crossing the era boundary in a tab that is not in
+front looks exactly like a bug and is not one. Call the frame by hand when driving the page headlessly.
+
 ## 20. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.

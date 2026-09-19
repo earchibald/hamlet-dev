@@ -21,7 +21,7 @@ const KEYMAP = [
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
   { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
-  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -78,6 +78,7 @@ const KEYMAP = [
   { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
   /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
   { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
+  { key: 'g',          alt: true, focus: 'dialog:start', action: 'takeGod', label: 'Take a god', button: 'takeGod' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
      clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
@@ -96,8 +97,9 @@ for (const t of TOOLS){
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
-/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows. */
-SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Speed ${v}\u00d7`, button: `speed${v}` }));
+/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
+   The label names both ladders, since the same row serves the ages and the days. */
+SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Pace ${PACE_LABEL[PACES[i]]} \u00b7 Speed ${SPEED_LABEL[v]}`, button: `speed${v}` }));
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
