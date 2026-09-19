@@ -476,7 +476,7 @@ function winOpen(kind, target){
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
   return w;
 }
-function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.focus === `window:${id}`) ui.focus = 'map'; }
+function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.focus === `window:${id}`) setFocus('map'); }
 /* Where Tab goes: the map, each docked drawer in order, then each window in order. */
 function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);

@@ -133,7 +133,7 @@ const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x &
 function pinCell(c, e){
   const t = targetForCell(c);
   const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
-  ui.focus = `window:${w.id}`; hideTip(); persist(); renderUI(true);
+  setFocus(`window:${w.id}`); hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
   const same = tipTarget && tipTarget.cell && tipTarget.cell[0] === c.x && tipTarget.cell[1] === c.y && tipTarget.cell[2] === c.z;

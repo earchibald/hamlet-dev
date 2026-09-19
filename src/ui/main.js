@@ -51,7 +51,7 @@ function initUI(){
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
   /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
   $('start').addEventListener('close', () => {
-    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
+    setFocus('map'); const make = $('start').returnValue === 'make'; $('start').returnValue = '';
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
@@ -74,10 +74,10 @@ function initUI(){
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;
+    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
-  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
+  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });
   wireWindows();
   initTimeline();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });

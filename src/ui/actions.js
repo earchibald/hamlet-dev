@@ -7,6 +7,9 @@ function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
+/* The one writer of `ui.focus`. Every file but this one calls this instead of setting the field
+   itself; writes inside actions.js keep setting it directly. */
+function setFocus(v){ ui.focus = v; }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
 function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
 function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }

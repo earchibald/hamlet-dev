@@ -1556,7 +1556,7 @@ test('a sector name with markup in it is escaped once it becomes markup: the pal
   const had = Object.fromEntries(['document', 'localStorage', 'window'].map(k => [k, globalThis[k]]));
   try {
     globalThis.document = doc; globalThis.localStorage = storage; globalThis.window = { innerWidth: 1200, innerHeight: 900 };
-    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs'],
+    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions'],
       [...NAMES, 'paletteRows', 'openPalette', 'renderPalette', 'renderTip'],
       { setTip: '(t, a) => { tipTarget = t; tipAnchor = a; }' });
     api.startWorld('r'); api.camp = api.camps[0];
