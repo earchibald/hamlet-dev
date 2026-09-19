@@ -112,6 +112,9 @@ function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; 
 
 /* World state */
 let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+/* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
+   wanderer may arrive on once the people are gone. */
+let wanderAt = 0;
 /* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
    regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
    of the run. godRng is the gods' own stream. */
