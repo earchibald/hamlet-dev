@@ -5,7 +5,9 @@ function readPalette(){
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
   fieldKey = '';
-  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
+  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim();
+  P.bg = cs.getPropertyValue('--bg').trim(); P['map-halo'] = cs.getPropertyValue('--map-halo').trim();
+  worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
 /* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
@@ -133,6 +135,33 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
+   appears under it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. */
+function drawMark(rec, f, alpha){
+  const m = markFor(rec.kind, rec.value); if (!m) return;
+  const q = tileSpot(rec.to); if (!q) return;
+  const d = clamp((f - TWEEN.cue) / (TWEEN.draw - TWEEN.cue), 0, 1);
+  if (d <= 0) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
+  wctx.globalAlpha = alpha;
+  wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
+  wctx.strokeStyle = P['field-line']; wctx.lineWidth = 4.3; wctx.lineCap = 'round'; wctx.lineJoin = 'round';
+  const n = Math.ceil(d * m.paths.length);
+  for (let i = 0; i < n; i++) wctx.stroke(new Path2D(m.paths[i]));
+  wctx.restore();
+  if (f < TWEEN.word) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
+  wctx.textAlign = 'center';
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.restore();
+}
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
    stay whole, and it is trimmed only when even two rows will not hold it. */
 function drawCaption(text, p){
@@ -209,8 +238,8 @@ function drawField(){
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
      this beat, at the same fraction, so a look-away never simply erases what happened. */
   if (figures){
-    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; }
-    if (now && f > 0) drawGesture(now, f);
+    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; drawMark(before, 1, 1 - f); }
+    if (now && f > 0){ drawGesture(now, f); drawMark(now, f, 1); }
   }
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
@@ -253,9 +282,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
-  if (figures && now && now.said !== null && now.said !== undefined && legends[now.said] && f > 0){
-    drawCaption(legends[now.said].text, tileSpot(now.to));
+  /* One caption at a time: the line the act on stage wrote. */
+  if (figures && now && f > 0){
+    const text = captionFor(now);
+    if (text) drawCaption(text, tileSpot(now.to));
   }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }

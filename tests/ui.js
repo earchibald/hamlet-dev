@@ -1331,27 +1331,63 @@ test('a walk and a stroke give their ends, and a gesture with no anchor draws no
   assert.deepEqual(line, [1, 2, 3, 4], 'the record is not touched');
 });
 
+test('every gesture the map can draw has a mark and a word, so a new act cannot reach the map with nothing to show', () => {
+  const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'MARKS', 'markFor']);
+  const kinds = ['split','claim','make','raise','dig','flow','pool','burn','freeze','hide','show','battle','twist','mingle','sleep','born','unmade','backstop'];
+  for (const k of kinds){
+    const m = api.markFor(k);
+    assert.ok(m, `${k} has no mark`);
+    assert.ok(m.word && m.word.length, `${k} has no word`);
+    assert.ok(Array.isArray(m.paths) && m.paths.length, `${k} has no strokes`);
+    for (const d of m.paths) assert.match(d, /^M[\d.\s]/, `${k} has a stroke that does not start with a move`);
+  }
+  assert.equal(api.markFor('wash', 'freeze'), api.markFor('freeze'), 'a wash takes the mark of the act it is');
+  assert.equal(api.markFor('wash', 'hide'), api.markFor('hide'));
+  assert.equal(api.markFor('nonesuch'), null, 'an unknown kind draws nothing rather than guessing');
+});
+
+test('a mark is one word, and the word is the act in the third person', () => {
+  const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'MARKS']);
+  for (const k in api.MARKS){
+    const w = api.MARKS[k].word;
+    if (k === 'backstop') continue;
+    assert.equal(w.split(' ').length, 1, `${k}'s word is more than one word`);
+    assert.equal(w, w.toLowerCase(), `${k}'s word is stored lower case; the map sets the case`);
+  }
+});
+
+test('the caption is the line the act wrote, and an act that wrote no line has none', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'captionFor']);
+  api.startWorld('gamma');
+  for (let k = 0; k < 4; k++) api.step(true);
+  const rec = api.creation.gestures[api.creation.gestures.length - 1];
+  const said = rec.said !== null && rec.said !== undefined;
+  assert.equal(api.captionFor(rec), said ? api.legends[rec.said].text : '');
+  assert.equal(api.captionFor({ said: null }), '', 'an act that wrote no line is silent, not wrong');
+});
+
 /* A canvas that draws nothing and keeps the list of what it was asked to draw. */
 function recordCtx(){
   const calls = [];
   const note = name => (...a) => { calls.push(name); return a; };
   const c = { calls, measureText: () => ({ width: 40 }) };
-  for (const k of ['setTransform', 'clearRect', 'fillRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = note(k);
+  for (const k of ['setTransform', 'clearRect', 'fillRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'scale', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = note(k);
   for (const k of ['fillStyle', 'strokeStyle', 'globalAlpha', 'lineWidth', 'font', 'textAlign', 'textBaseline']) Object.defineProperty(c, k, { set(v){ /* ink is not drawing */ }, get(){ return ''; } });
   return c;
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages){
-  const api = loadUI(['state', 'derive', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', ...TWEENS], {
+  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', ...TWEENS], {
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; }',
     setPace: '(v) => { pace = v; }',
     setAcc: '(v) => { acc = v; }',
   });
   const P = {};
-  for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
+  for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'bg', 'map-halo', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
   const wctx = recordCtx(), octx = recordCtx();
   const ocv = { width: 100, height: 100, getContext: () => octx };
   global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => recordCtx() }), querySelector: () => null };
+  global.Path2D = function(d){ this.d = d; };
   api.startCreation(seed);
   for (let k = 0; k < ages && api.era === 'gods'; k++) api.step();
   api.setUp({ wctx, ocv, octx, P });

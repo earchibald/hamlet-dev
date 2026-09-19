@@ -6621,6 +6621,19 @@ function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* The newest major line, for a beat with no act of its own on stage: the rest gate, the strain, and a
+   birth outside any single act's telling all speak this way. */
+function majorOfClose(){
+  for (let i = legends.length - 1; i >= 0; i--) if (legends[i].kind === 'major') return legends[i].text;
+  return '';
+}
+/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption; the age's
+   close takes the newest major line of the close, which is where the rest gate, the strain and a
+   backstop speak. */
+function captionFor(rec){
+  if (!rec) return majorOfClose();
+  return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
+}
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
 function standsIn(g){
   let r = g.region === null || g.region === undefined ? null : regionById(g.region);
@@ -7391,6 +7404,34 @@ function getAutosave(){
   })).catch(() => null);
 }
 
+/* The face of an act. Every mark is drawn in a 48-unit box, one weight, round caps, in the palette's own
+   ink over a disc of the map's background. They are strokes, never sprites and never emoji: the map draws
+   sprites for people and creatures, and a god's act is not a thing on the ground but something done to it.
+   Pairs read against each other — raise and dig are one chevron flipped, hide and show one circle closed
+   and radiating. The word is not a training wheel: eighteen marks is more than anyone learns at once. */
+const MARKS = {
+  split:    { word: 'parts',   paths: ['M10 38 L38 10', 'M6 16 A18 18 0 0 1 22 6', 'M26 42 A18 18 0 0 0 42 32'] },
+  claim:    { word: 'claims',  paths: ['M24 6 A18 18 0 1 1 23.9 6', 'M24 16 A8 8 0 1 1 23.9 16'] },
+  make:     { word: 'makes',   paths: ['M8 40 L40 40', 'M24 40 L24 18', 'M24 22 L15 13', 'M24 22 L33 13'] },
+  raise:    { word: 'raises',  paths: ['M8 38 L40 38', 'M12 28 L24 12 L36 28'] },
+  dig:      { word: 'digs',    paths: ['M8 12 L40 12', 'M12 22 L24 38 L36 22'] },
+  flow:     { word: 'flows',   paths: ['M6 28 C14 14 20 42 28 28 C32 21 36 18 42 20', 'M36 14 L42 20 L36 26'] },
+  pool:     { word: 'pools',   paths: ['M10 14 L10 26 A14 12 0 0 0 38 26 L38 14', 'M16 30 C20 26 22 34 26 30 C29 27 31 31 34 29'] },
+  burn:     { word: 'burns',   paths: ['M24 6 C33 18 38 24 38 30 A14 14 0 0 1 10 30 C10 22 18 18 24 6 Z', 'M24 25 C28 31 29 32 29 34 A5 5 0 0 1 19 34 C19 31 21 30 24 25 Z'] },
+  freeze:   { word: 'freezes', paths: ['M24 7 L24 41', 'M9 15.5 L39 32.5', 'M39 15.5 L9 32.5', 'M24 14 L19 10', 'M24 14 L29 10', 'M24 34 L19 38', 'M24 34 L29 38'] },
+  hide:     { word: 'hides',   paths: ['M24 12 A15 15 0 1 1 23.9 12', 'M5 31 L43 21'] },
+  show:     { word: 'shows',   paths: ['M24 17 A7 7 0 1 1 23.9 17', 'M24 3 L24 8', 'M24 40 L24 45', 'M3 24 L8 24', 'M40 24 L45 24', 'M9.5 9.5 L13 13', 'M35 35 L38.5 38.5', 'M38.5 9.5 L35 13', 'M13 35 L9.5 38.5'] },
+  battle:   { word: 'wars',    paths: ['M11 11 L37 37', 'M37 11 L11 37', 'M9 9 L15 9', 'M9 9 L9 15', 'M39 39 L33 39', 'M39 39 L39 33'] },
+  twist:    { word: 'twists',  paths: ['M10 38 C10 24 38 25 38 13 C38 5 28 5 26 13 C24 23 34 27 38 31'] },
+  mingle:   { word: 'mingles', paths: ['M18 24 A11 11 0 1 1 17.9 24', 'M30 24 A11 11 0 1 1 29.9 24'] },
+  sleep:    { word: 'sleeps',  paths: ['M8 26 A16 16 0 0 1 40 26', 'M14 33 L18 29', 'M24 36 L24 30', 'M34 33 L30 29'] },
+  born:     { word: 'wakes',   paths: ['M24 14 A10 10 0 1 1 23.9 14', 'M24 1 L24 7', 'M24 41 L24 47', 'M1 24 L7 24', 'M41 24 L47 24', 'M7.5 7.5 L12 12', 'M36 36 L40.5 40.5', 'M40.5 7.5 L36 12', 'M12 36 L7.5 40.5'] },
+  unmade:   { word: 'unmade',  paths: ['M24 6 A18 18 0 1 0 39 33', 'M31 40 L44 27', 'M31 27 L44 40'] },
+  backstop: { word: 'the world holds', paths: ['M16 8 L8 8 L8 40 L16 40', 'M32 8 L40 8 L40 40 L32 40', 'M24 18 L24 30'] },
+};
+/* A wash is the act it carries: a freeze, a hiding, or a showing. */
+function markFor(kind, value){ return MARKS[kind === 'wash' ? value : kind] || null; }
+
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
 
 function readPalette(){
@@ -7398,7 +7439,9 @@ function readPalette(){
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
   fieldKey = '';
-  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
+  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim();
+  P.bg = cs.getPropertyValue('--bg').trim(); P['map-halo'] = cs.getPropertyValue('--map-halo').trim();
+  worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
 /* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
@@ -7526,6 +7569,33 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
+   appears under it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. */
+function drawMark(rec, f, alpha){
+  const m = markFor(rec.kind, rec.value); if (!m) return;
+  const q = tileSpot(rec.to); if (!q) return;
+  const d = clamp((f - TWEEN.cue) / (TWEEN.draw - TWEEN.cue), 0, 1);
+  if (d <= 0) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
+  wctx.globalAlpha = alpha;
+  wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
+  wctx.strokeStyle = P['field-line']; wctx.lineWidth = 4.3; wctx.lineCap = 'round'; wctx.lineJoin = 'round';
+  const n = Math.ceil(d * m.paths.length);
+  for (let i = 0; i < n; i++) wctx.stroke(new Path2D(m.paths[i]));
+  wctx.restore();
+  if (f < TWEEN.word) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
+  wctx.textAlign = 'center';
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.restore();
+}
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
    stay whole, and it is trimmed only when even two rows will not hold it. */
 function drawCaption(text, p){
@@ -7602,8 +7672,8 @@ function drawField(){
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
      this beat, at the same fraction, so a look-away never simply erases what happened. */
   if (figures){
-    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; }
-    if (now && f > 0) drawGesture(now, f);
+    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; drawMark(before, 1, 1 - f); }
+    if (now && f > 0){ drawGesture(now, f); drawMark(now, f, 1); }
   }
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
@@ -7646,9 +7716,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
-  if (figures && now && now.said !== null && now.said !== undefined && legends[now.said] && f > 0){
-    drawCaption(legends[now.said].text, tileSpot(now.to));
+  /* One caption at a time: the line the act on stage wrote. */
+  if (figures && now && f > 0){
+    const text = captionFor(now);
+    if (text) drawCaption(text, tileSpot(now.to));
   }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
