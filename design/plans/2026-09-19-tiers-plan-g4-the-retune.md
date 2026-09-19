@@ -140,6 +140,22 @@ A chance a tick does not convert by division. Each of the 31 becomes a rate for 
 
 A period (`every`, with a phase `at`) is rewritten in world time by hand in task 2. The survey's part 3 lists the 17. A carried number would fire 86 times too often.
 
+### A marker flags a decision, not a number
+
+`ticks`, `strides`, `tickRate` and `strideRate` do not say what a value is. They say **nobody has decided yet what it means in real time**. That makes them a to-do list, and the plan is done when the list is empty.
+
+So a marked value is never converted because it happens to equal a real-unit expression. The arithmetic is free and the meaning is not: the conversion removes the flag that says nobody has decided, without anybody deciding. The value then looks settled, and the task that owed it a reading passes over it.
+
+`CLOCK.den.digRetry` is the worked example, raised by patcher and dev-coordinator while fixing `theLoneFounder` in PR 52. It is `ticks(500)`. Its new neighbour `CLOCK.arrival.foundRetry` is `hours(12)`, and at `DAY` of 1000 those are the same number, so the two sit in one table with one value and disagree about their own nature. Converting `digRetry` looks like tidying and is not.
+
+Two things settle it, and the second is the one that generalises.
+
+It buys nothing. Task 1 makes `ticks(n)` the converter `secs(n * 86.4)`, so `ticks(500)` becomes 43,200 world seconds, which is 12 hours exactly. The value G4 reaches by leaving it alone is the value the conversion would write today. The inconsistency dissolves in task 1 at no cost.
+
+It costs a reading. `digRetry` belongs to the den group, which task 6 rules on. Written `hours(12)` it arrives at task 6 already looking decided, and the question task 6 owes it — is half a world day right for a driven-out wolf to wait before trying for a hill again? — is the question a settled-looking value does not get asked. Note that `digAfter: days(3)` sits on the same line already in real units. The mixed line is the marker working, not a mess.
+
+**The rule.** Only the task that owns a group converts that group's markers, and it converts them having read the value. No other task, and no fix passing through, converts a marked value for consistency with a neighbour. A new value is never written with a marker, so a new neighbour in real units beside a marked one is the normal and correct state. If a passing fix finds the inconsistency jarring, it says so in a comment and leaves the value alone: an inconsistency on the record is cheaper than a decision nobody remembers making.
+
 ### The conversion rule for each category (survey, part 3)
 
 | Category | Count | Rule |
