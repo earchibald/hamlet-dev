@@ -449,3 +449,146 @@ test('the valley takes its name from the lore, at forty', () => {
   assert.equal(r.scores[0].axis, 'lore', `the top candidate came from ${r.scores[0].axis}`);
   assert.ok(api.chronicle.some(e => e.text.includes(`the whole valley a name: ${r.text}`)), api.chronicle[0].text);
 });
+
+/* ---------- the held hooks: what the real loop does ---------- */
+
+/* One 70-day run on seed r, shared by every test below that needs a whole season of play.
+   A run of that length costs about twenty seconds, so it is made once and kept. */
+let RUN70 = null;
+const run70 = () => RUN70 || (RUN70 = runDays('r', 70));
+
+test('a death stamps the tick and carries a tag the event table can read', () => {
+  const api = world();
+  const a = api.beings.find(b => b.species === 'human');
+  api.camp = a.camp || api.camps[0];
+  api.die(a, 'froze in the cold', 'frost');
+  assert.equal(a.alive, false);
+  assert.equal(a.diedAt, api.tick);
+  assert.equal(api.chronicle[0].tag, 'frost');
+  assert.match(api.chronicle[0].text, /froze in the cold/);
+});
+
+test('old age is tagged old, not death, and every other cause about a person carries a tag from the table', () => {
+  const { events } = run70();
+  const oldAge = events.filter(e => e.kind === 'death' && /old age|old and warm by the fire/.test(e.text));
+  assert.ok(oldAge.length > 0, 'no old-age death in 70 days');
+  for (const e of oldAge) assert.equal(e.tag, 'old', e.text);
+  const otherDeaths = events.filter(e => e.kind === 'death' && !/old age|old and warm by the fire/.test(e.text));
+  for (const e of otherDeaths) assert.ok(['fire', 'frost', 'death'].includes(e.tag), `${e.tag}: ${e.text}`);
+});
+
+test('the wolf, sprite, deer, and fish tags all appear once tasks, species, and fae are tagged', () => {
+  const { events } = run70();
+  const tags = new Set(events.filter(e => e.tag).map(e => e.tag));
+  for (const t of ['wolf', 'sprite', 'deer', 'fish']) assert.ok(tags.has(t), `no ${t} tag seen in 70 days`);
+  /* A pot needs a kiln, which seed r may not reach; check the line if it is there, never require it. */
+  const potLines = events.filter(e => e.text.includes(' fires ') && e.text.toLowerCase().includes('pot'));
+  for (const e of potLines) assert.equal(e.tag, 'pot', e.text);
+});
+
+test('a founding party carries the found tag on the line that sends it out', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log(`${a.name} and somebody set out for the meadow to the west, carrying coals in a bundle of bark.`, [a], 'major', 'found');
+  assert.equal(api.chronicle[0].tag, 'found');
+  const { events } = run70();
+  for (const e of events) if (e.text.includes('carrying coals in a bundle of bark')) assert.equal(e.tag, 'found', e.text);
+});
+
+test('a person walking the land reads the marks and learns the old names', () => {
+  const { api, events } = run70();
+  const learned = events.filter(e => e.text.includes('finds marks cut in the rock'));
+  assert.ok(learned.length > 0, 'nobody learned an old name in 70 days');
+  assert.ok(api.hills.some(h => h.nameKnown), 'no hill is known by its old name');
+  for (const e of learned) assert.equal(e.kind, 'info', e.text);
+});
+
+test('only a person learns an old name, and a world with every name learned costs nothing', () => {
+  const api = world();
+  const h = api.hills.find(x => x.nameKnown === false);
+  assert.ok(h, 'no unlearned hill on seed r');
+  const deer = api.beings.find(b => b.species === 'deer');
+  if (deer){ deer.x = h.x; deer.y = h.y; deer.z = 0; api.learnNamesHere(deer); assert.equal(h.nameKnown, false, 'a deer read the marks'); }
+  const a = api.firstPerson(); a.x = h.x; a.y = h.y; a.z = 0;
+  api.learnNamesHere(a);
+  assert.equal(h.nameKnown, true);
+  /* Once nothing is left to learn the pass gives up at once, and learns nothing more. */
+  api.lore.unknown = 0;
+  const g = api.hills.find(x => x.nameKnown === false);
+  if (g){ a.x = g.x; a.y = g.y; api.learnNamesHere(a); assert.equal(g.nameKnown, false, 'the early exit still read the marks'); }
+});
+
+test('every arrival line says the camp by name', () => {
+  const { events } = run70();
+  const arrivals = events.filter(e => e.text.includes('and is welcomed by the fire'));
+  assert.ok(arrivals.length > 0, 'nobody arrived at a camp in 70 days');
+  for (const e of arrivals) assert.ok(!e.text.includes('arrives at the camp '), e.text);
+});
+
+test('a founded camp carries its founder and its name from the moment the party leaves', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const before = api.camps.length;
+  const mate = api.makeBeing('human', a.x + 1, a.y, 0); mate.camp = c; mate.homeless = false; api.beings.push(mate);
+  if (!api.startFoundCamp(a)) return;
+  assert.equal(api.camps.length, before + 1);
+  const nc = api.camps[before];
+  assert.equal(nc.founder, a.id);
+  assert.equal(api.nameOf(nc), `${a.name}'s camp`);
+});
+
+test('a finished job names the ground it stands on, through the real stop', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  c.stash.stick = 6;
+  const spot = api.world.find(t => t.z === 0 && api.passable(t.x, t.y, 0) && !t.feature && !t.struct && api.dist(t.x, t.y, c.site[0], c.site[1]) > 20);
+  assert.ok(spot, 'no free ground away from the camp');
+  const s = api.sectorOfTile(spot);
+  assert.equal(api.nameOf(s), null, 'the sector is named already');
+  a.x = spot.x; a.y = spot.y; a.z = 0;
+  api.setTask(a, 'setSnare', { at: [spot.x, spot.y] }, { label: 'Setting a snare', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.runTask(a);
+  assert.equal(a.task, null, 'the job did not finish');
+  assert.ok(api.nameOf(s), 'the sector was not named by the finished job');
+  assert.ok(api.chronicle.some(e => e.text.includes(`calls this ground ${api.nameOf(s)}`)), api.chronicle[0].text);
+});
+
+test('a job with no work word names nothing', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const spot = api.world.find(t => t.z === 0 && api.passable(t.x, t.y, 0) && !t.feature && !t.struct && api.dist(t.x, t.y, c.site[0], c.site[1]) > 20);
+  const s = api.sectorOfTile(spot);
+  a.x = spot.x; a.y = spot.y; a.z = 0;
+  /* checkSnare on bare ground: the effect finds no snare, so there is no work word here. */
+  api.setTask(a, 'checkSnare', { at: [spot.x, spot.y] }, { label: 'Checking the snare', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.runTask(a);
+  assert.equal(api.nameOf(s), null, 'a job with no work word named the ground');
+});
+
+test('a delivery to the stash names the ground it lands on, through the real stop', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const s = api.sectorOfTile(api.tileAt(...c.stashTile));
+  if (api.nameOf(s)) return;
+  a.carrying = { kind: 'log', count: 2 };
+  api.setTask(a, 'deliver', { at: c.stashTile.slice() }, { label: 'Carrying 2 logs to camp', path: [] });
+  api.runTask(a);
+  assert.equal(a.carrying, null, 'the delivery did not land');
+  assert.ok(api.nameOf(s), 'the sector was not named by the delivery');
+});
+
+test('the first drink at a pool names it, through the real stop', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const p = api.ponds[0];
+  assert.ok(p, 'no pond on seed r');
+  const wet = p.tiles[0];
+  const beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => api.tileAt(wet.x + dx, wet.y + dy)).find(q => q && q.ground !== 'water' && api.passable(q.x, q.y, 0));
+  assert.ok(beside, 'no dry tile beside the pool');
+  a.x = beside.x; a.y = beside.y; a.z = 0; a.needs.water = 10;
+  api.setTask(a, 'drink', {}, { label: 'Going to drink', path: [] });
+  api.runTask(a);
+  assert.equal(a.needs.water, 100, 'the drink did not land');
+  assert.ok(api.nameOf(p), 'the pool was not named by the drink');
+  assert.ok(api.chronicle.some(e => e.text.includes(`calls the pool ${api.nameOf(p)}`)), api.chronicle[0].text);
+});

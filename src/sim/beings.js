@@ -348,6 +348,9 @@ function updateBeing(a){
        a per-tick cost with no chance of a hit. */
     if (camp && !camp.gnomes.known && !a.asleep && !(hourOf() >= 6 && hourOf() < 19)){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, CLOCK.thought.gnome); } }
     { const here = hereTile; if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; here.cave.disturbedBy = camp; a.cooldown.disturb = tick + CLOCK.cooldown.disturb; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, CLOCK.thought.burrow); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, CLOCK.thought.intruderGnome); } }
+    /* A person awake on the ground reads the marks the lost people cut. It gives no thought and
+       changes no need, so nobody's day moves because of it. */
+    if (!a.asleep) learnNamesHere(a);
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);

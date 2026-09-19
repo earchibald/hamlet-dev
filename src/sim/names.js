@@ -221,6 +221,10 @@ function oldNamesOnTheLand(){
   }
   for (const g of groves){ const x = newOldName('the old people named the grove'); if (x) giveName(g, x); }
   for (let k = 0; k < fords.length; k += 3){ const x = newOldName('the old people named the crossing'); if (x) giveName(fords[k], x); }
+  /* How many old names are still unread. `learnNamesHere` runs for every awake person on every
+     tick, so it needs one number to look at before it scans the ground. It counts only the things
+     that pass can learn; a name given later to anything else never enters it. */
+  lore.unknown = [big, ...hills, ...caves, ...groves, ...fords].filter(t => t && t.nameKnown === false).length;
 }
 
 /* ---------- learning an old name ----------
@@ -231,12 +235,16 @@ function oldNamesOnTheLand(){
 function learnName(thing, a, what){
   if (!thing || thing.nameKnown !== false || !thing.names.length) return false;
   thing.nameKnown = true;
+  if (lore && lore.unknown > 0) lore.unknown--;
   const r = thing.names[0];
   log(`${a.name} finds marks cut in the rock. The old people called ${what} ${r.text}, ${r.meaning}.`, [a], 'info');
   return true;
 }
+/* Only a person reads marks, and only while there are marks left to read. Both tests are one
+   comparison each, because this runs for every awake person on every tick. What is learned, and
+   the tick it is learned on, are the same as they would be without them. */
 function learnNamesHere(a){
-  if (!lore) return;
+  if (!lore || !lore.unknown || a.species !== 'human') return;
   const t = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null; if (!t) return;
   if (t.hill) learnName(t.hill, a, 'this hill');
   if (t.cave) learnName(t.cave, a, 'this hollow');
