@@ -275,6 +275,32 @@ test('persist and restore keep the open drawers, the mutes, and the speed, and c
   assert.doesNotThrow(() => api.persist()); assert.doesNotThrow(() => api.restore());
 });
 
+test('the fold and the zoom are remembered, and the opened chip is not', () => {
+  const api = loadUI(['state'], ['persist', 'restore', 'ui']);
+  const src = String(api.persist);
+  assert.match(src, /timelineFold/, 'the fold is a preference');
+  assert.match(src, /timelineZoom/, 'the zoom is a preference');
+  assert.doesNotMatch(src, /timelineChip/, 'the opened chip names one act of one creation and is not remembered');
+});
+
+test('the timeline actions stay inside their bounds, and the same chip twice closes it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui', 'TL_ZOOM_MAX']);
+  api.ui.timelineFold = true;
+  api.ACTIONS.foldTimeline();
+  assert.equal(api.ui.timelineFold, false);
+  api.ACTIONS.foldTimeline();
+  assert.equal(api.ui.timelineFold, true);
+  api.ui.timelineZoom = 0;
+  api.ACTIONS.zoomTimelineIn();
+  assert.equal(api.ui.timelineZoom, 0, 'it never goes below the default');
+  for (let n = 0; n < 40; n++) api.ACTIONS.zoomTimelineOut();
+  assert.equal(api.ui.timelineZoom, api.TL_ZOOM_MAX, 'it never goes past the widest');
+  api.ACTIONS.openChip('4:3');
+  assert.equal(api.ui.timelineChip, '4:3');
+  api.ACTIONS.openChip('4:3');
+  assert.equal(api.ui.timelineChip, null, 'the same chip twice closes it');
+});
+
 const CURSOR = [...DERIVE, 'cursor', 'cursorAfter', 'cursorPhrase', 'W', 'H', 'LW', 'LH'];
 
 test('the cursor moves by tiles in the sector view, by sectors elsewhere, and never leaves the world', () => {
@@ -1106,9 +1132,11 @@ test('a load puts the view back: one camp, nobody followed, no cards, and the cu
   api.ui.windows = [{ id: 1, kind: 'inspect', target: { being: 4242 }, x: 0, y: 0, w: 10, h: 10 }];
   api.ui.focus = 'window:1'; api.ui.row.people = 6; api.ui.pulses = [{ text: 'old' }]; api.ui.seenTick = 99;
   api.ui.autosaveDay = 0;
+  api.ui.timelineChip = '3:2';
   const answer = api.inject({ source: 'player', act: 'load', snapshot: snap });
   assert.match(answer, /^The world is as it was on day \d+\.$/);
   api.onLoad();
+  assert.equal(api.ui.timelineChip, null, 'a load closes an opened chip');
   const v = api.peek();
   assert.equal(v.viewCamp, api.camps[0], 'viewCamp is the loaded world’s first camp');
   assert.equal(api.camp, api.camps[0]);
