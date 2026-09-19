@@ -965,6 +965,18 @@ the fingerprint. They must be identical. A difference means pacing reached the d
 forbids. Record both fingerprints in the PR body; that one line is worth more than any count of passing
 view tests.
 
+Two conditions, or the comparison proves nothing.
+
+First, the two runs must really have run at two paces. Drive them in the browser with real timers, not
+by calling `step()` in a loop in Node. The ladder is consulted by the frame path; a Node loop cannot
+consult it, so both runs would be the same run twice. Identical fingerprints would then be guaranteed
+by the method and would read in the PR body exactly like the real result.
+
+Second, run a negative control before you trust the pass. On a scratch copy, leak a pace value into the
+door on purpose, run the same comparison, and confirm the fingerprints **diverge**. Throw the scratch
+copy away. A comparison that has never been shown to fail is not evidence that anything holds; the
+control is what makes the passing run mean something. Record the control in the PR body beside the pass.
+
 Then grep the BUILT page, not `src/sim/index.js`, for any test-only accessor this branch added:
 
 ```bash
