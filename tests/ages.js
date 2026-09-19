@@ -164,6 +164,30 @@ for (const seed of SEEDS){
   });
 }
 
+/* A step is the only thing that advances an age, whoever asked for the act. `takeTurn` applies the
+   player's option and moves the age past their god, and then stops. Without this the whole suite
+   passes either way: no other test reads the age between a choose and the step after it, so the one
+   thing the view depends on is the one thing nothing measured. */
+test('the player\'s act is one act, and a step is what carries the age on', () => {
+  const api = load(); api.startCreation('r', { force: true });
+  api.step(true);
+  const first = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: first.id });
+  /* Reach an open turn: the age stops at the player's god. */
+  for (let n = 0; !api.pending && api.era === 'gods' && n < 200; n++) api.step(true);
+  assert.ok(api.pending, 'no turn ever opened');
+  const mine = api.agePos.i, list = api.agePos.list;
+  const row = api.pending.opts.find(o => !o.failed);
+  assert.ok(row, 'nothing on the table could land');
+  api.inject({ source: 'player', act: 'choose', id: api.pending.god, opt: { type: row.type, region: row.region } });
+  assert.equal(api.pending, null, 'the turn stayed open');
+  assert.ok(api.agePos, 'the age was carried to its end inside the player\'s own act');
+  assert.equal(api.agePos.i, mine + 1, 'the age moved past more than the god whose turn it was');
+  /* The gods after theirs have not acted yet. The next step is what reaches the first of them. */
+  const next = list.findIndex((g, k) => k > mine && g.status === 'awake');
+  if (next >= 0){ api.step(true); assert.equal(api.agePos && api.agePos.i, next + 1, 'the step did not carry the age to the next awake god'); }
+});
+
 /* The two reasons an age stops, interleaved through one `agePos`. Act by act alone never sets
    `pending`, and a driven creation alone never asks for one act, so neither gate on its own ever
    resumes a turn that was opened inside an act-by-act run. That is where `prepared` and the drawn

@@ -5277,15 +5277,19 @@ function takeTurn(opt){
   creation.choices.push({ age: pending.age, god: g.id, opts: pending.opts, picked: row.type, byPlayer: true });
   pending = null;
   agePass();
-  withGodRng(() => { if (ageDecide()) ageEnd(); });
-  settleIfDue();
+  /* The act is applied and the age has moved past the god. It is not resumed here. A step resumes it,
+     and a step is the only thing that advances an age, whoever asked for the act. The player's choice
+     is then one act among the age's acts, and a view that plays one act at a time plays it like any
+     other instead of watching the rest of the age go by while it draws the one it was given.
+     Pacing stays out of the door: the door carries the act and nothing about the rate it is drawn at,
+     so a log still replays the same story. */
   return `You ${row.type}. ${g.name} acts.`;
 }
 
 /* The player leaves, or the god whose turn was open is gone. This only closes the open turn: it does
-   not resume the age. `takeTurn` is the one path that resumes, so there is no second copy of that
-   logic to keep in step with it. The engine's own next `step()` finds `agePos` still standing and
-   carries the age on from where it stood, through `ageDecide`. */
+   not resume the age. Nothing resumes an age but a step, which finds `agePos` still standing and
+   carries the age on from where it stood, through `ageDecide`. `takeTurn` closes its turn the same
+   way and for the same reason, so there is one rule and no copy of it to keep in step. */
 function releaseTurn(){
   pending = null;
 }
