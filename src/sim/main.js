@@ -61,12 +61,14 @@ function updateWorld(){
   spawnWildlife();
   godsTick();
 }
-/* In the gods era a step is an age. In the days era it is a tick. A species with perTick false is not
-   stepped by the tick: the gods keep their own clock. The engine will not step while a turn is open:
-   the world waits on the player, which is the locked clock. */
-function step(){
+/* In the gods era a step is an age, or with `oneAct` one god of it. In the days era it is a tick, and
+   `oneAct` means nothing there. A species with perTick false is not stepped by the tick: the gods
+   keep their own clock. The engine will not step while a turn is open: the world waits on the player,
+   which is the locked clock. The flag is forwarded rather than reached past, so that guard stays the
+   one gate into a step. */
+function step(oneAct){
   if (pending) return 'The turn is yours.';
-  if (era === 'gods') return ageStep();
+  if (era === 'gods') return ageStep(oneAct);
   tick++; updateWorld(); camp = camps[0];
   for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
   if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
