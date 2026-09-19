@@ -116,13 +116,28 @@ test('the snare jobs, the ember, and joining are in the table', () => {
   for (const k of ['setSnare', 'checkSnare', 'haulPit', 'fetchEmber', 'join']) assert.ok(api.TASKS[k], k);
 });
 
+test('the chases and the brand are in the table', () => {
+  const api = load(); api.startWorld('r');
+  for (const k of ['huntDeer', 'driveOff', 'brand', 'searchCave', 'clearRock', 'clearDen', 'followBrand', 'comeHome']) assert.ok(api.TASKS[k], k);
+});
+
+test('a brand task with no next step ends with no live ember', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(); api.camp = a.camp;
+  if (!a.camp.pit) return;
+  api.failTask(a);
+  api.TASKS.never = { type: 'work', begin: () => false, stops: [() => 'done'] };
+  assert.ok(api.startTask(a, 'brand', { label: 'Testing', next: { kind: 'never', args: {} } }));
+  assert.deepEqual(plain(a.task), []);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
 const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 0, tasks: 25, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
+  camps: 0, tasks: 5, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];

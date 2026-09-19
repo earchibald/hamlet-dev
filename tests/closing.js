@@ -192,7 +192,8 @@ test('the party keeps its brands lit until home, and the guard goal leaves a jus
 test('withBrand ends with no live ember when the chain does not start', () => {
   const { api, a, c } = readyCamp();
   api.tick = 9 * 1000;
-  assert.ok(api.withBrand(a, 'Testing', () => false));
+  api.TASKS.never = { type: 'work', begin: () => false, stops: [() => 'done'] };
+  assert.ok(api.withBrand(a, 'Testing', { kind: 'never', args: {} }));
   for (let k = 0; k < 20 && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null);
   assert.equal(a.carrying, null);
