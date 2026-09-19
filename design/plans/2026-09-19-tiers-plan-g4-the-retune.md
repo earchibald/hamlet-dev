@@ -223,17 +223,19 @@ grep -rnE "(day|days|night|week|season|winter|summer|spring|autumn|year|hour|min
 
 Re-run it at task 11 and add whatever is new. Do not trust this list to still be complete: it replaced an earlier sweep of mine that had missed two of these nine.
 
-| # | Line | What it says | The constant | Verdict, and what it must say after |
-|---|---|---|---|---|
-| 1 | `src/sim/goals.js:184` | "Keep the hearth three days without a break" | `CLOCK.limit.hearthProven` = `days(3)` | True today, unlinked. Read the constant. |
-| 2 | `src/sim/goals.js:319` | "Cooked meat spoils in two days" | `CLOCK.limit.cookedKeeps` = 1.8 days | True today, because 1.8 rounds to two. Read the constant. |
-| 3 | `src/sim/goals.js:326` | "Winter is `${SEASON_DAYS}` days long... That is one strip a day" | `SEASON_DAYS`, and an aim of 8 | **Breaks in task 1, not task 11.** Task 1 deletes `SEASON_DAYS`. The arithmetic behind "one strip a day" holds only by chance. dev 898db4e marks it with a comment naming this work; the comment goes when the fault does. |
-| 4 | `src/sim/goals.js:371` | a den "goes back to the beasts if the fire is out for a day" | `CLOCK.den.campDark` = `days(1)` | True today, unlinked. Read the constant. |
-| 5 | `src/sim/goals.js:376` | beasts "come back if the fire fails for a day" | `CLOCK.den.campDark` | As 4. |
-| 6 | `src/sim/species.js:271` | "With the fire out a day, the wolves are back in the den under the hill." | `CLOCK.den.campDark` | As 4, and it is a chronicle line rather than a goal row, so it outlives its moment. **The earlier sweep missed this one.** |
-| 7 | `src/ui/inspect.js:52` | a person's age as `${Math.floor(ageDays(a))} days` | `DAY` | Derived, so never false, but unreadable after the retune: a person of 70 reads as 25,550 days. Years. Task 8. |
-| 8 | `src/ui/inspect.js:84` | a bush or tree's age as `${...} days` | `DAY` | As 7, same fix, and **the earlier sweep missed this one too.** Task 8. |
-| 9 | `src/ui/keys.js:23` | "Step one hour" | `hours(1)` | True, and must stay true. Task 8 changes what the button does, not what it says. |
+**Two classes, and the list mixes them.** A goal row and an interface string are free to reword: nothing hashes them. A chronicle line is hashed. `fingerprint()` at `tests/lib/run.js:106` builds its `chronicle` field from `${e.tick}|${e.kind}|${e.text}` for every event, so rewording anything written through `log()` moves the record on every seed where that line fires. Row 6 is the only one of the nine in that class. Read the **Class** column before touching a row.
+
+| # | Line | Class | What it says | The constant | Verdict, and what it must say after |
+|---|---|---|---|---|---|
+| 1 | `src/sim/goals.js:184` | goal row | "Keep the hearth three days without a break" | `CLOCK.limit.hearthProven` = `days(3)` | True today, unlinked. Read the constant. |
+| 2 | `src/sim/goals.js:319` | goal row | "Cooked meat spoils in two days" | `CLOCK.limit.cookedKeeps` = 1.8 days | True today, because 1.8 rounds to two. Read the constant. |
+| 3 | `src/sim/goals.js:326` | goal row | "Winter is `${SEASON_DAYS}` days long... That is one strip a day" | `SEASON_DAYS`, and an aim of 8 | **Breaks in task 1, not task 11.** Task 1 deletes `SEASON_DAYS`. The arithmetic behind "one strip a day" holds only by chance. dev 898db4e marks it with a comment naming this work; the comment goes when the fault does. |
+| 4 | `src/sim/goals.js:371` | goal row | a den "goes back to the beasts if the fire is out for a day" | `CLOCK.den.campDark` = `days(1)` | True today, unlinked. Read the constant. |
+| 5 | `src/sim/goals.js:376` | goal row | beasts "come back if the fire fails for a day" | `CLOCK.den.campDark` | As 4. |
+| 6 | `src/sim/species.js:271` | **chronicle, hashed** | "With the fire out a day, the wolves are back in the den under the hill." | `CLOCK.den.campDark` | As 4, and it is a chronicle line, so it outlives its moment and it is in the fingerprint. **The earlier sweep missed this one.** Reword it inside the blessed change, in task 11, and not early as a tidy-up. It fires on zero of the six seeds over 70 days today, measured by dev-coordinator, so it is golden-neutral **by accident** — the same accident that hid the doomed line. This retune changes fire and den timing, which is what decides whether it ever fires. Expect the possibility that it starts firing and that the reword is then visible in the diff, and do not read that as a fault in the reword. |
+| 7 | `src/ui/inspect.js:52` | interface | a person's age as `${Math.floor(ageDays(a))} days` | `DAY` | Derived, so never false, but unreadable after the retune: a person of 70 reads as 25,550 days. Years. Task 8. |
+| 8 | `src/ui/inspect.js:84` | interface | a bush or tree's age as `${...} days` | `DAY` | As 7, same fix, and **the earlier sweep missed this one too.** Task 8. |
+| 9 | `src/ui/keys.js:23` | interface | "Step one hour" | `hours(1)` | True, and must stay true. Task 8 changes what the button does, not what it says. |
 
 Two lines the sweep raised and cleared, recorded so a later reader does not re-raise them. `src/sim/goals.js:188` prints `camp.streak / DAY`, and `src/ui/derive.js:126` and `:199` print `daysOfWood()`, which divides by `CLOCK.rate.pitBurn * DAY`. Both derive from the constants they describe and cannot go false.
 
