@@ -24,3 +24,28 @@ test('the days era stamps the tick alone, as it always did', () => {
   api.inject({ source: 'player', act: 'poke', id: api.firstPerson().id });
   assert.deepEqual(Object.keys(api.doorLog[0]).sort(), ['act', 'id', 'source', 'tick']);
 });
+
+test('every god\'s choice is kept, age by age, with its matrix', () => {
+  const api = load(); api.startCreation('gamma', {});
+  for (let n = 0; api.era === 'gods' && n < 60; n++) api.step();
+  const cs = api.creation.choices;
+  assert.ok(cs.length > 5, `expected many choices, got ${cs.length}`);
+  for (const c of cs){
+    assert.ok(Number.isInteger(c.age) && c.age >= 1, 'every choice names its age');
+    assert.ok(api.gods().some(g => g.id === c.god), 'every choice names a live god');
+    if (c.continued){ assert.equal(typeof c.type, 'string'); continue; }
+    assert.ok(Array.isArray(c.opts) && c.opts.length, 'a free choice carries its matrix');
+    for (const o of c.opts) assert.equal(typeof o.score, 'number');
+  }
+  const picked = cs.filter(c => !c.continued && c.picked);
+  assert.ok(picked.length > 3, 'most free choices land on an act');
+  const ages = cs.map(c => c.age);
+  assert.deepEqual(ages, [...ages].sort((a, b) => a - b), 'the record is in age order');
+});
+
+test('keeping the choices does not move the creation', () => {
+  const a = load(), b = load();
+  a.startWorld('gamma');
+  b.startCreation('gamma', {}); let n = 0; while (b.era === 'gods' && n++ < 1000) b.step();
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+});

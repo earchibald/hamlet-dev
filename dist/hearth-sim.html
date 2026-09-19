@@ -3755,16 +3755,21 @@ function godOptions(g){
   opts.sort((p, q) => q.score - p.score);
   return opts;
 }
+/* The decision is kept, not only the last one. `lastChoice` is what the god's card reads now; the
+   record in `creation.choices` is what the timeline reads, age by age, and what the annals inherit.
+   Nothing here draws a random number, so the creation is unmoved. */
 function decideGod(g){
   if (g.task){ const t = g.task;
     if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${t.type} unfinished.`, [g]); g.task = null; }
-    else { beginAct(); GOD_ACTS[t.type].continue(g, t); return; } }
+    else { beginAct(); creation.choices.push({ age, god: g.id, continued: true, type: t.type }); GOD_ACTS[t.type].continue(g, t); return; } }
   const opts = godOptions(g); g.lastChoice = { opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })), picked: null };
+  const rec = { age, god: g.id, opts: g.lastChoice.opts, picked: null };
+  creation.choices.push(rec);
   for (let k = 0; k < opts.length; k++){ const o = opts[k];
     beginAct(); deciding = { g, type: o.type };
     const ok = GOD_ACTS[o.type].apply(g, o.region);
     deciding = null;
-    if (ok){ g.lastChoice.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
+    if (ok){ g.lastChoice.picked = o.type; rec.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
     g.lastChoice.opts[k].failed = true; }
 }
 
@@ -3899,7 +3904,7 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1 };
+  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [] };
   deciding = null; saidFrom = 0; gestureFallbacks = {};
   withGodRng(() => initField());
 }
