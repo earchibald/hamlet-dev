@@ -187,7 +187,8 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] At 600 the page runs 10 ticks a frame. The cap on steps a frame becomes a cap on milliseconds a frame (8 ms), and the page says "The world cannot keep up at this speed." once when the cap bites for a whole second.
 - [ ] The Hour button steps 3,600 ticks over several frames under the same cap.
 - [ ] The date reads "Day 12 of spring, year 1, 14:05". The autosave still writes once a world day, which at 600 is every 2.4 wall minutes.
-- [ ] `tests/ui.js`: the ladder, the default, the disabled steps, the date string, the keys. Gates. Commit.
+- [ ] An age is printed in years, not days. `src/ui/panels.js:98` prints `${c.age} days` and `src/ui/inspect.js:52` prints `${Math.floor(ageDays(a))} days`. At real units a person of 70 reads as 25,550 days.
+- [ ] `tests/ui.js`: the ladder, the default, the disabled steps, the date string, the age in years, the keys. Gates. Commit.
 
 ### Task 8: The rest of the tests in world units
 
@@ -203,6 +204,7 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 **Files:** `src/sim/clock.js`, `tests/clock.js`, `design/notes.md`, `design/specs/2026-09-18-time-and-tiers-design.md`, `CLAUDE.md`, `design/settings.md`, and `design/reports/2026-09-g4-before-and-after.md` (new).
 
 - [ ] Remove the four markers. `tests/clock.js` fails if one is left in `src/`.
+- [ ] Re-read every player-facing string that states a time. The lint sees a bare literal in a rule. It does not see a correct constant used for the wrong quantity in prose, which is how issue 37 put the length of the year on the page as the length of winter. A sweep of dev 952bc4c found three in `src/sim/` to fix. `src/sim/goals.js:319` says "Cooked meat spoils in two days" and reads no constant, while `CLOCK.limit.cookedKeeps` is 1.8 days. `src/sim/goals.js:323` derives "That is one strip a day" from `SEASON_DAYS` and an aim of eight, so it lies if either moves. `src/sim/goals.js:368` and `:373` say a den goes back to the beasts if the fire is out "for a day" and read no limit. Make each string read its constant. The two interface strings are task 7's.
 - [ ] Tune against the long run on three seeds until a camp's first ten days read as today's do: a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10. Change a value only in the table, and log each change with its reason.
 - [ ] Write the report: for each seed, today's golden line beside the new three-day line; the long run's counts beside today's at the same world age of the camp; every value whose world-time meaning moved by more than a factor of two, with the reason; seconds a world day at day 3 and day 50; the floors that were removed and where G5 puts them back.
 - [ ] The notes gain a section on the real clock, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
