@@ -618,13 +618,25 @@ function nameFoundersCamp(c, a){
   if (nameTaken(text)){ nameThing(c, 'camp', a, c.site); return; }
   rename(c, nameRecord(text, { why: `the camp ${a.name} made`, by: a.id }));
 }
+/* The seven approved lines for the moment a camp takes its name. Each takes the name and the
+   reason clause nameThing already built. None may use the word village: nameVillage announces
+   that separately. Drawn from nrng so the run stays deterministic. */
+const CAMP_NAMED_LINES = [
+  (text, why) => `The camp has a name now: ${text}, ${why}.`,
+  (text, why) => `They start to call the camp ${text}, ${why}.`,
+  (text, why) => `The camp is ${text} now, ${why}.`,
+  (text, why) => `The camp goes by ${text} now, ${why}.`,
+  (text, why) => `Nobody calls it the camp any more. It is ${text}, ${why}.`,
+  (text, why) => `They have agreed on a name for the camp: ${text}, ${why}.`,
+  (text, why) => `They say the new name all evening: ${text}, ${why}.`,
+];
 /* The hearth has burned three days, so the place has a name. */
 function nameCampAtHearth(c){
   if (c.namedAt || !c.site || c.bestStreak < CLOCK.limit.hearthProven) return;
   const prev = camp; camp = c;
   const by = namerFor(c.site);
   const rec = by ? nameThing(c, 'camp', by, c.site) : null;
-  if (rec){ c.namedAt = tick; log(`They start to call this place ${rec.text}, ${rec.why}.`, campHumans(), 'major'); }
+  if (rec){ c.namedAt = tick; log(npick(CAMP_NAMED_LINES)(rec.text, rec.why), campHumans(), 'major'); }
   camp = prev;
 }
 /* A camp that becomes a village names itself again, with its whole history to draw on.

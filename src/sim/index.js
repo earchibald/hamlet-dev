@@ -35,7 +35,7 @@ const API = `return {
   near, nearAt, dist,
   seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, LAND_WORD_KINDS, OLD_FORBID,
   nameTheLand, learnName, learnNamesHere, LORE_BUILT, LORE_TOOK, SKY_MEANINGS, SPRITE_MEANINGS, OLD_CAVE_KINDS,
-  loreCandidates, valleyFallbacks, nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick,
+  loreCandidates, valleyFallbacks, nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick, CAMP_NAMED_LINES,
   WORD_TAIL, WORD_PHRASE, joinedWord, phraseWord, landRows, landCandidates, workRows,
   EVENT_NAMES, eventCandidates, nameEvents, eventName, isEventLine,
   WORK_WORDS, workWordAt, nameSectorForWork, namePondHere, nameValley, describe, compass, thingSpot, placePhrase, DESCRIBE_KIND,

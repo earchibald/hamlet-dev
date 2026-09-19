@@ -352,7 +352,7 @@ test('a hearth that has burned three days gets the camp a plain name, kept with 
   assert.ok(r.why, 'a name needs a reason');
   assert.ok(r.scores && r.scores.length >= 2, 'the candidate list is kept');
   assert.ok(r.scores[0].score >= r.scores[1].score, 'scores are sorted, top first');
-  assert.ok(api.chronicle.some(e => e.text.includes(`call this place ${r.text}`)), api.chronicle[0].text);
+  assert.ok(api.chronicle.some(e => api.CAMP_NAMED_LINES.some(f => e.text === f(r.text, r.why))), api.chronicle[0].text);
   assert.deepEqual(api.formerNames(c).map(x => x.text), [`${a.name}'s camp`]);
   const n = api.chronicle.length; api.nameCampAtHearth(c);
   assert.equal(api.chronicle.length, n, 'a camp is named once at the hearth');
