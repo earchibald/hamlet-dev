@@ -215,7 +215,11 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
   <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
+  <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
+  <p class="muted" id="startNote" hidden></p>
 </dialog>
+<!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
+<input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
@@ -285,11 +289,19 @@ let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
    only where the player chooses. No rule reads it, so it cannot move the creation. */
 const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false };
 let options;
+/* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
+   setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
+function checkOptions(o){
+  const q = { ...DEFAULT_OPTIONS, ...o };
+  if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
+  if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
+  if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  return null;
+}
 function setOptions(o){
+  const wrong = checkOptions(o);
+  if (wrong) throw new Error(wrong);
   options = { ...DEFAULT_OPTIONS, ...o };
-  if (!Number.isInteger(options.sw) || !Number.isInteger(options.sh) || options.sw < 1 || options.sh < 1) throw new Error(`The world needs at least one sector each way. Got ${options.sw} by ${options.sh}.`);
-  if (!Number.isInteger(options.zmin) || !Number.isInteger(options.zmax) || options.zmin > -2 || options.zmax < 2) throw new Error(`The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${options.zmin} to ${options.zmax}.`);
-  if (!Number.isInteger(options.ageLimit) || options.ageLimit < 1) throw new Error(`The age limit must be a whole number of ages, at least 1. Got ${options.ageLimit}.`);
   SW = options.sw; SH = options.sh; W = SW * LW; H = SH * LH;
   ZMIN = options.zmin; ZMAX = options.zmax; ZOFF = -ZMIN; NZ = ZMAX - ZMIN + 1;
 }
@@ -353,9 +365,18 @@ const BIOMES = {
   ash:     { name: 'Burnt ground' },
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
+/* Every field a fresh tile has besides x, y, z, and ground, with the value it starts at. makeTile spreads
+   this table, and a snapshot leaves out a field that still equals its default. The two read one table, so
+   they cannot drift. The key order is the order makeTile gave these fields. */
+const TILE_DEFAULTS = { feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null };
 
-/* Seeded random numbers. */
-function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+/* Seeded random numbers. A stream's whole state is one 32-bit number, and a snapshot reads it and sets it. */
+function mulberry32(a){
+  const f = function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  f.state = () => a | 0; f.setState = n => { a = n | 0; };
+  return f;
+}
+const streamState = f => f.state(), setStreamState = (f, n) => f.setState(n);
 function hashSeed(s){ let h = 2166136261; for (const c of String(s)){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 let rng = Math.random;
 const rint = n => Math.floor(rng() * n);
@@ -747,7 +768,7 @@ function poleShare(pole){ let n = 0, all = 0; for (const r of liveRegions()){ al
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
-function makeTile(x, y, z, ground){ return { x, y, z, ground, feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null }; }
+function makeTile(x, y, z, ground){ return { x, y, z, ground, ...TILE_DEFAULTS }; }
 /* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
 function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); const old = levels[z + ZOFF][idx(x, y)]; levels[z + ZOFF][idx(x, y)] = t; if (z !== 0){ if (old){ const k = raised.indexOf(old); if (k >= 0) raised[k] = t; else raised.push(t); } else raised.push(t); } return t; }
 function matOf(t){ return t.feature ? FEATURES[t.feature].mat : null; }
@@ -4798,13 +4819,580 @@ function step(){
   if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }
 
+/* ---------- snapshots: the whole world as plain JSON ----------
+   A snapshot is taken between steps, in the days era. It holds every piece of state the rules read,
+   and nothing that can be rebuilt from those. The state is a graph: a tile points at its cave, a cave
+   points back at its tiles, a snare is one object in two places. JSON cannot hold a graph, so REFS
+   names every field that points at another record, and each kind of target has a way to name one
+   record by a number, by an index pair, or by an id. The loader turns those names back into the one
+   record they name, so the sharing that the rules compare by identity comes back whole.
+
+   Nothing here draws from a random stream, and nothing here writes to a live record. */
+const SNAPSHOT_VERSION = 1;
+
+/* Every field of a record that holds a reference, and the kind of record it points at. A dotted name
+   is a path into a plain object the record owns; the encoder copies the objects along that path. The
+   owning lists (camp.snares, camp.pitfalls, region.marks, field.regions) are homes, not references. */
+const REFS = {
+  tile:     { hill: 'hill', cave: 'cave', mouth: 'cave', garden: 'camp', 'struct.camp': 'camp', 'struct.snare': 'snare', 'struct.pit': 'pit' },
+  being:    { camp: 'camp', grove: 'grove', target: 'camp', den: 'cave', oldDen: 'cave', shyOf: 'camp', body: 'body', history: 'lines' },
+  item:     {},
+  camp:     {},
+  snare:    { camp: 'camp' },
+  pit:      { camp: 'camp' },
+  cave:     { tiles: 'tiles', patch: 'tiles', mouth: 'tile', exit: 'tile', deep: 'tile', blocked: 'tile', hill: 'hill', searched: 'camp', cleared: 'camp', disturbedBy: 'camp', from: 'cave', mark: 'mark', 'holding.camp': 'camp' },
+  hill:     { mark: 'mark' },
+  grove:    { sector: 'sector', cave: 'cave', mark: 'mark' },
+  sector:   {},
+  region:   {},
+  boundary: {},
+  mark:     {},
+  line:     {},
+  creation: { 'gate.start': 'region' },
+  field:    { root: 'region' },
+};
+/* The lists that own their records, and the type of record each holds. A record met along one of these
+   paths is at home, not pointed at, so the encoder writes it whole. */
+const REF_HOMES = { camp: { snares: 'snare', pitfalls: 'pit' }, region: { marks: 'mark' }, field: { regions: 'region' } };
+/* Fields the snapshot leaves out because the loader rebuilds them, with the reason. The guard walks
+   past these; nothing else may hold a Map, a Set, or a record the snapshot does not name. */
+const REF_DERIVED = { field: { byId: 'rebuilt from field.regions' } };
+
+/* Scratch for one snapshot: the identity maps, the mark table, and the line table. It lives only
+   inside takeSnapshot and unnamedRefs. */
+let SNAP_IX = null;
+
+function snapMap(name, list){
+  if (SNAP_IX && SNAP_IX[name]) return SNAP_IX[name];
+  const m = new Map(); for (let i = 0; i < list.length; i++) m.set(list[i], i);
+  if (SNAP_IX) SNAP_IX[name] = m;
+  return m;
+}
+function snapIndex(name, list, rec, what){
+  const i = snapMap(name, list).get(rec);
+  if (i === undefined) throw new Error(`A snapshot cannot name this ${what}: it is in no ${name} list.`);
+  return i;
+}
+/* The marks that live in a region, by identity. */
+function markTable(){
+  if (SNAP_IX && SNAP_IX.marks) return SNAP_IX.marks;
+  const m = new Map();
+  if (field) for (const r of field.regions) for (let i = 0; i < r.marks.length; i++) m.set(r.marks[i], [r.id, i]);
+  if (SNAP_IX) SNAP_IX.marks = m;
+  return m;
+}
+
+/* How each kind of target is named, and how a loader reads that name back. `stage` is the loader's
+   half-built world: it holds the arrays camps, caves, hills, groves, sectors and lines, a regionById
+   map, and a tileAt(i) that finds a staged tile by its idx3 number.
+
+   The general rule: every kind here assumes its record lives in one list for ever, and names it by
+   its place in that list. A kind whose records can leave their list in play needs a stray path, or
+   the world becomes unsavable the moment one leaves. `grove` has one, because burnOut takes a grove
+   out of `groves` while its sprites still point at it. Before you add a kind, ask what removes a
+   record of it, and whether anything can still hold the record after. */
+const REF_KINDS = {
+  camp:   { toId: c => snapIndex('camps', camps, c, 'camp'),       fromId: (i, s) => at(s.camps, i, 'camp') },
+  cave:   { toId: c => snapIndex('caves', caves, c, 'cave'),       fromId: (i, s) => at(s.caves, i, 'cave') },
+  hill:   { toId: h => snapIndex('hills', hills, h, 'hill'),       fromId: (i, s) => at(s.hills, i, 'hill') },
+  grove:  { toId: g => groveId(g),                                 fromId: (i, s) => i !== null && typeof i === 'object' ? at(s.strayGroves, i.stray, 'grove') : at(s.groves, i, 'grove') },
+  sector: { toId: s => snapIndex('sectors', sectors, s, 'sector'), fromId: (i, s) => at(s.sectors, i, 'sector') },
+  line:   { toId: e => snapIndex('lines', lineList(), e, 'chronicle line'), fromId: (i, s) => at(s.lines, i, 'chronicle line') },
+  lines:  { toId: a => a.map(REF_KINDS.line.toId), fromId: (a, s) => a.map(i => REF_KINDS.line.fromId(i, s)) },
+  region: {
+    toId: r => { if (!field || field.byId.get(r.id) !== r) throw new Error('A snapshot cannot name this region: it is in no field.'); return r.id; },
+    fromId: (id, s) => { const r = s.regionById.get(id); if (!r) throw new Error(`This save names a region, ${id}, that is not in it.`); return r; },
+  },
+  tile: {
+    toId: t => { if (tileAt(t.x, t.y, t.z) !== t) throw new Error(`A snapshot cannot name this tile: ${t.x},${t.y},${t.z} is not where it lies.`); return idx3(t.x, t.y, t.z); },
+    fromId: (i, s) => { const t = s.tileAt(i); if (!t) throw new Error(`This save names a tile, ${i}, that is not in it.`); return t; },
+  },
+  tiles:  { toId: a => a.map(REF_KINDS.tile.toId), fromId: (a, s) => a.map(i => REF_KINDS.tile.fromId(i, s)) },
+  mark: {
+    toId: m => { const id = markTable().get(m); return id ? id.slice() : { whole: clean(m) }; },
+    fromId: (id, s) => {
+      if (id && !Array.isArray(id) && typeof id === 'object') return { ...id.whole };
+      const r = s.regionById.get(id[0]), m = r && r.marks[id[1]];
+      if (!m) throw new Error(`This save names a mark, ${id}, that is not in it.`);
+      return m;
+    },
+  },
+  snare: {
+    toId: s => ownedId(s, 'snares', 'snare'),
+    fromId: (id, s) => ownedFrom(id, s, 'snares', 'snare'),
+  },
+  pit: {
+    toId: p => ownedId(p, 'pitfalls', 'pitfall'),
+    fromId: (id, s) => ownedFrom(id, s, 'pitfalls', 'pitfall'),
+  },
+  /* A god's body is a hill, a cave, or a region. The name says which. */
+  body: {
+    toId: b => {
+      if (snapMap('hills', hills).has(b)) return { hill: REF_KINDS.hill.toId(b) };
+      if (snapMap('caves', caves).has(b)) return { cave: REF_KINDS.cave.toId(b) };
+      if (field && field.byId.get(b.id) === b) return { region: REF_KINDS.region.toId(b) };
+      throw new Error('A snapshot cannot name this body: it is no hill, cave, or region.');
+    },
+    fromId: (id, s) => {
+      if (id.hill !== undefined) return REF_KINDS.hill.fromId(id.hill, s);
+      if (id.cave !== undefined) return REF_KINDS.cave.fromId(id.cave, s);
+      if (id.region !== undefined) return REF_KINDS.region.fromId(id.region, s);
+      throw new Error('This save names a body that is no hill, cave, or region.');
+    },
+  },
+};
+function at(list, i, what){ const r = list && list[i]; if (!r) throw new Error(`This save names a ${what}, ${i}, that is not in it.`); return r; }
+/* A grove in `groves` is named by its place. A grove that has left the list is a stray: burnOut takes
+   a grove out of `groves` when its hollow pine burns, and its sprites keep pointing at it until the
+   last of them dies. A stray is written whole into the snapshot's `strayGroves`, once, and named
+   `{ stray: i }`. The loader hands every sprite of that grove the one staged object, because the
+   rules compare a sprite's grove by identity. */
+function groveId(g){
+  const i = snapMap('groves', groves).get(g);
+  if (i !== undefined) return i;
+  if (!SNAP_IX) throw new Error('A snapshot cannot name this grove: it is in no groves list.');
+  const stray = SNAP_IX.strayGroves || (SNAP_IX.strayGroves = { at: new Map(), list: [] });
+  let k = stray.at.get(g);
+  if (k === undefined){ k = stray.list.length; stray.at.set(g, k); stray.list.push(null); stray.list[k] = encode(g, 'grove'); }
+  return { stray: k };
+}
+/* A snare and a pitfall live in a camp's own list, and each knows its camp. */
+function ownedId(rec, list, what){
+  const c = rec.camp && snapMap('camps', camps).has(rec.camp) ? rec.camp : camps.find(q => q[list].includes(rec));
+  if (!c) throw new Error(`A snapshot cannot name this ${what}: it belongs to no camp.`);
+  const i = c[list].indexOf(rec);
+  if (i < 0) throw new Error(`A snapshot cannot name this ${what}: its camp does not hold it.`);
+  return [REF_KINDS.camp.toId(c), i];
+}
+function ownedFrom(id, s, list, what){
+  const c = at(s.camps, id[0], 'camp'), rec = c[list][id[1]];
+  if (!rec) throw new Error(`This save names a ${what}, ${id}, that is not in it.`);
+  return rec;
+}
+
+/* ---------- encoding a record ---------- */
+/* A deep copy with every undefined dropped. A save file holds no undefined, because JSON drops it and
+   a reader that meets a missing key reads it the same way. */
+function clean(v){
+  if (Array.isArray(v)) return v.map(x => x === undefined ? null : clean(x));
+  if (v && typeof v === 'object'){ const o = {}; for (const k of Object.keys(v)) if (v[k] !== undefined) o[k] = clean(v[k]); return o; }
+  return v;
+}
+/* REFS as a tree, so a dotted path is walked once: { camp: 'camp', struct: { camp: 'camp', ... } }. */
+const REF_PLAN = {};
+for (const type in REFS){
+  const plan = REF_PLAN[type] = {};
+  for (const path in REFS[type]){
+    const parts = path.split('.'); let node = plan;
+    for (let i = 0; i < parts.length - 1; i++) node = node[parts[i]] || (node[parts[i]] = {});
+    node[parts[parts.length - 1]] = REFS[type][path];
+  }
+}
+function refId(kind, v){ return v === null || v === undefined ? null : REF_KINDS[kind].toId(v); }
+/* Copy an object, turning every field the plan names into an id. Objects along a dotted path are
+   copied, never written to. */
+function encodeWith(rec, plan){
+  const out = {};
+  for (const k of Object.keys(rec)){
+    const v = rec[k], p = plan[k];
+    if (v === undefined) continue;
+    if (typeof p === 'string') out[k] = refId(p, v);
+    else if (p && v && typeof v === 'object') out[k] = encodeWith(v, p);
+    else out[k] = clean(v);
+  }
+  return out;
+}
+function encode(rec, type){
+  const plan = REF_PLAN[type] || {}, homes = REF_HOMES[type] || {}, out = {};
+  for (const k of Object.keys(rec)){
+    const v = rec[k], p = plan[k];
+    if (v === undefined) continue;
+    if (homes[k]) out[k] = v.map(x => encode(x, homes[k]));
+    else if (typeof p === 'string') out[k] = refId(p, v);
+    else if (p && v && typeof v === 'object') out[k] = encodeWith(v, p);
+    else out[k] = clean(v);
+  }
+  return out;
+}
+
+/* ---------- tiles ---------- */
+/* A level is an array of W * H entries, one for each cell, null where there is no tile. A tile is
+   saved without x, y, and z, which its place gives back, and without any field that still holds the
+   value makeTile gave it. */
+function encodeTile(t){
+  const out = {}, plan = REF_PLAN.tile;
+  for (const k of Object.keys(t)){
+    const v = t[k], p = plan[k];
+    if (v === undefined || k === 'x' || k === 'y' || k === 'z') continue;
+    if (k in TILE_DEFAULTS && v === TILE_DEFAULTS[k]) continue;
+    if (typeof p === 'string') out[k] = refId(p, v);
+    else if (p && v && typeof v === 'object') out[k] = encodeWith(v, p);
+    else out[k] = clean(v);
+  }
+  return out;
+}
+function encodeLevel(level){ const out = new Array(level.length); for (let i = 0; i < level.length; i++) out[i] = level[i] === null ? null : encodeTile(level[i]); return out; }
+
+/* ---------- the chronicle lines ---------- */
+/* One line object sits in the chronicle, in the legends, and in each being's history. The snapshot
+   holds each distinct line once, in the order first met, and the three lists hold its index, so the
+   sharing survives the round trip. */
+function lineList(){
+  if (SNAP_IX && SNAP_IX.lineList) return SNAP_IX.lineList;
+  const seen = new Set(), out = [];
+  const add = e => { if (!seen.has(e)){ seen.add(e); out.push(e); } };
+  for (const e of chronicle) add(e);
+  for (const e of legends) add(e);
+  for (const a of beings) if (a.history) for (const e of a.history) add(e);
+  if (SNAP_IX) SNAP_IX.lineList = out;
+  return out;
+}
+
+/* ---------- the snapshot ---------- */
+/* Which global the snapshot keeps, and under which name. The guard test in tests/snapshot.js reads
+   this table, so a new piece of state must be named here or in NOT_SAVED. */
+const SAVED_STATE = {
+  seedText: 'seed', options: 'options', tick: 'tick', nextId: 'nextId', fireCount: 'fireCount', wanderAt: 'wanderAt', doomAt: 'doomAt',
+  era: 'era', age: 'age', pulseAge: 'pulseAge', rng: 'rng', godRng: 'godRng',
+  levels: 'levels', raised: 'raised', hills: 'hills', caves: 'caves', sectors: 'sectors', groves: 'groves',
+  camps: 'camps', camp: 'campNow', beings: 'beings', items: 'items', corpses: 'corpses',
+  chronicle: 'chronicle', legends: 'legends', weather: 'weather', goalPriority: 'goalPriority',
+  namePool: 'namePool', godNamePool: 'godNamePool', gestureFallbacks: 'gestureFallbacks',
+  creation: 'creation', field: 'field', boundaries: 'boundaries',
+  resCache: 'resCache', startRegion: 'startRegion', doorLog: 'doorLog',
+  inhabited: 'inhabited', inhabitedTold: 'inhabitedTold',
+};
+/* The value of every saved global, by its snapshot name. The guard walks these, and a test holds this
+   table to SAVED_STATE, so a new saved global is walked without anyone remembering to add it here. */
+function savedValues(){
+  return { seed: seedText, options, tick, nextId, fireCount, wanderAt, doomAt, era, age, pulseAge,
+    rng, godRng, levels, raised, hills, caves, sectors, groves, camps, campNow: camp, beings, items, corpses,
+    chronicle, legends, weather, goalPriority, namePool, godNamePool, gestureFallbacks,
+    creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold };
+}
+/* Which global the snapshot leaves out, and why. Each of these comes back from something else. */
+const NOT_SAVED = {
+  SW: 'derived from options', SH: 'derived from options', W: 'derived from options', H: 'derived from options',
+  ZMIN: 'derived from options', ZMAX: 'derived from options', ZOFF: 'derived from options', NZ: 'derived from options',
+  world: 'derived: levels[ZOFF]', itemGrid: 'derived from items', regionOf: 'derived from field.regions',
+  bfsPrev: 'search scratch', bfsSeen: 'search scratch', bfsGen: 'search scratch',
+  deciding: 'lives inside one god act', saidFrom: 'lives inside one god act', settleNow: 'lives inside one age step',
+  replayHead: 'derived from the seed and the options', tileCheckImpl: 'a test seam',
+  SNAP_IX: 'scratch, lives inside one snapshot',
+  agePos: 'lives only in the ages', pending: 'lives only in the ages',
+  runUntil: 'lives only in the ages', stops: 'lives only in the ages',
+  lastLoadFault: 'the reason the last load was refused, not world state',
+};
+
+/* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
+function takeSnapshot(){
+  if (era !== 'days') throw new Error('A snapshot is taken only once the world is made.');
+  SNAP_IX = {};
+  try {
+    const lines = lineList(), lineId = e => REF_KINDS.line.toId(e);
+    const snap = {
+      version: SNAPSHOT_VERSION, seed: seedText, options: clean(options),
+      tick, nextId, fireCount, wanderAt, doomAt, era, age, pulseAge,
+      rng: streamState(rng), godRng: godRng ? streamState(godRng) : null,
+      levels: levels.map(encodeLevel),
+      raised: REF_KINDS.tiles.toId(raised),
+      hills: hills.map(h => encode(h, 'hill')),
+      caves: caves.map(c => encode(c, 'cave')),
+      sectors: sectors.map(s => encode(s, 'sector')),
+      groves: groves.map(g => encode(g, 'grove')),
+      camps: camps.map(c => encode(c, 'camp')),
+      campNow: camp ? REF_KINDS.camp.toId(camp) : null,
+      beings: beings.map(a => encode(a, 'being')),
+      items: items.map(i => encode(i, 'item')),
+      corpses: clean(corpses),
+      lines: lines.map(e => encode(e, 'line')),
+      chronicle: chronicle.map(lineId),
+      legends: legends.map(lineId),
+      weather: clean(weather), goalPriority: clean(goalPriority),
+      namePool: clean(namePool), godNamePool: clean(godNamePool), gestureFallbacks: clean(gestureFallbacks),
+      creation: creation ? encode(creation, 'creation') : null,
+      field: field ? { regions: field.regions.map(r => encode(r, 'region')), root: field.root ? REF_KINDS.region.toId(field.root) : null } : null,
+      boundaries: boundaries.map(b => encode(b, 'boundary')),
+      resCache: [...resCache].map(([k, v]) => [k, clean(v)]),
+      startRegion: startRegion ? [...startRegion] : null,
+      doorLog: clean(doorLog),
+      inhabited: inhabited ? clean(inhabited) : null, inhabitedTold,
+    };
+    /* Last, because encoding the rest is what finds them. */
+    snap.strayGroves = SNAP_IX.strayGroves ? SNAP_IX.strayGroves.list : [];
+    return snap;
+  } finally { SNAP_IX = null; }
+}
+
+/* ---------- loading ----------
+   A save file is outside data. The loader reads it into a stage, a half-built world of its own, and
+   only replaces the state once every record is built and every id has found the record it names. A
+   save that cannot be read leaves the world exactly as it was. */
+
+/* A deep copy of parsed data. Object spread is used, never Object.assign, so a key named __proto__ in
+   a save file becomes an own key of a plain object instead of reaching the prototype setter. */
+function snapCopy(v){
+  if (Array.isArray(v)) return v.map(snapCopy);
+  if (v && typeof v === 'object'){ const o = { ...v }; for (const k of Object.keys(o)) o[k] = snapCopy(o[k]); return o; }
+  return v;
+}
+function snapNeed(ok, what){ if (!ok) throw new Error(`This save's ${what} is not what a save holds.`); }
+function snapArray(v, what){ snapNeed(Array.isArray(v), what); return v; }
+function snapObj(v, what){ snapNeed(v !== null && typeof v === 'object' && !Array.isArray(v), what); return v; }
+function snapNum(v, what){ snapNeed(typeof v === 'number' && Number.isFinite(v), what); return v; }
+function snapText(v, what){ snapNeed(typeof v === 'string', what); return v; }
+/* A whole count, never negative, and small enough that adding to it stays exact. */
+function snapCount(v, what){ snapNeed(Number.isSafeInteger(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER / 2, what); return v; }
+/* A key the rules index blindly. A save that names one the table lacks would kill the page a step later. */
+function snapKey(v, table, what){ snapNeed(typeof v === 'string' && Object.prototype.hasOwnProperty.call(table, v), what); return v; }
+/* A field added to the snapshot after version 1 is read as optional, with the value a world that never
+   had it holds. The version rises only when the meaning of a field already saved changes. A rebuilt
+   page must not turn every player's autosave into a refusal. */
+function snapOpt(v, fallback){ return v === undefined ? fallback : v; }
+
+/* Turn every id the plan names back into the staged record it names. A key the save does not hold
+   stays missing, and a null stays null. The record's keys are written in place, so their order holds. */
+function resolvePlan(rec, plan, stage){
+  for (const k of Object.keys(plan)){
+    if (!Object.prototype.hasOwnProperty.call(rec, k)) continue;
+    const p = plan[k], v = rec[k];
+    if (typeof p === 'string'){ if (v !== null && v !== undefined) rec[k] = REF_KINDS[p].fromId(v, stage); }
+    else if (p && v && typeof v === 'object') resolvePlan(v, p, stage);
+  }
+}
+function resolveRefs(rec, type, stage){
+  resolvePlan(rec, REF_PLAN[type] || {}, stage);
+  const homes = REF_HOMES[type] || {};
+  for (const k in homes){ snapArray(rec[k], k); for (const x of rec[k]) resolveRefs(snapObj(x, k), homes[k], stage); }
+}
+function stageList(list, type, what){
+  snapArray(list, what);
+  return list.map(r => snapCopy(snapObj(r, what)));
+}
+
+/* Read the save into a stage. It reads the save and writes only the stage. Any fault throws. */
+function decodeSnapshot(snap){
+  const opts = { ...DEFAULT_OPTIONS, ...snap.options };
+  const w = opts.sw * LW, h = opts.sh * LH, area = w * h, nz = opts.zmax - opts.zmin + 1;
+  const stage = { options: opts, seed: snapText(snap.seed, 'seed') };
+
+  /* The levels first: a tile is named by its place, and everything else may name a tile. */
+  const saved = snapArray(snap.levels, 'levels');
+  snapNeed(saved.length === nz, 'levels');
+  stage.levels = saved.map((lv, li) => {
+    snapArray(lv, 'level'); snapNeed(lv.length === area, 'level');
+    const z = li + opts.zmin, out = new Array(area);
+    for (let i = 0; i < area; i++){
+      if (lv[i] === null || lv[i] === undefined){ out[i] = null; continue; }
+      const c = snapCopy(snapObj(lv[i], 'tile')), x = i % w;
+      snapKey(c.ground, GROUND, 'tile ground');
+      if (c.feature !== undefined && c.feature !== null) snapKey(c.feature, FEATURES, 'tile feature');
+      /* x, y, and z come from the tile's index, never from the saved copy: a hand-edited save
+         must not move a tile by forging its own position inside it. */
+      const { x: _x, y: _y, z: _z, ...rest } = c;
+      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...rest };
+    }
+    return out;
+  });
+  stage.tileAt = i => { if (!Number.isInteger(i) || i < 0 || i >= nz * area) return null; const lv = (i / area) | 0; return stage.levels[lv][i - lv * area]; };
+
+  /* Then every list of records, whole, with the ids still in place. */
+  stage.lines = stageList(snap.lines, 'line', 'lines');
+  stage.camps = stageList(snap.camps, 'camp', 'camps');
+  /* A camp's own plain objects and places. The rules read each without looking first. */
+  const spot = (v, what) => { if (v === null || v === undefined) return; snapArray(v, what); snapNeed(v.length === 2, what); snapNeed(Number.isInteger(v[0]) && v[0] >= 0 && v[0] < w && Number.isInteger(v[1]) && v[1] >= 0 && v[1] < h, what); };
+  for (const c of stage.camps){
+    snapArray(c.snares, 'snares'); snapArray(c.pitfalls, 'pitfalls');
+    for (const k of ['stash', 'fae', 'rot', 'tools', 'gnomes']) snapObj(c[k], 'camp ' + k);
+    for (const k of ['pit', 'stashTile', 'site']) spot(c[k], 'camp ' + k);
+  }
+  stage.hills = stageList(snap.hills, 'hill', 'hills');
+  stage.caves = stageList(snap.caves, 'cave', 'caves');
+  stage.sectors = stageList(snap.sectors, 'sector', 'sectors');
+  stage.groves = stageList(snap.groves, 'grove', 'groves');
+  stage.strayGroves = stageList(snapOpt(snap.strayGroves, []), 'grove', 'strayGroves');
+  stage.beings = stageList(snap.beings, 'being', 'beings');
+  for (const a of stage.beings) snapKey(a.species, SPECIES, 'being species');
+  stage.items = stageList(snap.items, 'item', 'items');
+  for (const it of stage.items) snapKey(it.kind, ITEMS, 'item kind');
+  stage.boundaries = stageList(snap.boundaries, 'boundary', 'boundaries');
+  stage.corpses = snapCopy(snapArray(snap.corpses, 'corpses'));
+  stage.field = snap.field === null ? null : { regions: stageList(snapObj(snap.field, 'field').regions, 'region', 'regions'), root: snap.field.root, byId: new Map() };
+  stage.regionById = new Map();
+  /* A region's tiles fill regionOf, an array of W * H. An index outside it would write past the end. */
+  if (stage.field) for (const r of stage.field.regions){
+    snapArray(r.marks, 'marks'); snapNum(r.id, 'region id');
+    for (const i of snapArray(r.tiles, 'region tiles')) snapNeed(Number.isInteger(i) && i >= 0 && i < area, 'region tiles');
+    stage.regionById.set(r.id, r);
+  }
+  stage.creation = snap.creation === null ? null : snapCopy(snapObj(snap.creation, 'creation'));
+
+  /* Then every id becomes the one record it names. fromId throws on an id that names nothing. */
+  for (const level of stage.levels) for (const t of level) if (t) resolveRefs(t, 'tile', stage);
+  for (const c of stage.camps) resolveRefs(c, 'camp', stage);
+  for (const c of stage.caves) resolveRefs(c, 'cave', stage);
+  for (const hl of stage.hills) resolveRefs(hl, 'hill', stage);
+  for (const g of stage.groves) resolveRefs(g, 'grove', stage);
+  for (const g of stage.strayGroves) resolveRefs(g, 'grove', stage);
+  for (const s of stage.sectors) resolveRefs(s, 'sector', stage);
+  for (const a of stage.beings) resolveRefs(a, 'being', stage);
+  for (const it of stage.items) resolveRefs(it, 'item', stage);
+  for (const b of stage.boundaries) resolveRefs(b, 'boundary', stage);
+  if (stage.creation) resolveRefs(stage.creation, 'creation', stage);
+  if (stage.field){ resolveRefs(stage.field, 'field', stage); for (const r of stage.field.regions) stage.field.byId.set(r.id, r); }
+
+  stage.raised = REF_KINDS.tiles.fromId(snapArray(snap.raised, 'raised'), stage);
+  stage.camp = snap.campNow === null ? null : REF_KINDS.camp.fromId(snap.campNow, stage);
+  stage.chronicle = REF_KINDS.lines.fromId(snapArray(snap.chronicle, 'chronicle'), stage);
+  stage.legends = REF_KINDS.lines.fromId(snapArray(snap.legends, 'legends'), stage);
+  stage.resCache = new Map(snapArray(snap.resCache, 'resCache').map(p => { snapArray(p, 'cache entry'); return [p[0], snapCopy(p[1])]; }));
+  stage.startRegion = snap.startRegion === null ? null : new Set(snapArray(snap.startRegion, 'startRegion'));
+  stage.doorLog = snapCopy(snapArray(snap.doorLog, 'doorLog'));
+
+  /* Last the plain values. */
+  stage.tick = snapCount(snap.tick, 'tick'); stage.nextId = snapCount(snap.nextId, 'nextId');
+  stage.fireCount = snapNum(snap.fireCount, 'fireCount');
+  stage.wanderAt = snapNum(snap.wanderAt, 'wanderAt'); stage.doomAt = snapNum(snap.doomAt, 'doomAt');
+  stage.inhabited = snapOpt(snap.inhabited, null);
+  if (stage.inhabited !== null) stage.inhabited = snapCopy(snapObj(stage.inhabited, 'inhabited'));
+  stage.inhabitedTold = !!snapOpt(snap.inhabitedTold, false);
+  stage.age = snapNum(snap.age, 'age');
+  stage.pulseAge = snap.pulseAge === null ? null : snapNum(snap.pulseAge, 'pulseAge');
+  stage.rng = snapNum(snap.rng, 'rng'); stage.godRng = snap.godRng === null ? null : snapNum(snap.godRng, 'godRng');
+  stage.weather = snapCopy(snapObj(snap.weather, 'weather'));
+  stage.goalPriority = snapCopy(snapObj(snap.goalPriority, 'goalPriority'));
+  stage.namePool = snapCopy(snapArray(snap.namePool, 'namePool'));
+  stage.godNamePool = snapCopy(snapArray(snap.godNamePool, 'godNamePool'));
+  stage.gestureFallbacks = snapCopy(snapObj(snap.gestureFallbacks, 'gestureFallbacks'));
+  return stage;
+}
+
+/* Put the stage in place of the state. Everything here is an assignment or a rebuild that cannot fail. */
+function commitSnapshot(s){
+  setOptions(s.options); allocSearch();
+  seedText = s.seed; tick = s.tick; nextId = s.nextId; fireCount = s.fireCount;
+  wanderAt = s.wanderAt; doomAt = s.doomAt;
+  era = 'days'; age = s.age; pulseAge = s.pulseAge;
+  levels = s.levels; world = levels[ZOFF]; raised = s.raised;
+  hills = s.hills; caves = s.caves; sectors = s.sectors; groves = s.groves;
+  camps = s.camps; camp = s.camp;
+  beings = s.beings; items = s.items; corpses = s.corpses;
+  chronicle = s.chronicle; legends = s.legends;
+  weather = s.weather; goalPriority = s.goalPriority;
+  namePool = s.namePool; godNamePool = s.godNamePool; gestureFallbacks = s.gestureFallbacks;
+  creation = s.creation; field = s.field; boundaries = s.boundaries;
+  resCache = s.resCache; startRegion = s.startRegion;
+  /* The derived state, rebuilt as the makers of each build it. */
+  rebuildItemGrid();
+  regionOf = new Int32Array(W * H);
+  if (field) for (const r of field.regions) for (const i of r.tiles) regionOf[i] = r.id;
+  rng = mulberry32(0); setStreamState(rng, s.rng);
+  godRng = s.godRng === null ? null : mulberry32(0);
+  if (godRng) setStreamState(godRng, s.godRng);
+  inhabited = s.inhabited; inhabitedTold = s.inhabitedTold;
+  /* These three live inside one step and start a step as beginCreation leaves them. */
+  deciding = null; saidFrom = 0; settleNow = false;
+  /* The ages are over in a loaded world, so nothing of the ages is left standing. A load can arrive
+     while a god's turn is open, and step() answers 'The turn is yours.' for as long as pending is set. */
+  agePos = null; pending = null; runUntil = null; stops = [];
+  resetDoor(); doorLog = s.doorLog;
+}
+
+/* Why the last load was refused, in the words the fault threw. The player sees the plain sentence;
+   this is for whoever is looking at the console. It is not world state, so no snapshot holds it. */
+let lastLoadFault = null;
+
+/* Load a whole world from a snapshot. Returns null when it loaded, or the sentence that says why not. */
+function loadSnapshot(snap){
+  lastLoadFault = null;
+  if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return 'This save cannot be read.';
+  if (snap.version !== SNAPSHOT_VERSION){
+    if (typeof snap.version !== 'number' || !Number.isFinite(snap.version)) return 'This file is not a save this world can read.';
+    return `This save is version ${snap.version}. This world reads version ${SNAPSHOT_VERSION}.`;
+  }
+  if (snap.era !== 'days') return 'This save was taken before the world was made. Only a made world can be loaded.';
+  const wrong = checkOptions(snap.options);
+  if (wrong) return wrong;
+  let stage;
+  try { stage = decodeSnapshot(snap); }
+  catch (e){ lastLoadFault = e && e.message ? e.message : String(e); return 'This save cannot be read.'; }
+  commitSnapshot(stage);
+  return null;
+}
+
+/* ---------- the guard ---------- */
+/* Every record of the state, by identity, with its type. */
+function registry(){
+  const reg = new Map();
+  const put = (r, type) => { if (r && typeof r === 'object') reg.set(r, type); };
+  for (const level of levels) for (const t of level) put(t, 'tile');
+  for (const a of beings) put(a, 'being');
+  for (const i of items) put(i, 'item');
+  for (const c of camps){ put(c, 'camp'); for (const s of c.snares) put(s, 'snare'); for (const p of c.pitfalls) put(p, 'pit'); }
+  for (const c of caves) put(c, 'cave');
+  for (const h of hills) put(h, 'hill');
+  for (const g of groves) put(g, 'grove');
+  for (const s of sectors) put(s, 'sector');
+  if (field) for (const r of field.regions){ put(r, 'region'); for (const m of r.marks) put(m, 'mark'); }
+  for (const b of boundaries) put(b, 'boundary');
+  for (const e of lineList()) put(e, 'line');
+  /* A stray grove is in no list, so the sprites that still point at it are the only way to reach it. */
+  for (const a of beings) if (a.grove && !reg.has(a.grove)) put(a.grove, 'grove');
+  return reg;
+}
+/* The saved globals the guard walks itself. The record lists are left out: every record in one is
+   already walked under its own type, and walking the list would name each of them a reference.
+   resCache is a Map and startRegion a Set, and the encoder holds each as entries; the values of
+   resCache are walked below. */
+const WALK_HOME = { levels: 1, raised: 1, hills: 1, caves: 1, sectors: 1, groves: 1, camps: 1, campNow: 1,
+  beings: 1, items: 1, chronicle: 1, legends: 1, boundaries: 1, creation: 1, field: 1, resCache: 1, startRegion: 1 };
+/* Walk every record and report each field that points at another record and is not named in REFS.
+   A new field that holds a reference fails the test in tests/snapshot.js until someone names it. */
+function unnamedRefs(){
+  SNAP_IX = {};
+  try {
+    const reg = registry(), out = new Set();
+    /* One step of the walk. It reports a reference REFS does not name, and it reports anything a
+       snapshot cannot hold: a Map, a Set, or any other object that is not plain data. The encoder
+       turns a Map or a Set into {}, and a round trip then agrees because both sides lost it, so the
+       guard must name it here instead. */
+    const step = (v, type, path, seen, named, homes) => {
+      if (v === null || typeof v !== 'object') return;
+      if (named[path] !== undefined || homes[path] !== undefined) return;
+      if ((REF_DERIVED[type] || {})[path] !== undefined) return;
+      const where = path ? type + '.' + path : type;
+      const kind = reg.get(v);
+      if (kind !== undefined){ out.add(where + ' -> ' + kind); return; }
+      if (seen.has(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)){ for (const x of v) step(x, type, path + '[]', seen, named, homes); return; }
+      if (v instanceof Map || v instanceof Set){ out.add(where + ' -> a Map or a Set, which a snapshot cannot hold'); return; }
+      if (Object.getPrototypeOf(v) !== Object.prototype){ out.add(where + ' -> not plain data, which a snapshot cannot hold'); return; }
+      for (const k of Object.keys(v)) step(v[k], type, path ? path + '.' + k : k, seen, named, homes);
+    };
+    const walk = (rec, type) => {
+      const named = REFS[type] || {}, homes = REF_HOMES[type] || {};
+      for (const k of Object.keys(rec)) step(rec[k], type, k, new Set(), named, homes);
+    };
+    for (const [rec, type] of reg) walk(rec, type);
+    if (creation) walk(creation, 'creation');
+    if (field) walk(field, 'field');
+    /* Every other saved global, under its own name. A new one is walked the day it joins the table. */
+    const vals = savedValues();
+    for (const name of Object.keys(vals)) if (!WALK_HOME[name]) step(vals[name], name, '', new Set(), {}, {});
+    for (const [k, v] of resCache) step(v, 'resCache', '[' + k + ']', new Set(), {}, {});
+    return [...out].sort();
+  } finally { SNAP_IX = null; }
+}
+
 /* ---------- the door ----------
    Every act from outside the engine enters here: the player now, and later chance, an LLM, or a
    human inhabiting a mob. The engine step is pure. The door is the one place the outside touches
    the state, and it keeps a log, so a seed, its options, and its log replay the same story. The
    door logs every lawful act, applied or not, because a replay against the same state does the
    same nothing, and a log that keeps what was tried is better provenance. Each act returns a
-   message for whoever asked.
+   message for whoever asked. One act is the exception: a refused `load` is not logged. It has
+   no tick of its own to be logged at, and the snapshot it carries can run to megabytes.
 
    Tick rule: an event stamped with tick N was applied after step N and before step N+1. An event
    that comes with a tick of its own, as a replayed one does, must come at that tick; the door
@@ -4845,6 +5433,12 @@ const DOOR_ACTS = {
     camp = prev;
     return 'Camp site set. The fire pit will go here.';
   },
+  /* A load replaces the whole world, so it is marked `replacesWorld` below: inject applies it before
+     logging, skips the tick guard (a save carries no tick of its own to arrive late at), and on
+     success logs a bare entry with the new tick, never the snapshot. `loadSnapshot` already restores
+     `doorLog` from the save, so this act's own return value is that function's raw result: `null` on
+     success, or the sentence to show when it is not. */
+  load(e){ return loadSnapshot(e.snapshot); },
   /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
      until each is built. An id of null leaves, and the open turn closes with it. */
   become(e){
@@ -4897,9 +5491,16 @@ const DOOR_ACTS = {
     return `A stop is set at age ${e.at}.`;
   },
 };
+DOOR_ACTS.load.replacesWorld = true;
 function inject(event){
   const act = DOOR_ACTS[event.act];
   if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
+  if (act.replacesWorld){
+    const refusal = act(event);
+    if (refusal !== null) return refusal;
+    doorLog.push({ source: event.source, act: event.act, tick });
+    return `The world is as it was on day ${dayOf()}.`;
+  }
   if (event.tick !== undefined && event.tick !== tick) return 'Not now.';
   /* In the gods era an age is the step and the tick stands still, so the age is the stamp that
      tells one act from another. In the days era nothing changes: the tick is the stamp. */
@@ -4963,6 +5564,9 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
+  autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
+  autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
@@ -5364,6 +5968,13 @@ function paletteMatch(query, rows){
   return hit.sort((a, b) => score(a) - score(b));
 }
 
+/* The name of a save file. The seed goes to lower case, and each run of anything else becomes one
+   dash. A seed of nothing but punctuation leaves no name, so it is called the world. */
+function saveName(seed, t){
+  const s = String(seed == null ? '' : seed).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'world';
+  return `hearth-${s}-day-${Math.floor(t / DAY) + 1}.json`;
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -5434,6 +6045,11 @@ const KEYMAP = [
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
+  /* Save and Load take Ctrl, as New world does. Neither has a button: the strip is full, and the palette lists both. */
+  { key: 's',          ctrl: true, focus: 'any', action: 'saveWorld', label: 'Save world to a file' },
+  { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
+  /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
+  { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
@@ -5485,6 +6101,81 @@ function keyName(k){
   /* Shift shows on a named key and on a letter or a digit. `?` and `>` already carry it in the character. */
   const shift = k.shift && (k.key.length > 1 || /^[a-z0-9]$/i.test(k.key));
   return `${k.meta ? '\u2318' : ''}${k.ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${k.alt ? 'Alt+' : ''}${key}`;
+}
+
+/* Storage for saves, and nothing else. No view state changes here, and no DOM at load time.
+   The built page is published as a sandboxed artifact, where a download, a file picker, or a
+   database may all be blocked. Every call sits in a try, every error event is answered, and each
+   function resolves with a plain value instead of throwing. A page that cannot store still plays. */
+const SAVE_DB = 'hearth', SAVE_STORE = 'saves', AUTOSAVE_KEY = 'autosave';
+/* The object URL is freed on the next turn of the loop, after the click has taken the file. */
+const SAVE_FREE_MS = 1000;
+
+/* Hand the player a file. Returns null when the download started, or the sentence to show. */
+function writeSaveFile(name, text){
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* already gone */ } }, SAVE_FREE_MS);
+    return null;
+  } catch (e) { return 'This page cannot write a file.'; }
+}
+
+/* Read a chosen file. Resolves with { snapshot } or { error }. It never rejects. */
+function readSaveFile(file){
+  return new Promise(resolve => {
+    try {
+      const r = new FileReader();
+      r.onerror = () => resolve({ error: 'This file cannot be read.' });
+      r.onabort = () => resolve({ error: 'This file cannot be read.' });
+      r.onload = () => { try { resolve({ snapshot: JSON.parse(r.result) }); } catch (e) { resolve({ error: 'This file is not a save.' }); } };
+      r.readAsText(file);
+    } catch (e) { resolve({ error: 'This file cannot be read.' }); }
+  });
+}
+
+/* The one database. Resolves with the database, or with null when there is none to be had. */
+function saveDb(){
+  return new Promise(resolve => {
+    try {
+      if (typeof indexedDB === 'undefined' || !indexedDB){ resolve(null); return; }
+      const req = indexedDB.open(SAVE_DB, 1);
+      req.onupgradeneeded = () => { try { if (!req.result.objectStoreNames.contains(SAVE_STORE)) req.result.createObjectStore(SAVE_STORE); } catch (e) { /* the transaction fails below */ } };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+
+/* Write the one autosave slot. Resolves true when it was kept, false when it was not. */
+function putAutosave(text){
+  return saveDb().then(db => new Promise(resolve => {
+    if (!db){ resolve(false); return; }
+    try {
+      const tx = db.transaction(SAVE_STORE, 'readwrite');
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+      tx.objectStore(SAVE_STORE).put(text, AUTOSAVE_KEY);
+    } catch (e) { resolve(false); }
+  })).catch(() => false);
+}
+
+/* Read the one autosave slot. Resolves with the text, or with null when the slot is empty or shut. */
+function getAutosave(){
+  return saveDb().then(db => new Promise(resolve => {
+    if (!db){ resolve(null); return; }
+    try {
+      const tx = db.transaction(SAVE_STORE, 'readonly'), req = tx.objectStore(SAVE_STORE).get(AUTOSAVE_KEY);
+      req.onsuccess = () => resolve(typeof req.result === 'string' ? req.result : null);
+      req.onerror = () => resolve(null);
+      tx.onerror = () => resolve(null);
+      tx.onabort = () => resolve(null);
+    } catch (e) { resolve(null); }
+  })).catch(() => null);
 }
 
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
@@ -6231,7 +6922,22 @@ function renderFoot(){
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
 function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNote(''); showContinue(); ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+/* One line inside the start dialog, for an answer that the foot behind it would hide. An empty line hides it. */
+function startNote(text){ const p = $('startNote'); if (!p) return; p.textContent = text; p.hidden = !text; }
+/* The Continue button, shown only when the autosave slot holds a world. The save is outside data, so its
+   seed goes in as text, never as markup, and a slot without a real tick is no slot: it would say "day NaN".
+   The key comes from the key map, so the button cannot drift from it. */
+function showContinue(){
+  const b = $('continueBtn'); if (!b) return;
+  const ok = !!lastSave && typeof lastSave.tick === 'number' && Number.isFinite(lastSave.tick);
+  b.hidden = !ok;
+  if (!ok) return;
+  const row = KEYMAP.find(k => k.button === 'continueBtn');
+  b.textContent = `Continue ${lastSave.seed}, day ${Math.floor(Number(lastSave.tick) / DAY) + 1}`;
+  const k = document.createElement('kbd'); k.textContent = row ? keyName(row) : '';
+  b.appendChild(k);
+}
 let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
 function muteChoice(k){
@@ -6324,7 +7030,131 @@ function newWorld(seed){
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
   viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  /* A new world has no autosave of its own, so its first day writes one. */
+  ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* ---------- saves ----------
+   The player's own file, the one autosave slot, and the view after a world arrives from either.
+   The storage sits in saves.js. The door is the only way a save enters the world. */
+
+/* Write the world to a file the player keeps. */
+function saveWorld(){
+  if (inAges()){ say('The world is not made yet. There is nothing to save.'); return; }
+  let text;
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){ console.warn('The world could not be saved: ' + (e && e.message)); say('This world cannot be saved.'); return; }
+  const name = saveName(seedText, tick);
+  /* The page hands the file to the browser and is never told what became of it. A sandbox can refuse
+     the download without an error, so the line says what was asked for, not what came of it. */
+  say(writeSaveFile(name, text) || `Saving ${name}.`);
+}
+
+/* Open the file picker. The input's change handler carries on in openSaveFile. */
+function loadWorldFile(){
+  try { $('loadFile').click(); }
+  catch (e){ say('This page cannot open a file.'); }
+}
+
+/* A file the player chose. A file that is not a save says so and changes nothing. */
+function openSaveFile(file){
+  readSaveFile(file).then(r => {
+    if (r.error){ say(r.error); return; }
+    loadWorld(r.snapshot);
+  });
+}
+
+/* The one way a snapshot enters. The door answers with a sentence either way, so the log says whether
+   the world changed: a load that lands appends an entry of its own, and a refusal appends nothing. */
+function loadWorld(snapshot, note){
+  const last = doorLog[doorLog.length - 1];
+  const answer = inject({ source: 'player', act: 'load', snapshot });
+  const landed = doorLog[doorLog.length - 1] !== last;
+  if (landed) onLoad();
+  /* The player gets the plain sentence. Whoever has the console open gets the reason the save threw. */
+  else if (lastLoadFault) console.warn('The save was refused: ' + lastLoadFault);
+  /* A world that arrived says so in the foot, over the new valley. A refusal goes where the caller asks. */
+  if (landed || !note) say(answer); else note(answer);
+  return landed;
+}
+
+/* The view after a load. Everything it remembers points at the world that was replaced, and the new
+   world can be a smaller one, so this puts the view back on the ground as onSettle does. */
+function onLoad(){
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  viewCamp = camps[0]; camp = camps[0];
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  /* A row index, a followed person, and an open card all name a being of the old world. */
+  followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  cursor = { x: clamp(cursor.x, 0, W - 1), y: clamp(cursor.y, 0, H - 1), z: clamp(cursor.z, ZMIN, ZMAX) };
+  cur = { sx: clamp(cur.sx, 0, SW - 1), sy: clamp(cur.sy, 0, SH - 1) };
+  lvl = clamp(lvl, ZMIN, ZMAX);
+  /* A save is always of the days, so the frame must not take the loaded world for a settle. */
+  lastEra = era;
+  /* The loaded day is already saved. The next dawn writes the slot again. */
+  ui.autosaveDay = dayOf();
+  /* The rest is the page. The tests run this function with no canvas and no dialog behind it. */
+  if (!wcv) return;
+  wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  ocv.width = W * WS; ocv.height = H * WS;
+  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setView('loc', secOf(cursor.x, cursor.y));
+}
+
+/* One autosave slot, written at the first frame of each new day. It is the whole world, so a page
+   that cannot store one says so once and plays on. */
+function autosave(){
+  ui.autosaveDay = dayOf();
+  let text;
+  /* A world the snapshot cannot name is not a silent failure. It is said once, as a slot that cannot
+     be written is, and the reason goes to the console. */
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){
+    console.warn('The autosave could not be taken: ' + (e && e.message));
+    if (ui.autosaveFaultWarned) return;
+    ui.autosaveFaultWarned = true;
+    say('This world cannot be saved, so there is no autosave. The game plays on.');
+    return;
+  }
+  putAutosave(text).then(ok => {
+    if (ok || ui.autosaveWarned) return;
+    ui.autosaveWarned = true;
+    say('This page cannot keep an autosave. The game plays on.');
+  });
+}
+
+/* A step threw. The world is left where it stopped, the game pauses, and one plain sentence says so.
+   The fault goes to the console for whoever is looking. The frame loop itself keeps running. */
+function onFault(e){
+  /* onFault runs inside the frame loop's own try. A throw in here must not stop the next frame from
+     being queued, so the body gets its own try, with a bare console.error as the last resort. */
+  try {
+    console.error(e);
+    acc = 0;
+    setPaused(true);
+    say('The world stopped on a fault. Load a save or make a new world.');
+  } catch (e2){ console.error(e2); }
+}
+
+/* The autosave read once when the page opens, parsed here and kept for the start dialog. */
+let lastSave = null;
+function offerContinue(){
+  getAutosave().then(text => {
+    if (!text) return;
+    try { lastSave = JSON.parse(text); }
+    catch (e){ return; }
+    /* The slot is outside data. A save without a real tick would offer "day NaN", so it is no save. */
+    if (!lastSave || typeof lastSave !== 'object' || lastSave.era !== 'days' || typeof lastSave.tick !== 'number' || !Number.isFinite(lastSave.tick)){ lastSave = null; return; }
+    showContinue();
+  });
+}
+
+/* Continue the last world, from the start dialog. A refusal stays in the dialog. */
+function continueWorld(){
+  if (!lastSave){ startNote('There is no world to continue.'); return; }
+  if (loadWorld(lastSave, startNote)) closeDialogs();
 }
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
@@ -6429,6 +7259,9 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  saveWorld(){ saveWorld(); },
+  loadWorldFile(){ loadWorldFile(); },
+  continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
     if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
@@ -6456,19 +7289,30 @@ const ACTIONS = {
 
 function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
+  /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
+     every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
   if (!paused){
-    /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-    if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
-    else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+    try {
+      /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
+      if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+    } catch (e){ onFault(e); }
   }
-  if (lastEra === 'gods' && !inAges()) onSettle();
-  lastEra = era;
-  if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
-  camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  draw();
-  /* Pulses read every goal's state. Once a render, not once a frame. */
-  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
-  requestAnimationFrame(frame);
+  /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
+  try {
+    if (lastEra === 'gods' && !inAges()) onSettle();
+    lastEra = era;
+    /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
+       take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
+    if (!inAges() && dayOf() > ui.autosaveDay) autosave();
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    draw();
+    /* Pulses read every goal's state. Once a render, not once a frame. */
+    if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
+  } finally {
+    requestAnimationFrame(frame);
+  }
 }
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -6497,6 +7341,9 @@ function initUI(){
     ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
+  /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
+  $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
+  $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
@@ -6534,7 +7381,9 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
+       that is how Alt+C continues the last world while the cursor sits in the seed box. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput' && !(e.ctrlKey || e.altKey || e.metaKey)) return;
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
@@ -6547,6 +7396,8 @@ function initUI(){
   setTool('inspect');
   newWorld(randomSeed());
   if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
+  offerContinue();
   openStart();
   requestAnimationFrame(frame);
 }

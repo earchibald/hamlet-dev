@@ -4,7 +4,8 @@
    the state, and it keeps a log, so a seed, its options, and its log replay the same story. The
    door logs every lawful act, applied or not, because a replay against the same state does the
    same nothing, and a log that keeps what was tried is better provenance. Each act returns a
-   message for whoever asked.
+   message for whoever asked. One act is the exception: a refused `load` is not logged. It has
+   no tick of its own to be logged at, and the snapshot it carries can run to megabytes.
 
    Tick rule: an event stamped with tick N was applied after step N and before step N+1. An event
    that comes with a tick of its own, as a replayed one does, must come at that tick; the door
@@ -45,6 +46,12 @@ const DOOR_ACTS = {
     camp = prev;
     return 'Camp site set. The fire pit will go here.';
   },
+  /* A load replaces the whole world, so it is marked `replacesWorld` below: inject applies it before
+     logging, skips the tick guard (a save carries no tick of its own to arrive late at), and on
+     success logs a bare entry with the new tick, never the snapshot. `loadSnapshot` already restores
+     `doorLog` from the save, so this act's own return value is that function's raw result: `null` on
+     success, or the sentence to show when it is not. */
+  load(e){ return loadSnapshot(e.snapshot); },
   /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
      until each is built. An id of null leaves, and the open turn closes with it. */
   become(e){
@@ -97,9 +104,16 @@ const DOOR_ACTS = {
     return `A stop is set at age ${e.at}.`;
   },
 };
+DOOR_ACTS.load.replacesWorld = true;
 function inject(event){
   const act = DOOR_ACTS[event.act];
   if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
+  if (act.replacesWorld){
+    const refusal = act(event);
+    if (refusal !== null) return refusal;
+    doorLog.push({ source: event.source, act: event.act, tick });
+    return `The world is as it was on day ${dayOf()}.`;
+  }
   if (event.tick !== undefined && event.tick !== tick) return 'Not now.';
   /* In the gods era an age is the step and the tick stands still, so the age is the stamp that
      tells one act from another. In the days era nothing changes: the tick is the stamp. */
