@@ -3,7 +3,7 @@
 A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds the design, the rules that were tuned by testing, and the bugs already found and fixed. Do not re-derive them.
 
 ## Layout
-- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, time, chronicle), field (the countries and their boundaries), marks (what a god did to a country), world, path, camps, beings, species, fae, tasks, goals, weather, gods (the primal gods and the ages), settle (from marks to tiles), main, door. `door.js` is the one way in from outside: `inject(event)`.
+- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, and the chronicle), clock (the calendar, the units, and every duration and rate), field (the countries and their boundaries), marks (what a god did to a country), world, path, camps, beings, species, fae, tasks, goals, weather, gods (the primal gods and the ages), settle (from marks to tiles), main, door. `door.js` is the one way in from outside: `inject(event)`.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/ui/`: the canvas interface. Reads state, draws, handles tools. Never changes the rules. Plain scripts in one scope like `src/sim/`, joined by `src/ui/index.js`. `derive.js` and `keys.js` have no DOM and are tested in `tests/ui.js`. View state changes in `actions.js`, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`.
@@ -20,6 +20,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/options.js`: world size and the level range at start. Fast.
 - `tests/ages.js`: twenty-four seeds run the creation to settle, with a report. The tuning tool for the grammar of the ages. Fast.
 - `tests/settle.js`: the painters, the founding sites, the creatures, the bodies, and the tile check. Fast.
+- `tests/clock.js`: the unit helpers, the table's values, and a lint: no bare time literal in a rule. Fast.
 - `npm run fast` runs them all.
 
 ## Rules of work
@@ -28,6 +29,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Every new behaviour must be visible to the player: a chronicle line, a thought, a goal state, or a tooltip row.
 - Any death in a 70-day soak that is not old age is a bug until proven otherwise. Trace it with `tests/trace-deaths.js`.
 - The engine step is pure. Every outside act enters by `inject()` in `src/sim/door.js` and is logged. A seed, its options, and its log replay the same story.
+- A duration or a rate goes in `CLOCK` in `src/sim/clock.js`, or in a species or recipe row written with the unit helpers. `tests/clock.js` fails on a bare one.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.

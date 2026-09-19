@@ -243,7 +243,7 @@ function defendDen(a){
   failTask(h); START.flee(h);
 }
 
-/* Each CLOCK.gnome.every the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */
+/* Once each CLOCK.gnome.every ticks the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */
 function gnomeTick(){
   if (tick % CLOCK.gnome.every !== 0) return;
   for (const c of caves){

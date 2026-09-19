@@ -1408,7 +1408,8 @@ function placeGrove(within, mark){
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
-  for (let k = 0; k < CLOCK.plant.samples; k++){
+  const samples = CLOCK.plant.samples;
+  for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
       const age = tick - (t.planted || 0);
@@ -2309,7 +2310,7 @@ function defendDen(a){
   failTask(h); START.flee(h);
 }
 
-/* Each CLOCK.gnome.every the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */
+/* Once each CLOCK.gnome.every ticks the burrows look about them. A camp's workshop within 40 tiles is copied within a few days. */
 function gnomeTick(){
   if (tick % CLOCK.gnome.every !== 0) return;
   for (const c of caves){
@@ -2414,7 +2415,7 @@ Object.assign(START, {
   },
 });
 
-/* Each CLOCK.every.fae a camp's favour with the sprites does its work: extra berries or blight, drift toward 0, moss light, snares in a grove. */
+/* Once each CLOCK.every.fae ticks a camp's favour with the sprites does its work: extra berries or blight, drift toward 0, moss light, snares in a grove. */
 function faeTick(){
   if (camp.fae.favor >= 30 && camp.site){ for (let k = 0; k < 6; k++){ const t = tileAt(camp.site[0] + rint(21) - 10, camp.site[1] + rint(21) - 10); if (t && t.feature === 'bush' && t.berries < 5 && !isWinter()) t.berries++; } }
   if (camp.fae.blightUntil > tick && camp.site){ for (let k = 0; k < 10; k++){ const t = tileAt(clamp(camp.site[0] + rint(25) - 12, 0, W - 1), clamp(camp.site[1] + rint(25) - 12, 0, H - 1)); if (t.feature === 'bush' && t.berries > 0) t.berries--; } }

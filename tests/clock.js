@@ -119,7 +119,6 @@ const RULES = [
 const ROLL_FILES = ['camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'world'];
 /* A chance rolled once per event is not a rate. Each entry is the exact text of a match, with the reason. */
 const EVENT_CHANCES = [
-  'rng() < (t.struct.snare.chance',   // rolled once, when an animal steps on the trap
   'rng() < 0.125',                    // rolled once, when an animal steps on the trap
   'rng() > 0.45 + a.skills.hunt * 0.1',   // the deer that breaks free of a wolf
   'rng() < 0.6',                          // the carcass roll (whether a venison carcass is finished), and the prank's victim roll
@@ -131,10 +130,6 @@ const EVENT_CHANCES = [
   'rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25',   // the sparks that take
   'rng() < 0.4 + a.traits.patience * 0.4',   // the rocks that prove to be firestones
 ];
-/* The ratchet. A file listed here may still hold this many bare literals. A file not listed holds none.
-   Each task of the plan removes its files. The close removes the ratchet. */
-const PENDING = {};
-
 /* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
    fallback default is not a duration either. */
 const hasNumber = s => /\d/.test(s.replace(/[!=]==\s*0\b/g, '').replace(/\|\|\s*0\)/g, ')').replace(/\b[A-Za-z_]\w*/g, ''));
@@ -156,12 +151,32 @@ function bareIn(file){
 }
 
 test('no rule holds a bare time literal', () => {
-  const over = [];
-  for (const f of FILES){
-    if (f === 'clock') continue;
-    const bare = bareIn(f), allowed = PENDING[f] || 0;
-    if (bare.length > allowed) over.push(`${f}.js holds ${bare.length} bare literals, and ${allowed} are allowed:\n  ` + bare.join('\n  '));
-    if (PENDING[f] !== undefined && bare.length < allowed) over.push(`${f}.js holds ${bare.length} bare literals. Lower its PENDING count from ${allowed}.`);
+  const bare = FILES.filter(f => f !== 'clock').flatMap(bareIn);
+  assert.equal(bare.length, 0, bare.join('\n'));
+});
+
+test('every entry of the table is a finite number', () => {
+  const C = load().CLOCK;
+  const walk = (o, at) => { for (const k in o){ const v = o[k], p = at + '.' + k; if (v && typeof v === 'object') walk(v, p); else assert.ok(Number.isFinite(v), `${p} is ${v}`); } };
+  walk(C, 'CLOCK');
+});
+
+test('every entry of the table is read by a rule', () => {
+  const C = load().CLOCK, src = FILES.filter(f => f !== 'clock').map(f => fs.readFileSync(path.join(SIM, f + '.js'), 'utf8')).join('\n') + fs.readFileSync(path.join(SIM, '..', 'ui', 'derive.js'), 'utf8');
+  const unread = [];
+  const reads = p => new RegExp(p.replace(/\./g, '\\.') + '\\b').test(src);
+  const walk = (o, at) => { for (const k in o){ const v = o[k], p = at + '.' + k; if (v && typeof v === 'object') walk(v, p); else if (!reads(p) && !src.includes(at + '[')) unread.push(p); } };
+  walk(C, 'CLOCK');
+  assert.deepEqual(unread, []);
+});
+
+test('every event chance names a roll the lint finds', () => {
+  const found = new Set();
+  for (const f of ROLL_FILES){
+    const src = fs.readFileSync(path.join(SIM, f + '.js'), 'utf8');
+    const r = RULES.find(r => r.rolls);
+    for (const m of src.matchAll(r.re)) found.add(m[0].trim());
   }
-  assert.equal(over.length, 0, over.join('\n'));
+  const dead = EVENT_CHANCES.filter(s => !found.has(s));
+  assert.deepEqual(dead, []);
 });

@@ -283,3 +283,31 @@ The acts the door knows: light, poke, priority (a goal set off, on, or high), an
 - A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
 - G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data. Tasks as data is what a save format waits on.
 - Then the lingering gods. A sleeping god wakes, later gods are born of side effects or of belief, and the four inhabit modes come through the door.
+
+## 17. The clock table
+
+`src/sim/clock.js` holds the calendar, the unit helpers, and one table, `CLOCK`. It loads directly after `core.js`. No rule in `src/sim/` holds a bare tick count: every duration and every rate is read from `CLOCK` by name.
+
+What counts as time, in short form:
+
+| Kind | Goes in | Helper |
+|---|---|---|
+| A duration in ticks | `CLOCK` | `ticks(n)` |
+| A duration in whole days | `CLOCK`, as ticks | `days(n)` |
+| A duration in strides | `CLOCK` | `strides(n)` |
+| A rate per tick | `CLOCK.rate` | `tickRate(p)` |
+| A rate per stride | `CLOCK.rate` | `strideRate(p)` |
+| A chance that repeats with time | `CLOCK`, beside its period | a bare number |
+| A per-species or per-recipe value | its own table | the same helpers |
+| A chance rolled once per event | stays where it is | listed in `EVENT_CHANCES` |
+| Not time (distances, scores, amounts, multipliers without a unit) | stays where it is | none |
+
+A being runs its task once a stride, not once a tick, so a task's progress threshold and period count strides.
+
+`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each returns its argument unchanged. A value inside one is still in today's units: a count of ticks, a count of strides, a rate for each tick, a rate for each stride. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done.
+
+The rows of `SPECIES`, `LIFE`, and `RECIPES` stay in their own tables. They are written with the same unit helpers, not moved into `CLOCK`.
+
+`tests/clock.js` lints `src/sim/` for a bare time literal in a rule: a tick added to, a tick compared, a period, a thought's duration, a multiple of `DAY`, an age in days, a progress threshold, a wait, work in a build or a recipe, a stride, a decay, a small step added or subtracted, a need gained, or a roll. `EVENT_CHANCES` lists each chance that is rolled once per event, not on a repeating period, with the reason: a snare's catch, a spear's hit, sparks that take, the rocks that prove to be firestones, and the rest. A spear's hit on a deer can roll more than once in one hunt, since a missed deer flees and the hunt goes on; it is still a chance for each throw, so it stays in `EVENT_CHANCES`.
+
+The soak's six-seed fingerprint did not move through the whole plan. G1 is a pure refactor: every literal moved to `CLOCK` at its same value, in the same order of rolls.

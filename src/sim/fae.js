@@ -84,7 +84,7 @@ Object.assign(START, {
   },
 });
 
-/* Each CLOCK.every.fae a camp's favour with the sprites does its work: extra berries or blight, drift toward 0, moss light, snares in a grove. */
+/* Once each CLOCK.every.fae ticks a camp's favour with the sprites does its work: extra berries or blight, drift toward 0, moss light, snares in a grove. */
 function faeTick(){
   if (camp.fae.favor >= 30 && camp.site){ for (let k = 0; k < 6; k++){ const t = tileAt(camp.site[0] + rint(21) - 10, camp.site[1] + rint(21) - 10); if (t && t.feature === 'bush' && t.berries < 5 && !isWinter()) t.berries++; } }
   if (camp.fae.blightUntil > tick && camp.site){ for (let k = 0; k < 10; k++){ const t = tileAt(clamp(camp.site[0] + rint(25) - 12, 0, W - 1), clamp(camp.site[1] + rint(25) - 12, 0, H - 1)); if (t.feature === 'bush' && t.berries > 0) t.berries--; } }

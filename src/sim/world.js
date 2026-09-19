@@ -710,7 +710,8 @@ function placeGrove(within, mark){
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
-  for (let k = 0; k < CLOCK.plant.samples; k++){
+  const samples = CLOCK.plant.samples;
+  for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
       const age = tick - (t.planted || 0);

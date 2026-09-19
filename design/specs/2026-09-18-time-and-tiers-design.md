@@ -76,6 +76,8 @@ This is the cost of a real clock. At a speed where a walk can be watched, a day 
 
 **The world's scale.** At 1.5 m a tile the default world is 420 m by 180 m: a hamlet and its fields. That is right for G. H needs a land. The field already covers the whole world in countries, so H can paint a country into tiles when someone first goes there. The register records it as H's.
 
+**As built (G1).** `SPECIES`, `LIFE`, and `RECIPES` keep their own rows rather than moving into `CLOCK`; each row is written with the same unit helpers, so a per-species decay or a recipe's work reads the same way a `CLOCK` entry does. `perHour` is linear: it scales a per-tick amount (fuel burn, warmth gained) and a small per-tick chance by the same division, so one helper serves both. Four legacy markers remain in the code once G1 closes: `ticks`, `strides`, `tickRate`, and `strideRate`. Each returns its argument unchanged and marks a value still in today's units. G4, the retune, replaces every marker with a world unit; it is complete when the source holds none of the four.
+
 ## 2. Tasks as data
 
 Today a task is a closure. `startBuild(a, at, 70, label, done)` builds an object with an `arrive` function, and the effect, the chronicle line, and the thoughts are written inline. A goal offers `start: a => ...`. A closure cannot be saved, cannot be handed to another executor, and cannot be read without running it.
