@@ -111,6 +111,8 @@ A story is the seed, the options, and the log, so a replay is always a valid loa
 - The snapshot test is the oracle. Run N ticks, take a snapshot, load it into a fresh sim, run M more. The fingerprint equals a straight run of N plus M. It holds with a person in the middle of a task.
 - In the page: Save writes a file. Load reads one. The browser keeps one autosave slot, written at each dawn. `load` passes the door.
 
+**As built (G3).** A snapshot holds the tick, both random streams' positions, and the rest of the state a made world carries today. This list names a placement stream, but G3 built none; when a later plan adds one, its position joins the snapshot beside `rng` and `godRng`. `REFS`, in `src/sim/snapshot.js`, names every reference field found by a guard test that walks the whole state; nothing it missed survived that test. The oracle (a save mid-run, a load into a fresh sim, a run-on compared to a straight run) found no fault over six cases and a seventh soak test, and a sabotage pass proved five of six broken loaders would be caught. `load` passes the door as `DOOR_ACTS.load`, marked `replacesWorld`: it applies before logging and is the one lawful act a refusal does not log, because it carries no tick of its own and its snapshot can run to megabytes. The page writes Save to a file, reads Load from one, and keeps one autosave slot in IndexedDB, written at the first frame of each new day; every storage call sits in a try, so a sandboxed page still plays. `design/notes.md`, section 18, has the full account.
+
 ## 4. The day tier
 
 **The land stays true.** A stick gathered is a real stick taken from a real tile. A lean-to built stands on a real tile.
