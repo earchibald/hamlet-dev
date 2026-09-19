@@ -705,6 +705,28 @@ function nameThings(){
   return [valley, river, stillWater, ...camps, ...(sectors || []), ...(hills || []), ...(caves || []), ...(groves || []), ...fords, ...ponds].filter(Boolean);
 }
 
+/* The index and the used meanings after a load. Both are read back out of the saved name records,
+   so no snapshot carries either. The records are replayed oldest first, by the tick each was given
+   on, which is the order `giveName` wrote them in, so the index holds what a straight run holds.
+   Within one tick the order of two records never decides anything: no two things ever carry one
+   text, because `scoreCandidates` scores a text another thing owns at zero and `newOldName` tries
+   again on a taken one. A meaning is used when an old name carries it, so the land words on the
+   saved records are exactly the meanings `takeMeaning` handed out and kept. `lost` holds the named
+   lines the chronicle has dropped, which the index alone still reaches; the snapshot saves them. */
+function rebuildNames(lost = []){
+  nameIndex = new Map(); usedMeanings = new Set();
+  const all = [];
+  const add = thing => { if (thing && thing.names) for (let i = thing.names.length - 1; i >= 0; i--) all.push([thing.names[i], thing]); };
+  for (const thing of nameThings()) add(thing);
+  for (const e of lineList()) add(e);
+  for (const e of lost) add(e);
+  all.sort((p, q) => p[0].since - q[0].since);
+  for (const [rec, thing] of all){
+    nameIndex.set(rec.text.toLowerCase(), thing);
+    if (rec.tongue === 'old' && LAND_WORDS.includes(rec.meaning)) usedMeanings.add(rec.meaning);
+  }
+}
+
 /* ---------- the old tongue ----------
    A syllable table is built from the name stream at generation. An old name is
    one or two words of one to three syllables. */
@@ -5575,7 +5597,8 @@ const SNAPSHOT_VERSION = 1;
    is a path into a plain object the record owns; the encoder copies the objects along that path. The
    owning lists (camp.snares, camp.pitfalls, region.marks, field.regions) are homes, not references. */
 const REFS = {
-  tile:     { hill: 'hill', cave: 'cave', mouth: 'cave', garden: 'camp', 'struct.camp': 'camp', 'struct.snare': 'snare', 'struct.pit': 'pit' },
+  tile:     { hill: 'hill', cave: 'cave', mouth: 'cave', garden: 'camp', 'struct.camp': 'camp', 'struct.snare': 'snare', 'struct.pit': 'pit',
+              water: 'water', pond: 'pond', ford: 'ford' },
   being:    { camp: 'camp', grove: 'grove', target: 'camp', den: 'cave', oldDen: 'cave', shyOf: 'camp', body: 'body', history: 'lines' },
   item:     {},
   camp:     {},
@@ -5591,6 +5614,12 @@ const REFS = {
   line:     {},
   creation: { 'gate.start': 'region' },
   field:    { root: 'region' },
+  /* The naming records. A water, a pond, and a ford are found once, when the land is named, and each
+     water tile points back at the record it belongs to. The valley is pointed at by nothing. */
+  water:    { tiles: 'tiles' },
+  pond:     { tiles: 'tiles' },
+  ford:     {},
+  valley:   {},
 };
 /* The lists that own their records, and the type of record each holds. A record met along one of these
    paths is at home, not pointed at, so the encoder writes it whole. */
@@ -5681,6 +5710,16 @@ const REF_KINDS = {
       throw new Error('This save names a body that is no hill, cave, or region.');
     },
   },
+  /* The three kinds the naming work added. `findWaters` makes all of them, once, on the tick the land
+     is named, and nothing anywhere takes one out again: no water, pond, or ford is ever removed, and
+     no tile ever stops being water. So each keeps its place for the life of the world, and no stray
+     path is needed. The great water is one of two globals, so its name says which. */
+  water: {
+    toId: w => { if (w === river) return 'river'; if (w === stillWater) return 'still'; throw new Error('A snapshot cannot name this water: it is neither the river nor the still water.'); },
+    fromId: (id, s) => { const w = id === 'river' ? s.river : id === 'still' ? s.stillWater : null; if (!w) throw new Error(`This save names a water, ${id}, that is not in it.`); return w; },
+  },
+  pond: { toId: p => snapIndex('ponds', ponds, p, 'pond'), fromId: (i, s) => at(s.ponds, i, 'pond') },
+  ford: { toId: f => snapIndex('fords', fords, f, 'ford'), fromId: (i, s) => at(s.fords, i, 'ford') },
 };
 function at(list, i, what){ const r = list && list[i]; if (!r) throw new Error(`This save names a ${what}, ${i}, that is not in it.`); return r; }
 /* A grove in `groves` is named by its place. A grove that has left the list is a stray: burnOut takes
@@ -5788,6 +5827,20 @@ function lineList(){
   if (SNAP_IX) SNAP_IX.lineList = out;
   return out;
 }
+/* A named event whose line no list of the world reaches any more. The chronicle keeps only its last
+   300 lines, and a line can fall out of all three lists while the name index still points at it: the
+   text stays taken, so no other thing is ever given it. Nothing else can reach such a line, so it is
+   saved whole, beside the lines, and the loaded index holds it again. Everything else the index
+   points at is a thing of `nameThings`, a chronicle line, or a grove that left `groves`. */
+function lostNameLines(){
+  if (!nameIndex) return [];
+  const held = new Set(lineList());
+  for (const t of nameThings()) held.add(t);
+  for (const a of beings) if (a.grove) held.add(a.grove);
+  const out = [], seen = new Set();
+  for (const thing of nameIndex.values()) if (!held.has(thing) && !seen.has(thing)){ seen.add(thing); out.push(thing); }
+  return out;
+}
 
 /* ---------- the snapshot ---------- */
 /* Which global the snapshot keeps, and under which name. The guard test in tests/snapshot.js reads
@@ -5802,6 +5855,8 @@ const SAVED_STATE = {
   creation: 'creation', field: 'field', boundaries: 'boundaries',
   resCache: 'resCache', startRegion: 'startRegion', doorLog: 'doorLog',
   inhabited: 'inhabited', inhabitedTold: 'inhabitedTold',
+  nrng: 'nrng', lore: 'lore', tongue: 'tongue', valley: 'valley', river: 'river', stillWater: 'stillWater',
+  ponds: 'ponds', fords: 'fords',
 };
 /* The value of every saved global, by its snapshot name. The guard walks these, and a test holds this
    table to SAVED_STATE, so a new saved global is walked without anyone remembering to add it here. */
@@ -5809,7 +5864,8 @@ function savedValues(){
   return { seed: seedText, options, tick, nextId, fireCount, wanderAt, doomAt, era, age, pulseAge,
     rng, godRng, levels, raised, hills, caves, sectors, groves, camps, campNow: camp, beings, items, corpses,
     chronicle, legends, weather, goalPriority, namePool, godNamePool, gestureFallbacks,
-    creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold };
+    creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold,
+    nrng, lore, tongue, valley, river, stillWater, ponds, fords };
 }
 /* Which global the snapshot leaves out, and why. Each of these comes back from something else. */
 const NOT_SAVED = {
@@ -5823,6 +5879,8 @@ const NOT_SAVED = {
   agePos: 'lives only in the ages', pending: 'lives only in the ages',
   runUntil: 'lives only in the ages', stops: 'lives only in the ages',
   lastLoadFault: 'the reason the last load was refused, not world state',
+  nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
+  usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
@@ -5858,6 +5916,16 @@ function takeSnapshot(){
       startRegion: startRegion ? [...startRegion] : null,
       doorLog: clean(doorLog),
       inhabited: inhabited ? clean(inhabited) : null, inhabitedTold,
+      /* The names. The name stream is held as one position, like the world's own streams, so a loaded
+         world names the next thing with the number the straight run would have drawn. */
+      nrng: nrng ? streamState(nrng) : null,
+      lore: lore ? clean(lore) : null, tongue: tongue ? clean(tongue) : null,
+      valley: valley ? encode(valley, 'valley') : null,
+      river: river ? encode(river, 'water') : null,
+      stillWater: stillWater ? encode(stillWater, 'water') : null,
+      ponds: ponds.map(p => encode(p, 'pond')),
+      fords: fords.map(f => encode(f, 'ford')),
+      lostNames: lostNameLines().map(e => encode(e, 'line')),
     };
     /* Last, because encoding the rest is what finds them. */
     snap.strayGroves = SNAP_IX.strayGroves ? SNAP_IX.strayGroves.list : [];
@@ -5968,6 +6036,21 @@ function decodeSnapshot(snap){
   }
   stage.creation = snap.creation === null ? null : snapCopy(snapObj(snap.creation, 'creation'));
 
+  /* The naming records, before the tiles are joined up: a water tile points at the water it lies in.
+     A save written before the naming work holds none of these fields, and `hasNames` says so: the
+     loader then seeds the name stream afresh, which is what a world that never named anything holds. */
+  const one = (v, what) => v === null || v === undefined ? null : snapCopy(snapObj(v, what));
+  stage.hasNames = snap.nrng !== undefined;
+  stage.nrng = snap.nrng === undefined || snap.nrng === null ? null : snapNum(snap.nrng, 'nrng');
+  stage.lore = one(snap.lore, 'lore');
+  stage.tongue = one(snap.tongue, 'tongue');
+  stage.valley = one(snap.valley, 'valley');
+  stage.river = one(snap.river, 'river');
+  stage.stillWater = one(snap.stillWater, 'still water');
+  stage.ponds = stageList(snapOpt(snap.ponds, []), 'pond', 'ponds');
+  stage.fords = stageList(snapOpt(snap.fords, []), 'ford', 'fords');
+  stage.lostNames = stageList(snapOpt(snap.lostNames, []), 'line', 'lostNames');
+
   /* Then every id becomes the one record it names. fromId throws on an id that names nothing. */
   for (const level of stage.levels) for (const t of level) if (t) resolveRefs(t, 'tile', stage);
   for (const c of stage.camps) resolveRefs(c, 'camp', stage);
@@ -5980,6 +6063,10 @@ function decodeSnapshot(snap){
   for (const it of stage.items) resolveRefs(it, 'item', stage);
   for (const b of stage.boundaries) resolveRefs(b, 'boundary', stage);
   if (stage.creation) resolveRefs(stage.creation, 'creation', stage);
+  if (stage.river) resolveRefs(stage.river, 'water', stage);
+  if (stage.stillWater) resolveRefs(stage.stillWater, 'water', stage);
+  for (const p of stage.ponds) resolveRefs(p, 'pond', stage);
+  for (const f of stage.fords) resolveRefs(f, 'ford', stage);
   if (stage.field){ resolveRefs(stage.field, 'field', stage); for (const r of stage.field.regions) stage.field.byId.set(r.id, r); }
 
   stage.raised = REF_KINDS.tiles.fromId(snapArray(snap.raised, 'raised'), stage);
@@ -6031,6 +6118,15 @@ function commitSnapshot(s){
   godRng = s.godRng === null ? null : mulberry32(0);
   if (godRng) setStreamState(godRng, s.godRng);
   inhabited = s.inhabited; inhabitedTold = s.inhabitedTold;
+  /* The names. A save written before the naming work names nothing, so the name stream is seeded from
+     the seed, as a fresh world seeds it. Otherwise every record comes back and the index is rebuilt. */
+  if (!s.hasNames) seedNames();
+  else {
+    nrng = mulberry32(0); if (s.nrng !== null) setStreamState(nrng, s.nrng);
+    lore = s.lore; tongue = s.tongue; valley = s.valley;
+    river = s.river; stillWater = s.stillWater; ponds = s.ponds; fords = s.fords;
+    rebuildNames(s.lostNames);
+  }
   /* These three live inside one step and start a step as beginCreation leaves them. */
   deciding = null; saidFrom = 0; settleNow = false;
   /* The ages are over in a loaded world, so nothing of the ages is left standing. A load can arrive
@@ -6077,6 +6173,9 @@ function registry(){
   if (field) for (const r of field.regions){ put(r, 'region'); for (const m of r.marks) put(m, 'mark'); }
   for (const b of boundaries) put(b, 'boundary');
   for (const e of lineList()) put(e, 'line');
+  put(valley, 'valley'); put(river, 'water'); put(stillWater, 'water');
+  for (const p of ponds || []) put(p, 'pond');
+  for (const f of fords || []) put(f, 'ford');
   /* A stray grove is in no list, so the sprites that still point at it are the only way to reach it. */
   for (const a of beings) if (a.grove && !reg.has(a.grove)) put(a.grove, 'grove');
   return reg;
@@ -6086,7 +6185,8 @@ function registry(){
    resCache is a Map and startRegion a Set, and the encoder holds each as entries; the values of
    resCache are walked below. */
 const WALK_HOME = { levels: 1, raised: 1, hills: 1, caves: 1, sectors: 1, groves: 1, camps: 1, campNow: 1,
-  beings: 1, items: 1, chronicle: 1, legends: 1, boundaries: 1, creation: 1, field: 1, resCache: 1, startRegion: 1 };
+  beings: 1, items: 1, chronicle: 1, legends: 1, boundaries: 1, creation: 1, field: 1, resCache: 1, startRegion: 1,
+  valley: 1, river: 1, stillWater: 1, ponds: 1, fords: 1 };
 /* Walk every record and report each field that points at another record and is not named in REFS.
    A new field that holds a reference fails the test in tests/snapshot.js until someone names it. */
 function unnamedRefs(){

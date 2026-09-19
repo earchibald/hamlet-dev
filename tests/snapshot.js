@@ -274,6 +274,108 @@ test('a world whose hollow pine burned out under its sprites saves, loads, and r
   sameStory(o);
 });
 
+/* ---------- the names ----------
+   The naming work hung state on the world the snapshot had to learn: the name stream, the lore, the
+   valley, the water, the ponds, the crossings, a name record on every thing that has a name, and an
+   epithet on a person. The index from a text to the thing that holds it is derived, so the loader
+   rebuilds it, and these tests hold the rebuilt one to the live one. */
+
+/* Every name the world holds, in a shape two worlds can be compared by. `nameThings` gives the same
+   list in the same order in both, so a thing is named by its place in it, and a named event by its
+   place in the chronicle. The index is compared sorted, because what it must give back is the same
+   thing for the same text, not the same order of insertion. */
+function nameState(api){
+  const things = api.nameThings(), lines = api.chronicle;
+  const where = t => { const i = things.indexOf(t); return i >= 0 ? 'thing ' + i : 'line ' + lines.indexOf(t); };
+  const recs = t => (t.names || []).map(r => [r.text, r.tongue, r.meaning, r.since, r.by, r.why, JSON.stringify(r.scores)].join('|'));
+  return {
+    stream: api.streamState(api.nrng),
+    lore: api.lore, tongue: api.tongue,
+    valley: api.nameOf(api.valley),
+    things: things.map(t => [api.nameOf(t), t.nameKnown === undefined ? 'plain' : String(t.nameKnown), ...recs(t)].join(' / ')),
+    events: lines.filter(e => e.names).map(e => where(e) + ' ' + recs(e).join(' / ')),
+    index: [...api.nameIndex].map(([k, t]) => k + ' -> ' + where(t) + ' = ' + api.nameOf(t)).sort(),
+    epithets: api.beings.map(b => [b.epithet || '', ...(b.epithets || []).map(r => r.text)].join('|')),
+  };
+}
+/* The small valley of seed alpha at step 23000 has named a camp twice over, a village, four sectors,
+   seven events, and the valley itself, and eighteen people carry an epithet. */
+test('a world with every kind of name, saved, loaded, and run on, names as the straight run does', t => {
+  const o = oracle('alpha', 23000, 1500, SMALL);
+  const snap = o.snap;
+  t.diagnostic(`at the save: the valley is ${snap.valley.names[0].text}, ${snap.sectors.filter(s => s.names && s.names.length).length} sector(s) named, ${snap.lostNames.length} name(s) the index alone holds, ${snap.nrng} in the name stream`);
+  /* What the save was picked for. Each is read off the save itself. */
+  assert.ok(snap.valley.names.length, 'the valley was meant to have a name at the save');
+  assert.ok(snap.camps.some(c => c.villageNamed), 'a village was meant to have named itself');
+  assert.ok(snap.camps.some(c => c.names && c.names.length > 1), 'a camp was meant to carry a former name');
+  assert.ok(snap.sectors.some(s => s.names && s.names.length), 'a sector was meant to be named');
+  assert.ok(snap.lines.some(e => e.names && e.names.length), 'an event was meant to be named');
+  assert.ok(snap.beings.some(b => b.epithet), 'somebody was meant to carry an epithet');
+  assert.ok(snap.stillWater && snap.stillWater.names.length, 'the water was meant to carry an old name');
+  assert.ok(snap.lostNames.length > 0, 'the chronicle was meant to have dropped a line that only the index still holds');
+  assert.equal(typeof snap.nrng, 'number');
+  sameStory(o);
+  /* And the names themselves, once both worlds have run on. */
+  assert.deepEqual(nameState(o.b), nameState(o.a));
+  /* The rebuilt index answers for every text, the former ones with it. */
+  const was = o.a, api = o.b;
+  const texts = was.nameThings().flatMap(x => (x.names || []).map(r => r.text));
+  assert.ok(texts.length > 10);
+  for (const text of texts){
+    assert.equal(api.nameTaken(text), true, text);
+    assert.deepEqual(api.nameRecordOf(text), was.nameRecordOf(text), text);
+  }
+  const former = was.camps.flatMap(c => was.formerNames(c)).map(r => r.text);
+  assert.ok(former.length > 0, 'a camp was meant to carry a former name');
+  for (const text of former) assert.equal(api.nameTaken(text), true, text);
+  /* The water comes back as the one record its tiles point at. */
+  assert.ok(was.world.filter(t => t.water).length > 100);
+  assert.equal(api.world.filter(t => t.water).length, was.world.filter(t => t.water).length);
+  for (const t of api.world) if (t.water) assert.equal(t.water, api.stillWater);
+  assert.equal(api.lore.unknown, was.lore.unknown);
+});
+/* The other end: a world saved on the day it was made. The land carries its old names, and nobody
+   living has named anything yet. The default size of seed alpha is the one world with a river, a
+   crossing, and ponds in it, so its tiles are the ones that point at all three kinds of water. */
+test('a world saved before anybody living has named a thing round-trips whole', () => {
+  const was = load(); was.startWorld('alpha');
+  assert.equal(was.nameOf(was.valley), null, 'the valley was meant to have no name yet');
+  assert.ok(was.camps.every(c => !c.names || !c.names.length), 'no camp was meant to be named yet');
+  assert.ok(was.river && was.fords.length && was.ponds.length, 'this world was meant to have a river, a crossing, and a pond');
+  const api = load();
+  assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
+  assert.deepStrictEqual(through(api.takeSnapshot()), through(was.takeSnapshot()));
+  assert.deepEqual(nameState(api), nameState(was));
+  /* Every water tile, every pond tile, and the crossing point at the one record they did. */
+  for (const t of api.world) if (t.water) assert.equal(t.water, api.river);
+  for (const p of api.ponds){ assert.ok(p.tiles.length); for (const t of p.tiles) assert.equal(t.pond, p); }
+  for (const f of api.fords) assert.equal(api.world[f.y * api.W + f.x].ford, f);
+  /* And it names things from there as the straight run does. */
+  for (let i = 0; i < 4000; i++){ was.step(); api.step(); }
+  assert.deepEqual(nameState(api), nameState(was));
+  assert.ok(nameState(api).things.some(s => s.split(' / ')[0] !== 'null'), 'nothing was named after the load');
+});
+/* The versioning policy again: a save written before the naming work holds none of these fields, and
+   the loader seeds the name stream as a fresh world does. Such a save names no water, no pond, and no
+   crossing, so no tile of it points at one. */
+test('a version 1 save written before the names loads, and the world starts its names afresh', () => {
+  const api = load(), old = through(lateWorld().takeSnapshot());
+  for (const k of ['nrng', 'lore', 'tongue', 'valley', 'river', 'stillWater', 'ponds', 'fords']) delete old[k];
+  for (const lv of old.levels) for (const t of lv){ if (!t) continue; delete t.water; delete t.pond; delete t.ford; }
+  for (const list of ['hills', 'caves', 'sectors', 'groves', 'camps', 'beings', 'lines'])
+    for (const r of old[list]){ delete r.names; delete r.nameKnown; delete r.epithet; delete r.epithets; }
+  assert.equal(old.version, 1);
+  assert.equal(api.loadSnapshot(old), null);
+  assert.equal(api.lore, null);
+  assert.equal(api.nameOf(api.valley), null);
+  assert.equal(api.river, null); assert.equal(api.stillWater, null);
+  assert.deepEqual(api.ponds, []); assert.deepEqual(api.fords, []);
+  assert.equal(api.nameIndex.size, 0);
+  assert.equal(api.usedMeanings.size, 0);
+  assert.equal(typeof api.streamState(api.nrng), 'number');
+  for (let i = 0; i < 200; i++) api.step();
+});
+
 /* ---------- Become ----------
    The player can be a god, and the days era keeps that: `inhabited` and `inhabitedTold` are saved.
    Nothing else of the ages is. A load resets the four ages-only names, so a save loaded while a
@@ -575,7 +677,11 @@ const FROZEN_TABLES = new Set(['DIRS', 'RING', 'NEAR', 'AROUND', 'DEFAULT_OPTION
   'ITEMS', 'BIOMES', 'TILE_DEFAULTS', 'STAGES', 'SEASONS', 'CLOCK', 'CONTRASTS', 'INHERITED', 'BIOME_OF', 'GROWS',
   'NAMES', 'GATHERERS', 'RECIPES', 'PLACES', 'MAKERS', 'GOD_NAMES', 'EPITHET', 'BODY', 'LEAVES', 'SCAR_OF', 'MAKES',
   'KINDS', 'STRAIN', 'GOD_ACTS', 'GOD_BARS', 'SCAR_PAINTERS', 'SPAWN', 'REFS', 'REF_HOMES', 'REF_DERIVED', 'REF_KINDS',
-  'SAVED_STATE', 'NOT_SAVED', 'WALK_HOME', 'DOOR_SOURCES', 'DOOR_ACTS']);
+  'SAVED_STATE', 'NOT_SAVED', 'WALK_HOME', 'DOOR_SOURCES', 'DOOR_ACTS',
+  /* The naming tables. The namer reads each one and writes into none of them. */
+  'OLD_ONSETS', 'OLD_VOWELS', 'OLD_CODAS', 'OLD_FORBID', 'LAND_WORDS', 'LORE_BUILT', 'LORE_TOOK', 'SKY_MEANINGS',
+  'SPRITE_MEANINGS', 'OLD_CAVE_KINDS', 'BIOME_WORD', 'LAND_MARKS', 'WORD_TAIL', 'WORD_PHRASE', 'NOTABLE_TAILS',
+  'AXIS_TRAIT', 'EVENT_NAMES', 'EVENT_KINDS', 'WORK_WORDS', 'DEED_EPITHETS', 'FATE_EPITHETS', 'DESCRIBE_KIND']);
 
 test('every top-level let or var in the sim is saved or listed with a reason', () => {
   const api = load(), saved = api.SAVED_STATE, not = api.NOT_SAVED;

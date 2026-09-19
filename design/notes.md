@@ -458,10 +458,11 @@ The whole-branch review of G2 left these for the snapshots (G3) and the day tier
 | The creation | `creation`, `field`, `boundaries` |
 | The caches and the log | `resCache`, `startRegion`, `doorLog` |
 | The player | `inhabited`, `inhabitedTold` |
+| The names | `nrng` as one position, `lore`, `tongue`, `valley`, `river`, `stillWater`, `ponds`, `fords`, `lostNames` |
 
 `campNow` is the index of the global `camp`. The spec (section 3) names a placement stream among the state a snapshot holds. No such stream exists yet, because plan G has not reached it. The snapshot holds the two streams the sim has today, `rng` and `godRng`.
 
-**The versioning policy.** A field added after version 1 is read as optional, with the value a world that never had it holds. The helper is `snapOpt(v, fallback)`. The version stays 1. It rises only when the meaning of a field already saved changes, and a save of an older version is then refused with its own sentence. The reason is the autosave slot: Continue offers what that slot holds, and a rebuilt page must not turn every player's Continue into a refusal. `inhabited`, `inhabitedTold`, and `strayGroves` were the first three fields added this way.
+**The versioning policy.** A field added after version 1 is read as optional, with the value a world that never had it holds. The helper is `snapOpt(v, fallback)`. The version stays 1. It rises only when the meaning of a field already saved changes, and a save of an older version is then refused with its own sentence. The reason is the autosave slot: Continue offers what that slot holds, and a rebuilt page must not turn every player's Continue into a refusal. `inhabited`, `inhabitedTold`, and `strayGroves` were the first three fields added this way. The name fields followed: a save written before the naming work holds no `nrng`, and the loader then seeds the name stream as a fresh world seeds it, which is what a world that named nothing holds.
 
 **What it rebuilds instead of saving.** The loader rebuilds `world` (`levels[ZOFF]`), `itemGrid` (from `items`), `regionOf` and `field.byId` (by a walk of `field.regions` in order), the search scratch, and `replayHead`. `deciding`, `saidFrom`, and `settleNow` live inside one step, and the loader sets them as `beginCreation` does. `agePos`, `pending`, `runUntil`, and `stops` live only in the ages. The loader resets all four, so a save loaded while a god's turn is open leaves no turn standing.
 
@@ -479,6 +480,8 @@ A guard test reads every top-level `let` and `var` the sim declares. It holds ea
 | `snare`, `pit` | one in a `camp.snares` or `camp.pitfalls` | `[campIndex, indexInList]` |
 | `body` | a god's body: a hill, a cave, or a region | `{ hill: i }`, `{ cave: i }`, or `{ region: id }` |
 | `line`, `lines` | a chronicle line | its index in the snapshot's `lines` list |
+| `water` | the great water: the river, or the lake where no god drew a river | `'river'` or `'still'`, which says which global it is |
+| `pond`, `ford` | one in `ponds` or `fords` | its index in that list |
 
 A chronicle line sits in `chronicle`, in `legends`, and in each being's `history`. The snapshot holds each distinct line once, in `lines`, in the order first met, and the three lists hold indexes into it, so the sharing survives the round trip. `camp.snares`, `camp.pitfalls`, `region.marks`, and `field.regions` are homes, not references: a record met there is written whole, not pointed at.
 
@@ -489,6 +492,12 @@ Such a grove is a stray: it is named `{ stray: i }` and written whole into `stra
 No other kind loses a referenced record in play. Every `caves.splice` call drops a cave pushed a moment before, inside the function that made it. `burnOut` takes a burnt snare or pitfall out of its camp and clears `tile.struct` in the same step, so nothing points at it after. `setPole` filters a country's marks, but it drops only pole marks. A hill, a cave, or a grove never holds a pole mark.
 
 Three other places filter marks: the battle win in `gods.js` near line 297, the backstop in `gods.js` near line 488, and `undoSettle` in `settle.js` near line 107. They drop only pole, scar, height, depth, or rest marks. All four filters run only in the ages, before a hill, a cave, or a grove of the settled world holds a mark.
+
+**The names.** `findWaters` makes the water, the pond, and the ford records once, on the tick the land is named, and nothing takes one out again. No tile stops being water either. So each of the three kinds keeps its place for the life of the world, and none of them needs a stray path. A water tile points at its record in `t.water`, a pond tile in `t.pond`, and the sand of a crossing in `t.ford`, and each of those three fields is a row of `REFS`.
+
+`nameIndex` and `usedMeanings` are not saved. `rebuildNames` in `src/sim/names.js` reads both back out of the saved name records, oldest record first, by the tick each name was given on. That is the order `giveName` wrote them in. No two things ever carry one text, so the order inside one tick decides nothing. A meaning is used when an old name carries it, so the land words on the saved records are exactly the meanings `takeMeaning` handed out and kept.
+
+One thing the index holds that nothing else reaches: a named event whose line the chronicle has dropped. The chronicle keeps its last 300 lines, and a line can fall out of all three lists while the index still holds its text, so no other thing is ever given that text. Those lines are saved whole, in `lostNames`, and `rebuildNames` takes them with the rest. A day-23 save of the small valley of seed alpha holds three.
 
 The `{ whole: mark }` path is the net under that: it saves such a mark whole, and a mark shared by two holders would then come back as two objects. Several caves can share one mark, so that net is not free, and a mark that could leave its region would want a stray path of its own.
 

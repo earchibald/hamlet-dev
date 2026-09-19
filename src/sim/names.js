@@ -62,6 +62,28 @@ function nameThings(){
   return [valley, river, stillWater, ...camps, ...(sectors || []), ...(hills || []), ...(caves || []), ...(groves || []), ...fords, ...ponds].filter(Boolean);
 }
 
+/* The index and the used meanings after a load. Both are read back out of the saved name records,
+   so no snapshot carries either. The records are replayed oldest first, by the tick each was given
+   on, which is the order `giveName` wrote them in, so the index holds what a straight run holds.
+   Within one tick the order of two records never decides anything: no two things ever carry one
+   text, because `scoreCandidates` scores a text another thing owns at zero and `newOldName` tries
+   again on a taken one. A meaning is used when an old name carries it, so the land words on the
+   saved records are exactly the meanings `takeMeaning` handed out and kept. `lost` holds the named
+   lines the chronicle has dropped, which the index alone still reaches; the snapshot saves them. */
+function rebuildNames(lost = []){
+  nameIndex = new Map(); usedMeanings = new Set();
+  const all = [];
+  const add = thing => { if (thing && thing.names) for (let i = thing.names.length - 1; i >= 0; i--) all.push([thing.names[i], thing]); };
+  for (const thing of nameThings()) add(thing);
+  for (const e of lineList()) add(e);
+  for (const e of lost) add(e);
+  all.sort((p, q) => p[0].since - q[0].since);
+  for (const [rec, thing] of all){
+    nameIndex.set(rec.text.toLowerCase(), thing);
+    if (rec.tongue === 'old' && LAND_WORDS.includes(rec.meaning)) usedMeanings.add(rec.meaning);
+  }
+}
+
 /* ---------- the old tongue ----------
    A syllable table is built from the name stream at generation. An old name is
    one or two words of one to three syllables. */
