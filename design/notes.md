@@ -117,6 +117,10 @@ The smoke is what calls a newcomer, so a camp with a cold pit calls nobody. That
 
 This is the world's rule, not a god's deed. It writes no legend, because the gods era is over at settle. It does not end the run either: the animals, the sprites, the gnomes, the weather, and everything the people built go on without them. The fire does not go out the moment the last person falls, so the smoke arrival can still bring people for as long as the fuel lasts. The wanderer is the floor under that, not a replacement for it.
 
+A valley down to one living person is finished too. A birth needs two adults who like each other, so one person can never make a second. But one person with the fire out is a common thing: mid-winter, mid-journey, a founding party on the road. So the rule does not fire on the count of the people alone. The line counts as doomed only when exactly one person lives, no second adult walks the valley, and every hearth in the valley has stood cold for `CLOCK.arrival.afterTheDoomed`. The chronicle then says the line cannot go on, and a stranger crosses the hills a further `CLOCK.arrival.afterTheLast` later, outside winter. That stranger meets somebody alive, so the chronicle says so in its own line, not in the line about bones.
+
+The two rules take turns and never run together. One needs nobody alive, the other needs exactly one. If the last person dies while the doomed wait is open, the doomed wait drops, and the empty valley rule takes the valley over from its own first line. Once the doomed line is said, only the count of the people closes the wait: a fire relit does not save a line of one.
+
 Spoilage: cooked meat 1800 ticks, berries 3500, doubled in winter and doubled by a storehouse. Smoked meat keeps.
 
 ## 9. Fire as the loop
