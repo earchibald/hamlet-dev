@@ -2,9 +2,6 @@
 
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
-/* renderUI lives in panels.js, which the pure Node tests for derive.js, keys.js, and actions.js do not join.
-   This guard lets focusStep and back run there, the way uiNow already guards performance. */
-const renderIfReady = force => { if (typeof renderUI === 'function') renderUI(force); };
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
@@ -241,7 +238,7 @@ function rowOpen(){
   else if (r.kind === 'line'){ const who = campHumans().concat(beings.filter(b => b.alive && b.species !== 'human')).find(b => namesIn(r.e.text, b.name)); if (who){ if (!inAges()) cursorTo(who.x, who.y, who.z); ACTIONS.inspect(who.id); } }
 }
 function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return; const r = drawerRows('goals')[ui.row.goals]; if (!r || r.kind !== 'goal') return; say(inject({ source: 'player', act: 'priority', id: r.id, pri: clamp((goalPriority[r.id] ?? 1) + d, 0, 2) })); renderUI(true); }
-function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderIfReady(true); }
+function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
@@ -271,7 +268,7 @@ const ACTIONS = {
   focusPrev(){ focusStep(-1); },
   back(){
     if (ui.focus.startsWith('window:')){ winClose(Number(ui.focus.slice(7))); persist(); renderUI(true); return; }
-    if (ui.focus !== 'map'){ ui.focus = 'map'; renderIfReady(true); return; }
+    if (ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); return; }
     /* With the map focused, Esc closes the topmost window. The last entry of ui.windows is the one in front. */
     if (ui.windows.length){ winClose(ui.windows[ui.windows.length - 1].id); persist(); renderUI(true); return; }
     hideTip();

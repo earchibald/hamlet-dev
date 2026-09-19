@@ -108,7 +108,7 @@ for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), alt: true, focus: 'di
 /* The dispatcher. focus is 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>'.
    Returns { action, arg, focus } or null. The row's own focus comes back so a caller can tell an 'any' row from a focused one.
    focus defaults to the live ui.focus, so a caller that already holds the current focus need not pass it. */
-function keyAction(e, focus = ui.focus){
+function keyAction(e, focus){
   const kind = focus.startsWith('dialog:') ? focus : focus.startsWith('drawer:') ? 'drawer' : focus.startsWith('window:') ? 'window' : focus;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const code = e.code && /^Digit\d$/.test(e.code) ? e.code.slice(5) : null;
@@ -117,8 +117,8 @@ function keyAction(e, focus = ui.focus){
     if (k.focus !== want) continue;
     const rowKey = k.key.length === 1 ? k.key.toLowerCase() : k.key;
     if (rowKey !== key && !(code && rowKey === code)) continue;
-    if (!!k.shift !== !!e.shiftKey) continue;
-    if (!!k.ctrl !== !!e.ctrlKey || !!k.alt !== !!e.altKey || !!k.meta !== !!e.metaKey) continue;
+    if (!!k.shift !== e.shiftKey) continue;
+    if (!!k.ctrl !== e.ctrlKey || !!k.alt !== e.altKey || !!k.meta !== e.metaKey) continue;
     return { action: k.action, arg: k.arg, focus: k.focus };
   }
   return null;

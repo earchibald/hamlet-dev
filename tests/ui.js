@@ -302,27 +302,23 @@ test('the timeline actions stay inside their bounds, and the same chip twice clo
 });
 
 test('the timeline keys change meaning by focus, and do not take the level keys away', () => {
-  const api = loadUI(['state', 'keys'], ['keyAction', 'KEYMAP', 'ui']);
-  api.ui.focus = 'map';
-  assert.equal(api.keyAction({ key: '[' }).action, 'levelDown', 'the map keeps its levels');
-  assert.equal(api.keyAction({ key: ']' }).action, 'levelUp');
-  api.ui.focus = 'timeline';
-  assert.equal(api.keyAction({ key: '[' }).action, 'zoomTimelineOut', 'the timeline zooms while it holds focus');
-  assert.equal(api.keyAction({ key: ']' }).action, 'zoomTimelineIn');
-  assert.equal(api.keyAction({ key: 't' }).action, 'foldTimeline', 'T folds from anywhere');
-  api.ui.focus = 'map';
-  assert.equal(api.keyAction({ key: 't' }).action, 'foldTimeline');
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.equal(keyHit(api, ev('['), 'map').action, 'levelDown', 'the map keeps its levels');
+  assert.equal(keyHit(api, ev(']'), 'map').action, 'levelUp');
+  assert.equal(keyHit(api, ev('['), 'timeline').action, 'zoomTimelineOut', 'the timeline zooms while it holds focus');
+  assert.equal(keyHit(api, ev(']'), 'timeline').action, 'zoomTimelineIn');
+  assert.equal(keyHit(api, ev('t'), 'timeline').action, 'foldTimeline', 'T folds from anywhere');
+  assert.equal(keyHit(api, ev('t'), 'map').action, 'foldTimeline');
 });
 
-test('the timeline joins the focus cycle and Escape leaves it', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui', 'focusStep']);
-  api.ui.focus = 'timeline';
-  api.ACTIONS.back();
-  assert.equal(api.ui.focus, 'map', 'Escape returns focus to the map');
-  const seen = new Set();
-  api.ui.focus = 'map';
-  for (let n = 0; n < 12; n++){ api.focusStep(1); seen.add(api.ui.focus); }
-  assert.ok(seen.has('timeline'), 'Tab reaches the timeline');
+test('the timeline joins the focus cycle only while the ages run, and Escape leaves it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'focusRing', 'startCreation', 'era', 'step']);
+  api.startCreation('gamma', {});
+  assert.ok(api.focusRing().includes('timeline'), 'the ages show the band');
+  assert.equal(keyHit(api, ev('Escape'), 'timeline').action, 'back');
+  let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+  assert.ok(!api.focusRing().includes('timeline'), 'the days era has no band to focus');
 });
 
 test('every timeline button has a key', () => {
