@@ -207,7 +207,7 @@ test('a story with a load in it replays: the load passes through inject, and a r
   assert.equal(b.inject({ source: 'player', act: 'load', snapshot: snap }), `The world is as it was on day ${b.dayOf()}.`);
   assert.deepEqual(b.doorLog, [...snap.doorLog, { source: 'player', act: 'load', tick: b.tick }]);
 
-  const cb = collect(b); cb.skipPresent();
+  const cb = collect(b);
   runOn(b, SAVE_STEP, TOTAL_STEP - SAVE_STEP, cb, scriptGod);
 
   const replay = b.replay;
@@ -217,14 +217,14 @@ test('a story with a load in it replays: the load passes through inject, and a r
   /* A fresh sim replays the whole merged log from tick 0. `inject` is watched, so a `load` entry
      that slipped past `logGod` and reached the door would be caught here, not only by a mismatched
      fingerprint. */
-  const c = load(); c.startWorld(replay.seed, replay.options);
+  const c = load(); const cc = collect(c); c.startWorld(replay.seed, replay.options);
   let loadSentToDoor = false;
   const realInject = c.inject;
   c.inject = e => { if (e.act === 'load') loadSentToDoor = true; return realInject(e); };
-  const cc = collect(c); cc.drain();
   const rg = replayGod(replay);
-  for (let i = 0; i < TOTAL_STEP; i++){ c.step(); rg(c); cc.drain(); }
+  for (let i = 0; i < TOTAL_STEP; i++){ c.step(); rg(c); }
 
+  cb.check('the loaded world'); cc.check('the replayed world');
   assert.equal(loadSentToDoor, false, 'the replay sent the load entry to the door');
   assert.deepEqual(fingerprint(b, cb.events), fingerprint(c, cc.events.slice(cut)));
 });

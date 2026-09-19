@@ -58,6 +58,11 @@ const API = `return {
   campName, campNameOf, campHumans, humans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
+  /* The chronicle test seam. This object is built inside a template literal, so no backticks here.
+     watchChronicle(a) points the sink at an array and answers how many lines were already written,
+     so a harness that started late can say so rather than report a short run as a whole one. */
+  get chronicleWritten(){ return chronicleWritten; },
+  watchChronicle(a){ chronicleSink = a; return chronicleWritten; },
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },

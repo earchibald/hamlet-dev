@@ -27,31 +27,45 @@ function replayGod(replay){
 }
 
 /* The event collector. The chronicle keeps only its last 300 lines, so a run that wants them all must
-   take each line as it appears. `drain()` walks the chronicle, newest first, until it meets a line it
-   has already taken, then pushes the new ones, oldest first. It knows a line by its object. A world
-   loaded from a snapshot holds new objects for the same lines, so its whole window would be taken
-   again: `skipPresent()` marks every line now in the chronicle as seen, and the collector goes on
-   from the load as if it had been there all along. */
+   take each line as it appears. This used to scrape the chronicle after each step, which held only
+   while a step was small enough that 300 lines could not be written inside one. Two callers broke
+   that: `runDays` built the collector after `startWorld`, so a long creation was already trimmed
+   before anything watched (seed `sweep23` wrote 965 lines and kept 300), and a step that covers a
+   span rather than a tick can write past 300 between two looks.
+
+   So the engine hands each line over as it is written. `collect` points the sink at its own array,
+   and `from` is what had been written already. `check()` proves the collector missed nothing, and
+   that it did not start late: both are silent failures otherwise, because a short chronicle
+   fingerprints cleanly and reports itself as a pass. */
 function collect(api){
-  const events = []; const seen = new WeakSet();
-  const drain = () => { const ch = api.chronicle; let n = 0; while (n < ch.length && !seen.has(ch[n])) n++; for (let j = n - 1; j >= 0; j--){ seen.add(ch[j]); events.push(ch[j]); } };
-  const skipPresent = () => { for (const e of api.chronicle) seen.add(e); };
-  return { events, drain, skipPresent };
+  const events = [];
+  const from = api.watchChronicle(events);
+  const check = (why = '') => {
+    const owed = api.chronicleWritten - from;
+    if (events.length !== owed) throw new Error(`the collector holds ${events.length} lines and ${owed} were written${(why ? ` (${why})` : '')}`);
+  };
+  return { events, from, check };
 }
 /* Step a world on. The loop index starts at `fromStep`, not at 0, so a world that carries on from a
    snapshot gives the script god the same numbers an unbroken run gives it. */
 function runOn(api, fromStep, steps, collector, god = scriptGod){
-  for (let i = fromStep; i < fromStep + steps; i++){ api.step(); god(api, i); collector.drain(); }
+  for (let i = fromStep; i < fromStep + steps; i++){ api.step(); god(api, i); }
   return collector;
 }
 
 /* Run one seed. Returns the api and the full list of chronicle events in order. */
 function runDays(seed, days, onTick, god = scriptGod, opts = {}){
-  const api = load(); api.startWorld(seed, opts);
-  const c = collect(api); c.drain();
+  /* The collector goes on before the world does. The creation is logged inside `startWorld`, and on
+     a seed with a long one it is longer than the chronicle keeps. */
+  const api = load();
+  const c = collect(api);
+  api.startWorld(seed, opts);
   const n = days * DAY;
   if (!onTick) runOn(api, 0, n, c, god);
   else for (let i = 0; i < n; i++){ runOn(api, i, 1, c, god); onTick(api, i, c.events); }
+  /* Both silent failures, and both look like a pass: a short chronicle fingerprints cleanly. */
+  if (c.from !== 0) throw new Error(`seed ${seed}: the creation was logged before the collector watched (${c.from} lines)`);
+  c.check(`seed ${seed}`);
   return { api, events: c.events };
 }
 
