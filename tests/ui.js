@@ -758,6 +758,65 @@ test('a mark keeps a reason that is not the stock one, and a country names the g
   assert.ok(api.countryLine(r).includes(g.name));
 });
 
+const TL_API = ['timelineModel', 'chipMatrix', 'timelineSpan', 'ui', 'creation', 'age', 'era', 'gods', 'startCreation', 'step'];
+
+test('the timeline folds to one row of the creation in age order', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  const m = api.timelineModel();
+  assert.equal(m.shown, true);
+  assert.equal(m.folded, true);
+  assert.equal(m.rows.length, 1, 'folded is one row');
+  assert.equal(m.rows[0].id, 'all');
+  assert.equal(m.now, api.age);
+  const ages = m.rows[0].cells.map(c => c.age);
+  assert.deepEqual(ages, [...ages].sort((a, b) => a - b), 'cells run in age order');
+  for (const c of m.rows[0].cells) assert.match(c.chip, /^\d+:\d+$/, 'every cell names its entry');
+});
+
+test('unfolded, the timeline is a row for each god and a row for the gate', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const m = api.timelineModel();
+  assert.equal(m.folded, false);
+  assert.equal(m.rows[m.rows.length - 1].id, 'gate', 'the gate is the last row');
+  const godIds = api.gods().map(g => g.id);
+  for (const r of m.rows.slice(0, -1)) assert.ok(godIds.includes(r.id), 'every other row is a god');
+  assert.ok(m.rows.length > 1);
+});
+
+test('a chip opens the matrix that produced it, unsorted and unscored by the view', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  const rec = api.creation.choices.find(c => !c.continued && c.picked);
+  const m = api.chipMatrix(`${rec.age}:${rec.god}`);
+  assert.equal(m.age, rec.age);
+  assert.equal(m.picked, rec.picked);
+  assert.equal(typeof m.name, 'string');
+  assert.deepEqual(m.opts.map(o => o.score), rec.opts.map(o => o.score), 'the view neither sorts nor scores');
+  assert.equal(api.chipMatrix('9999:1'), null, 'a chip that names nothing opens nothing');
+});
+
+test('the zoom sets the span, and the default keeps the near ages large', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  assert.deepEqual(api.timelineSpan(0, 20), { from: 9, to: 20 }, 'the default shows the last twelve');
+  assert.deepEqual(api.timelineSpan(1, 20), { from: 1, to: 20 }, 'one step out doubles it, clamped at age one');
+  assert.deepEqual(api.timelineSpan(0, 3), { from: 1, to: 3 }, 'a young creation is never cut short');
+  assert.equal(api.timelineSpan(9, 400).from, 1, 'the widest shows the whole creation');
+});
+
+test('the band is not shown once the valley is made', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
+  assert.equal(api.era, 'days');
+  assert.equal(api.timelineModel().shown, false, 'the creation is over');
+});
+
 /* The feedback pass, round three. */
 test('each speed button has a direct key, Shift with its place on the ladder, from every focus', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS']);

@@ -52,6 +52,9 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  timelineFold: true,  /* the timeline is one row; false is a row for each god */
+  timelineZoom: 0,     /* 0 keeps the near ages large; each step out doubles the span */
+  timelineChip: null,  /* the chip the player opened, `age:god`, or null. Not a preference: it names one act of one creation. */
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */

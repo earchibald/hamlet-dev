@@ -5570,6 +5570,9 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  timelineFold: true,  /* the timeline is one row; false is a row for each god */
+  timelineZoom: 0,     /* 0 keeps the near ages large; each step out doubles the span */
+  timelineChip: null,  /* the chip the player opened, `age:god`, or null. Not a preference: it names one act of one creation. */
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
@@ -5872,6 +5875,65 @@ function drawerRows(id){
   if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
   if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
+}
+
+/* ---------- the timeline ----------
+   The record of the creation, laid flat under the map. It reads `creation.choices`, which the sim
+   keeps: one entry for each god that decided in each age, with that god's whole scored option list,
+   what it picked, and what failed to apply. The view neither sorts nor scores. Nothing here reaches
+   into a rule, and nothing here changes one. */
+
+/* How many ages the band covers. Zoom 0 is the default and keeps the near ages large; each step out
+   doubles the span. The span never begins before age one, and never ends before the live age. */
+const TL_SPAN = 12, TL_ZOOM_MAX = 9;
+function timelineSpan(zoom, now){
+  const want = TL_SPAN * Math.pow(2, Math.max(0, Math.min(TL_ZOOM_MAX, zoom)));
+  return { from: Math.max(1, now - want + 1), to: Math.max(1, now) };
+}
+
+/* One cell's words. A carried act says so. A free choice names what it took, or says the ground
+   refused every option it had. */
+function tlCellText(rec, withWho){
+  const g = beingById(rec.god);
+  const who = withWho && g ? `${g.name}: ` : '';
+  if (rec.continued) return `${who}carries on`;
+  if (!rec.picked) return `${who}finds nothing it can do`;
+  return `${who}${rec.picked}`;
+}
+
+function timelineModel(){
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  if (!inAges() || !creation || !creation.choices) return empty;
+  const now = age;
+  const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}` });
+  if (ui.timelineFold !== false){
+    return { shown: true, folded: true, from, to, now, marks: [],
+      rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
+  }
+  const rows = [];
+  for (const g of gods()){
+    const mine = inSpan.filter(c => c.god === g.id);
+    if (!mine.length && g.status !== 'awake') continue;
+    rows.push({ id: g.id, label: g.name, cells: mine.map(r => cell(r, false)) });
+  }
+  /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
+     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. */
+  const gate = creation.gate;
+  rows.push({ id: 'gate', label: 'The gate', cells: [{ age: now, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null }] });
+  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+}
+
+/* One chip, opened. The matrix is the record's own, in the record's own order. */
+function chipMatrix(key){
+  if (!key || !creation || !creation.choices) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  const rec = creation.choices.find(c => c.age === a && c.god === id);
+  if (!rec) return null;
+  const g = beingById(rec.god);
+  return { age: rec.age, god: rec.god, name: g ? g.name : 'someone gone', picked: rec.picked || null,
+    byPlayer: !!rec.byPlayer, continued: !!rec.continued, opts: rec.opts || [] };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
