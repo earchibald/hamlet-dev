@@ -7,7 +7,7 @@ function resetState(seed, opts){
   tick = Math.round(CLOCK.startsAt); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0;
+  goalPriority = {}; wanderAt = 0; doomAt = 0;
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
