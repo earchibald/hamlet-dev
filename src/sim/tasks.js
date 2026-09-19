@@ -274,7 +274,7 @@ function startDriveOff(a, w){
     arrive(a, t){
       if (!a.carrying){ if (nearAt(a, px, py) > 1) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.guardEmber }; t.label = 'Running at the wolf with fire'; }
       if (!w.alive || nearAt(w, ...camp.pit) > 22 || ++t.progress > CLOCK.chase.guard){ a.carrying = null; if (w.alive && nearAt(w, ...camp.pit) > 22){ if (tick - camp.guardLogged > CLOCK.cooldown.guardLine){ camp.guardLogged = tick; log(`${a.name} chases the wolf off into the dark with a burning branch.`, campHumans(), 'good'); } addThought(a, 'brave', 'Drove off a wolf', 8, CLOCK.thought.brave); drift(a, 'bravery', 0.03); for (const h of campHumans()) if (h !== a) addThought(h, 'guarded', `${a.name} drove off a wolf`, 4, CLOCK.thought.guarded); } return 'done'; }
-      if (near(a, w) <= 2){ addThought(w, 'burnedWolf', 'A human came at me with fire', -20, CLOCK.thought.burnedWolf); w.cooldown.raid = tick + CLOCK.cooldown.wolfBurned; w.cooldown.wander = tick + CLOCK.cooldown.wolfWanders; w.shyOf = camp; failTask(w); START.flee(w); }
+      if (near(a, w) <= 2){ addThought(w, 'burned', 'A human came at me with fire', -20, CLOCK.thought.burnedWolf); w.cooldown.raid = tick + CLOCK.cooldown.wolfBurned; w.cooldown.wander = tick + CLOCK.cooldown.wolfWanders; w.shyOf = camp; failTask(w); START.flee(w); }
       const q = bfs(a.x, a.y, a.z, (x, y, z) => z === w.z && dist(x, y, w.x, w.y) <= 2, 500, a); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
     },
     cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
@@ -394,7 +394,7 @@ function startCutTree(a){
       if (t.progress < CLOCK.work.cutTree) return 'continue';
       tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
       gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
-      const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axeCut', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
+      const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
       return chain(a, t, startGather(a, 'log')) || 'done';
     },
     cleanup(){ if (tree.claimed === a.id) tree.claimed = null; } };
