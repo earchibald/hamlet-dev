@@ -471,17 +471,22 @@ function log(text, who = [], kind = 'info', tag = null){
 }
 
 /* ---------- the clock: the calendar, the units, and every duration and rate ---------- */
-/* A tick is the smallest step of the world. DAY is the number of ticks in a world day. TPS is the
-   number of ticks the page runs in a real second at speed 1. */
-const DAY = 1000, TPS = 12;
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A tick is one world second. DAY is the number of ticks in a world day, so it is the number of
+   seconds in a day. How fast the page draws those ticks is the interface's business and is not in
+   here: speed is view state and never passes the door, so the same seed reaches the same world
+   whether it is watched at one tick a second or run flat out with nobody looking. */
+const DAY = 86400;
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A year is 365 days. Winter carries the odd day, so the four lengths sum to the year exactly and
+   no season has to be derived by subtraction. */
+const SEASON_LENGTHS = [91, 91, 91, 92], YEAR_DAYS = 365;
 
-/* World units into ticks. Built for the retune. No rule reads secs, mins, or years yet. */
+/* World units into ticks. */
 const secs = n => n * DAY / 86400;
 const mins = n => n * DAY / 1440;
 const hours = n => n * DAY / 24;
 const days = n => n * DAY;
-const years = n => n * SEASON_DAYS * 4 * DAY;
+const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
    does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
@@ -490,14 +495,38 @@ const perHour = p => p / hours(1);
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
    and a roll must not move. */
 const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
-/* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
-   clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
-   stride. The retune replaces every one with a world unit. When none is left, the retune is done. */
-const ticks = n => n, strides = n => n, tickRate = p => p, strideRate = p => p;
+/* Legacy markers. A value inside one is still in the units of the old clock: a count of the old
+   1000-tick day, a count of a being's strides, a rate for each of those ticks, a rate for each
+   stride. The retune replaces every one with a world unit. When none is left, the retune is done.
 
-/* The calendar. */
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
+   All four are converters now, and none is an identity. The old day held 1000 ticks and the new one
+   holds 86,400, so one old tick is 86.4 world seconds. A stride was two of those ticks for every
+   being that works, so it is 172.8. Converting is not a reading and does not settle anything: it
+   keeps each value's meaning in the world exactly where it was, so that the retune's later tasks
+   read a value that still means what it always meant rather than one that became 86 times shorter
+   the day the day got longer.
+
+   The rates convert the other way, by division, for the same reason. A chance of 0.0006 a tick used
+   to come up about once in 1,700 ticks, which was under two world days; left alone it would come up
+   about once every half hour. Lightning would strike a camp eighty-six times as often and nothing
+   would be red, because a rate is a number and every number is still a number after a rebasing.
+
+   A marker is a to-do item and not a spelling. It says nobody has decided what this means in real
+   time. Only the task that owns a group converts that group's markers, having read each value. Do
+   not convert one because it happens to equal a round world unit: the arithmetic is free and the
+   reading is not, and a value that arrives at its task already looking settled is not asked the
+   question the task owes it. A marker may be removed, never added. */
+const ticks = n => n * 86.4, strides = n => n * 172.8, tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+
+/* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
+   because the seasons are not all the same length.
+   Each takes a day and falls back to today's. That is not only for the tests: a rule or a panel that
+   asks what season some other day falls in should not have to move the world to find out, and a
+   function that answers from its argument can be checked without a world at all. */
+const dayOfYear = (d = dayOf()) => ((d - 1) % YEAR_DAYS) + 1;
+const yearOf = (d = dayOf()) => Math.floor((d - 1) / YEAR_DAYS) + 1;
+const seasonOf = (d = dayOf()) => { let n = dayOfYear(d); for (let i = 0; i < 4; i++){ if (n <= SEASON_LENGTHS[i]) return SEASONS[i]; n -= SEASON_LENGTHS[i]; } return SEASONS[3]; };
+const isWinter = (d = dayOf()) => seasonOf(d) === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;
 const dayOf = () => Math.floor(tick / DAY) + 1;
 const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
@@ -526,6 +555,9 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
+  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
+     not a duration, which is why it is a small whole number and not a world unit. */
+  dark: { slower: 2 },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
@@ -2758,11 +2790,21 @@ function runTask(a){
   const t = a.task; a.status = t.label;
   if (t.wait > 0){ t.wait--; return; }
   if (t.path.length){
-    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
-    const [nx, ny, nz] = t.path[0];
-    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
-    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    /* A tick is one world second and a tile is a stride, so walking is one tile a tick and a run is
+       two. `stride` is the species' walking speed in tiles a tick; `fast` is the run.
+       In the dark a person feels their way at half speed. That was a flag on the being that flipped
+       each time it walked, which is state for something the tick already answers: move on even ticks
+       only. A flag would also have to be saved, and it said nothing a reader of the tick could not
+       work out. Half of one tile a tick is one tile every two ticks either way. */
+    if (a.inDark && tick % CLOCK.dark.slower) return;
+    const sp = SPECIES[a.species];
+    const speed = t.fast ? 2 : (sp.stride || 1);
+    for (let n = 0; n < speed && t.path.length; n++){
+      const [nx, ny, nz] = t.path[0];
+      if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
+      a.x = nx; a.y = ny; a.z = nz; t.path.shift();
+      if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    }
     return;
   }
   const r = taskStop(a);
@@ -3674,8 +3716,10 @@ function updateBeing(a){
     /* No work in the dark: any task that is not a walk back to the light fails, and the walk is slow. */
     if (a.task && a.task.type !== 'flee' && !(a.task.path.length && a.task.path[a.task.path.length - 1][2] >= 0)) failTask(a);
   }
-  const fast = a.task && a.task.fast;
-  if (!fast && (tick + a.id) % sp.stride) return;
+  /* The stride gate is gone. It ran this head on one tick in `stride` and so was both the cadence of
+     a being's thinking and the speed of its walk, one number doing two jobs. `stride` is now a speed
+     in tiles a tick and the walk reads it in `runTask`; the cadence of the head is task 3's to set,
+     and until then it runs every tick. That is slow on purpose and is reported, not hidden. */
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, CLOCK.thought.emberlost); }
   if (a.species === 'human' && fireCount > 0 && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'ember' && a.task.type !== 'guard'))){
     const d = nearestFire(a.x, a.y, 5, a.z);
@@ -3704,13 +3748,13 @@ const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, o
 const ageDays = a => (tick - a.born) / DAY;
 const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
-  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: ticks(2), zmin: -2, zmax: 2 },
-  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
-  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 2, prey: true },
-  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(1), zmin: -2, zmax: 2, fae: true },
-  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, folk: true },
+  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
+  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
+  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true },
+  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, fae: true },
+  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, folk: true },
 };
 const NAMES = ['Ada','Bram','Cora','Dov','Esk','Fen','Greta','Hal','Iva','Jory','Kit','Lune','Mott','Nell','Orrin','Pim','Quill','Rook','Sable','Tam','Ulla','Voss','Wren','Yara'];
 
@@ -4449,11 +4493,13 @@ const GOALS = [
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
     offers(a){ if (!camp.pit || camp.rack) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the rack', score: 30, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 2, 3); if (!site) return [];
       return [{ label: 'build the drying rack', score: 45, task: { kind: 'buildRack', args: { at: site } } }]; } },
-  /* The aim of 8 and SEASON_DAYS are set apart, and today they happen to match, so "one strip a day"
-     holds. Plan G4 retunes the clock, and a season that is no longer eight days makes this sentence
-     false in words as the old one was false in digits. Read it again with G4. */
+  /* The aim of 8 was set when winter was eight days long, so "one strip a day" held. G4 made winter
+     92 days and the sentence stopped being true, so it no longer claims a rate. The aim itself is a
+     quantity and not a duration, so this task does not move it: eight strips against a 92-day winter
+     is now thin, and that is a tuning question for task 11 with the long run in front of it, not an
+     arithmetic one to settle here. Reported, not fixed. */
   { id: 'smoke', title: 'Smoke meat for lean days', stage: 'food', after: 'rack', standing: true,
-    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS} days long, and the bushes give nothing then. That is one strip a day.` }; },
+    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. The bushes give nothing through winter, and it is a long one.` }; },
     offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
       const out = [];
       if (camp.stash.carcass >= 1) out.push({ label: 'smoke a rabbit over the fire', score: seasonOf() === 'autumn' ? 66 : camp.stash.smoked < 4 ? 60 : 30, task: { kind: 'smokeMeat', args: { at: camp.rack } } });
@@ -4752,7 +4798,7 @@ function strayLightning(){
    tile. Gods come into being from contrasts: the seed makes the first, and every other is made by a
    lack. In the gods era a step is an age; every awake god scores its acts over the live regions and
    does the best one, eldest first. Everything here draws from the gods' own stream. */
-SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: ticks(0), zmin: 0, zmax: 0, perTick: false };
+SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: 0, zmin: 0, zmax: 0, perTick: false };
 LIFE.god = { adult: 0, old: Infinity, life: Infinity, death: 'killable' };
 const GOD_NAMES = ['Ondru', 'Sael', 'Ashka', 'Veyl', 'Morrow', 'Ilse', 'Thrum', 'Kesh', 'Ubbe', 'Nyr', 'Tamsa', 'Orun'];
 const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet', dry: 'who is Dry', hot: 'who is Hot', cold: 'who is Cold', still: 'who is Still', moving: 'who Moves', light: 'who is Light', dark: 'who is Dark' };
@@ -5809,7 +5855,10 @@ function step(oneAct){
    record they name, so the sharing that the rules compare by identity comes back whole.
 
    Nothing here draws from a random stream, and nothing here writes to a live record. */
-const SNAPSHOT_VERSION = 1;
+/* Version 2: plan G4 made a tick one world second, so `tick` and every stamp saved beside it mean
+   86.4 times less than they did. A version 1 save holds numbers that are all still numbers and are
+   all wrong, which no field-by-field default can rescue, so it is refused with its sentence. */
+const SNAPSHOT_VERSION = 2;
 
 /* Every field of a record that holds a reference, and the kind of record it points at. A dotted name
    is a path into a plain object the record owns; the encoder copies the objects along that path. The
@@ -6615,6 +6664,11 @@ let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = nu
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+/* How many world ticks the page draws in one real second at speed 1. A tick is one world second,
+   so this is how much faster than life the valley runs when it is watched at the slowest speed.
+   It lives here and not in the clock table because it is wall time, and wall time is the
+   interface's: it never passes the door, and the same seed reaches the same world at any speed. */
+const TICKS_A_SECOND = 60;
 const AGE_MS = 2000;
 /* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
    full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
@@ -6982,7 +7036,11 @@ function campSummary(){
 
 function seasonLine(){
   if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
-  const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
+  /* The seasons are not all the same length, so the days left are counted off this season's own
+     length rather than one shared number. */
+  const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
+  let d = dayOfYear(); for (let k = 0; k < i; k++) d -= SEASON_LENGTHS[k];
+  const left = SEASON_LENGTHS[i] - d + 1;
   return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
 }
 
@@ -8723,7 +8781,7 @@ function frame(now){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
-      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */

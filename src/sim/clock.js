@@ -1,15 +1,20 @@
 /* ---------- the clock: the calendar, the units, and every duration and rate ---------- */
-/* A tick is the smallest step of the world. DAY is the number of ticks in a world day. TPS is the
-   number of ticks the page runs in a real second at speed 1. */
-const DAY = 1000, TPS = 12;
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A tick is one world second. DAY is the number of ticks in a world day, so it is the number of
+   seconds in a day. How fast the page draws those ticks is the interface's business and is not in
+   here: speed is view state and never passes the door, so the same seed reaches the same world
+   whether it is watched at one tick a second or run flat out with nobody looking. */
+const DAY = 86400;
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A year is 365 days. Winter carries the odd day, so the four lengths sum to the year exactly and
+   no season has to be derived by subtraction. */
+const SEASON_LENGTHS = [91, 91, 91, 92], YEAR_DAYS = 365;
 
-/* World units into ticks. Built for the retune. No rule reads secs, mins, or years yet. */
+/* World units into ticks. */
 const secs = n => n * DAY / 86400;
 const mins = n => n * DAY / 1440;
 const hours = n => n * DAY / 24;
 const days = n => n * DAY;
-const years = n => n * SEASON_DAYS * 4 * DAY;
+const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
    does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
@@ -18,14 +23,38 @@ const perHour = p => p / hours(1);
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
    and a roll must not move. */
 const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
-/* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
-   clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
-   stride. The retune replaces every one with a world unit. When none is left, the retune is done. */
-const ticks = n => n, strides = n => n, tickRate = p => p, strideRate = p => p;
+/* Legacy markers. A value inside one is still in the units of the old clock: a count of the old
+   1000-tick day, a count of a being's strides, a rate for each of those ticks, a rate for each
+   stride. The retune replaces every one with a world unit. When none is left, the retune is done.
 
-/* The calendar. */
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
+   All four are converters now, and none is an identity. The old day held 1000 ticks and the new one
+   holds 86,400, so one old tick is 86.4 world seconds. A stride was two of those ticks for every
+   being that works, so it is 172.8. Converting is not a reading and does not settle anything: it
+   keeps each value's meaning in the world exactly where it was, so that the retune's later tasks
+   read a value that still means what it always meant rather than one that became 86 times shorter
+   the day the day got longer.
+
+   The rates convert the other way, by division, for the same reason. A chance of 0.0006 a tick used
+   to come up about once in 1,700 ticks, which was under two world days; left alone it would come up
+   about once every half hour. Lightning would strike a camp eighty-six times as often and nothing
+   would be red, because a rate is a number and every number is still a number after a rebasing.
+
+   A marker is a to-do item and not a spelling. It says nobody has decided what this means in real
+   time. Only the task that owns a group converts that group's markers, having read each value. Do
+   not convert one because it happens to equal a round world unit: the arithmetic is free and the
+   reading is not, and a value that arrives at its task already looking settled is not asked the
+   question the task owes it. A marker may be removed, never added. */
+const ticks = n => n * 86.4, strides = n => n * 172.8, tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+
+/* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
+   because the seasons are not all the same length.
+   Each takes a day and falls back to today's. That is not only for the tests: a rule or a panel that
+   asks what season some other day falls in should not have to move the world to find out, and a
+   function that answers from its argument can be checked without a world at all. */
+const dayOfYear = (d = dayOf()) => ((d - 1) % YEAR_DAYS) + 1;
+const yearOf = (d = dayOf()) => Math.floor((d - 1) / YEAR_DAYS) + 1;
+const seasonOf = (d = dayOf()) => { let n = dayOfYear(d); for (let i = 0; i < 4; i++){ if (n <= SEASON_LENGTHS[i]) return SEASONS[i]; n -= SEASON_LENGTHS[i]; } return SEASONS[3]; };
+const isWinter = (d = dayOf()) => seasonOf(d) === 'winter';
 const hourOf = () => ((tick % DAY) / DAY) * 24;
 const dayOf = () => Math.floor(tick / DAY) + 1;
 const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
@@ -54,6 +83,9 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
+  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
+     not a duration, which is why it is a small whole number and not a world unit. */
+  dark: { slower: 2 },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs

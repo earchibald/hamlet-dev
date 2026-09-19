@@ -7,7 +7,10 @@
    record they name, so the sharing that the rules compare by identity comes back whole.
 
    Nothing here draws from a random stream, and nothing here writes to a live record. */
-const SNAPSHOT_VERSION = 1;
+/* Version 2: plan G4 made a tick one world second, so `tick` and every stamp saved beside it mean
+   86.4 times less than they did. A version 1 save holds numbers that are all still numbers and are
+   all wrong, which no field-by-field default can rescue, so it is refused with its sentence. */
+const SNAPSHOT_VERSION = 2;
 
 /* Every field of a record that holds a reference, and the kind of record it points at. A dotted name
    is a path into a plain object the record owns; the encoder copies the objects along that path. The

@@ -43,11 +43,21 @@ function runTask(a){
   const t = a.task; a.status = t.label;
   if (t.wait > 0){ t.wait--; return; }
   if (t.path.length){
-    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
-    const [nx, ny, nz] = t.path[0];
-    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
-    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    /* A tick is one world second and a tile is a stride, so walking is one tile a tick and a run is
+       two. `stride` is the species' walking speed in tiles a tick; `fast` is the run.
+       In the dark a person feels their way at half speed. That was a flag on the being that flipped
+       each time it walked, which is state for something the tick already answers: move on even ticks
+       only. A flag would also have to be saved, and it said nothing a reader of the tick could not
+       work out. Half of one tile a tick is one tile every two ticks either way. */
+    if (a.inDark && tick % CLOCK.dark.slower) return;
+    const sp = SPECIES[a.species];
+    const speed = t.fast ? 2 : (sp.stride || 1);
+    for (let n = 0; n < speed && t.path.length; n++){
+      const [nx, ny, nz] = t.path[0];
+      if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
+      a.x = nx; a.y = ny; a.z = nz; t.path.shift();
+      if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    }
     return;
   }
   const r = taskStop(a);

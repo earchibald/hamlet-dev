@@ -9,20 +9,87 @@ test('clock.js loads directly after core.js', () => {
   assert.equal(FILES[0], 'core'); assert.equal(FILES[1], 'clock');
 });
 
+/* A tick is one world second, so DAY is pinned as a bare number and everything else in this file is
+   measured against it. That is deliberate. Most of the assertions below read the same helpers the
+   table reads, so they would hold at any DAY whatever; this one line is what stops the file agreeing
+   with itself about a wrong day. If it goes, the file verifies the table against its own definition
+   and catches nothing. */
+test('a tick is one world second and the day is 86,400 of them', () => {
+  const api = load();
+  assert.equal(api.DAY, 86400);
+  assert.equal(api.secs(1), 1);
+  assert.equal(api.mins(1), 60);
+  assert.equal(api.hours(1), 3600);
+  assert.equal(api.days(1), 86400);
+});
+
 test('the unit helpers turn world units into ticks', () => {
   const api = load();
-  assert.equal(api.DAY, 1000);
   assert.equal(api.days(16), 16 * api.DAY);
   assert.equal(api.hours(24), api.DAY);
   assert.equal(api.hours(7), api.DAY * 7 / 24);
   assert.equal(api.mins(1440), api.DAY);
   assert.equal(api.secs(86400), api.DAY);
-  assert.equal(api.years(1), api.SEASON_DAYS * 4 * api.DAY);
+  assert.equal(api.years(1), 365 * api.DAY);
+  assert.equal(api.YEAR_DAYS, 365);
 });
 
-test('the legacy markers return their argument unchanged', () => {
+/* The year, and the seasons that are not all the same length. */
+test('a year is 365 days and winter carries the odd one', () => {
   const api = load();
-  for (const f of [api.ticks, api.strides, api.tickRate, api.strideRate]){ assert.equal(f(0.0006), 0.0006); assert.equal(f(3000), 3000); }
+  assert.deepEqual(api.SEASON_LENGTHS, [91, 91, 91, 92]);
+  assert.equal(api.SEASON_LENGTHS.reduce((a, b) => a + b, 0), api.YEAR_DAYS);
+});
+
+test('the calendar names the season, the day of the year, and the year', () => {
+  const api = load();
+  assert.equal(api.seasonOf(1), 'spring');
+  assert.equal(api.seasonOf(91), 'spring');
+  assert.equal(api.seasonOf(92), 'summer');
+  assert.equal(api.seasonOf(183), 'autumn');
+  assert.equal(api.seasonOf(274), 'winter');
+  assert.equal(api.seasonOf(365), 'winter');
+  assert.ok(api.isWinter(274));
+  assert.ok(!api.isWinter(92));
+  /* The year turns over and the seasons start again, which is the whole point of a 365-day year. */
+  assert.equal(api.seasonOf(366), 'spring');
+  assert.equal(api.dayOfYear(366), 1);
+  assert.equal(api.yearOf(366), 2);
+  assert.equal(api.yearOf(365), 1);
+  assert.equal(api.dayOfYear(365), 365);
+  /* Winter's extra day is real: day 365 is winter and day 366 is not. */
+  assert.equal(api.seasonOf(273), 'autumn');
+});
+
+test('night runs from 20:00 to 06:00', () => {
+  const api = load();
+  api.startWorld('clocktest');
+  /* The only way to ask the hour is to be at it, so the world is stepped to each one. `hourOf` reads
+     the live tick and there is no seam that sets it, which is right: a test seam on the tick would
+     be a way to move the world without the door. */
+  const at = h => { while (api.hourOf() < h) api.step(); return api.isNight(); };
+  assert.ok(!at(12)); assert.ok(!at(19)); assert.ok(at(20)); assert.ok(at(23));
+});
+
+/* `ticks` is a converter now, not an identity: one tick of the old 1000-tick day is 86.4 world
+   seconds. Every value still written `ticks(n)` below is asserted THROUGH it, which says the true
+   thing about that value — that it keeps the world meaning it had and nobody has yet decided what
+   it should be. Pinning the converter here once is what keeps those assertions honest; without this
+   test they would hold whatever `ticks` did. */
+test('every marker converts the old clock, and none is an identity', () => {
+  const api = load();
+  /* A tick of the old 1000-tick day is 86.4 world seconds. A stride was two of those ticks. */
+  assert.equal(api.ticks(1), 86.4);
+  assert.equal(api.ticks(1000), api.days(1));
+  assert.equal(api.ticks(500), api.hours(12));
+  assert.equal(api.strides(1), 172.8);
+  assert.equal(api.strides(500), api.days(1));
+  /* The rates divide, because a rate a tick spread over 86.4 times as many ticks must be that much
+     smaller to mean the same thing. Left as identities they would fire 86 times as often and no
+     test would go red, because a rate is a number and a number survives any rebasing. */
+  assert.equal(api.tickRate(86.4), 1);
+  assert.equal(api.strideRate(172.8), 1);
+  assert.ok(Math.abs(api.tickRate(0.0006) * api.days(1) - 0.6) < 1e-9, 'a chance a tick no longer means what it meant a day');
 });
 
 test('perHour spreads an hourly rate over the ticks of an hour', () => {
@@ -40,55 +107,71 @@ test('rollFor gives the rate itself over one tick, and compounds over many', () 
 
 test('the hearth and the ember read the table', () => {
   const api = load();
-  assert.equal(api.CLOCK.rate.pitBurn, 0.25);
-  assert.equal(api.CLOCK.limit.ember, 420);
+  assert.equal(api.CLOCK.rate.pitBurn, api.tickRate(0.25));
+  assert.equal(api.CLOCK.limit.ember, api.ticks(420));
 });
 
 test('the camp rules and the cellular systems read the table', () => {
   const C = load().CLOCK;
-  assert.equal(C.every.spoil, 100); assert.equal(C.every.fae, 300); assert.equal(C.every.prune, 200); assert.equal(C.every.carcassRot, 50);
-  assert.deepEqual(C.birth, { every: 400, chance: 0.35, gap: 16000 });
-  assert.deepEqual(C.arrival, { first: 700, firstSpread: 600, firstByHand: 700, secondHearth: 900, wait: 900, spread: 900, chance: 0.7, villageChance: 0.85, afterTheLast: 10000, afterTheDoomed: 10000, foundRetry: 500 });
-  assert.deepEqual(C.storm, { first: 1500, firstSpread: 2000, length: 150, lengthSpread: 300, gap: 2000, summerGap: 4000, gapSpread: 3000 });
-  assert.equal(C.food.cookedKeeps, 1800); assert.equal(C.food.berriesKeep, 3500);
-  assert.equal(C.rate.lightningLit, 0.0006); assert.equal(C.rate.lightningOut, 0.0035); assert.equal(C.rate.strayLightning, 0.0008);
-  assert.equal(C.plant.samples, 60); assert.equal(C.plant.bushOld, 60000);
+  const T = load().ticks;
+  assert.equal(C.every.spoil, T(100)); assert.equal(C.every.fae, T(300)); assert.equal(C.every.prune, T(200)); assert.equal(C.every.carcassRot, T(50));
+  assert.deepEqual(C.birth, { every: T(400), chance: 0.35, gap: load().days(16) });
+  /* The two waits of `theLoneFounder` are deliberately different and must stay different: a stable
+     failure waits the whole stretch, a passing one waits half a day. This pins which value each is,
+     not merely that each is some value. */
+  assert.deepEqual(C.arrival, { first: T(700), firstSpread: T(600), firstByHand: T(700), secondHearth: T(900), wait: T(900), spread: T(900), chance: 0.7, villageChance: 0.85, afterTheLast: load().days(10), afterTheDoomed: load().days(10), foundRetry: load().hours(12) });
+  assert.notEqual(C.arrival.foundRetry, C.arrival.afterTheLast, 'the two founding waits collapsed into one');
+  assert.deepEqual(C.storm, { first: T(1500), firstSpread: T(2000), length: T(150), lengthSpread: T(300), gap: T(2000), summerGap: T(4000), gapSpread: T(3000) });
+  assert.equal(C.food.cookedKeeps, T(1800)); assert.equal(C.food.berriesKeep, T(3500));
+  const R = load().tickRate;
+  assert.equal(C.rate.lightningLit, R(0.0006)); assert.equal(C.rate.lightningOut, R(0.0035)); assert.equal(C.rate.strayLightning, R(0.0008));
+  assert.equal(C.plant.samples, R(60)); assert.equal(C.plant.bushOld, load().days(60));
 });
 
 test('needs, cooldowns, and the base tasks read the table', () => {
   const C = load().CLOCK;
-  assert.deepEqual(C.cold, { under: 0.012, winterNight: 0.06, winterDay: 0.025, summer: 0, night: 0.012, day: 0.003 });
-  assert.equal(C.rate.fireWarms, 0.5); assert.equal(C.rate.freezeHurts, 0.03); assert.equal(C.rate.starveHurts, 0.04);
-  assert.equal(C.rate.heals, 0.01); assert.equal(C.rate.fireHurts, 2.5); assert.equal(C.rate.oldAgeDeath, 0.0006);
-  assert.equal(C.rate.sitRests, 0.05); assert.equal(C.rate.sitWarms, 0.4);
-  assert.equal(C.cooldown.offerFailed, 60); assert.equal(C.cooldown.pathBlocked, 40); assert.equal(C.cooldown.taskFailed, 120); assert.equal(C.cooldown.needFailed, 120); assert.equal(C.cooldown.disturb, 1000);
-  assert.equal(C.limit.task, 1500); assert.equal(C.limit.hurtRemembered, 600);
-  assert.equal(C.task.sit, 90); assert.equal(C.task.sitChat, 25); assert.equal(C.task.standStill, 20);
-  assert.equal(C.thought.grief, 3000); assert.equal(C.thought.ateCooked, 700);
+  const R = load().tickRate, S = load().strideRate;
+  assert.deepEqual(C.cold, { under: R(0.012), winterNight: R(0.06), winterDay: R(0.025), summer: 0, night: R(0.012), day: R(0.003) });
+  assert.equal(C.rate.fireWarms, R(0.5)); assert.equal(C.rate.freezeHurts, R(0.03)); assert.equal(C.rate.starveHurts, R(0.04));
+  assert.equal(C.rate.heals, R(0.01)); assert.equal(C.rate.fireHurts, R(2.5)); assert.equal(C.rate.oldAgeDeath, R(0.0006));
+  assert.equal(C.rate.sitRests, S(0.05)); assert.equal(C.rate.sitWarms, S(0.4));
+  const T = load().ticks;
+  assert.equal(C.cooldown.offerFailed, T(60)); assert.equal(C.cooldown.pathBlocked, T(40)); assert.equal(C.cooldown.taskFailed, T(120)); assert.equal(C.cooldown.needFailed, T(120)); assert.equal(C.cooldown.disturb, T(1000));
+  assert.equal(C.limit.task, T(1500)); assert.equal(C.limit.hurtRemembered, T(600));
+  const St = load().strides;
+  assert.equal(C.task.sit, St(90)); assert.equal(C.task.sitChat, St(25)); assert.equal(C.task.standStill, St(20));
+  assert.equal(C.thought.grief, T(3000)); assert.equal(C.thought.ateCooked, T(700));
 });
 
 test('the animals, the sprites, and the gnomes read the table', () => {
   const api = load(), C = api.CLOCK;
-  assert.deepEqual(C.spawn.rabbitLitter, { every: 250, chance: 0.8 });
-  assert.equal(C.spawn.rabbitStray.every, 300);
-  assert.deepEqual(C.spawn.fawn, { every: 2000, at: 1000 });
-  assert.deepEqual(C.spawn.wolf, { every: 10000, at: 2500 });
-  assert.equal(C.spawn.fox.every, 6000);
-  assert.deepEqual(C.den, { birthEvery: 500, birthGap: 20000, digAfter: 3000, digRetry: 500, biteGap: 150, campDark: 1000 });
-  assert.equal(C.gnome.every, 500); assert.equal(C.gnome.copyChance, 0.3); assert.equal(C.gnome.repayGap, 6000); assert.equal(C.gnome.leaveAfter, 3000);
-  assert.equal(C.chase.wolf, 140); assert.equal(C.chase.wolfPerSkill, 30); assert.equal(C.chase.stalk, 160);
-  assert.equal(C.sprite.dance, 240); assert.equal(C.sprite.prankGap, 300);
-  assert.equal(api.SPECIES.human.decay.food, 0.035); assert.equal(api.SPECIES.sprite.stride, 1);
+  const T = api.ticks, D = api.days;
+  assert.deepEqual(C.spawn.rabbitLitter, { every: T(250), chance: 0.8 });
+  assert.equal(C.spawn.rabbitStray.every, T(300));
+  assert.deepEqual(C.spawn.fawn, { every: T(2000), at: T(1000) });
+  assert.deepEqual(C.spawn.wolf, { every: T(10000), at: T(2500) });
+  assert.equal(C.spawn.fox.every, T(6000));
+  /* `digRetry` keeps its marker on purpose. It reaches hours(12) by conversion alone, and converting
+     it would remove the flag that says task 6 still owes it a reading. Its spelling is the point. */
+  assert.deepEqual(C.den, { birthEvery: T(500), birthGap: D(20), digAfter: D(3), digRetry: T(500), biteGap: T(150), campDark: D(1) });
+  assert.equal(C.gnome.every, T(500)); assert.equal(C.gnome.copyChance, 0.3); assert.equal(C.gnome.repayGap, D(6)); assert.equal(C.gnome.leaveAfter, D(3));
+  const St = api.strides;
+  assert.equal(C.chase.wolf, St(140)); assert.equal(C.chase.wolfPerSkill, St(30)); assert.equal(C.chase.stalk, St(160));   // task 7 rules on the chases
+  assert.equal(C.sprite.dance, St(240)); assert.equal(C.sprite.prankGap, T(300));
+  assert.equal(api.SPECIES.human.decay.food, api.tickRate(0.035));
+  /* `stride` is a speed in tiles a tick now, not a count of ticks between acts. Everyone walks one. */
+  assert.equal(api.SPECIES.sprite.stride, 1); assert.equal(api.SPECIES.human.stride, 1);
 });
 
 test('human work reads the table', () => {
   const api = load(), C = api.CLOCK;
-  assert.equal(C.work.firepit, 70); assert.equal(C.work.knapAxe, 70); assert.equal(C.work.leanTo, 110); assert.equal(C.work.storehouse, 140); assert.equal(C.work.hut, 120);
-  assert.equal(C.work.feedFire, 6); assert.equal(C.work.checkSnare, 4); assert.equal(C.work.fish, 110); assert.equal(C.work.cutTree, 60);
-  assert.equal(C.chase.deer, 220); assert.equal(C.chase.deerPerSkill, 40); assert.equal(C.chase.deerMissed, 40); assert.equal(C.chase.guard, 200);
-  assert.equal(C.limit.guardEmber, 500); assert.equal(C.limit.hearthProven, 3000);
-  assert.equal(C.cooldown.sparks, 150); assert.equal(C.cooldown.wolfBurned, 2500); assert.equal(C.cooldown.wolfDriven, 3000);
-  assert.equal(api.RECIPES.find(r => r.id === 'workshop').work, 140);
+  const St = api.strides;
+  assert.equal(C.work.firepit, St(70)); assert.equal(C.work.knapAxe, St(70)); assert.equal(C.work.leanTo, St(110)); assert.equal(C.work.storehouse, St(140)); assert.equal(C.work.hut, St(120));
+  assert.equal(C.work.feedFire, St(6)); assert.equal(C.work.checkSnare, St(4)); assert.equal(C.work.fish, St(110)); assert.equal(C.work.cutTree, St(60));
+  assert.equal(C.chase.deer, St(220)); assert.equal(C.chase.deerPerSkill, St(40)); assert.equal(C.chase.deerMissed, St(40)); assert.equal(C.chase.guard, St(200));
+  assert.equal(C.limit.guardEmber, api.ticks(500)); assert.equal(C.limit.hearthProven, api.days(3));
+  assert.equal(C.cooldown.sparks, api.ticks(150)); assert.equal(C.cooldown.wolfBurned, api.ticks(2500)); assert.equal(C.cooldown.wolfDriven, api.ticks(3000));
+  assert.equal(api.RECIPES.find(r => r.id === 'workshop').work, St(140));
 });
 
 /* ---------- the lint: no bare time literal in a rule ---------- */
@@ -106,7 +189,8 @@ const RULES = [
   { name: 'a wait',               re: /\bwait:\s*\d+/g },
   { name: 'work in startBuild',   re: /startBuild\(a,\s*(\[[^\]]*\]|[^,]+),\s*[\d.]+/g },
   { name: 'work in a recipe',     re: /\bwork:\s*\d+/g },
-  { name: 'a stride',             re: /\bstride:\s*\d+/g },
+  /* `stride` was a count of ticks between acts; G4 made it a speed in tiles a tick, so it is no
+     longer a duration and the lint no longer reads it as one. */
   { name: 'a decay',              re: /\b(food|water|rest|social|warmth|glow|play):\s*[\d.]+/g, files: ['species'] },
   { name: 'a small step',         re: /(-=|\+=)\s*\d*\.\d+/g },
   { name: 'a need gained',        re: /needs\.\w+\s*[+-]\s*0\.\d+/g },

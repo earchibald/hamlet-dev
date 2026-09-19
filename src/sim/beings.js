@@ -390,8 +390,10 @@ function updateBeing(a){
     /* No work in the dark: any task that is not a walk back to the light fails, and the walk is slow. */
     if (a.task && a.task.type !== 'flee' && !(a.task.path.length && a.task.path[a.task.path.length - 1][2] >= 0)) failTask(a);
   }
-  const fast = a.task && a.task.fast;
-  if (!fast && (tick + a.id) % sp.stride) return;
+  /* The stride gate is gone. It ran this head on one tick in `stride` and so was both the cadence of
+     a being's thinking and the speed of its walk, one number doing two jobs. `stride` is now a speed
+     in tiles a tick and the walk reads it in `runTask`; the cadence of the head is task 3's to set,
+     and until then it runs every tick. That is slow on purpose and is reported, not hidden. */
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, CLOCK.thought.emberlost); }
   if (a.species === 'human' && fireCount > 0 && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'ember' && a.task.type !== 'guard'))){
     const d = nearestFire(a.x, a.y, 5, a.z);

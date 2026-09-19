@@ -20,6 +20,11 @@ let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = nu
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
+/* How many world ticks the page draws in one real second at speed 1. A tick is one world second,
+   so this is how much faster than life the valley runs when it is watched at the slowest speed.
+   It lives here and not in the clock table because it is wall time, and wall time is the
+   interface's: it never passes the door, and the same seed reaches the same world at any speed. */
+const TICKS_A_SECOND = 60;
 const AGE_MS = 2000;
 /* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
    full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and

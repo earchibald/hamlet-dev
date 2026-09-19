@@ -8,7 +8,7 @@ function frame(now){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
-      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
