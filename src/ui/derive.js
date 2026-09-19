@@ -39,6 +39,40 @@ function agesDue(acc, dt, pace){
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
+/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+   They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
+
+/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
+   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+   caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
+function tweenTier(ms){
+  if (ms >= TWEEN.full) return 'full';
+  if (ms >= TWEEN.figure) return 'figure';
+  if (ms >= TWEEN.walk) return 'walk';
+  return 'none';
+}
+/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
+   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
+   the order is the chronicle's order, and the last one still finishes. */
+function gestureSlice(i, n, f){
+  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
+  return clamp((f - start) / (1 - start), 0, 1);
+}
+/* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
+   is nowhere to draw, and with no `from` the star is already where it belongs. */
+function pointAt(from, to, f){
+  if (to === null || to === undefined) return null;
+  const bx = to % W, b = { x: bx, y: (to - bx) / W };
+  if (from === null || from === undefined) return b;
+  const ax = from % W, a = { x: ax, y: (from - ax) / W }, t = clamp(f, 0, 1);
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+/* How much of a line is stroked. Nothing at 0, the whole line at 1. */
+function lineSoFar(line, f){
+  if (!line || !line.length) return [];
+  return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
+}
+
 /* The mean of a list of #rrggbb colours, as rgb(). */
 function mixHex(list){
   let r = 0, g = 0, b = 0;

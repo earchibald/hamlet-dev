@@ -21,8 +21,15 @@ let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', wor
 /* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
 const AGE_MS = 2000;
+/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
+   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
+/* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
+   field and the new one over it, so only the countries that changed appear to change. */
+let ocv2, octx2, fieldAge = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */

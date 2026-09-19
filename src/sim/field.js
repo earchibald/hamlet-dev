@@ -25,6 +25,23 @@ const regionById = id => field.byId.get(id);
 const liveRegions = () => field.regions.filter(r => !r.children);
 const regionAt = (x, y) => inb(x, y) ? regionById(regionOf[idx(x, y)]) : null;
 const canSplit = r => !r.children && r.area >= 2 * SECTOR_AREA && !r.marks.some(m => m.kind === 'rest');
+/* The heart of a region: the tile nearest the mean of its tiles' coordinates. A tie goes to the lowest
+   tile index. A region is any shape, and a child of a ragged parent may lie in two pieces, so the mean
+   can fall outside the region; the nearest real tile is taken instead. A god's anchor starts here, and
+   returns here when a split cuts its tile away. It is a scan and a comparison: it draws no random
+   number, so it cannot move a stream. No rule reads it. */
+function heartTile(r){
+  if (!r || !r.tiles.length) return null;
+  let sx = 0, sy = 0;
+  for (const i of r.tiles){ const x = i % W; sx += x; sy += (i - x) / W; }
+  const mx = sx / r.tiles.length, my = sy / r.tiles.length;
+  let best = null, bd = Infinity;
+  for (const i of r.tiles){
+    const x = i % W, y = (i - x) / W, d = (x - mx) * (x - mx) + (y - my) * (y - my);
+    if (d < bd || (d === bd && i < best)){ bd = d; best = i; }
+  }
+  return best;
+}
 /* The live regions that share an edge with r. */
 function neighboursOf(r){
   const seen = new Set();
