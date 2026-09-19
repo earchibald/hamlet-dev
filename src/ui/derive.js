@@ -245,6 +245,29 @@ function peopleRows(){
   return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
 }
 
+/* One plain-English line for a hover on a name. Every field of the record, in order. */
+function nameTitle(rec){
+  if (!rec) return '';
+  const who = rec.by === null ? 'named by the camp' : rec.by === 'lost' ? 'named by the lost people' : `named by ${(beingById(rec.by) || { name: 'somebody' }).name}`;
+  return [
+    rec.tongue === 'old' ? `${rec.text}, ${rec.meaning}, in the old tongue` : rec.text,
+    `since day ${Math.floor(rec.since / DAY) + 1}`,
+    rec.why,
+    who,
+    rec.scores && rec.scores.length ? `scores: ${rec.scores.map(s => `${s.text} ${s.score}`).join(', ')}` : '',
+  ].filter(Boolean).join('. ') + '.';
+}
+/* The current camp's name now, and the names it had before. */
+function campNames(){ return { now: camp.names && camp.names.length ? camp.names[0] : null, past: formerNames(camp) }; }
+/* A sector's label. Once it has a name of its own, the biome word stays beside it, so the ground
+   a name was given for is still there. With no name yet it is just the biome word, as before. */
+function sectorLabel(s){
+  const n = nameOf(s);
+  if (!n) return s.name;
+  const w = s.name.toLowerCase();
+  return `${n}, ${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
+}
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
@@ -356,7 +379,7 @@ function paletteRows(){
   if (!inAges()) for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
   if (!inAges()) for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
   if (!inAges()) camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
-  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${sectorLabel(s)} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
   for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
   if (!inAges()) for (const s of STAGES) if (stagesShown().includes(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
   for (const g of gods()) out.push({ label: `Inspect ${g.name} ${g.epithet}`, key: '', action: 'inspect', arg: g.id, group: 9 });

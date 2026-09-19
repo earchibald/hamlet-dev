@@ -990,4 +990,74 @@ test('a god stands on a tile of a live country, so its star is drawn on the grou
   }
 });
 
+/* Task 10: the interface shows the names. */
+const NAMES = ['nameTitle', 'campNames', 'sectorLabel', 'fullName', 'describe', 'nameOf', 'formerNames', 'nameRecord', 'rename'];
+
+test('a hover line on a name says the tongue, the meaning, the day, the reason, who named it, and the scores', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r'); api.camp = api.camps[0];
+  const a = api.beings[0];
+  const plain = api.nameRecord('Reedwater', { why: 'for the reeds along the water', by: a.id, scores: [{ text: 'Reedwater', axis: 'land', score: 33 }, { text: 'Pinehill', axis: 'land', score: 21 }] });
+  const line = api.nameTitle(plain);
+  assert.match(line, /^Reedwater\./);
+  assert.match(line, /since day 1/);
+  assert.match(line, /for the reeds along the water/);
+  assert.match(line, new RegExp(`named by ${a.name}`));
+  assert.match(line, /scores: Reedwater 33, Pinehill 21/);
+  /* Seed r has no painted river, so the great water is the lake it found instead. */
+  const old = (api.river || api.stillWater).names[0];
+  assert.match(api.nameTitle(old), new RegExp(`${old.text}, ${old.meaning}, in the old tongue`));
+  assert.match(api.nameTitle(old), /named by the lost people/);
+  assert.equal(api.nameTitle(null), '');
+});
+
+test('the camp view model gives the name now and the names before it', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r'); api.camp = api.camps[0];
+  const c = api.camps[0];
+  /* A fresh camp holds no name record yet: nameFoundersCamp and nameCampAtHearth are the only
+     writers, and neither has run. So the first rename gives it its first record, with nothing
+     before it; the second rename is the one that leaves a former name behind. */
+  api.rename(c, api.nameRecord('Old Camp', { why: 'a first name', by: null }));
+  api.rename(c, api.nameRecord('Reedwater', { why: 'for the reeds', by: null }));
+  const n = api.campNames();
+  assert.equal(n.now.text, 'Reedwater');
+  assert.equal(n.past.length, 1);
+  assert.equal(n.past[0].text, 'Old Camp');
+});
+
+test('a person with an epithet is shown by their full name, and a god keeps its own', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r');
+  const a = api.firstPerson();
+  assert.equal(api.fullName(a), a.name);
+  a.epithet = 'firekeeper';
+  assert.equal(api.fullName(a), `${a.name} firekeeper`);
+  /* Gods carry their own epithet from creation. fullName must not be asked to draw a god row: the
+     god card and the People drawer's god rows read a.name and a.epithet directly, unchanged. */
+  const g = api.beings.find(b => b.species === 'god');
+  assert.ok(g && g.epithet, 'a god carries its own epithet');
+});
+
+test('the People drawer shows a god by its own name and epithet, unaffected by fullName', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...NAMES, 'godRows', 'drawerRows']);
+  api.startCreation('alpha', {}); api.camp = api.camps[0];
+  for (let i = 0; i < 6; i++) api.step();
+  assert.equal(api.era, 'gods');
+  const rows = api.drawerRows('people');
+  assert.ok(rows.length);
+  for (const r of rows){
+    const g = r.r.a;
+    assert.equal(g.species, 'god');
+    /* fullName would print "name epithet" too, with no space rule broken, but the row itself must
+       still be built from the god's own fields, not from a person's naming pass. */
+    assert.equal(api.fullName(g), `${g.name} ${g.epithet}`);
+  }
+});
+
+test('a sector shows its own name beside the biome word once it has one, and just the biome word before that', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r');
+  const s = api.sectors[0];
+  assert.equal(api.sectorLabel(s), s.name, 'no name yet: the biome word alone');
+  s.names = [api.nameRecord('Timberground', { why: 'for the work done here', by: null })];
+  assert.match(api.sectorLabel(s), new RegExp(`^Timberground, an? ${s.name.toLowerCase()}$`));
+});
+
 module.exports = { loadUI };

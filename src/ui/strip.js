@@ -19,6 +19,7 @@ function renderClock(){
 function renderStrip(){
   /* The village title is not part of the name, so it is added here, not by the sim. */
   $('campName').textContent = inAges() ? 'The ages' : camp.name + (camp.village ? ', a village' : '');
+  $('campName').title = inAges() ? '' : nameTitle(campNames().now);
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
