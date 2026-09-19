@@ -100,7 +100,9 @@ function workKind({ label, amount, skill, effect, type = 'work' }){
       const l = of(label, t.args), n = of(amount, t.args);
       t.progress += workSpeed(a, of(skill, t.args) || skillOfLabel(l)); t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
       if (t.progress < n) return 'continue';
-      effect(a, t.args, t); return 'done';
+      /* The effect lands first, because a job that raises a structure is what gives the ground its
+         work word. A job whose place carries no word in WORK_WORDS names nothing. */
+      effect(a, t.args, t); nameSectorForWork(a, workWordAt(at)); return 'done';
     }] };
 }
 Object.assign(TASKS, {
@@ -120,7 +122,8 @@ Object.assign(TASKS, {
       const c = a.carrying;
       if (c.kind === 'firestones'){ camp.tools.firestones = 1; a.carrying = null; log(`${a.name} lays two firestones by the pit. ${ITEMS.firestones.find} The camp can make its own fire now.`, campHumans(), 'major'); addThought(a, 'find', 'Brought firestones up from the dark', 10, CLOCK.thought.find); return 'done'; }
       if (c.kind === 'bones'){ a.carrying = null; log(`${a.name} brings old bones up from the dark, and nobody is sure whose they were. ${ITEMS.bones.find}`, campHumans(), 'major'); addThought(a, 'find', 'Found old bones in the dark', -3, CLOCK.thought.find); for (const h of campHumans()) if (h !== a) addThought(h, 'bones', 'There were bones under the hill', -2, CLOCK.thought.bones); return 'done'; }
-      stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); return 'done';
+      /* The ground a delivery lands on takes its name from what the camp carries home to it. */
+      stashAdd(c.kind, c.count); a.carrying = null; gainXp(a, 'gather'); nameSectorForWork(a, WORK_WORDS[c.kind]); return 'done';
     }] },
   gather: { type: 'gather',
     begin(a, args){

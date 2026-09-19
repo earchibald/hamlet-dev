@@ -119,7 +119,7 @@ Object.assign(TASKS, {
         const q = walkFar(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
-      a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); return 'done';
+      a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
     }] },
   eat: { type: 'eat',
     begin(a, args){
