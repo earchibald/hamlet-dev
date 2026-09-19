@@ -1025,9 +1025,14 @@ function namerFor(place){
   const here = place ? folk.filter(h => nearAt(h, place[0], place[1]) <= 12) : folk;
   return (here.length ? here : folk).slice().sort((p, q) => q.traits.sociability - p.traits.sociability || p.id - q.id)[0];
 }
-/* The one namer. `extra` is the candidates only this moment has. */
+/* The one namer. `extra` is the candidates only this moment has. It goes first, so a
+   text it shares with the ordinary axes keeps `extra`'s score instead of losing the
+   dedup to the lower one. The valley is the one kind named from the lore alone: it is
+   not a place anyone stands in, so the land and the notable axes have nothing to say
+   about it, and the ordinary pool is left out. */
 function nameThing(thing, kind, by, place, extra = []){
-  const scored = scoreCandidates([...candidatesFor(kind, by, place), ...extra], by, thing);
+  const pool = kind === 'valley' ? extra : [...extra, ...candidatesFor(kind, by, place)];
+  const scored = scoreCandidates(pool, by, thing);
   const top = scored[0];
   if (!top || top.score <= 0) return null;
   if (thing.names && thing.names.length && thing.names[0].text === top.text) return thing.names[0];
@@ -1063,7 +1068,81 @@ function nameTick(){
   if (tick % DAY !== CLOCK.names.nameHour) return;
   const prev = camp;
   for (const c of camps){ camp = c; nameCampAtHearth(c); nameEvents(c); }
+  if (camps[0] && camps[0].village && !nameOf(valley)){ camp = camps[0]; nameValley(camps[0]); }
   camp = prev;
+}
+
+/* ---------- sectors, ponds, and the valley ---------- */
+/* What a finished piece of work leaves on the ground, by structure type and by item kind.
+   Rules read this table. The namer never reads a task's label. */
+const WORK_WORDS = {
+  snare: 'snare', pitfall: 'pit', workshop: 'bench', kiln: 'kiln', firepit: 'hearth', hut: 'roof',
+  leanto: 'roof', storehouse: 'store', rack: 'rack', stone: 'offering', ward: 'ward',
+  clay: 'clay', fish: 'fish', log: 'timber', stick: 'stick', rock: 'stone', berries: 'berry',
+  fibre: 'reed', carcass: 'snare', venison: 'deer', moss: 'moss', water: 'water', cuttings: 'cutting',
+};
+function workWordAt(at){
+  const t = at && hasTile(at[0], at[1], 0) ? tileAt(at[0], at[1]) : null;
+  return t && t.struct ? (WORK_WORDS[t.struct.type] || null) : null;
+}
+/* A sector is named by the first camp member to finish work in it. */
+function nameSectorForWork(a, word){
+  if (!word || !a.camp || !a.camp.site || !hasTile(a.x, a.y, 0)) return;
+  const s = sectorOfTile(world[idx(a.x, a.y)]);
+  if (!s || nameOf(s)) return;
+  const prev = camp; camp = a.camp;
+  const extra = [
+    { text: cap(word) + (WORD_TAIL[word] || 'ground'), axis: 'work', base: 25, why: `for the ${word} work done here` },
+    { text: `the ${cap(word)} ${WORD_PHRASE[word] || 'Ground'}`, axis: 'work', base: 25, why: `for the ${word} work done here` },
+  ];
+  const rec = nameThing(s, 'sector', a, [a.x, a.y], extra);
+  if (rec) log(`${a.name} calls this ground ${rec.text}, ${rec.why}.`, campHumans(), 'info');
+  camp = prev;
+}
+/* A pond is named by the first person to drink from it. */
+function namePondHere(a){
+  if (a.species !== 'human' || !a.camp || !lore) return;
+  const t = nearFind(a.x, a.y, q => !!q.pond, NEAR, a.z);
+  if (!t || nameOf(t.pond)) return;
+  const prev = camp; camp = a.camp;
+  const rec = nameThing(t.pond, 'pond', a, [t.x, t.y]);
+  if (rec) log(`${a.name} drinks and calls the pool ${rec.text}, ${rec.why}.`, campHumans(), 'info');
+  camp = prev;
+}
+/* The valley is named once, by the first camp's namer, with the lore axis at 40. */
+function nameValley(c){
+  if (nameOf(valley) || !c.site) return;
+  const by = namerFor(c.site); if (!by) return;
+  const rec = nameThing(valley, 'valley', by, c.site, loreCandidates(40));
+  if (rec) log(`${by.name} gives the whole valley a name: ${rec.text}, ${rec.why}.`, campHumans(), 'major');
+}
+
+/* ---------- describing a thing with no name yet ---------- */
+const DESCRIBE_KIND = { hill: 'hill', cave: 'cave', grove: 'grove', ford: 'crossing', pond: 'pool', river: 'river', valley: 'valley', camp: 'camp' };
+const compass = (dx, dy) => Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'east' : dx < 0 ? 'west' : 'at') : (dy > 0 ? 'south' : 'north');
+function thingSpot(thing){
+  if (thing.x !== undefined) return [thing.x, thing.y];
+  if (thing.exit) return [thing.exit.x, thing.exit.y];
+  if (thing.site) return thing.site.slice();
+  if (thing.tiles && thing.tiles.length && thing.tiles[0].x !== undefined) return [thing.tiles[0].x, thing.tiles[0].y];
+  if (thing.biome !== undefined) return secCenter(thing);
+  return null;
+}
+/* Where a thing is, said by the nearest camp. */
+function placePhrase(label, at){
+  if (!at) return `the ${label}`;
+  const c = camps.filter(k => k.site).sort((p, q) => dist(p.site[0], p.site[1], at[0], at[1]) - dist(q.site[0], q.site[1], at[0], at[1]))[0];
+  if (!c) return `the ${label}`;
+  return `the ${label} ${compass(at[0] - c.site[0], at[1] - c.site[1])} of ${c.name}`;
+}
+/* The name, or, with none, the kind and the place. An old name nobody has learned is not shown.
+   A sector already carries a plain name, its biome's name, so an unnamed sector is described by
+   that rather than the biome table again. */
+function describe(thing, kind){
+  if (!thing) return '';
+  if (thing.nameKnown !== false){ const n = nameOf(thing); if (n) return n; }
+  const label = thing.biome !== undefined ? thing.name.toLowerCase() : (DESCRIBE_KIND[kind] || 'place');
+  return placePhrase(label, thingSpot(thing));
 }
 
 /* ---------- the field that divides ----------

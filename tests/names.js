@@ -358,3 +358,55 @@ test('a fresher event outscores an older one on recency alone', () => {
   assert.ok(fire && wolf, 'both events should be candidates');
   assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
 });
+
+test('a finished snare names the ground it stands on, from the work and the land', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const s = api.sectors[api.secIdx(...Object.values(api.secOf(a.x, a.y)))];
+  assert.equal(api.nameOf(s), null);
+  const t = api.tileAt(a.x + 1, a.y); t.feature = null; t.struct = { type: 'snare', snare: { armed: true, camp: c } };
+  api.nameSectorForWork(a, api.workWordAt([t.x, t.y]));
+  assert.ok(api.nameOf(s), 'the sector has no name');
+  assert.ok(api.chronicle.some(e => e.text.includes(`calls this ground ${api.nameOf(s)}`)), api.chronicle[0].text);
+  const before = api.nameOf(s);
+  api.nameSectorForWork(a, 'fish');
+  assert.equal(api.nameOf(s), before, 'a sector is named once');
+});
+
+test('an unnamed sector is described by its biome and its direction from the nearest camp', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const here = api.secOf(...c.site);
+  const east = api.sectors.find(s => s.sy === here.sy && s.sx === here.sx + 1);
+  assert.equal(api.describe(east, 'sector'), `the ${east.name.toLowerCase()} east of ${c.name}`);
+  api.giveName(east, api.nameRecord('Snarewood', { why: 'for the snares' }));
+  assert.equal(api.describe(east, 'sector'), 'Snarewood');
+  const h = api.hills[0];
+  assert.match(api.describe(h, 'hill'), /^the hill (north|south|east|west|at) of /, 'an unlearned old name is not shown');
+  h.nameKnown = true;
+  assert.equal(api.describe(h, 'hill'), api.nameOf(h));
+});
+
+test('the first drink names the pool', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const p = api.ponds[0];
+  assert.ok(p, 'no pond on seed r');
+  const wet = p.tiles[0];
+  const beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => api.tileAt(wet.x + dx, wet.y + dy)).find(q => q && q.ground !== 'water');
+  assert.ok(beside, 'no dry tile beside the pool');
+  a.x = beside.x; a.y = beside.y; a.z = 0;
+  api.namePondHere(a);
+  assert.ok(api.nameOf(p), 'the pool has no name');
+});
+
+test('the valley takes its name from the lore, at forty', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  assert.equal(api.nameOf(api.valley), null);
+  api.nameValley(c);
+  const r = api.valley.names[0];
+  assert.ok(r, 'the valley has no name');
+  assert.equal(r.scores[0].axis, 'lore', `the top candidate came from ${r.scores[0].axis}`);
+  assert.ok(api.chronicle.some(e => e.text.includes(`the whole valley a name: ${r.text}`)), api.chronicle[0].text);
+});
