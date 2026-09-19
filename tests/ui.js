@@ -1036,20 +1036,33 @@ test('a person with an epithet is shown by their full name, and a god keeps its 
   assert.ok(g && g.epithet, 'a god carries its own epithet');
 });
 
-test('the People drawer shows a god by its own name and epithet, unaffected by fullName', () => {
-  const api = loadUI(['state', 'derive', 'keys'], [...NAMES, 'godRows', 'drawerRows']);
+/* Review fix 1: the People drawer's row label is a field of the row itself, chosen once in
+   drawerRows, not `esc(fullName(a))` for every row regardless of species. A god's row must read
+   exactly as it did at d08a432, before task 10: the name alone, nothing joined on by fullName. */
+test('the People drawer gives a person their full name, and leaves a god’s row exactly as it read before names', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...NAMES, 'drawerRows']);
   api.startCreation('alpha', {}); api.camp = api.camps[0];
   for (let i = 0; i < 6; i++) api.step();
   assert.equal(api.era, 'gods');
-  const rows = api.drawerRows('people');
-  assert.ok(rows.length);
-  for (const r of rows){
-    const g = r.r.a;
-    assert.equal(g.species, 'god');
-    /* fullName would print "name epithet" too, with no space rule broken, but the row itself must
-       still be built from the god's own fields, not from a person's naming pass. */
-    assert.equal(api.fullName(g), `${g.name} ${g.epithet}`);
-  }
+  const godRows = api.drawerRows('people');
+  assert.ok(godRows.length);
+  for (const r of godRows) assert.equal(r.label, r.r.a.name, 'a god’s row carries no epithet from fullName');
+
+  const api2 = loadUI(['state', 'derive'], [...NAMES, 'drawerRows']); api2.startWorld('r');
+  const p = api2.firstPerson(); p.epithet = 'firekeeper';
+  const row = api2.drawerRows('people').find(x => x.id === p.id);
+  assert.equal(row.label, `${p.name} firekeeper`, 'a person’s row carries their full name');
+});
+
+/* A god's inspector head is a different function, inspectGod, never touched by task 10; this locks
+   that in against the same regression the People drawer had. */
+test('a god’s inspector head reads as it did before names: its name, its own epithet, nothing more', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...NAMES, 'inspectGod']);
+  api.startCreation('alpha', {}); api.camp = api.camps[0];
+  for (let i = 0; i < 6; i++) api.step();
+  const g = api.gods()[0];
+  const html = api.inspectGod(g);
+  assert.match(html, new RegExp(`<div class="head"><strong style="color:[^"]*">${g.name}</strong><span>${g.epithet}</span></div>`));
 });
 
 test('a sector shows its own name beside the biome word once it has one, and just the biome word before that', () => {
@@ -1058,6 +1071,63 @@ test('a sector shows its own name beside the biome word once it has one, and jus
   assert.equal(api.sectorLabel(s), s.name, 'no name yet: the biome word alone');
   s.names = [api.nameRecord('Timberground', { why: 'for the work done here', by: null })];
   assert.match(api.sectorLabel(s), new RegExp(`^Timberground, an? ${s.name.toLowerCase()}$`));
+});
+
+/* Review fix 3: a sector inside a sentence that supplies its own words around it ("in ... at 3,4.")
+   reads its own name with no article, and keeps the old "the <biome>" phrase when it has none. */
+test('sectorProse names the sector mid-sentence when it can, and keeps the plain biome phrase when it cannot', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'sectorProse']); api.startWorld('r');
+  const s = api.sectors[0];
+  assert.equal(api.sectorProse(s), `the ${s.name.toLowerCase()}`, 'unnamed: the plain biome phrase, as it always read');
+  s.names = [api.nameRecord('Timberground', { why: 'test', by: null })];
+  assert.equal(api.sectorProse(s), 'Timberground', 'named: the sector’s own name, with no article of its own');
+});
+
+test('inspectTile’s Where row uses the sector’s own name once it has one', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'actions'], [...NAMES, 'inspectTile', 'LW', 'LH']);
+  api.startWorld('r');
+  const s = api.sectors[0];
+  s.names = [api.nameRecord('Timberground', { why: 'test', by: null })];
+  const html = api.inspectTile(s.sx * api.LW, s.sy * api.LH, 0);
+  assert.match(html, /Timberground, a /);
+});
+
+/* Review fix 2: sectorLabel carries sim text (a naming record), and it is escaped once, at the
+   place it turns into markup: the palette row and the sector tooltip. The builders themselves
+   (paletteRows, sectorSummary) stay raw, so nothing here is escaped twice. */
+test('a sector name with markup in it is escaped once it becomes markup: the palette row and the sector tooltip', () => {
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc; globalThis.localStorage = storage; globalThis.window = { innerWidth: 1200, innerHeight: 900 };
+    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs'],
+      [...NAMES, 'paletteRows', 'openPalette', 'renderPalette', 'renderTip'],
+      { setTip: '(t, a) => { tipTarget = t; tipAnchor = a; }' });
+    api.startWorld('r'); api.camp = api.camps[0];
+    const s = api.sectors[0];
+    s.names = [api.nameRecord('<b>Timberground</b>', { why: 'a test name', by: null })];
+
+    /* openPalette is what a real keypress runs: it fills the dialog's own row list from
+       paletteRows() before the first render, which a bare renderPalette() call cannot do. */
+    api.openPalette();
+    const row = api.paletteRows().find(r => r.label.includes('Timberground'));
+    assert.ok(row, 'the sector has a palette row');
+    assert.ok(row.label.includes('<b>Timberground</b>'), 'the builder keeps the raw text, unescaped');
+    el.value = 'Timberground';
+    api.renderPalette();
+    const paletteHTML = el.innerHTML;
+    assert.ok(paletteHTML.includes('&lt;b&gt;Timberground&lt;/b&gt;'), 'the palette escapes the sector name at render');
+    assert.ok(!paletteHTML.includes('<b>Timberground</b>'), 'the tag itself never lands unescaped in the palette');
+
+    api.setTip({ sector: { sx: s.sx, sy: s.sy } }, { x: 0, y: 0, left: false });
+    el.innerHTML = '';
+    api.renderTip();
+    const tipHTML = el.innerHTML;
+    assert.ok(tipHTML.includes('&lt;b&gt;Timberground&lt;/b&gt;'), 'the tooltip escapes the sector name at render');
+    assert.ok(!tipHTML.includes('<b>Timberground</b>'), 'the tag itself never lands unescaped in the tooltip');
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
 });
 
 module.exports = { loadUI };

@@ -5746,6 +5746,10 @@ function sectorLabel(s){
   const w = s.name.toLowerCase();
   return `${n}, ${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
 }
+/* A sector inside a sentence that already has its own words around it ("in ... at 3,4."). A named
+   sector is a proper noun and needs no article of its own; an unnamed one is still just its biome
+   word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
+function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
 function campSummary(){
   return {
@@ -5765,7 +5769,9 @@ function seasonLine(){
 
 /* The rows a drawer's keys act on, in the order the drawer shows them. */
 function drawerRows(id){
-  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r }));
+  /* A person's row shows their full name, epithet and all; a god's row is untouched by that, since
+     a god already carries its own epithet from creation and its row read that way before names. */
+  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r, label: r.a.species === 'human' ? fullName(r.a) : r.a.name }));
   if (id === 'goals'){
     if (inAges()) return [];
     const out = [];
@@ -6419,7 +6425,7 @@ function inspectGod(g){
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
   else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
-  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in the ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
+  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
   /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
@@ -6455,14 +6461,14 @@ function inspectBeing(a, full = false){
   const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
-    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
+    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
     ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
 }
 function inspectTile(x, y, z = 0){
-  const s = secOf(x, y), where = `${sectors[secIdx(s.sx, s.sy)].name}, ${x - s.sx * LW},${y - s.sy * LH}`;
+  const s = secOf(x, y), where = `${esc(sectorLabel(sectors[secIdx(s.sx, s.sy)]))}, ${x - s.sx * LW},${y - s.sy * LH}`;
   if (!hasTile(x, y, z)) return `<table class="kv"><tr><td>Where</td><td>${where}</td></tr><tr><td>Level</td><td>${levelName(z)}. ${z > 0 ? 'Open air. The ground is below.' : 'Solid earth. Nothing is dug here.'}</td></tr></table>`;
   const t = tileAt(x, y, z), rows = [['Where', where], ['Level', levelName(z)], ['Ground', GROUND[t.ground].name + (GROUND[t.ground].walk || t.ground === 'water' ? '' : '. Nothing walks through it.')]];
   const c = z === 0 ? camps.find(c => c.site && ((c.site[0] === x && c.site[1] === y) || (c.stashTile[0] === x && c.stashTile[1] === y) || (c.pit && c.pit[0] === x && c.pit[1] === y) || (c.rack && c.rack[0] === x && c.rack[1] === y) || (c.shelter && c.shelter[0] === x && c.shelter[1] === y) || (c.workshop && c.workshop[0] === x && c.workshop[1] === y) || (c.kiln && c.kiln[0] === x && c.kiln[1] === y))) : null;
@@ -6520,7 +6526,9 @@ function renderTip(){
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
   const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
-    : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
+    /* sectorSummary is one plain sentence, not markup of its own, so it is escaped whole here,
+       at the one place it becomes the tip's innerHTML. Nothing inside it escapes itself first. */
+    : tipTarget.sector ? '<div class="muted">' + esc(sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)])) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
   tip.innerHTML = body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;
@@ -6578,7 +6586,11 @@ function renderStrip(){
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
   if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
-  const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
+  /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
+     no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
+     can run past that room where the bare biome word never did, so the title keeps the biome word, as
+     it always did; the sector's own name is one hover away, in the card the window's body shows. */
+  const [x, y] = w.target.tile, s = secOf(x, y); return `${esc(sectors[secIdx(s.sx, s.sy)].name)} ${x - s.sx * LW},${y - s.sy * LH}`;
 }
 function renderWindows(){
   const box = $('windows'), seen = new Set();
@@ -6684,7 +6696,7 @@ function renderDrawers(){
 function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
-  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(fullName(a));
+  el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
     return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
@@ -6774,7 +6786,10 @@ let palRows = [], palHit = [], palSel = 0;
 function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; ui.focus = 'dialog:palette'; $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
 function renderPalette(){
   palHit = paletteMatch($('paletteInput').value, palRows).slice(0, 40); palSel = clamp(palSel, 0, Math.max(0, palHit.length - 1));
-  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${r.label}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
+  /* Every row's label is escaped here, once, at the one place a label becomes markup. A static label
+     (from KEYMAP, a being's plain name, and so on) has never held a special character, so this changes
+     nothing for it; a sector's own name can, now that a name is free-form text from the namer. */
+  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${esc(r.label)}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
   const sel = $('paletteList').querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
 function paletteMove(d){ palSel = clamp(palSel + d, 0, Math.max(0, palHit.length - 1)); renderPalette(); }

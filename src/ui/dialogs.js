@@ -22,7 +22,10 @@ let palRows = [], palHit = [], palSel = 0;
 function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; ui.focus = 'dialog:palette'; $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
 function renderPalette(){
   palHit = paletteMatch($('paletteInput').value, palRows).slice(0, 40); palSel = clamp(palSel, 0, Math.max(0, palHit.length - 1));
-  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${r.label}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
+  /* Every row's label is escaped here, once, at the one place a label becomes markup. A static label
+     (from KEYMAP, a being's plain name, and so on) has never held a special character, so this changes
+     nothing for it; a sector's own name can, now that a name is free-form text from the namer. */
+  $('paletteList').innerHTML = palHit.map((r, i) => `<li class="${i === palSel ? 'sel' : ''}" data-i="${i}"><span>${i < 9 ? `<kbd>Alt+${i + 1}</kbd> ` : ''}${esc(r.label)}</span>${r.key ? `<kbd>${r.key}</kbd>` : ''}</li>`).join('') || '<li class="muted">Nothing matches.</li>';
   const sel = $('paletteList').querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
 function paletteMove(d){ palSel = clamp(palSel + d, 0, Math.max(0, palHit.length - 1)); renderPalette(); }

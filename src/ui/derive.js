@@ -267,6 +267,10 @@ function sectorLabel(s){
   const w = s.name.toLowerCase();
   return `${n}, ${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
 }
+/* A sector inside a sentence that already has its own words around it ("in ... at 3,4."). A named
+   sector is a proper noun and needs no article of its own; an unnamed one is still just its biome
+   word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
+function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
 function campSummary(){
   return {
@@ -286,7 +290,9 @@ function seasonLine(){
 
 /* The rows a drawer's keys act on, in the order the drawer shows them. */
 function drawerRows(id){
-  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r }));
+  /* A person's row shows their full name, epithet and all; a god's row is untouched by that, since
+     a god already carries its own epithet from creation and its row read that way before names. */
+  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r, label: r.a.species === 'human' ? fullName(r.a) : r.a.name }));
   if (id === 'goals'){
     if (inAges()) return [];
     const out = [];
