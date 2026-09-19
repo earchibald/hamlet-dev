@@ -135,6 +135,7 @@ const CLOCK = {
     wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
     chance: 0.7, villageChance: 0.85,
     afterTheLast: days(10),                       // with no person alive in the valley, the wait before a lone wanderer crosses the hills
+    afterTheDoomed: days(10),                     // with one person alive, how long the hearth must be cold before the line counts as doomed
   },
   party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },   // foodKeeps: what the stash keeps is under `food`
   storm: {
