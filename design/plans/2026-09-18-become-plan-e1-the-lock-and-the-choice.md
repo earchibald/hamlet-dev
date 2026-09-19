@@ -10,6 +10,8 @@
 
 **Spec:** `design/specs/2026-09-18-become-a-god-design.md`. Read sections 1 to 5 before starting.
 
+**Amended after the branch review.** The code blocks in Tasks 4 and 6 were written before the work and were overtaken by it. They are corrected here to the code as it stands: the once-per-god preparation runs in `ageDecide` before the turn check, which is load-bearing for the equality; `agePos` carries `prepared` and `opts`; `decideGod` takes the drawn matrix and keeps only its continue branch; one function advances the age's position; `inhabited` carries its mode; and `run` takes `{ what, at }` as `watch` does.
+
 ## Global Constraints
 
 - Files in `src/sim/` are **not** ES modules. They share one scope. Do not add `import` or `export`.
@@ -424,7 +426,7 @@ Claude-Session: https://claude.ai/code/session_01SRWSFkabqzfz1cs5RaStxv"
 **Interfaces:**
 - Consumes: `agePos`, `ageBegin`, `ageDecide`, `ageEnd` from Task 3. `creation.choices` from Task 2.
 - Produces:
-  - `inhabited` — the id of the being the player is, or `null`.
+  - `inhabited` — `null`, or `{ id, mode }`: the being the player is and how they hold it. `mode` is `'become'` here. It is an object and not a bare id so that Possess, when it is built, changes no read site.
   - `pending` — `null`, or `{ god, age, opts }`. `opts` is the matrix: `[{ type, label, score, region }]`, `region` a region id. A row gains `failed: true` when a chosen option did not land.
   - `takeTurn(opt)` — applies `{ type, region }` for the pending god. Returns a message. Clears `pending` and finishes the age when the option lands.
   - `step()` returns `'The turn is yours.'` and does nothing while `pending` is set.
@@ -545,20 +547,30 @@ In `src/sim/gods.js`, directly after the `agePos` declaration from Task 3:
    of what the player did. This is only so they can see it happen. */
 function note(text){ chronicle.unshift({ tick, when: stamp(), text, kind: 'info' }); if (chronicle.length > 300) chronicle.pop(); }
 
-/* Who the player is, and the turn that is open. `inhabited` is a being id or null. `pending` is null,
-   or the god whose turn it is with the matrix it was given. The engine will not step while `pending`
-   is set: this is the locked clock the mythos spec reserved. */
+/* Who the player is, and the turn that is open. `inhabited` is null, or `{ id, mode }`: the being the
+   player is and how they hold it. `mode` is `become` here, and the other three modes name themselves
+   the day each is built, so no read site has to change again. `pending` is null, or the god whose turn
+   it is with the matrix it was given. The engine will not step while `pending` is set: this is the
+   locked clock the mythos spec reserved. */
 let inhabited = null;
 let pending = null;
 
-/* Fill the open turn. settleHome and godNeeds run here, once, before the options are drawn, exactly
-   where the autonomous path runs them. The matrix is drawn once and kept; drawing it twice would
-   draw from the stream twice. */
+/* Whether the player has been told their god can act no more. One line, not one an age. */
+let inhabitedTold = false;
+
+/* Fill the open turn. The once-per-god preparation (settleHome, godNeeds, abandonUnfinished) runs in
+   `ageDecide`, not here, so it happens exactly once however many times the turn is opened. The matrix
+   is drawn once and kept on `agePos.opts`; re-opening the same god's turn, after the player left and
+   came back, reuses it and draws nothing. Task 5 adds the bar on each row. */
 function openTurn(g){
-  settleHome(g); godNeeds(g);
-  const opts = godOptions(g);
-  pending = { god: g.id, age, opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })) };
+  if (!agePos.opts) agePos.opts = godOptions(g);
+  pending = { god: g.id, age, opts: agePos.opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })) };
 }
+
+/* The age moves past the god at `agePos.i`. The preparation and the drawn matrix belong to that god
+   alone, so they are dropped with it. Both paths that advance the age call this, and there is one
+   copy of the invariant. */
+function agePass(){ agePos.i++; agePos.prepared = false; agePos.opts = null; }
 
 /* Apply one option for the god whose turn is open. An option that does not land leaves the turn open
    with its row marked failed, because the player is owed the reason; the autonomous god falls to the
@@ -581,15 +593,44 @@ function takeTurn(opt){
   if (!landed) return `The ground refuses it. ${g.name} cannot ${row.type} there.`;
   creation.choices.push({ age: pending.age, god: g.id, opts: pending.opts, picked: row.type, byPlayer: true });
   pending = null;
-  agePos.i++;
+  agePass();
   withGodRng(() => { if (ageDecide()) ageEnd(); });
   if (settleNow){ settleNow = false; settle(); }
   return `You ${row.type}. ${g.name} acts.`;
 }
 
-/* The player leaves, or the god whose turn was open is gone. The open turn closes and the creation
-   runs itself from where it stands. */
+/* The player leaves, or the god whose turn was open is gone. This only closes the open turn: it does
+   not resume the age. `takeTurn` is the one path that resumes, so there is no second copy of that
+   logic to keep in step with it. The engine's own next `step()` finds `agePos` still standing and
+   carries the age on from where it stood, through `ageDecide`. */
 function releaseTurn(){ pending = null; }
+```
+
+The abandon branch moves too. `decideGod` used to drop an unfinished act and then make a full free
+choice, which the player never saw: the turn check had already passed, because the god still carried
+a task. Move it to the preparation, where it runs for every god, so the order of the log lines and the
+random draws is unchanged.
+
+In `src/sim/gods.js`, above `decideGod`:
+
+```js
+/* A god with too little calm or too little expression drops the act it carries. This runs in the
+   once-per-god preparation in `ageDecide`, for every god, before any turn can open: a god that
+   abandons its act has a free choice, and the player must be shown it. `decideGod` therefore keeps
+   only the continue branch. Nothing here draws a random number. */
+function abandonUnfinished(g){
+  if (!g.task) return;
+  if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${g.task.type} unfinished.`, [g]); g.task = null; }
+}
+```
+
+And in `decideGod`, keep only the continue branch, and take the matrix the caller already drew:
+
+```js
+function decideGod(g, given){
+  if (g.task){ const t = g.task;
+    beginAct(); creation.choices.push({ age, god: g.id, continued: true, type: t.type }); GOD_ACTS[t.type].continue(g, t); return; }
+  const opts = given || godOptions(g); ...
 ```
 
 - [ ] **Step 4: Suspend the age at the inhabited god, and snapshot the gods once an age**
@@ -599,26 +640,43 @@ function releaseTurn(){ pending = null; }
 In `src/sim/gods.js`, in `ageBegin`, replace the last line:
 
 ```js
-  agePos = { i: 0, list: gods() };
+  agePos = { i: 0, list: gods(), prepared: false, opts: null };
 ```
 
 In `src/sim/gods.js`, replace `ageDecide` from Task 3:
 
 ```js
+/* A god that sleeps, dies, or is unmade decides nothing, so no turn opens for it ever again. The
+   player is told once, and is told nothing more until they take another god. */
+function tellIfGone(){
+  if (!inhabited || inhabitedTold) return;
+  const me = beingById(inhabited.id);
+  if (me && me.status === 'awake') return;
+  inhabitedTold = true;
+  note(`${me ? me.name : 'The god you took'} acts no more. Take another god, or watch.`);
+}
+
 /* The gods of this age, as they stood when it began, and where we are among them. The list is taken
    once an age and never retaken, so a suspended age resumes through the same gods the age started
-   with, and a god born mid-age waits for the next age exactly as it always did. */
+   with, and a god born mid-age waits for the next age exactly as it always did.
+   `agePos.prepared` and `agePos.opts` belong to the god at `agePos.i` alone: settleHome, godNeeds,
+   abandonUnfinished, and the drawn matrix run or are drawn once for that god, however many times its
+   turn is opened and abandoned before the age moves past it. The preparation runs BEFORE the turn
+   check, and that order is load-bearing: a god that abandons its act has a free choice, and the
+   player must be given it. */
 function ageDecide(){
+  tellIfGone();
   const list = agePos.list;
   while (agePos.i < list.length){
     const g = list[agePos.i];
     if (g.status === 'awake'){
+      if (!agePos.prepared){ settleHome(g); godNeeds(g); abandonUnfinished(g); agePos.prepared = true; }
       /* The player's god with a free choice stops the age here. A god carrying an act has no choice
          to make, so it carries on and the turn does not open. */
-      if (g.id === inhabited && !g.task && runUntil === null){ openTurn(g); return false; }
-      settleHome(g); godNeeds(g); decideGod(g);
+      if (inhabited && g.id === inhabited.id && !g.task && runUntil === null){ openTurn(g); return false; }
+      decideGod(g, agePos.opts);
     }
-    agePos.i++;
+    agePass();
   }
   return true;
 }
@@ -659,14 +717,18 @@ In `src/sim/door.js`, replace the stub `become` from Task 1 and add `choose`:
     if (e.mode !== undefined && e.mode !== 'become') return 'Only Become is built. Possess, Vessel, and Manifestation wait for their own specs.';
     if (e.id === null || e.id === undefined){
       if (inhabited === null) return 'You are nobody already.';
-      inhabited = null; releaseTurn();
+      inhabited = null; inhabitedTold = false; releaseTurn();
       note('The hand above lifts. Whatever was moving falls still, and goes on by itself.');
       return 'You are nobody again. The creation goes on without you.';
     }
+    /* Only a god can be taken in this slice, and a god acts only in the ages. Without this guard a
+       god-era become replayed in the days era would land on a sleeping god and open nothing.
+       Leaving is above this line, so it works in either era. */
+    if (era !== 'gods') return 'The ages are over. A god cannot be taken now.';
     const g = beingById(e.id);
     if (!g || !g.alive || g.species !== 'god') return 'Only a god can be taken, and only while it lives.';
-    if (inhabited !== null && inhabited !== g.id) releaseTurn();
-    inhabited = g.id;
+    if (inhabited !== null && inhabited.id !== g.id) releaseTurn();
+    inhabited = { id: g.id, mode: 'become' }; inhabitedTold = false;
     note(`Something older than the gods looks out through ${g.name}.`);
     return `You are ${g.name}, ${g.epithet}.`;
   },
@@ -941,7 +1003,7 @@ test('a run takes the engine\'s own choice until the age it names', () => {
   api.inject({ source: 'player', act: 'become', id: g.id });
   api.step();
   assert.ok(api.pending, 'the turn opens before the run');
-  assert.equal(api.inject({ source: 'player', act: 'run', until: api.age + 4 }), `Running to age ${api.age + 4}.`);
+  assert.equal(api.inject({ source: 'player', act: 'run', what: 'age', at: api.age + 4 }), `Running to age ${api.age + 4}.`);
   assert.equal(api.pending, null, 'a run closes the open turn');
   let n = 0; while (api.era === 'gods' && api.runUntil !== null && n++ < 50) api.step();
   assert.equal(api.runUntil, null, 'the run ended');
@@ -957,7 +1019,7 @@ test('a stop on an age ends a run early, and says why', () => {
   const at = api.age + 3;
   assert.equal(api.inject({ source: 'player', act: 'watch', what: 'age', at }), `A stop is set at age ${at}.`);
   assert.deepEqual(api.stops, [{ what: 'age', at }]);
-  api.inject({ source: 'player', act: 'run', until: api.age + 40 });
+  api.inject({ source: 'player', act: 'run', what: 'age', at: api.age + 40 });
   let n = 0; while (api.era === 'gods' && api.runUntil !== null && n++ < 50) api.step();
   assert.equal(api.age, at, 'the run stopped at the stop, not at the run\'s own end');
   assert.match(api.chronicle[0].text, /age/i);
@@ -983,7 +1045,7 @@ test('a creation run entirely on autopilot is the creation the engine runs alone
   b.startCreation('delta', {});
   b.step();
   b.inject({ source: 'player', act: 'become', id: b.awakeGods()[0].id });
-  b.inject({ source: 'player', act: 'run', until: 100000 });
+  b.inject({ source: 'player', act: 'run', what: 'age', at: 100000 });
   let n = 0; while (b.era === 'gods' && n++ < 2000) b.step();
   assert.equal(b.era, 'days');
   assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
@@ -1014,7 +1076,9 @@ In `src/sim/gods.js`, in `ageBegin`, after `agePos = { i: 0 };` add:
      the player is never stopped without a reason. */
   if (runUntil !== null){
     const stop = stops.find(s => s.what === 'age' && s.at === age);
-    if (stop){ runUntil = null; note(`Age ${age}. The stop you set is reached.`); }
+    /* A stop that fired is spent. It is taken off the list, so a later run past this age is not
+       stopped again by a mark the player already saw reached. */
+    if (stop){ runUntil = null; stops.splice(stops.indexOf(stop), 1); note(`Age ${age}. The stop you set is reached.`); }
     else if (age >= runUntil){ runUntil = null; note(`Age ${age}. The run you set is over.`); }
   }
 ```
@@ -1024,20 +1088,24 @@ In `src/sim/gods.js`, in `ageBegin`, after `agePos = { i: 0 };` add:
 In `src/sim/door.js`, inside `DOOR_ACTS`, after `choose`:
 
 ```js
-  /* Run: the god chooses for itself until the age named, or until a stop is reached. Autopilot is the
-     engine's own chooser and nothing else, so a creation run on autopilot is an unwatched creation. */
+  /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the
+     engine's own chooser and nothing else, so a creation run on autopilot is an unwatched creation.
+     A run names a mark ahead of now in the same shape a stop does: `{ what, at }`. */
   run(e){
+    if (e.what !== 'age') return 'Only a run to an age is built. A run to an event waits for the watch list.';
     if (era !== 'gods') return 'There are no ages to run.';
     if (inhabited === null) return 'You are nobody. There is nothing to hand over.';
-    if (!Number.isInteger(e.until) || e.until <= age) return 'A run goes to an age still ahead.';
-    runUntil = e.until; releaseTurn();
-    note(`${beingById(inhabited).name} goes on alone a while.`);
-    return `Running to age ${e.until}.`;
+    if (!Number.isInteger(e.at) || e.at <= age) return 'A run goes to an age still ahead.';
+    runUntil = e.at; releaseTurn();
+    note(`${beingById(inhabited.id).name} goes on alone a while.`);
+    return `Running to age ${e.at}.`;
   },
-  /* Watch: set or clear a stop. The same stop twice clears it. */
+  /* Watch: set or clear a stop. The same stop twice clears it. A stop is a mark ahead of now, so an
+     age already passed cannot carry one: it would never fire. */
   watch(e){
     if (e.what !== 'age') return 'Only a stop on an age is built. A stop on an event waits for the watch list.';
     if (!Number.isInteger(e.at)) return 'A stop on an age names a whole age.';
+    if (e.at <= age) return 'That age is already past. A stop goes on an age still ahead.';
     const k = stops.findIndex(s => s.what === 'age' && s.at === e.at);
     if (k >= 0){ stops.splice(k, 1); return `The stop at age ${e.at} is cleared.`; }
     stops.push({ what: 'age', at: e.at });
@@ -1051,7 +1119,7 @@ In `src/sim/gods.js`, in `beginCreation`, add to the reset line that already cle
 
 ```js
   deciding = null; saidFrom = 0; gestureFallbacks = {};
-  agePos = null; pending = null; inhabited = null; runUntil = null; stops = [];
+  agePos = null; pending = null; inhabited = null; inhabitedTold = false; runUntil = null; stops = [];
 ```
 
 - [ ] **Step 6: Expose the new names**
@@ -1067,26 +1135,53 @@ In `src/sim/index.js`, in the `API` string, on the gods line, after `GOD_BARS, b
 In `tests/ages.js`, after the `creationOf` function, add:
 
 ```js
-/* The gate for Become: a creation run entirely on autopilot is the creation startWorld runs alone.
-   Autopilot is the engine's own chooser, so this must hold on every seed, line for line. */
-function autopilotOf(seed){
-  const api = load(); api.startCreation(seed, {});
+/* The gate for Become: a creation the player drove, turn by turn, is the creation startWorld runs
+   alone. The player takes the top row of the matrix every time a turn opens, which is what the
+   engine's own chooser takes, so every age suspends at the player's god and resumes through the
+   door. A pure `run` would prove nothing here: `ageDecide` opens no turn while `runUntil` is set,
+   so a driver that runs first never suspends an age at all. The pure-`run` path keeps its own test
+   in `tests/become.js`. Force Actions is on, because a bar is a lens on the matrix and not a rule:
+   with it off a barred top row could not be taken, and the player could not follow the engine.
+   Returns the api and how many turns the player took, so a run that opened none fails. */
+function steeredOf(seed){
+  const api = load(); api.startCreation(seed, { force: true });
   api.step();
-  const awake = api.awakeGods();
-  if (awake.length) api.inject({ source: 'player', act: 'become', id: awake[0].id });
-  api.inject({ source: 'player', act: 'run', until: api.options.ageLimit * 2 + 4 });
-  const max = api.options.ageLimit * 2 + 2;
-  for (let n = 0; api.era === 'gods' && n < max; n++) api.step();
-  return api;
+  const first = api.awakeGods()[0];
+  assert.equal(api.inject({ source: 'player', act: 'become', id: first.id }),
+    `You are ${first.name}, ${first.epithet}.`, 'the first god that wakes is taken');
+  let turns = 0;
+  const max = (api.options.ageLimit * 2 + 2) * 20;
+  for (let n = 0; api.era === 'gods' && n < max; n++){
+    if (api.pending){
+      const row = api.pending.opts.find(o => !o.failed);
+      if (row){
+        turns++;
+        const msg = api.inject({ source: 'player', act: 'choose', id: api.pending.god, opt: { type: row.type, region: row.region } });
+        assert.match(msg, /^You \w+\. .+ acts\.$|^The ground refuses it\./, `seed ${seed}: ${msg}`);
+        continue;
+      }
+      api.inject({ source: 'player', act: 'become', id: null });
+      api.step();
+      continue;
+    }
+    const me = api.inhabited && api.beingById(api.inhabited.id);
+    if ((!me || me.status !== 'awake') && api.awakeGods().length){
+      const g = api.awakeGods()[0];
+      assert.equal(api.inject({ source: 'player', act: 'become', id: g.id }), `You are ${g.name}, ${g.epithet}.`);
+    }
+    api.step();
+  }
+  return { api, turns };
 }
 ```
 
 And, inside the existing `for (const seed of SEEDS)` loop, after the existing `test(...)` call, add a second test:
 
 ```js
-  test(`seed ${seed}: an autopiloted creation is an unwatched one`, () => {
+  test(`seed ${seed}: a creation the player drove is an unwatched one`, () => {
     const a = load(); a.startWorld(seed);
-    const b = autopilotOf(seed);
+    const { api: b, turns } = steeredOf(seed);
+    assert.ok(turns > 0, 'no turn ever opened: the age never suspended');
     assert.equal(b.era, 'days');
     assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
     assert.equal(b.tick, a.tick);
@@ -1117,7 +1212,7 @@ In `design/settings.md`, replace the `Inhabit modes` row with:
 And add a row for the stops:
 
 ```markdown
-| A stop on an age | E, become a god, section 4 | built | `watch` with `{ what: 'age', at }`. The same stop twice clears it. A run ends at the first stop that names the age, and the chronicle says why. A stop on an event needs an event kind on every chronicle line, which is G section 7 and is not written; the act refuses that kind by name until it is. |
+| A stop on an age | E, become a god, section 4 | built | `watch` with `{ what: 'age', at }`, and `run` takes the same pair. A stop on an age already passed is refused, and a stop that fired is taken off the list. The same stop twice clears it. A run ends at the first stop that names the age, and the chronicle says why. A stop on an event needs an event kind on every chronicle line, which is G section 7 and is not written; the act refuses that kind by name until it is. |
 ```
 
 - [ ] **Step 11: Build and commit**

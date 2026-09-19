@@ -45,10 +45,12 @@ Every act from outside enters by `inject()` in `src/sim/door.js`. This spec adds
 
 | Act | Payload | Meaning |
 |---|---|---|
-| `become` | `{ id, mode }` | Inhabit this being. `mode` is `become` here; `possess`, `vessel`, and `manifest` are refused until their specs are built. `id` of `null` leaves. |
+| `become` | `{ id, mode }` | Inhabit this being. `mode` is `become` here; `possess`, `vessel`, and `manifest` are refused until their specs are built. `id` of `null` leaves. A god can be taken only in the gods era; leaving works in either era. |
 | `choose` | `{ id, opt }` | Take this option from the open matrix. |
-| `run` | `{ until }` | Autopilot until a mark. |
+| `run` | `{ what, at }` | Autopilot until a mark. In this slice `what` is `age` only. |
 | `watch` | `{ what, at }` | Set or clear a stop. In this slice `what` is `age` only. |
+
+**A run and a stop are the same shape.** Both name a mark ahead of now, so both take `{ what, at }`. Only `age` is built, and either act refuses any other `what` by name.
 
 **An option is named, never numbered.** `opt` is `{ type, region }`: the act and the country it falls on. An index into a sorted list is not a name, and a list sorted by score is not stable across a replay.
 
@@ -101,7 +103,9 @@ Several stand at once. The run reaches whichever comes first. The rest stay set.
 
 **A stop is a watch.** Setting a stop is the `watch` act. Clearing one is the same act.
 
-**The act is shaped for what comes, and refuses what is not built.** `watch` takes `{ what, at }`. `what` of `age` is built. Any other `what` is refused at the door with a message that says the watch list is not built yet. When G writes event kinds onto chronicle lines, the event form drops into the same act and the same timeline marks, and nothing in the interface changes.
+**The act is shaped for what comes, and refuses what is not built.** `watch` takes `{ what, at }`, and `run` takes the same pair, because both name a mark ahead of now. `what` of `age` is built. Any other `what` is refused at the door with a message that says the watch list is not built yet. When G writes event kinds onto chronicle lines, the event form drops into both acts and the same timeline marks, and nothing in the interface changes.
+
+**A stop fires once.** The stop that ends a run is taken off the list, so a later run past that age is not stopped again by a mark the player already saw reached. A `watch` on an age already passed is refused: a mark behind the now-line can never fire.
 
 ## 5. The record of every god's choice
 
@@ -183,13 +187,15 @@ The determinism contract of the mythos spec, section 0, stands. The engine step 
 
 **A creation the player steered is a different story, and an equally lawful one.** It replays exactly from its seed and its log.
 
+**The gods-era replayer is not built.** Nothing replays a steered creation today, and no test claims it does. `replayGod` in `tests/lib/run.js` selects the acts of a tick, every gods-era act shares one tick, and `runDays` only starts after settle. The door already stamps the age beside the tick and refuses an act from another age, so the record is there; what is missing is a runner. It needs three things: a replayer that selects by age as well as by tick, a drain point inside the gods era where the acts of an age are offered in their logged order, and a creation-scale runner that starts before settle instead of after it. Until then the claim above is a contract the door keeps, not a tested one.
+
 **A player's act is a chronicle line and never a legend.** In the gods era every logged line joins the legends, and the legends are the creation's own story. A hand reaching in is not part of that story, and a legend that differed would break the equality autopilot rests on. The door log is the record of what the player did.
 
 **The gate for the whole slice.** `tests/ui.js` already asserts that a watched creation equals an unwatched one. That assertion is restated: an **autopiloted** creation equals an unwatched one. `tests/ages.js` runs twenty-four seeds from creation to settle; it gains the same equality, fingerprint for fingerprint, on all twenty-four.
 
 | Test | What it gains |
 |---|---|
-| `tests/ages.js` | Twenty-four autopiloted creations equal twenty-four unwatched ones. A resumed `ageStep` draws what an unbroken one drew. |
+| `tests/ages.js` | Twenty-four creations the player drove, turn by turn, equal twenty-four unwatched ones, line for line. Every age suspends at the player's god and resumes through the door, so a resumed `ageStep` draws what an unbroken one drew. A run that opens no turn fails the test. |
 | `tests/become.js` | The four acts, landing and refused: a `become` on a being that is not a god, a `choose` with no turn open, a `choose` outside the open matrix, a forced `choose` with the setting off. |
 | `tests/ui.js` | The timeline view model folded, unfolded, and zoomed. The marks ahead of now. The matrix rows, including a barred one with its reason. A key on every new button. |
 
@@ -208,4 +214,5 @@ Each of these is its own spec. None is designed here, and the four acts and the 
 | Quests | A camp goal is already a quest: it has a state, it offers work, and it takes a priority. A quest is a goal a person adopts. No new system. |
 | The other three modes | Possess, Vessel, Manifestation. Refusal, drift, and the rewriting of a character by play belong to them, not to Become. |
 | Undo | Never. The door log is the record and determinism forbids it. |
+| A gods-era replayer | The door logs every act with its age. Nothing replays it: `replayGod` selects by tick, and one age is one tick. See section 11. |
 | A stop on an event | It needs an `event` kind on every chronicle line. That is G section 7, and it is not written. The `watch` act and the timeline marks are built to take it the day it exists. |
