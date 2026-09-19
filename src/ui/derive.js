@@ -33,30 +33,24 @@ function godRows(){
     status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
 }
 
-/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
-function agesDue(acc, dt, pace){
-  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+/* How many beats a frame owes. acc is the part of a beat carried from the last frame. At most eight in a
+   frame: more than that is a tab that slept, and a slept tab snaps rather than replaying in fast forward. */
+function beatsDue(acc, dt, pace){
+  const a = acc + dt * pace / BEAT_MS, n = Math.floor(a);
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
 /* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
-/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
-   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+/* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run
+   time, so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
    caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
-function tweenTier(ms){
+function beatTier(ms){
   if (ms >= TWEEN.full) return 'full';
   if (ms >= TWEEN.figure) return 'figure';
   if (ms >= TWEEN.walk) return 'walk';
   return 'none';
-}
-/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
-   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
-   the order is the chronicle's order, and the last one still finishes. */
-function gestureSlice(i, n, f){
-  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
-  return clamp((f - start) / (1 - start), 0, 1);
 }
 /* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
    is nowhere to draw, and with no `from` the star is already where it belongs. */

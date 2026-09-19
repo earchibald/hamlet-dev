@@ -18,13 +18,16 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
-/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
-   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
-const AGE_MS = 2000;
-/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
-   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
-   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
-const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
+/* The ages. pace is the speed of the gods era: a quarter, a half, single, or double. It is not saved; a
+   new world starts at single. lastEra is the era the last frame saw, so the frame can see the flip at
+   settle. */
+const BEAT_MS = 1000;
+const PACES = [0.25, 0.5, 1, 2];
+/* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue,
+   draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
+   durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, draw: 0.6, word: 0.85 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old

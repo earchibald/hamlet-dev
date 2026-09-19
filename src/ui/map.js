@@ -156,7 +156,7 @@ function drawCaption(text, p){
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
 function drawField(){
-  const span = AGE_MS / pace, tier = tweenTier(span);
+  const span = BEAT_MS / pace, tier = beatTier(span);
   const key = [seedText, age, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
@@ -173,13 +173,12 @@ function drawField(){
   const still = paused || anyDialogOpen();
   const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
   const recs = creation.gestureAge === age ? creation.gestures : [];
-  const slices = recs.map((rec, i) => gestureSlice(i, recs.length, f));
   const figures = f < 1 && (tier === 'full' || tier === 'figure');
 
   /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
   const skip = new Set();
-  if (figures) recs.forEach((rec, i) => {
-    if (rec.kind !== 'split' || slices[i] >= 1) return;
+  if (figures) recs.forEach(rec => {
+    if (rec.kind !== 'split' || f >= 1) return;
     const b = boundaries.find(q => q.a === rec.near && q.b === rec.far); if (b) skip.add(b.id);
   });
   const skipKey = [...skip].sort().join(',');
@@ -191,8 +190,8 @@ function drawField(){
 
   /* The intent cue: what the god weighed before it acted, at the slow tier and in the first part of the
      gesture's own slice. It replays a decision already taken; it does not ask the rules to look ahead. */
-  if (tier === 'full' && f < 1) recs.forEach((rec, i) => {
-    const s = slices[i]; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
+  if (tier === 'full' && f < 1) recs.forEach(rec => {
+    const s = f; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
     const fade = (1 - s / TWEEN.cue) * 0.7;
     for (const o of rec.weighed.opts){
       const r = regionById(o.region); if (!r) continue;
@@ -206,12 +205,12 @@ function drawField(){
   });
 
   /* The act's own figure, one per gesture, each in its own slice. */
-  if (figures) recs.forEach((rec, i) => { if (slices[i] > 0) drawGesture(rec, slices[i]); });
+  if (figures) recs.forEach(rec => { if (f > 0) drawGesture(rec, f); });
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
   const moving = new Map();
-  if (f < 1 && tier !== 'none') recs.forEach((rec, i) => {
-    const s = slices[i]; if (s <= 0) return;
+  if (f < 1 && tier !== 'none') recs.forEach(rec => {
+    const s = f; if (s <= 0) return;
     const p = walkPoint(rec, s);
     const beaten = rec.kind === 'battle' && rec.loser === rec.god;
     if (p) moving.set(rec.god, { p, end: rec.to,
@@ -248,7 +247,7 @@ function drawField(){
   wctx.globalAlpha = 1;
   /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
   if (figures){
-    const said = recs.filter((rec, i) => rec.said !== null && rec.said !== undefined && legends[rec.said] && slices[i] > 0);
+    const said = recs.filter(rec => rec.said !== null && rec.said !== undefined && legends[rec.said] && f > 0);
     const pick = said.slice().reverse().find(rec => legends[rec.said].kind === 'major') || said[said.length - 1];
     if (pick) drawCaption(legends[pick.said].text, tileSpot(pick.to));
   }

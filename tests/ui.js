@@ -784,13 +784,31 @@ test('after settle the view model is the day-era one again', () => {
   assert.equal(api.drawerRows('goals')[0].kind, 'stage');
 });
 
-test('ages come due one in two seconds at pace 1, and never more than eight in a frame', () => {
-  const api = loadUI(['state', 'derive'], ['agesDue', 'AGE_MS']);
-  assert.equal(api.AGE_MS, 2000);
-  assert.deepEqual(api.agesDue(0, 1000, 1), { n: 0, acc: 0.5 });
-  assert.deepEqual(api.agesDue(0.5, 1000, 1), { n: 1, acc: 0 });
-  assert.deepEqual(api.agesDue(0, 250, 16), { n: 2, acc: 0 });
-  assert.deepEqual(api.agesDue(0, 250, 1000), { n: 8, acc: 0 });
+test('the beat clock: a frame owes as many beats as its time buys, and carries the rest', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue', 'beatTier', 'BEAT_MS', 'PACES']);
+  assert.equal(api.BEAT_MS, 1000);
+  assert.deepEqual(api.PACES, [0.25, 0.5, 1, 2]);
+  assert.deepEqual(api.beatsDue(0, 1000, 1), { n: 1, acc: 0 });
+  assert.deepEqual(api.beatsDue(0, 500, 1), { n: 0, acc: 0.5 });
+  assert.deepEqual(api.beatsDue(0.5, 500, 1), { n: 1, acc: 0 });
+  assert.deepEqual(api.beatsDue(0, 1000, 2), { n: 2, acc: 0 });
+  assert.deepEqual(api.beatsDue(0, 1000, 0.25), { n: 0, acc: 0.25 });
+});
+
+test('the beat clock: a tab that slept owes at most eight beats and drops the rest', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue']);
+  assert.deepEqual(api.beatsDue(0, 60000, 1), { n: 8, acc: 0 });
+});
+
+test('the tier reads the beat length, and every pace on the ladder lands where the design says', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatTier', 'BEAT_MS', 'PACES']);
+  const tierAt = p => api.beatTier(api.BEAT_MS / p);
+  assert.equal(tierAt(0.25), 'full', 'a quarter speed beat is four seconds');
+  assert.equal(tierAt(0.5), 'full');
+  assert.equal(tierAt(1), 'full', 'single speed is the readable default and draws everything');
+  assert.equal(tierAt(2), 'figure', 'double speed drops the intent cue and keeps the figure');
+  assert.equal(api.beatTier(200), 'walk');
+  assert.equal(api.beatTier(50), 'none');
 });
 
 test('H hurries the ages from any focus', () => {
@@ -1261,38 +1279,18 @@ test('a folded stage names its idle goals, and says nothing more when it is unfo
    The tween's four pure functions, and the drawing itself run in Node over a recording canvas. Five of the
    gesture kinds never fire on the seeds tests/ages.js runs, so every kind is drawn from a record built here. */
 
-const TWEENS = ['tweenTier', 'gestureSlice', 'pointAt', 'lineSoFar', 'TWEEN', 'AGE_MS', 'SPEEDS'];
+const TWEENS = ['beatTier', 'pointAt', 'lineSoFar', 'TWEEN', 'BEAT_MS', 'PACES'];
 
 test('the tiers of the tween come off the length in milliseconds, in order down the pace ladder', () => {
   const api = loadUI(['state', 'derive'], TWEENS);
-  assert.deepEqual(api.SPEEDS.map(p => api.tweenTier(api.AGE_MS / p)), ['full', 'figure', 'walk', 'none']);
   /* Each tier holds from its own length up to the next. */
-  assert.equal(api.tweenTier(api.TWEEN.full), 'full');
-  assert.equal(api.tweenTier(api.TWEEN.full - 1), 'figure');
-  assert.equal(api.tweenTier(api.TWEEN.figure), 'figure');
-  assert.equal(api.tweenTier(api.TWEEN.figure - 1), 'walk');
-  assert.equal(api.tweenTier(api.TWEEN.walk), 'walk');
-  assert.equal(api.tweenTier(api.TWEEN.walk - 1), 'none');
-  assert.equal(api.tweenTier(0), 'none');
-});
-
-test('every gesture of an age has a slice inside the tween, and every slice ends with it', () => {
-  const api = loadUI(['state', 'derive'], TWEENS);
-  for (const n of [1, 2, 3, 7, 10]){
-    for (let i = 0; i < n; i++){
-      assert.equal(api.gestureSlice(i, n, 0), 0, `gesture ${i} of ${n} has run before the tween began`);
-      assert.equal(api.gestureSlice(i, n, 1), 1, `gesture ${i} of ${n} does not finish with the tween`);
-      for (const f of [-1, 0.1, 0.25, 0.5, 0.9, 2]){
-        const s = api.gestureSlice(i, n, f);
-        assert.ok(s >= 0 && s <= 1, `slice ${s} of gesture ${i} of ${n} at ${f} is outside the tween`);
-      }
-    }
-    /* The starts are staggered, in the order the gods acted, over no more than a third of the tween. */
-    const run = [];
-    for (let i = 0; i < n; i++) run.push(api.gestureSlice(i, n, 0.5));
-    for (let i = 1; i < n; i++) assert.ok(run[i] < run[i - 1], `gesture ${i} of ${n} does not follow the one before it`);
-    assert.ok(api.gestureSlice(n - 1, n, api.TWEEN.stagger) >= 0, 'the last gesture has started by the end of the stagger');
-  }
+  assert.equal(api.beatTier(api.TWEEN.full), 'full');
+  assert.equal(api.beatTier(api.TWEEN.full - 1), 'figure');
+  assert.equal(api.beatTier(api.TWEEN.figure), 'figure');
+  assert.equal(api.beatTier(api.TWEEN.figure - 1), 'walk');
+  assert.equal(api.beatTier(api.TWEEN.walk), 'walk');
+  assert.equal(api.beatTier(api.TWEEN.walk - 1), 'none');
+  assert.equal(api.beatTier(0), 'none');
 });
 
 test('a walk and a stroke give their ends, and a gesture with no anchor draws nothing', () => {
