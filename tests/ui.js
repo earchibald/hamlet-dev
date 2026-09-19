@@ -1085,4 +1085,26 @@ test('saves.js loads in Node and its storage answers without a browser', async (
   assert.deepEqual(await api.readSaveFile(null), { error: 'This file cannot be read.' });
 });
 
+/* These four each need a document, which these tests do not have, so each is held to its source. */
+test('the page says what it asked for, tells the player when a save fails, and stops on a fault', () => {
+  const actions = fs.readFileSync('src/ui/actions.js', 'utf8');
+  const main = fs.readFileSync('src/ui/main.js', 'utf8');
+  const dialogs = fs.readFileSync('src/ui/dialogs.js', 'utf8');
+  /* A sandbox can refuse the download with no error, so the line cannot claim the file was written. */
+  assert.match(actions, /say\(writeSaveFile\(name, text\) \|\| `Saving \$\{name\}\.`\)/);
+  assert.doesNotMatch(actions, /Saved as/);
+  /* An autosave that cannot be taken is said once, not swallowed. */
+  assert.match(actions, /This world cannot be saved, so there is no autosave\./);
+  assert.match(actions, /console\.warn\('The autosave could not be taken: '/);
+  /* A refusal shows the plain sentence and puts the reason in the console. */
+  assert.match(actions, /console\.warn\('The save was refused: ' \+ lastLoadFault\)/);
+  /* A throw inside a step pauses the game and says so. The frame loop itself runs on. */
+  assert.match(main, /catch \(e\)\{ onFault\(e\); \}/);
+  assert.match(actions, /function onFault/);
+  assert.match(actions, /The world stopped on a fault\. Load a save or make a new world\./);
+  /* A slot without a real tick is no slot, in both places that read one. */
+  assert.match(dialogs, /typeof lastSave\.tick === 'number' && Number\.isFinite\(lastSave\.tick\)/);
+  assert.match(actions, /typeof lastSave\.tick !== 'number' \|\| !Number\.isFinite\(lastSave\.tick\)/);
+});
+
 module.exports = { loadUI };

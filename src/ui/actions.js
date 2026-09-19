@@ -68,9 +68,11 @@ function saveWorld(){
   if (inAges()){ say('The world is not made yet. There is nothing to save.'); return; }
   let text;
   try { text = JSON.stringify(takeSnapshot()); }
-  catch (e){ say('This world cannot be saved.'); return; }
+  catch (e){ console.warn('The world could not be saved: ' + (e && e.message)); say('This world cannot be saved.'); return; }
   const name = saveName(seedText, tick);
-  say(writeSaveFile(name, text) || `Saved as ${name}.`);
+  /* The page hands the file to the browser and is never told what became of it. A sandbox can refuse
+     the download without an error, so the line says what was asked for, not what came of it. */
+  say(writeSaveFile(name, text) || `Saving ${name}.`);
 }
 
 /* Open the file picker. The input's change handler carries on in openSaveFile. */
@@ -94,6 +96,8 @@ function loadWorld(snapshot, note){
   const answer = inject({ source: 'player', act: 'load', snapshot });
   const landed = doorLog[doorLog.length - 1] !== last;
   if (landed) onLoad();
+  /* The player gets the plain sentence. Whoever has the console open gets the reason the save threw. */
+  else if (lastLoadFault) console.warn('The save was refused: ' + lastLoadFault);
   /* A world that arrived says so in the foot, over the new valley. A refusal goes where the caller asks. */
   if (landed || !note) say(answer); else note(answer);
   return landed;
@@ -128,13 +132,30 @@ function onLoad(){
 function autosave(){
   ui.autosaveDay = dayOf();
   let text;
+  /* A world the snapshot cannot name is not a silent failure. It is said once, as a slot that cannot
+     be written is, and the reason goes to the console. */
   try { text = JSON.stringify(takeSnapshot()); }
-  catch (e){ return; }
+  catch (e){
+    console.warn('The autosave could not be taken: ' + (e && e.message));
+    if (ui.autosaveWarned) return;
+    ui.autosaveWarned = true;
+    say('This world cannot be saved, so there is no autosave. The game plays on.');
+    return;
+  }
   putAutosave(text).then(ok => {
     if (ok || ui.autosaveWarned) return;
     ui.autosaveWarned = true;
     say('This page cannot keep an autosave. The game plays on.');
   });
+}
+
+/* A step threw. The world is left where it stopped, the game pauses, and one plain sentence says so.
+   The fault goes to the console for whoever is looking. The frame loop itself keeps running. */
+function onFault(e){
+  console.error(e);
+  acc = 0;
+  setPaused(true);
+  say('The world stopped on a fault. Load a save or make a new world.');
 }
 
 /* The autosave read once when the page opens, parsed here and kept for the start dialog. */
@@ -144,7 +165,8 @@ function offerContinue(){
     if (!text) return;
     try { lastSave = JSON.parse(text); }
     catch (e){ return; }
-    if (!lastSave || typeof lastSave !== 'object' || lastSave.era !== 'days'){ lastSave = null; return; }
+    /* The slot is outside data. A save without a real tick would offer "day NaN", so it is no save. */
+    if (!lastSave || typeof lastSave !== 'object' || lastSave.era !== 'days' || typeof lastSave.tick !== 'number' || !Number.isFinite(lastSave.tick)){ lastSave = null; return; }
     showContinue();
   });
 }

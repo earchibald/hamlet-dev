@@ -5,11 +5,13 @@ function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNot
 /* One line inside the start dialog, for an answer that the foot behind it would hide. An empty line hides it. */
 function startNote(text){ const p = $('startNote'); if (!p) return; p.textContent = text; p.hidden = !text; }
 /* The Continue button, shown only when the autosave slot holds a world. The save is outside data, so its
-   seed goes in as text, never as markup. The key comes from the key map, so the button cannot drift from it. */
+   seed goes in as text, never as markup, and a slot without a real tick is no slot: it would say "day NaN".
+   The key comes from the key map, so the button cannot drift from it. */
 function showContinue(){
   const b = $('continueBtn'); if (!b) return;
-  b.hidden = !lastSave;
-  if (!lastSave) return;
+  const ok = !!lastSave && typeof lastSave.tick === 'number' && Number.isFinite(lastSave.tick);
+  b.hidden = !ok;
+  if (!ok) return;
   const row = KEYMAP.find(k => k.button === 'continueBtn');
   b.textContent = `Continue ${lastSave.seed}, day ${Math.floor(Number(lastSave.tick) / DAY) + 1}`;
   const k = document.createElement('kbd'); k.textContent = row ? keyName(row) : '';
