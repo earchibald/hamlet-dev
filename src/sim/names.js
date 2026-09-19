@@ -661,7 +661,7 @@ function nameVillage(c){
   /* nameThing renames a camp in place before it returns, so c.name is already the new text by
      here. The kept-or-changed check must look at `was`, the name this place had a moment ago. */
   if (!rec || rec.text === was) log(`${c.name} is a village now.`, campHumans(), 'major');
-  else log(`${c.name} is a village now. Its people call it ${rec.text}, ${rec.why}.`, campHumans(), 'major');
+  else log(`${was} is a village now. Its people call it ${rec.text}, ${rec.why}.`, campHumans(), 'major');
   camp = prev;
 }
 /* The nightly pass, at the fire. It runs at the end of updateCamps, once a day, at the hour
