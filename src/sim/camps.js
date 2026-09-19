@@ -185,8 +185,9 @@ function afterTheLast(){
 }
 
 /* The line that cannot go on. A birth needs two adults who like each other, so one person alone can
-   never make a second. A valley down to one living person is finished, and the smoke arrival cannot
-   save it either, because a cold pit makes no smoke.
+   never make a second. The count of one says that already, so nothing counts the adults again.
+   A valley down to one living person is finished, and the smoke arrival cannot save it either,
+   because a cold pit makes no smoke.
    One person with the fire out is not enough on its own. A camp is briefly down to one person with a
    cold pit often enough: mid-winter, mid-journey, a founding party on the road. So the hearth must
    have been cold a long while, and every hearth in the valley must be cold. `outSince` is the tick a
@@ -194,7 +195,6 @@ function afterTheLast(){
 function lineIsDoomed(){
   const hs = humans();
   if (hs.length !== 1) return false;
-  if (hs.filter(h => stage(h) === 'adult').length >= 2) return false;
   const hearths = camps.filter(c => c.pit);
   if (!hearths.length) return false;
   return hearths.every(c => { const t = tileAt(c.pit[0], c.pit[1]); return !!(t && t.struct && !t.struct.lit && c.outSince && tick - c.outSince >= CLOCK.arrival.afterTheDoomed); });

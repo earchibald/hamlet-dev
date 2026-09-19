@@ -245,6 +245,18 @@ function peopleRows(){
   return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
 }
 
+/* The state lines on a person's card: short facts about what holds them right now, one idea each.
+   The card serves the hover tip and the pinned window, so one list covers both. Raw text comes back
+   and the card escapes it. Only a living person carries these; a beast, a god, and the dead get none.
+   This reads the being and the tick and writes nothing. */
+function stateLines(a){
+  if (!a || a.species !== 'human' || !a.alive) return [];
+  const out = [];
+  if (a.inDark) out.push('In the dark without a brand.');
+  if (a.cooldown && a.cooldown.stalked > tick) out.push('The wolves keep their distance for now.');
+  return out;
+}
+
 /* One plain-English line for a hover on a name. Every field of the record, in order. */
 function nameTitle(rec){
   if (!rec) return '';
