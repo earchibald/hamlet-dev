@@ -330,9 +330,13 @@ const ACTIONS = {
        that step goes on to ageDecide and never begins the age twice.
        Known gap, for whoever builds god-era replay: this one call does not pass the door and is not in
        the door log. A log replayed onto a fresh startCreation has no record that an age was begun
-       before the become act, so the become would find no god. God-era replay is not built today
-       (replayGod selects by tick and runDays starts after settle), so nothing depends on it yet. A
-       door act that begins the ages would close this; door.js is not this branch's to change. */
+       before the become act, and the damage is not one failed lookup. nextId (core.js) is a single
+       counter for beings, camps, regions, boundaries, items and caves alike, so a replay that skips
+       this call hands every later thing an id one below the id the log recorded: the become finds no
+       god, and every id-bearing act after it resolves against the wrong thing. God-era replay is not
+       built today (replayGod selects by tick and runDays starts after settle), so nothing depends on
+       it yet. The fix is a door act that begins the ages, so god-making and the take happen inside one
+       logged act; door.js is not this branch's to change. */
     withGodRng(() => ageBegin());
     const g = gods()[0];
     const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });

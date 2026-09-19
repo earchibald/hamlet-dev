@@ -691,7 +691,7 @@ test('take a god: the world is made, a god is taken, and the creation waits on t
   /* newWorld touches wcv, ocv, and dpr directly, and setPace/setPaused reach the page through $. There
      is no browser here, so the canvases are stubbed and the page calls are withPage's, the same rig
      the un-pausing test above uses for the same reason. */
-  const api = loadUI(['state', 'derive', 'actions'], [...DERIVE, 'ACTIONS', 'inAges',
+  const api = loadUI(['state', 'derive', 'actions'], [...DERIVE, 'ACTIONS', 'inAges', 'beingById',
     'get paused(){ return paused; }, set paused(v){ paused = v; }'], {
     setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }',
   });
@@ -704,6 +704,15 @@ test('take a god: the world is made, a god is taken, and the creation waits on t
   /* The gap in the brief's own test: it seeded a field newWorld never reads, so it could not tell a kept
      seed from a thrown-away one. This is the seed actually reaching the world. */
   assert.equal(api.seedText, 'gamma', 'the typed seed is kept, not swapped for a random one');
+  /* The property the whole shape of this action exists to hold: the god is taken BEFORE it acts. Taking
+     it with `step(true)` instead of `ageBegin()` would still make a god, still let become claim it, and
+     still satisfy every assertion above — the god would simply have already decided. A turn is open for
+     the player only while the god has no task (gods.js's ageDecide takes that branch), so a task here
+     means the creation moved without the player and the turn card never waited. */
+  const me = api.beingById(api.inhabited.id);
+  assert.ok(me, 'the taken god is a being in the world');
+  assert.ok(!me.task, 'the god has not acted: the turn still waits on the player');
+  assert.equal(api.creation.choices.length, 0, 'no turn has been decided yet, by anyone');
 });
 
 test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a time along that edge', () => {
