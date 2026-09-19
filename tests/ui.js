@@ -904,8 +904,12 @@ test('an opened chip says who weighed what, and what it took', () => {
 });
 
 /* decideGod walks its options in order and marks every one it cannot land as failed, so the taken
-   row is always the first row with no failed flag, on a record that has a picked type. These four
-   shapes do not reliably occur in a short creation, so the records are built directly. */
+   row is always the first row with no failed flag, on a record that has a picked type. This holds
+   for the engine's own choices: decideGod tries options strictly in order and stops at the first
+   that lands. It cannot hold for a player's choice: takeTurn lets the player take any option by
+   name, at any index, and marks failed only the rows actually tried, so an earlier untried row
+   would misread as taken. These shapes do not reliably occur in a short creation, so the records
+   are built directly. */
 test('the taken row is the first option that did not fail', () => {
   const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
   api.startCreation('gamma', {});
@@ -916,11 +920,21 @@ test('the taken row is the first option that did not fail', () => {
   assert.deepEqual(f.rows.map(r => !!r.taken), [false, true, false]);
 });
 
+test('a player-taken record marks no row taken, even with no failed rows', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', byPlayer: true, opts: [
+    { type: 'dig', score: 25 }, { type: 'split', score: 19 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'the view does not guess which row a player took');
+});
+
+/* decideGod's continued push writes only { age, god, continued: true, type }; it carries no opts. */
 test('a continued record marks no row taken', () => {
   const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
   api.startCreation('gamma', {});
-  api.creation.choices = [{ age: 3, god: 1, continued: true, type: 'dig', opts: [
-    { type: 'dig', score: 25 }, { type: 'split', score: 19 } ] }];
+  api.creation.choices = [{ age: 3, god: 1, continued: true, type: 'dig' }];
   api.ui.timelineChip = '3:1';
   const f = api.footChip();
   assert.ok(f.rows.every(r => !r.taken), 'nothing is marked taken');

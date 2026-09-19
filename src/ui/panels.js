@@ -111,7 +111,7 @@ const NOTE_MS = 4000;
    row saying the ground refused it, and the taken row marked so the player can tell which option
    the head's verb refers to. Every string here came from the simulation, so it passes through esc. */
 function chipFootLine(chip){
-  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('');
+  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('<span class="muted">·</span>');
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
 function renderFoot(){
