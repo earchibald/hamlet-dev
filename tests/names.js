@@ -450,6 +450,70 @@ test('the valley takes its name from the lore, at forty', () => {
   assert.ok(api.chronicle.some(e => e.text.includes(`the whole valley a name: ${r.text}`)), api.chronicle[0].text);
 });
 
+/* The three texts loreCandidates offers, in the same shapes the namer builds them. */
+function loreTexts(api){ return [api.titleCase(api.lore.people.replace(/^the /, '')), api.lore.sky.text, api.lore.sprites.text]; }
+
+test('the valley is named even when every lore text is already taken, and the name is its own', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  for (const t of loreTexts(api)) api.giveName({ names: [] }, api.nameRecord(t, {}));
+  api.nameValley(c);
+  const n = api.nameOf(api.valley);
+  assert.ok(n, 'the valley has no name');
+  assert.equal(loreTexts(api).includes(n), false, `the valley took ${n}, which another thing holds`);
+  assert.equal(api.valley.names[0].scores[0].axis, 'lore', 'the fallback is still a lore name');
+  const texts = api.nameThings().flatMap(t => (t.names || []).map(r => r.text.toLowerCase()));
+  assert.equal(new Set(texts).size, texts.length, 'a name is used twice');
+});
+
+test('the first camp that is a village names the valley, even when it is not the first camp in the list', () => {
+  const { api, a, c } = hearthCamp();
+  const c2 = api.makeCamp('The second camp');
+  c2.site = [a.x, a.y];
+  const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0);
+  mate.camp = c2; mate.homeless = false; mate.asleep = false; api.beings.push(mate);
+  c2.village = true;
+  api.tick = 10 * api.DAY + api.CLOCK.names.nameHour;
+  assert.equal(c.village, false, 'the first camp in the list must not be a village');
+  api.nameTick();
+  const n = api.nameOf(api.valley);
+  assert.ok(n, 'the valley waited on the first camp in the list');
+  assert.ok(api.chronicle.some(e => e.text.includes(`the whole valley a name: ${n}`)), api.chronicle[0].text);
+  const lines = api.chronicle.filter(e => e.text.includes('gives the whole valley a name')).length;
+  api.tick += api.DAY;
+  api.nameTick();
+  assert.equal(api.nameOf(api.valley), n, 'the valley is named once');
+  assert.equal(api.chronicle.filter(e => e.text.includes('gives the whole valley a name')).length, lines);
+});
+
+test('a name a person gives aloud is known at once, and describe says it', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  /* With the plain lore text taken, one of the two old-tongue texts wins. */
+  api.giveName({ names: [] }, api.nameRecord(loreTexts(api)[0], {}));
+  api.nameValley(c);
+  const r = api.valley.names[0];
+  assert.ok(r, 'the valley has no name');
+  assert.equal(r.tongue, 'old', 'an old-tongue lore text should have won');
+  assert.notEqual(r.by, 'lost', 'a person gave this name');
+  assert.equal(api.valley.nameKnown, true, 'the people know the name they just chose');
+  assert.equal(api.describe(api.valley, 'valley'), r.text);
+});
+
+test('an old name with no giver still waits to be found, and a person\'s name spends the count of unread marks', () => {
+  const api = world();
+  const h = api.hills.find(x => x.nameKnown === false);
+  assert.ok(h, 'no unlearned hill on seed r');
+  const before = api.lore.unknown;
+  assert.ok(before > 0, 'nothing is left to learn');
+  api.giveName(h, api.nameRecord('Sunnahill', { tongue: 'old', meaning: 'the bright hill', by: api.firstPerson().id }));
+  assert.equal(h.nameKnown, true, 'a name a person gives aloud is known');
+  assert.equal(api.lore.unknown, before - 1, 'the count of unread marks did not follow');
+  const g = { names: [] };
+  api.giveName(g, api.nameRecord('Vethunar', { tongue: 'old', meaning: 'the quiet ground' }));
+  assert.equal(g.nameKnown, false, 'the land\'s own names still start unknown');
+});
+
 /* ---------- the held hooks: what the real loop does ---------- */
 
 /* One 70-day run, shared by every test below that needs a whole season of play. A run of that

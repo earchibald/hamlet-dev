@@ -29,13 +29,24 @@ function nameRecord(text, o = {}){
   return { text, tongue: o.tongue || 'plain', meaning: o.meaning || '', since: tick,
     why: o.why || '', by: o.by === undefined ? 'lost' : o.by, scores: o.scores || null };
 }
-/* Give a thing a name. An old name starts unknown: somebody has to find the marks. */
+/* Who gave the name. `by` is a being's id when a living person spoke it, 'lost' for the old
+   tongue, and null for a name the camp gave with nobody named. Only a person's name is spoken. */
+const spokenAloud = rec => rec.by !== 'lost' && rec.by !== null && rec.by !== undefined;
+/* Give a thing a name. The land's old names start unknown: somebody has to find the marks. A
+   record with no giver is one of those, and the record says so, so no rule reads the text. Every
+   other name is spoken by a person, and the people know the name they just chose. A name spoken
+   over a thing whose marks nobody had read yet also spends one of the unread marks, so the count
+   `learnNamesHere` reads stays right. */
 function giveName(thing, rec){
   if (!thing.names) thing.names = [];
   thing.names.unshift(rec);
   nameIndex.set(rec.text.toLowerCase(), thing);
-  if (rec.tongue === 'old'){ if (thing.nameKnown === undefined) thing.nameKnown = false; }
-  else thing.nameKnown = true;
+  if (rec.tongue === 'old' && !spokenAloud(rec)){
+    if (thing.nameKnown === undefined) thing.nameKnown = false;
+    return rec;
+  }
+  if (thing.nameKnown === false && lore && lore.unknown > 0) lore.unknown--;
+  thing.nameKnown = true;
   return rec;
 }
 const nameOf = thing => thing && thing.names && thing.names.length ? thing.names[0].text : null;
@@ -364,6 +375,20 @@ function loreCandidates(base){
     { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.text}, ${lore.sprites.meaning}` },
   ];
 }
+/* The valley's last resort. A lore text another thing already holds scores zero, and three texts
+   are all the lore has, so hills, sectors, and camps can take every one and leave the valley with
+   nothing. These compounds are built from the same lore words, in a shape nothing else offers, so
+   they are always free. They score under the plain texts, so they only win once those are gone. */
+const VALLEY_FALLBACK_BASE = 20;
+function valleyFallbacks(){
+  if (!lore) return [];
+  const b = VALLEY_FALLBACK_BASE;
+  return [
+    { text: `Vale of ${lore.sky.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for the vale of ${lore.sky.text}, ${lore.sky.meaning}` },
+    { text: `Vale of ${lore.sprites.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for the vale of ${lore.sprites.text}, ${lore.sprites.meaning}` },
+    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: b, why: `for the vale of ${lore.people}, who were here first` },
+  ];
+}
 /* ---------- events ----------
    A chronicle line whose tag is in this table, and whose kind is major, bad, or a
    death, is an event. The table is keyed on the tag and gives two shapes: a word for
@@ -496,7 +521,8 @@ function nameTick(){
   if (tick % DAY !== CLOCK.names.nameHour) return;
   const prev = camp;
   for (const c of camps){ camp = c; nameCampAtHearth(c); nameVillage(c); nameEvents(c); epithetPass(c); }
-  if (camps[0] && camps[0].village && !nameOf(valley)){ camp = camps[0]; nameValley(camps[0]); }
+  /* The valley waits for the first village, whichever camp in the list reaches it first. */
+  if (!nameOf(valley)){ const first = camps.find(c => c.village && c.site); if (first){ camp = first; nameValley(first); } }
   camp = prev;
 }
 
@@ -545,11 +571,12 @@ function namePondHere(a){
   if (rec) log(`${a.name} drinks and calls the pool ${rec.text}, ${rec.why}.`, campHumans(), 'info');
   camp = prev;
 }
-/* The valley is named once, by the first camp's namer, with the lore axis at 40. */
+/* The valley is named once, by the first village's namer, with the lore axis at 40. The fallbacks
+   go in below them, so the valley always takes a name on the night it is asked for one. */
 function nameValley(c){
   if (nameOf(valley) || !c.site) return;
   const by = namerFor(c.site); if (!by) return;
-  const rec = nameThing(valley, 'valley', by, c.site, loreCandidates(40));
+  const rec = nameThing(valley, 'valley', by, c.site, [...loreCandidates(40), ...valleyFallbacks()]);
   if (rec) log(`${by.name} gives the whole valley a name: ${rec.text}, ${rec.why}.`, campHumans(), 'major');
 }
 
