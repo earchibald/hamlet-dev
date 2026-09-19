@@ -582,7 +582,7 @@ function takeTurn(opt){
   pending = null;
   agePass();
   withGodRng(() => { if (ageDecide()) ageEnd(); });
-  if (settleNow){ settleNow = false; settle(); }
+  settleIfDue();
   return `You ${row.type}. ${g.name} acts.`;
 }
 
@@ -658,13 +658,27 @@ function ageEnd(){
   if (age >= options.ageLimit) backstop();
 }
 
+/* The ages are over. What only an age could read goes with them: a position in an age, an open turn,
+   a run, and the stops it would have ended at. None of them can fire once the days begin, and a stale
+   one would be carried into a save of the days era. Who the player is outlives the ages, so
+   `inhabited` and `inhabitedTold` stay.
+   It runs only when the valley held. A settle may discard the valley and hand the ages back, and a
+   discarded valley must not cost the player the run they set. */
+function endAges(){ if (era !== 'days') return; agePos = null; pending = null; runUntil = null; stops = []; }
+
+/* The one way the creation ends. Two paths reach it: an age that runs to its end in `ageStep`, and an
+   age that runs to its end inside the player's own turn, in `takeTurn`. Both must end the ages the
+   same way, so neither calls `settle` itself. A settle that discards the valley leaves the era in the
+   ages, and `endAges` does nothing then, so the player keeps the run and the stops they set. */
+function settleIfDue(){ if (!settleNow) return; settleNow = false; settle(); endAges(); }
+
 function ageStep(){
   withGodRng(() => {
     if (!agePos) ageBegin();
     if (!ageDecide()) return;
     ageEnd();
   });
-  if (settleNow){ settleNow = false; settle(); }
+  settleIfDue();
 }
 /* The creation itself, on a world that has already been reset. */
 function beginCreation(){
