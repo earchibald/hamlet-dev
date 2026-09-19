@@ -29,7 +29,7 @@ const API = `return {
   near, nearAt, dist,
   seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
   nameTheLand, learnName, learnNamesHere, LORE_BUILT, LORE_TOOK, SKY_MEANINGS, SPRITE_MEANINGS, OLD_CAVE_KINDS,
-  nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameTick,
+  nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick,
   EVENT_NAMES, eventCandidates, nameEvents, eventName, isEventLine,
   WORK_WORDS, workWordAt, nameSectorForWork, namePondHere, nameValley, describe, compass, thingSpot, placePhrase, DESCRIBE_KIND,
   get lore(){ return lore; }, get valley(){ return valley; }, get river(){ return river; }, get stillWater(){ return stillWater; }, get ponds(){ return ponds; }, get fords(){ return fords; },

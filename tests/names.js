@@ -236,6 +236,45 @@ test('a hearth that has burned three days gets the camp a plain name, kept with 
   assert.equal(api.chronicle.length, n, 'a camp is named once at the hearth');
 });
 
+test('a village keeps its name at sixty, and the line says it is a village now', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.nameCampAtHearth(c);
+  const was = c.name;
+  c.village = true;
+  api.nameVillage(c);
+  assert.equal(c.name, was, 'the name it has is worth 60, so it is kept');
+  assert.equal(c.names.length, 2, 'no duplicate record for a kept name');
+  assert.ok(api.chronicle.some(e => e.text === `${was} is a village now.`), api.chronicle[0].text);
+  assert.ok(c.villageNamed);
+  const n = api.chronicle.length; api.nameVillage(c);
+  assert.equal(api.chronicle.length, n, 'a village is named once');
+});
+
+test('a village with fresh, strong events renames itself, and the reason is kept', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.nameCampAtHearth(c);
+  const was = c.name;
+  /* Fresh wolf nights pile recency on one event candidate until it beats sixty. */
+  for (let k = 0; k < 6; k++) api.log(`A wolf comes out of the dark, night ${k}.`, [a], 'bad', 'wolf');
+  a.traits.temper = 1;
+  c.village = true;
+  api.nameVillage(c);
+  assert.notEqual(c.name, was, 'a strong event should win');
+  assert.equal(api.formerNames(c)[0].text, was);
+  assert.ok(c.names[0].why, 'a rename carries a reason');
+  assert.ok(api.chronicle.some(e => e.text.includes(`is a village now. Its people call it ${c.name}`)), api.chronicle[0].text);
+});
+
+test('rename is the one door, and it keeps the old record', () => {
+  const { api, c } = hearthCamp();
+  api.rename(c, api.nameRecord('Coldwater', { why: 'the well went bad', by: null }));
+  assert.equal(c.name, 'Coldwater');
+  assert.equal(api.nameOf(c), 'Coldwater');
+  assert.equal(api.formerNames(c).length, 1);
+});
+
 test('a name already used anywhere in the world scores zero', () => {
   const { api, a, c } = hearthCamp();
   const cands = api.candidatesFor('camp', a, c.site);

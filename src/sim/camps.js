@@ -204,7 +204,10 @@ function updateCamps(){
     }
     if (tick % CLOCK.every.spoil === 0) spoilFood();
     if (tick % CLOCK.every.fae === 0) faeTick();
-    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
+    /* The promotion sets the flag and the thought, on this tick, as it always has: the layout
+       guard needs a being's mood to move at the same moment it does today. The naming and the
+       chronicle line belong to nameVillage, which runs in the nightly pass, at its own fire. */
+    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
     /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
        A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
        the land feeds, and winter, when nothing can be gathered, then killed it together. */

@@ -1065,13 +1065,35 @@ function nameCampAtHearth(c){
   if (rec){ c.namedAt = tick; log(`They start to call this place ${rec.text}, ${rec.why}.`, campHumans(), 'major'); }
   camp = prev;
 }
+/* A camp that becomes a village names itself again, with its whole history to draw on.
+   The name it has is a candidate at 60, so most villages keep it and only gain the title.
+   The title is not part of the name: the interface writes "Reedwater, a village".
+   The keep candidate is the thing's own current name, and scoreCandidates only zeroes a text
+   another thing owns, so it keeps its 60. When it wins, nameThing pushes nothing.
+   The village thought is added at the promotion, in camps.js, on the same tick the flag is
+   set. This runs later, at the nightly pass, so it adds no thought of its own: the layout
+   guard must not see a being's mood move to a different tick than it does today. */
+function nameVillage(c){
+  if (!c.village || c.villageNamed || !c.site) return;
+  c.villageNamed = tick;
+  const prev = camp; camp = c;
+  const was = c.name;
+  const keep = nameOf(c) ? [{ text: nameOf(c), axis: 'keep', base: 60, why: 'the name it already has' }] : [];
+  const by = namerFor(c.site);
+  const rec = by ? nameThing(c, 'camp', by, c.site, keep) : null;
+  /* nameThing renames a camp in place before it returns, so c.name is already the new text by
+     here. The kept-or-changed check must look at `was`, the name this place had a moment ago. */
+  if (!rec || rec.text === was) log(`${c.name} is a village now.`, campHumans(), 'major');
+  else log(`${c.name} is a village now. Its people call it ${rec.text}, ${rec.why}.`, campHumans(), 'major');
+  camp = prev;
+}
 /* The nightly pass, at the fire. It runs at the end of updateCamps, once a day, at the hour
    the clock table names. Nothing here draws from the world stream, so the order of the
    world's own steps never moves. A cheap early return, since this runs every tick. */
 function nameTick(){
   if (tick % DAY !== CLOCK.names.nameHour) return;
   const prev = camp;
-  for (const c of camps){ camp = c; nameCampAtHearth(c); nameEvents(c); }
+  for (const c of camps){ camp = c; nameCampAtHearth(c); nameVillage(c); nameEvents(c); }
   if (camps[0] && camps[0].village && !nameOf(valley)){ camp = camps[0]; nameValley(camps[0]); }
   camp = prev;
 }
@@ -2283,7 +2305,10 @@ function updateCamps(){
     }
     if (tick % CLOCK.every.spoil === 0) spoilFood();
     if (tick % CLOCK.every.fae === 0) faeTick();
-    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
+    /* The promotion sets the flag and the thought, on this tick, as it always has: the layout
+       guard needs a being's mood to move at the same moment it does today. The naming and the
+       chronicle line belong to nameVillage, which runs in the nightly pass, at its own fire. */
+    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
     /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
        A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
        the land feeds, and winter, when nothing can be gathered, then killed it together. */
@@ -5979,8 +6004,8 @@ function renderClock(){
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
 }
 function renderStrip(){
-  /* The sim renames a camp when it becomes a village, so the name needs no suffix here. */
-  $('campName').textContent = inAges() ? 'The ages' : camp.name;
+  /* The village title is not part of the name, so it is added here, not by the sim. */
+  $('campName').textContent = inAges() ? 'The ages' : camp.name + (camp.village ? ', a village' : '');
   $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
