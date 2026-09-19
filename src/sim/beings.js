@@ -315,7 +315,7 @@ function chooseTask(a){
     o.failed = true; a.cooldown[key] = tick + CLOCK.cooldown.offerFailed;
   }
 }
-function checkSnare(r){
+function rollSnare(r){
   const t = tileAt(r.x, r.y, r.z);
   if (t.struct && t.struct.type === 'snare' && t.struct.snare.armed && rng() < (t.struct.snare.chance || 0.7) + (t.struct.snare.camp.fae.favor >= 30 ? 0.1 : 0)){
     const s = t.struct.snare; s.armed = false; s.catch = 'carcass'; r.alive = false; r.status = 'Dead';

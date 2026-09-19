@@ -103,7 +103,8 @@ TASKS.setOfferingStone = workKind({ label: 'Setting the offering stone', amount:
 } });
 TASKS.leaveBerries = workKind({ label: 'Leaving berries on the stone', amount: CLOCK.work.leaveBerries, effect(a, args){
   if (camp.stash.berries < 2) return;
-  stashTake('berries', 2); tileAt(...args.at).struct.offering = 2; addThought(a, 'gift', 'Left a gift for the sprites', 3, CLOCK.thought.giftLeft);
+  const st = tileAt(...args.at).struct; if (!st || st.type !== 'stone') return;
+  stashTake('berries', 2); st.offering = 2; addThought(a, 'gift', 'Left a gift for the sprites', 3, CLOCK.thought.giftLeft);
 } });
 TASKS.setWardPosts = workKind({ label: 'Charring and setting ward posts', amount: CLOCK.work.wardPosts, effect(a, args){
   if (camp.ward) return;

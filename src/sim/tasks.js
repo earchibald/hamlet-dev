@@ -47,7 +47,7 @@ function runTask(a){
     const [nx, ny, nz] = t.path[0];
     if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
     a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') checkSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
     return;
   }
   const r = taskStop(a);
@@ -250,7 +250,7 @@ Object.assign(TASKS, {
       return 'continue';
     }] },
 });
-/* Delivering is called from inside other jobs' effects, below, so it keeps a plain function. */
+/* Delivering keeps a plain function because tests/closing.js and the API call it by name. */
 function startDeliver(a){ return startTask(a, 'deliver'); }
 /* A garden goes on open soil or grass within eight of the pit, with room for four bushes around it. */
 function gardenSpot(){
@@ -369,7 +369,7 @@ TASKS.huntDeer = { type: 'hunt',
     if (!d || !d.alive || ++t.progress > CLOCK.chase.deer + a.skills.hunt * CLOCK.chase.deerPerSkill){ a.carrying = null; addThought(a, 'missed', 'The deer got away', -3, CLOCK.thought.missed); a.xp.hunt = (a.xp.hunt || 0) + 1; return 'fail'; }
     if (near(a, d) <= 2){
       if (rng() < 0.3 + a.skills.hunt * 0.12){ d.hp = 0; die(d, 'was speared'); a.carrying = null; gainXp(a, 'hunt'); addThought(a, 'kill', 'Brought down a deer', 12, CLOCK.thought.kill); drift(a, 'bravery', 0.02); log(`${a.name} brings down a deer with the spear.`, campHumans(), 'major');
-        const it = items.find(i => i.kind === 'venison' && i.x === d.x && i.y === d.y); if (it){ removeItem(it); a.carrying = { kind: 'venison', count: 1 }; return chain(a, t, startDeliver(a)) || 'done'; } return 'done'; }
+        const it = items.find(i => i.kind === 'venison' && i.x === d.x && i.y === d.y); if (it){ removeItem(it); a.carrying = { kind: 'venison', count: 1 }; return chain(a, t, startTask(a, 'deliver')) || 'done'; } return 'done'; }
       d.skills.wary = Math.min(3, (d.skills.wary || 0) + 1); addThought(d, 'escaped', 'A hunter missed', -6, CLOCK.thought.escaped); failTask(d); startTask(d, 'flee'); t.progress += CLOCK.chase.deerMissed;
     }
     const p = bfs(a.x, a.y, a.z, (x, y, z) => z === d.z && dist(x, y, d.x, d.y) <= 2, 700, a); if (!p) return 'fail'; t.path = p.slice(0, 4); t.fast = near(a, d) <= 8; return 'continue';
@@ -430,7 +430,7 @@ TASKS.searchCave = { type: 'search',
   }, (a, t) => {
     const c = caves[t.args.cave]; const [sx, sy] = camp.stashTile;
     if (nearAt(a, sx, sy) > 1){ const q = pathToStop(a, sx, sy, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
-    c.searched = camp; return chain(a, t, startDeliver(a)) || 'done';
+    c.searched = camp; return chain(a, t, startTask(a, 'deliver')) || 'done';
   }],
   release(a, t){ const c = caves[t.args.cave]; if (c.claimed === a.id) c.claimed = null; if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
 /* Break the fallen rock with the axe. c.blocked is read again from the cave when the work begins,
