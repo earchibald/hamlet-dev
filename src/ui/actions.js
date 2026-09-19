@@ -325,7 +325,14 @@ const ACTIONS = {
     newWorld(seed);
     /* The first god is born at the first age, which a step opens, not startCreation. Take one here so
        there is a god to take; ageBegin only, never ageDecide, so the turn card still waits and no act
-       runs on its own. The god picture is drawn on the gods' own stream, as every age's is. */
+       runs on its own. The god picture is drawn on the gods' own stream, as every age's is: calling
+       ageBegin here consumes exactly what the first step would have consumed, and agePos is set, so
+       that step goes on to ageDecide and never begins the age twice.
+       Known gap, for whoever builds god-era replay: this one call does not pass the door and is not in
+       the door log. A log replayed onto a fresh startCreation has no record that an age was begun
+       before the become act, so the become would find no god. God-era replay is not built today
+       (replayGod selects by tick and runDays starts after settle), so nothing depends on it yet. A
+       door act that begins the ages would close this; door.js is not this branch's to change. */
     withGodRng(() => ageBegin());
     const g = gods()[0];
     const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });
