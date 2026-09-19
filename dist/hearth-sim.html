@@ -375,6 +375,9 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;
+/* The valley down to one person. doomAt is 0 unless the line is doomed. It holds the tick a lone
+   wanderer may arrive on once the chronicle has said the line cannot go on. */
+let doomAt = 0;
 /* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
    regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
    of the run. godRng is the gods' own stream. */
@@ -539,6 +542,7 @@ const CLOCK = {
     wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
     chance: 0.7, villageChance: 0.85,
     afterTheLast: days(10),                       // with no person alive in the valley, the wait before a lone wanderer crosses the hills
+    afterTheDoomed: days(10),                     // with one person alive, how long the hearth must be cold before the line counts as doomed
   },
   party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },   // foodKeeps: what the stash keeps is under `food`
   storm: {
@@ -1690,9 +1694,49 @@ function afterTheLast(){
   log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campName()} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
 }
 
+/* The line that cannot go on. A birth needs two adults who like each other, so one person alone can
+   never make a second. A valley down to one living person is finished, and the smoke arrival cannot
+   save it either, because a cold pit makes no smoke.
+   One person with the fire out is not enough on its own. A camp is briefly down to one person with a
+   cold pit often enough: mid-winter, mid-journey, a founding party on the road. So the hearth must
+   have been cold a long while, and every hearth in the valley must be cold. `outSince` is the tick a
+   pit went out, and it is 0 while the pit burns. */
+function lineIsDoomed(){
+  const hs = humans();
+  if (hs.length !== 1) return false;
+  if (hs.filter(h => stage(h) === 'adult').length >= 2) return false;
+  const hearths = camps.filter(c => c.pit);
+  if (!hearths.length) return false;
+  return hearths.every(c => { const t = tileAt(c.pit[0], c.pit[1]); return !!(t && t.struct && !t.struct.lit && c.outSince && tick - c.outSince >= CLOCK.arrival.afterTheDoomed); });
+}
+
+/* The wanderer who comes to the last of a line. The chronicle says the line is doomed, and one
+   stranger crosses the hills after the same wait as after the last death, outside winter. They meet
+   somebody alive, which is a different meeting from a cold hearth among bones.
+   Only the count of the people holds the wait open. If the last one dies, `afterTheLast` takes the
+   valley over, and this rule drops its wait rather than run a second one beside it. If a stranger
+   arrives, the valley is two again and the wait is over. */
+function theDoomedLine(){
+  if (humans().length !== 1){ doomAt = 0; return; }
+  const last = humans()[0];
+  if (!doomAt){
+    if (!lineIsDoomed()) return;
+    doomAt = tick + CLOCK.arrival.afterTheLast;
+    log(`${last.name} is the only person left in the valley. The hearth is cold. No child comes of one person alone.`, [last], 'major');
+    return;
+  }
+  if (tick < doomAt || isWinter()) return;
+  const home = camps.find(c => c.site); if (!home) return;
+  camp = home;
+  const b = comeOverTheHills(); if (!b) return;
+  doomAt = 0;
+  log(`${b.name} comes over the hills to ${campName()}. No smoke called them. ${last.name} is not the last of the people now.`, [b, last], 'major');
+}
+
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
   afterTheLast();
+  theDoomedLine();
   for (const c of camps){
     camp = c;
     const pt = pitTile();
@@ -4487,7 +4531,7 @@ function resetState(seed, opts){
   tick = Math.round(CLOCK.startsAt); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0;
+  goalPriority = {}; wanderAt = 0; doomAt = 0;
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
