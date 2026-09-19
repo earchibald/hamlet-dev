@@ -16,8 +16,13 @@ no build step but `node build.js`. Canvas 2D for the map. `node --test` for the 
 
 ## Global constraints
 
-- **Branch from `age-beat`** (hamlet-mythos, PR #45, HEAD 460a148), not from dev. Work in
-  `/Users/earchibald/Worktrees/hamlet-become` on branch `become-e3`. Merge dev in when #45 lands.
+- **Branch from `take-turn-one-act`** (hamlet-mythos, PR #47, on top of the merged #45), not from dev.
+  Work in `/Users/earchibald/Worktrees/hamlet-become` on branch `become-e3`. Merge dev in when #47 lands.
+- **The view never asks whether an act came from the player or from a god.** `takeTurn` applies the
+  option, moves past the god, and returns without resuming; a step is the only thing that advances an
+  age. So after a `choose` lands, the age stands one god past the player's and the view draws that as
+  one beat like any other. If you find yourself writing a branch on `byPlayer` anywhere in the
+  playback path, stop: the shape is wrong, not the engine.
 - **Nothing in this plan changes `src/sim/`.** If a task seems to need it, stop and ask; `src/sim/gods.js`
   and `src/sim/door.js` belong to the hamlet-mythos session.
 - **`src/ui/derive.js` and `src/ui/keys.js` have no DOM.** Every pure part goes there so `tests/ui.js`

@@ -98,11 +98,24 @@ a turn is open and `pending` is set. After the change it means a turn is open *o
 `pending` tells them apart, but only by implication, and `takeTurn` and `ageStep` both rely on the
 old meaning. The invariant goes in the comment above `ageDecide`, in that file's voice.
 
-**The player's own act is a beat like any other.** `takeTurn` resumes the age when the player applies
-an option. It takes the same flag, so the act the player chose plays as its own beat and the rest of
-the age advances act by act under the view. The player-turn path is not a corner in this slice: `Take
-a god` is how the user will test it, so an age that ran to its end the moment the player chose would
-break beat playback in exactly the mode E3 exists to deliver.
+**The player's own act is a beat like any other, and `takeTurn` does less rather than more.** My first
+shape for this was a flag on `takeTurn`, matching `ageDecide`'s. It was wrong, and the reason is the
+door. The view reaches `takeTurn` only through `inject`, so a flag would have to ride on the event
+and be logged — and then pacing passes the door. A door log must replay the same story at any rate it
+is drawn at. This spec forbids that a page later, so the flag contradicted it.
+
+Instead `takeTurn` stops resuming the age at all. It applies the option, calls `agePass()` to move
+past the god, and returns. A step is the only thing that advances an age, whoever asked for the act.
+That deletes a special case rather than adding one: `releaseTurn` already closed a turn without
+resuming, so there is now one rule and no second copy to keep in step.
+
+For the view this means: after a `choose` lands, the age stands one god past the player's. The view
+draws that as one beat like any other, and the next step reaches the next awake god. **The view never
+needs to know whether an act came from the player or from a god.**
+
+This was reached with no test reading the age between a `choose` and the step after it — the whole
+suite passed against both shapes. `tests/ages.js` now holds it: the player's act is one act, and a
+step is what carries the age on.
 
 **The age's close is one beat and is not subdivided.** `ageEnd` runs `unmake` over the pantheon
 first and `restGate()` second. Draw between the two and the field shows gods already gone against a
