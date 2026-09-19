@@ -92,6 +92,12 @@ const CLOCK = {
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
     disturb: ticks(1000),             // between two counts of one person in a gnome burrow
     raid: ticks(1200), stalk: ticks(2000), wolfLine: ticks(300),
+    /* Between two maulings of the same person. `stalk` above sits on the wolf, and the valley holds
+       more than one wolf, so it is no floor for the victim at all: four wolves mauled one founder in
+       three ticks. This one sits on the person. It is sized off `rate.heals`, which gives a person
+       0.006 to 0.014 hit points a tick by hardiness. In 4000 ticks that is 24 to 56, against a maul
+       of 20 to 34. A person of middling hardiness wins back 40, more than the worst maul. */
+    stalked: ticks(4000),
     sparks: ticks(150),               // between two tries at striking sparks into the tinder
     guardLine: ticks(800),            // between two chronicle lines about the same wolf chase
     wolfBurned: ticks(2500), wolfWanders: ticks(600),   // a wolf driven off with fire keeps away, then wanders again
