@@ -53,6 +53,9 @@ function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Mat
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
+   to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
+const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
 /* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */

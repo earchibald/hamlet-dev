@@ -15,6 +15,13 @@ const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
 }
+/* The one or two gestures drawn this beat: the act on stage, and the act before it while it fades.
+   Mirrors the pair drawField reads in map.js, so a hover on the mark finds the same act the mark shows.
+   `creation.gestures` holds only the age now playing; an age that has moved on keeps none of them. */
+function liveGestures(){
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  return { now: recs.length ? recs[recs.length - 1] : null, before: recs.length > 1 ? recs[recs.length - 2] : null };
+}
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
 function standsIn(g){
   let r = g.region === null || g.region === undefined ? null : regionById(g.region);
@@ -33,6 +40,37 @@ function countryLine(r){
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
   return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
+   both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
+   the player made: decideGod marks every option it tried, so the taken row is the first unfailed row and
+   is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
+   row. E3 does not store the row a player took; a later slice does.
+   No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
+   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a country's "Country" row. */
+function actCard(rec){
+  const m = markFor(rec.kind, rec.value);
+  const g = beingById(rec.god);
+  const said = captionFor(rec);
+  const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
+  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const r = regionById(rec.region !== undefined ? rec.region : rec.near);
+  if (r) rows.push({ label: 'where', value: countryLine(r) });
+  if (rec.weighed && !rec.byPlayer){
+    rows.push({ label: 'weighed', value: rec.weighed.opts.map(o => `${o.type} ${Math.round(o.score)}`).join(' · ') });
+  }
+  return { head, rows };
+}
+/* The act behind a timeline chip, `age:god`, for the foot to show the same card a hover would. Only the
+   age now playing keeps its gestures (see liveGestures), so a chip from an earlier age finds none here;
+   the foot falls back to the chip's own matrix in that case. */
+function actCardForChip(key){
+  if (!key) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  if (creation.gestureAge !== a) return null;
+  const rec = creation.gestures.find(x => x.age === a && x.god === id);
+  return rec ? actCard(rec) : null;
 }
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){

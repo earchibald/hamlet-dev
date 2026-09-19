@@ -6625,6 +6625,13 @@ const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
 }
+/* The one or two gestures drawn this beat: the act on stage, and the act before it while it fades.
+   Mirrors the pair drawField reads in map.js, so a hover on the mark finds the same act the mark shows.
+   `creation.gestures` holds only the age now playing; an age that has moved on keeps none of them. */
+function liveGestures(){
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  return { now: recs.length ? recs[recs.length - 1] : null, before: recs.length > 1 ? recs[recs.length - 2] : null };
+}
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
 function standsIn(g){
   let r = g.region === null || g.region === undefined ? null : regionById(g.region);
@@ -6643,6 +6650,37 @@ function countryLine(r){
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
   return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
+   both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
+   the player made: decideGod marks every option it tried, so the taken row is the first unfailed row and
+   is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
+   row. E3 does not store the row a player took; a later slice does.
+   No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
+   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a country's "Country" row. */
+function actCard(rec){
+  const m = markFor(rec.kind, rec.value);
+  const g = beingById(rec.god);
+  const said = captionFor(rec);
+  const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
+  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const r = regionById(rec.region !== undefined ? rec.region : rec.near);
+  if (r) rows.push({ label: 'where', value: countryLine(r) });
+  if (rec.weighed && !rec.byPlayer){
+    rows.push({ label: 'weighed', value: rec.weighed.opts.map(o => `${o.type} ${Math.round(o.score)}`).join(' · ') });
+  }
+  return { head, rows };
+}
+/* The act behind a timeline chip, `age:god`, for the foot to show the same card a hover would. Only the
+   age now playing keeps its gestures (see liveGestures), so a chip from an earlier age finds none here;
+   the foot falls back to the chip's own matrix in that case. */
+function actCardForChip(key){
+  if (!key) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  if (creation.gestureAge !== a) return null;
+  const rec = creation.gestures.find(x => x.age === a && x.god === id);
+  return rec ? actCard(rec) : null;
 }
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
@@ -8037,8 +8075,11 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
-  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
+     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     hover on the mark reads the act and not the ground it changed. */
+  const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
+    : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     /* sectorSummary is one plain sentence, not markup of its own, so it is escaped whole here,
        at the one place it becomes the tip's innerHTML. Nothing inside it escapes itself first. */
@@ -8283,13 +8324,28 @@ function chipFootLine(chip){
   const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('<span class="muted">·</span>');
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
+/* An act's card, in the same table an inspected region already shows: a muted head, then its rows as
+   label and value. Every string came from the simulation, so it passes through esc. Used for the hover
+   on a mark and, through actFootLine, for the timeline cell that opens the same act. */
+function actCardHTML(card){
+  const rows = card.rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.value)}</td></tr>`).join('');
+  return `<div class="muted" style="margin:1px 0 5px">${esc(card.head)}</div><table class="kv">${rows}</table>`;
+}
+/* The act's card, as one line for the foot: the head, then its rows as label and value. */
+function actFootLine(card){
+  const rows = card.rows.map(r => `<span class="chiprow">${esc(r.label)}: ${esc(r.value)}</span>`).join('<span class="muted">·</span>');
+  return `<span class="chiphead">${esc(card.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${esc(cursorPhrase())}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${esc(ui.note.text)}</span>`; return; }
   ui.note = null;
-  const chip = footChip();
+  /* The chip's own age still plays: the same act has a gesture, and its card is the one the mark on the
+     field shows. An older chip keeps no gesture (see actCardForChip), so the chip's own matrix stands. */
+  const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
+  const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
@@ -8426,6 +8482,9 @@ function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Mat
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
+   to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
+const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
 /* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
@@ -8821,7 +8880,18 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
-  wcv.addEventListener('pointermove', e => { if (inAges()){ const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 }; tipTarget = { field: [c.x, c.y] }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return; } whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => {
+    if (inAges()){
+      const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 };
+      /* Within the mark's own halo (see drawMark's 34-unit ring) a hover reads the act; past it, the
+         country under the pointer stands as it always has. */
+      const p = worldPixelFrom(e), { now, before } = liveGestures();
+      const onMark = [now, before].find(rec => rec && rec.to !== null && rec.to !== undefined && Math.hypot(p.x - tileSpot(rec.to).x, p.y - tileSpot(rec.to).y) <= 34);
+      tipTarget = onMark ? { act: onMark } : { field: [c.x, c.y] };
+      tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return;
+    }
+    whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip();
+  });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => {
     if (inAges()){ const c = tileFromWorld(e); openGodAt(c.x, c.y); return; }

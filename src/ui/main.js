@@ -91,7 +91,18 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
-  wcv.addEventListener('pointermove', e => { if (inAges()){ const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 }; tipTarget = { field: [c.x, c.y] }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return; } whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => {
+    if (inAges()){
+      const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 };
+      /* Within the mark's own halo (see drawMark's 34-unit ring) a hover reads the act; past it, the
+         country under the pointer stands as it always has. */
+      const p = worldPixelFrom(e), { now, before } = liveGestures();
+      const onMark = [now, before].find(rec => rec && rec.to !== null && rec.to !== undefined && Math.hypot(p.x - tileSpot(rec.to).x, p.y - tileSpot(rec.to).y) <= 34);
+      tipTarget = onMark ? { act: onMark } : { field: [c.x, c.y] };
+      tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return;
+    }
+    whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip();
+  });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => {
     if (inAges()){ const c = tileFromWorld(e); openGodAt(c.x, c.y); return; }

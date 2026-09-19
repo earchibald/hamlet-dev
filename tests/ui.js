@@ -1366,6 +1366,27 @@ test('the caption is the line the act wrote, and an act that wrote no line has n
   assert.equal(api.captionFor({ said: null }), '', 'an act that wrote no line is silent, not wrong');
 });
 
+test('the act card names the act, its place in the age, and what the god weighed', () => {
+  const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'actCard']);
+  api.startWorld('gamma');
+  for (let k = 0; k < 6; k++) api.step(true);
+  const rec = api.creation.gestures[api.creation.gestures.length - 1];
+  const card = api.actCard(rec);
+  assert.ok(card.head.length, 'the card leads with the sentence');
+  assert.ok(card.rows.some(r => /Age \d/.test(r.value)), 'the card says which age');
+  assert.ok(card.rows.length >= 2);
+});
+
+test('the act card withholds the weighed row for a record the player made', () => {
+  const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'actCard']);
+  api.startWorld('gamma');
+  api.step(true);
+  const rec = { ...api.creation.gestures[0], byPlayer: true, weighed: null };
+  const card = api.actCard(rec);
+  assert.equal(card.rows.some(r => r.label === 'weighed'), false,
+    'the taken row cannot be derived for a player record until a later slice stores it');
+});
+
 /* A canvas that draws nothing and keeps the list of what it was asked to draw. */
 function recordCtx(){
   const calls = [];
