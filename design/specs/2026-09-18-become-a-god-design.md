@@ -23,7 +23,7 @@ This spec is the first slice of piece E, the inhabit modes. It builds one of the
 | Starting | A second button on the start dialog: `Take a god`. You become the first god that wakes. |
 | Determinism | Every act passes the door and is logged. A seed, its options, and its log replay the same story. |
 | The gate | Twenty-four autopiloted creations equal twenty-four unwatched ones, fingerprint for fingerprint. |
-| Out of scope here | Everything person-scale. What a character knows. Death and continuation. Combat. The other three modes. |
+| Out of scope here | Everything person-scale. What a character knows. Death and continuation. Combat. The other three modes. Stops on an event, which wait on G section 7. |
 
 ## 0. What this slice is for
 
@@ -41,14 +41,14 @@ If the fault is none of these, the instrument still says so, because the player 
 
 ## 1. The four acts
 
-Every act from outside enters by `inject()` in `src/sim/door.js`. This spec adds four. `watch` is G's act, reused without change.
+Every act from outside enters by `inject()` in `src/sim/door.js`. This spec adds four. `watch` is shaped as G's act will be, and is cut down to what exists.
 
 | Act | Payload | Meaning |
 |---|---|---|
 | `become` | `{ id, mode }` | Inhabit this being. `mode` is `become` here; `possess`, `vessel`, and `manifest` are refused until their specs are built. `id` of `null` leaves. |
 | `choose` | `{ id, opt }` | Take this option from the open matrix. |
 | `run` | `{ until }` | Autopilot until a mark. |
-| `watch` | `{ who, what }` | Set or clear a stop. G's act. |
+| `watch` | `{ what, at }` | Set or clear a stop. In this slice `what` is `age` only. |
 
 **An option is named, never numbered.** `opt` is `{ type, region }`: the act and the country it falls on. An index into a sorted list is not a name, and a list sorted by score is not stable across a replay.
 
@@ -94,12 +94,14 @@ The mythos spec reserved a locked clock: the engine ticks only when an inhabitin
 | Mark | Name | What it is |
 |---|---|---|
 | Run | run to | Where the autopilot ends and the matrix comes back. |
-| Event | a stop on an event | G's watch list: who and what. Fires before the event and pauses on the line that says why. |
-| Time | a stop on a time | An age. New: G's stops are all event kinds. |
+| Time | a stop on a time | An age. The only kind this slice builds. |
+| Event | a stop on an event | Who and what. **Not built here.** It needs an `event` kind on every chronicle line, which is G section 7 and is not written yet. Building it here would duplicate G. |
 
 Several stand at once. The run reaches whichever comes first. The rest stay set.
 
-**A stop is a watch.** Setting a stop is the `watch` act. Clearing one is the same act. Nothing else is needed.
+**A stop is a watch.** Setting a stop is the `watch` act. Clearing one is the same act.
+
+**The act is shaped for what comes, and refuses what is not built.** `watch` takes `{ what, at }`. `what` of `age` is built. Any other `what` is refused at the door with a message that says the watch list is not built yet. When G writes event kinds onto chronicle lines, the event form drops into the same act and the same timeline marks, and nothing in the interface changes.
 
 ## 5. The record of every god's choice
 
@@ -204,3 +206,4 @@ Each of these is its own spec. None is designed here, and the four acts and the 
 | Quests | A camp goal is already a quest: it has a state, it offers work, and it takes a priority. A quest is a goal a person adopts. No new system. |
 | The other three modes | Possess, Vessel, Manifestation. Refusal, drift, and the rewriting of a character by play belong to them, not to Become. |
 | Undo | Never. The door log is the record and determinism forbids it. |
+| A stop on an event | It needs an `event` kind on every chronicle line. That is G section 7, and it is not written. The `watch` act and the timeline marks are built to take it the day it exists. |
