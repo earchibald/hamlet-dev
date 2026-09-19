@@ -903,6 +903,52 @@ test('an opened chip says who weighed what, and what it took', () => {
   assert.equal(typeof f.rows[0].score, 'number');
 });
 
+/* decideGod walks its options in order and marks every one it cannot land as failed, so the taken
+   row is always the first row with no failed flag, on a record that has a picked type. These four
+   shapes do not reliably occur in a short creation, so the records are built directly. */
+test('the taken row is the first option that did not fail', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', opts: [
+    { type: 'dig', score: 25, failed: true }, { type: 'dig', score: 23 }, { type: 'split', score: 19 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.deepEqual(f.rows.map(r => !!r.taken), [false, true, false]);
+});
+
+test('a continued record marks no row taken', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, continued: true, type: 'dig', opts: [
+    { type: 'dig', score: 25 }, { type: 'split', score: 19 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'nothing is marked taken');
+});
+
+test('a record where every option failed marks no row taken', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: null, opts: [
+    { type: 'dig', score: 25, failed: true }, { type: 'split', score: 19, failed: true } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'nothing landed, so nothing is marked taken');
+});
+
+test('the taken row shows even when several failed options push it past the four-row cap', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', opts: [
+    { type: 'dig', score: 30, failed: true }, { type: 'dig', score: 28, failed: true },
+    { type: 'dig', score: 26, failed: true }, { type: 'dig', score: 24, failed: true },
+    { type: 'dig', score: 22, failed: true }, { type: 'dig', score: 20 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.equal(f.rows.length, 4, 'the cap holds');
+  assert.ok(f.rows.some(r => r.taken && r.score === 20), 'the taken row is one of the four shown');
+});
+
 test('the zoom sets the span, and the default keeps the near ages large', () => {
   const api = loadUI(['state', 'derive'], TL_API);
   assert.deepEqual(api.timelineSpan(0, 20), { from: 9, to: 20 }, 'the default shows the last twelve');

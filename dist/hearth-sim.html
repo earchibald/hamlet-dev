@@ -99,6 +99,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
 #foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
+#foot .chiprow.taken{color:var(--accent);font-weight:700}
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
@@ -5971,14 +5972,21 @@ function chipMatrix(key){
 }
 
 /* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
-   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop. */
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop.
+   decideGod walks its options in order and marks every one it cannot land as failed, so when the
+   record has a picked type, the taken row is the first option that is not failed. A continued record,
+   or one where every option failed, has no taken row. The taken row always shows, even when several
+   failed options would push it past the four-row cap: then the first three rows show, and the taken
+   row takes the fourth place in place of whichever row it would have displaced. */
 function footChip(){
   const m = chipMatrix(ui.timelineChip);
   if (!m) return null;
   const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
   const hand = m.byPlayer ? ', by your hand' : '';
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`,
-    rows: m.opts.slice(0, 4).map(o => ({ type: o.type, score: o.score, failed: !!o.failed })) };
+  const takenIdx = m.picked ? m.opts.findIndex(o => !o.failed) : -1;
+  const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
+  const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
@@ -7093,9 +7101,10 @@ const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: ren
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
 /* The chip's line for the foot: its head, then its rows as their act and their score, a failed
-   row saying the ground refused it. Every string here came from the simulation, so it passes through esc. */
+   row saying the ground refused it, and the taken row marked so the player can tell which option
+   the head's verb refers to. Every string here came from the simulation, so it passes through esc. */
 function chipFootLine(chip){
-  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : ''}</span>`).join('');
+  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('');
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
 function renderFoot(){

@@ -348,14 +348,21 @@ function chipMatrix(key){
 }
 
 /* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
-   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop. */
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop.
+   decideGod walks its options in order and marks every one it cannot land as failed, so when the
+   record has a picked type, the taken row is the first option that is not failed. A continued record,
+   or one where every option failed, has no taken row. The taken row always shows, even when several
+   failed options would push it past the four-row cap: then the first three rows show, and the taken
+   row takes the fourth place in place of whichever row it would have displaced. */
 function footChip(){
   const m = chipMatrix(ui.timelineChip);
   if (!m) return null;
   const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
   const hand = m.byPlayer ? ', by your hand' : '';
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`,
-    rows: m.opts.slice(0, 4).map(o => ({ type: o.type, score: o.score, failed: !!o.failed })) };
+  const takenIdx = m.picked ? m.opts.findIndex(o => !o.failed) : -1;
+  const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
+  const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
