@@ -78,7 +78,6 @@ TASKS.fetchEmber = { type: 'ember',
     addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
     return 'done';
   }] };
-function startFetchEmber(a){ return startTask(a, 'fetchEmber'); }
 
 /* ---------- task builders (humans) ---------- */
 /* Continue straight into a new task from inside an old one. */
@@ -102,14 +101,6 @@ function workKind({ label, amount, skill, effect, type = 'work' }){
       if (t.progress < n) return 'continue';
       effect(a, t.args, t); return 'done';
     }] };
-}
-/* The old door to a build, for offers that are not data yet. Task 8 of plan G2 removes it. */
-function startBuild(a, at, work, label, done, skill){
-  const p = pathToStop(a, at[0], at[1], 1); if (!p) return false;
-  const k = workKind({ label, amount: work, skill, effect: b => done(b) });
-  a.task = { type: 'work', label: `Walking to ${label.toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: at, within: 1, args: { at },
-    arrive: (b, t) => k.stops[0](b, t) };
-  return true;
 }
 Object.assign(TASKS, {
   deliver: { type: 'deliver',
@@ -258,13 +249,8 @@ Object.assign(TASKS, {
       return 'continue';
     }] },
 });
+/* Delivering is called from inside other jobs' effects, below, so it keeps a plain function. */
 function startDeliver(a){ return startTask(a, 'deliver'); }
-function startGather(a, kind){ return startTask(a, 'gather', { item: kind }); }
-function startPickBerries(a){ return startTask(a, 'pickBerries'); }
-function startPickFibre(a){ return startTask(a, 'pickFibre'); }
-function startFish(a){ return startTask(a, 'fish'); }
-function startDigClay(a){ return startTask(a, 'digClay'); }
-function startTakeCuttings(a){ return startTask(a, 'takeCuttings'); }
 /* A garden goes on open soil or grass within eight of the pit, with room for four bushes around it. */
 function gardenSpot(){
   if (!camp.pit) return null; const [px, py] = camp.pit; let best = null;
@@ -301,12 +287,10 @@ TASKS.setSnare = (() => {
     return k.begin(a, args);
   } };
 })();
-function startSetSnare(a){ return startTask(a, 'setSnare'); }
 TASKS.checkSnare = workKind({ label: 'Checking the snare', amount: CLOCK.work.checkSnare, effect(a, args){
   const st = tileAt(args.at[0], args.at[1]).struct, s = st && st.type === 'snare' ? st.snare : null;
   if (s && s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; }
 } });
-function startCheckSnare(a, s){ return startTask(a, 'checkSnare', { at: [s.x, s.y] }); }
 /* Deer live in their meadows and feed at the bushes there, often well past the camp's own sector,
    so a pit close to camp seldom sees one. This scans everywhere passable within thirty tiles of
    the site for grass beside a bush, away from snares and other pits, with a deer standing there
@@ -332,9 +316,7 @@ TASKS.haulPit = workKind({ label: 'Hauling the deer out of the pit', amount: CLO
   const st = tileAt(args.at[0], args.at[1]).struct, p = st && st.type === 'pitfall' ? st.pit : null;
   if (!p || !p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good');
 } });
-function startHaulPit(a, p){ return startTask(a, 'haulPit', { at: [p.x, p.y] }); }
-/* Walk to the camp, or to a founding party's target when there is no site yet. startJoin(a), in
-   camps.js, is the door, because chooseTask and the founding party call it by name. */
+/* Walk to the camp, or to a founding party's target when there is no site yet. */
 TASKS.join = { type: 'travel',
   begin(a, args){
     const c = a.camp, dest = c.site || c.target; if (!dest) return false;
@@ -374,7 +356,6 @@ TASKS.quarry = { type: 'work',
     log(`${a.name} quarries two rocks from the face.`, [a]);
     return chain(a, t, startTask(a, 'deliver')) || 'done';
   }] };
-function startQuarry(a){ return startTask(a, 'quarry'); }
 
 function deerNear(){ if (!camp.site) return null; return beings.filter(b => b.alive && b.species === 'deer' && nearAt(b, ...camp.site) <= 34).sort((p, q) => nearAt(p, ...camp.site) - nearAt(q, ...camp.site))[0] || null; }
 TASKS.huntDeer = { type: 'hunt',
@@ -393,7 +374,6 @@ TASKS.huntDeer = { type: 'hunt',
     const p = bfs(a.x, a.y, a.z, (x, y, z) => z === d.z && dist(x, y, d.x, d.y) <= 2, 700, a); if (!p) return 'fail'; t.path = p.slice(0, 4); t.fast = near(a, d) <= 8; return 'continue';
   }],
   release(a, t){ if (a.carrying && a.carrying.kind === 'spear') a.carrying = null; } };
-function startHuntDeer(a, d){ return startTask(a, 'huntDeer', { deer: d.id }); }
 /* An owner just driven from a den they held flees into it and sits within guard range while its raid
    cooldown runs. Chasing it with fire again is a livelock: skip it until the cooldown lifts. */
 function wolfNear(){ if (!camp.pit) return null; return beings.filter(b => b.alive && b.species === 'wolf' && nearAt(b, ...camp.pit) <= 11 && !(b.oldDen && b.oldDen.cleared === camp && (b.cooldown.raid || 0) > tick)).sort((p, q) => nearAt(p, ...camp.pit) - nearAt(q, ...camp.pit))[0] || null; }
@@ -410,7 +390,6 @@ TASKS.driveOff = { type: 'guard',
     const q = bfs(a.x, a.y, a.z, (x, y, z) => z === w.z && dist(x, y, w.x, w.y) <= 2, 500, a); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
   }],
   release(a, t){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
-function startDriveOff(a, w){ return startTask(a, 'driveOff', { wolf: w.id, at: camp.pit }); }
 
 /* Take a brand from the pit, then go on to next.kind. Shared by the cave search and the den clearing. */
 TASKS.brand = { type: 'work',
@@ -453,7 +432,6 @@ TASKS.searchCave = { type: 'search',
     c.searched = camp; return chain(a, t, startDeliver(a)) || 'done';
   }],
   release(a, t){ const c = caves[t.args.cave]; if (c.claimed === a.id) c.claimed = null; if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
-function startSearchCave(a, c){ return withBrand(a, 'Going into the dark', { kind: 'searchCave', args: { cave: caves.indexOf(c) } }); }
 /* Break the fallen rock with the axe. c.blocked is read again from the cave when the work begins,
    at the pit and again once the party arrives, so a rock cleared by someone else in the meantime
    is noticed rather than cleared a second time. */
@@ -479,10 +457,6 @@ TASKS.clearRock = { type: 'work',
     const [stx, sty] = camp.stashTile; const q = pathToStop(a, stx, sty, 1); if (!q) return 'done'; t.path = q; t.label = 'Coming up out of the dark'; t.stop = 1; return 'continue';
   }, () => 'done'],
   release(a, t){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
-function startClearRock(a, c){
-  if (!c.blocked) return false;
-  return withBrand(a, 'Going down to the fallen rock', { kind: 'clearRock', args: { cave: caves.indexOf(c) } });
-}
 /* A den party member: brave, grown, has a home to go back to, and healthy. Used both to size up
    whether a camp has a party (the dens goal's state) and to pick the mate (startClearDen). */
 const denReady = h => h.traits.bravery >= 0.5 && stage(h) !== 'young' && !h.homeless && h.hp >= 60;
@@ -565,7 +539,6 @@ TASKS.cutTree = { type: 'work',
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
   release(a, t){ const [tx, ty, tz] = t.args.tree; const tree = tileAt(tx, ty, tz); if (tree.claimed === a.id) tree.claimed = null; } };
-function startCutTree(a){ return startTask(a, 'cutTree'); }
 TASKS.fillWater = { type: 'gather',
   begin(a, args){
     if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
@@ -573,4 +546,3 @@ TASKS.fillWater = { type: 'gather',
     return { label: 'Going to fill the waterskin', path: p, progress: 0 };
   },
   stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
-function startFillWater(a){ return startTask(a, 'fillWater'); }

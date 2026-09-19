@@ -275,7 +275,7 @@ function chooseTask(a){
       { type: 'wander', score: 6 },
     ];
     if (a.homeless && camp && (camp.site || camp.target)) opts.push({ type: 'join', score: 62 });
-    else for (const o of offersFor(a)){ if (stage(a) === 'young' && /hunt|wolf|lead a party|cut a tree|ember/.test(o.label)) continue; opts.push({ type: 'work', label: o.label, goal: o.goal, start: o.start, score: (o.score + tr.diligence * 25 - low) * poke * (stage(a) === 'young' ? 0.7 : 1) }); }
+    else for (const o of offersFor(a)){ if (stage(a) === 'young' && /hunt|wolf|lead a party|cut a tree|ember/.test(o.label)) continue; opts.push({ type: 'work', label: o.label, goal: o.goal, task: o.task, score: (o.score + tr.diligence * 25 - low) * poke * (stage(a) === 'young' ? 0.7 : 1) }); }
     if (a.carrying) opts.push({ type: 'deliver', score: 95 });
   } else if (a.species === 'rabbit'){
     opts = [{ type: 'flee', score: threatsFor(a).length ? 120 : 0 }, { type: 'eat', score: urg(n.food) * (drowsy(a) ? 0.6 : 1.2) }, { type: 'rest', score: n.rest < 40 || weather.storm ? 50 : drowsy(a) ? 35 : 0 }, { type: 'wander', score: drowsy(a) ? 4 : 12 }];
@@ -313,7 +313,7 @@ function chooseTask(a){
     if (o.score <= 0 && o.type !== 'wander') continue;
     const key = o.label || o.type;
     if ((a.cooldown[key] || 0) > tick){ o.failed = true; continue; }
-    const ok = o.type === 'work' ? o.start(a) : o.type === 'join' ? startJoin(a) : o.type === 'deliver' ? startDeliver(a) : TASKS[o.type] ? startTask(a, o.type) : START[o.type](a);
+    const ok = o.type === 'work' ? startTask(a, o.task.kind, o.task.args) : o.type === 'join' ? startTask(a, 'join') : o.type === 'deliver' ? startTask(a, 'deliver') : startTask(a, o.type);
     if (ok){ a.lastChoice.picked = key; if (a.task){ a.task.started = tick; a.task.key = key; } return; }
     o.failed = true; a.cooldown[key] = tick + CLOCK.cooldown.offerFailed;
   }

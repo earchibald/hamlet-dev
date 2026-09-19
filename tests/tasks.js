@@ -131,13 +131,31 @@ test('a brand task with no next step ends with no live ember', () => {
   assert.deepEqual(plain(a.task), []);
 });
 
+test('every offer is data', () => {
+  const api = load(); api.startWorld('r');
+  const seen = new Set();
+  for (let k = 0; k < 9000; k++){
+    api.step();
+    if (k % 50) continue;
+    for (const h of api.humans()){ api.camp = h.camp; if (!h.camp) continue;
+      for (const o of api.offersFor(h)){ seen.add(o.task && o.task.kind); assert.deepEqual(plain(o, 'offer'), [], o.label); assert.ok(api.TASKS[o.task.kind], o.label); } }
+  }
+  assert.ok(seen.size > 3);
+});
+
+test('what a being last chose is plain data', () => {
+  const api = load(); api.startWorld('r');
+  for (let k = 0; k < 3000; k++) api.step();
+  for (const b of api.beings) if (b.alive && b.lastChoice) assert.deepEqual(plain(b.lastChoice, 'lastChoice'), []);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
 const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 0, tasks: 5, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
+  camps: 0, tasks: 4, beings: 3, species: 0, fae: 0, goals: 0, recipes: 0,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];

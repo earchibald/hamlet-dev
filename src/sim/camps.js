@@ -115,7 +115,7 @@ function startFoundCamp(leader){
   for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
   for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
-  return startJoin(leader);
+  return startTask(leader, 'join');
 }
 function shelterSite(){
   const [px, py] = camp.pit; let best = null;
@@ -126,10 +126,6 @@ function shelterSite(){
   }
   return best ? [best.x, best.y] : null;
 }
-
-/* The 'join' kind lives in tasks.js: camps.js loads before tasks.js (src/sim/index.js's FILES),
-   so a top-level TASKS.join assignment here would read TASKS before its declaration runs. */
-function startJoin(a){ return startTask(a, 'join'); }
 
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
