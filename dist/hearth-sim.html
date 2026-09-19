@@ -3887,6 +3887,66 @@ let settleNow = false;
    drawn from identically. */
 let agePos = null;
 
+/* A line the player is owed but the world does not remember. In the gods era every logged line joins
+   the legends, and the legends are the creation's own story: a hand reaching in is not part of it, and
+   a legend that differed would break the equality that autopilot rests on. The door log is the record
+   of what the player did. This is only so they can see it happen. */
+function note(text){ chronicle.unshift({ tick, when: stamp(), text, kind: 'info' }); if (chronicle.length > 300) chronicle.pop(); }
+
+/* Who the player is, and the turn that is open. `inhabited` is a being id or null. `pending` is null,
+   or the god whose turn it is with the matrix it was given. The engine will not step while `pending`
+   is set: this is the locked clock the mythos spec reserved. */
+let inhabited = null;
+let pending = null;
+
+/* The age the autopilot runs to. Null when the player is choosing. Task 6 gives it its act. */
+let runUntil = null;
+
+/* Fill the open turn. settleHome and godNeeds run here, once, before the options are drawn, exactly
+   where the autonomous path runs them. The matrix is drawn once and kept; drawing it twice would
+   draw from the stream twice. */
+function openTurn(g){
+  settleHome(g); godNeeds(g);
+  const opts = godOptions(g);
+  pending = { god: g.id, age, opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })) };
+}
+
+/* Apply one option for the god whose turn is open. An option that does not land leaves the turn open
+   with its row marked failed, because the player is owed the reason; the autonomous god falls to the
+   next option in silence. */
+function takeTurn(opt){
+  const g = beingById(pending.god);
+  const k = pending.opts.findIndex(o => o.type === opt.type && o.region === opt.region);
+  if (k < 0) return 'That is not on the table.';
+  const row = pending.opts[k];
+  const r = regionById(row.region);
+  let landed = false;
+  withGodRng(() => {
+    g.lastChoice = { opts: pending.opts, picked: null };
+    beginAct(); deciding = { g, type: row.type };
+    landed = !!(r && GOD_ACTS[row.type].apply(g, r));
+    deciding = null;
+    if (landed){ g.lastChoice.picked = row.type; g.acted++; gainGodXp(g, row.type); noteBeside(g, r); }
+    else row.failed = true;
+  });
+  if (!landed) return `The ground refuses it. ${g.name} cannot ${row.type} there.`;
+  creation.choices.push({ age: pending.age, god: g.id, opts: pending.opts, picked: row.type, byPlayer: true });
+  pending = null;
+  agePos.i++;
+  withGodRng(() => { if (ageDecide()) ageEnd(); });
+  if (settleNow){ settleNow = false; settle(); }
+  return `You ${row.type}. ${g.name} acts.`;
+}
+
+/* The player leaves, or the god whose turn was open is gone. The open turn closes and the creation
+   runs itself from where it stands: nobody is owed a wait for the next step, so the interrupted age
+   is carried on to its end, or to the next thing there is to decide, right here. */
+function releaseTurn(){
+  pending = null;
+  if (agePos) withGodRng(() => { if (ageDecide()) ageEnd(); });
+  if (settleNow){ settleNow = false; settle(); }
+}
+
 function ageBegin(){
   age++;
   /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
@@ -3894,18 +3954,22 @@ function ageBegin(){
   if (age === 1) firstGod();
   /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
   if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
-  agePos = { i: 0 };
+  agePos = { i: 0, list: gods() };
 }
 
-/* Runs the awake gods from the position on. Returns false when the age is suspended, true when its
-   gods are done. `gods()` filters `beings` fresh on every call, so the one loop it replaces took its
-   list once, at the head of the age: a god made mid-age by a split lands in `beings` but not in that
-   list, and so is not reached until the next age. This takes the same one list, once, to match. */
+/* The gods of this age, as they stood when it began, and where we are among them. The list is taken
+   once an age and never retaken, so a suspended age resumes through the same gods the age started
+   with, and a god born mid-age waits for the next age exactly as it always did. */
 function ageDecide(){
-  const list = gods();
+  const list = agePos.list;
   while (agePos.i < list.length){
     const g = list[agePos.i];
-    if (g.status === 'awake'){ settleHome(g); godNeeds(g); decideGod(g); }
+    if (g.status === 'awake'){
+      /* The player's god with a free choice stops the age here. A god carrying an act has no choice
+         to make, so it carries on and the turn does not open. */
+      if (g.id === inhabited && !g.task && runUntil === null){ openTurn(g); return false; }
+      settleHome(g); godNeeds(g); decideGod(g);
+    }
     agePos.i++;
   }
   return true;
@@ -4238,8 +4302,10 @@ function updateWorld(){
   godsTick();
 }
 /* In the gods era a step is an age. In the days era it is a tick. A species with perTick false is not
-   stepped by the tick: the gods keep their own clock. */
+   stepped by the tick: the gods keep their own clock. The engine will not step while a turn is open:
+   the world waits on the player, which is the locked clock. */
 function step(){
+  if (pending) return 'The turn is yours.';
   if (era === 'gods') return ageStep();
   tick++; updateWorld(); camp = camps[0];
   for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
@@ -4294,11 +4360,29 @@ const DOOR_ACTS = {
     return 'Camp site set. The fire pit will go here.';
   },
   /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
-     until each is built. Task 3 gives this act its turn lock; here it only names who you are. */
+     until each is built. An id of null leaves, and the open turn closes with it. */
   become(e){
+    if (e.mode !== undefined && e.mode !== 'become') return 'Only Become is built. Possess, Vessel, and Manifestation wait for their own specs.';
+    if (e.id === null || e.id === undefined){
+      if (inhabited === null) return 'You are nobody already.';
+      inhabited = null; releaseTurn();
+      note('The hand above lifts. Whatever was moving falls still, and goes on by itself.');
+      return 'You are nobody again. The creation goes on without you.';
+    }
     const g = beingById(e.id);
     if (!g || !g.alive || g.species !== 'god') return 'Only a god can be taken, and only while it lives.';
+    if (inhabited !== null && inhabited !== g.id) releaseTurn();
+    inhabited = g.id;
+    note(`Something older than the gods looks out through ${g.name}.`);
     return `You are ${g.name}, ${g.epithet}.`;
+  },
+  /* Choose: take one option from the open matrix. The option is named, never numbered, because a list
+     sorted by score is not stable across a replay. */
+  choose(e){
+    if (!pending) return 'It is nobody\'s turn.';
+    if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    return takeTurn(e.opt);
   },
 };
 function inject(event){

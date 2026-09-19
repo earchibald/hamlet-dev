@@ -69,3 +69,97 @@ test('agePos is null between ages', () => {
   api.step();
   assert.equal(api.agePos, null, 'a finished age leaves no position behind');
 });
+
+test('becoming a god opens its turn, and the engine will not step until you choose', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  const ageWas = api.age;
+  api.step();
+  assert.ok(api.pending, 'the turn is open');
+  assert.equal(api.pending.god, g.id);
+  assert.ok(api.pending.opts.length, 'the matrix is the god\'s own options');
+  assert.equal(api.step(), 'The turn is yours.');
+  assert.equal(api.age, ageWas + 1, 'the age began and then stopped at your god');
+  const before = api.creation.choices.length;
+  const top = api.pending.opts[0];
+  const msg = api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: top.type, region: top.region } });
+  assert.match(msg, /^You /);
+  assert.equal(api.pending, null, 'the turn closes');
+  assert.ok(api.creation.choices.length > before, 'the choice is in the record');
+});
+
+test('taking the best option every turn is the creation the engine runs alone', () => {
+  const a = load(), b = load();
+  a.startWorld('gamma');
+  b.startCreation('gamma', {});
+  let n = 0;
+  while (b.era === 'gods' && n++ < 2000){
+    if (b.pending){
+      const g = b.pending.god, top = b.pending.opts[0];
+      b.inject({ source: 'player', act: 'choose', id: g, opt: { type: top.type, region: top.region } });
+      continue;
+    }
+    if (!b.inhabited && b.awakeGods().length) b.inject({ source: 'player', act: 'become', id: b.awakeGods()[0].id });
+    b.step();
+  }
+  assert.equal(b.era, 'days');
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  assert.equal(b.tick, a.tick);
+});
+
+test('what the player does is a chronicle line and never a legend', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const was = api.legends.length;
+  api.inject({ source: 'player', act: 'become', id: api.awakeGods()[0].id });
+  assert.equal(api.legends.length, was, 'the legends are the world\'s story, not the player\'s');
+  assert.match(api.chronicle[0].text, /looks out through/);
+});
+
+test('a suspended age resumes through the gods the age began with', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn is open');
+  const was = api.agePos.list;
+  const top = api.pending.opts[0];
+  api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: top.type, region: top.region } });
+  /* The age either finished, which clears the position, or it ran on through the same list. */
+  assert.ok(api.agePos === null || api.agePos.list === was, 'the age never retook its list of gods');
+});
+
+test('the door refuses what is not built and what is not open', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  assert.equal(api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: 'split', region: 1 } }),
+    'It is nobody\'s turn.');
+  assert.equal(api.inject({ source: 'player', act: 'become', id: g.id, mode: 'possess' }),
+    'Only Become is built. Possess, Vessel, and Manifestation wait for their own specs.');
+  assert.equal(api.inject({ source: 'player', act: 'become', id: 99999 }),
+    'Only a god can be taken, and only while it lives.');
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.equal(api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: 'nosuch', region: 1 } }),
+    'That is not on the table.');
+  assert.ok(api.pending, 'a refused choice leaves the turn open');
+});
+
+test('leaving hands the creation back, and it runs on', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending);
+  assert.equal(api.inject({ source: 'player', act: 'become', id: null }), 'You are nobody again. The creation goes on without you.');
+  assert.equal(api.pending, null, 'leaving closes the open turn');
+  assert.equal(api.inhabited, null);
+  const ageWas = api.age;
+  api.step();
+  assert.ok(api.age > ageWas, 'the ages run again');
+});

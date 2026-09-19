@@ -46,11 +46,29 @@ const DOOR_ACTS = {
     return 'Camp site set. The fire pit will go here.';
   },
   /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
-     until each is built. Task 3 gives this act its turn lock; here it only names who you are. */
+     until each is built. An id of null leaves, and the open turn closes with it. */
   become(e){
+    if (e.mode !== undefined && e.mode !== 'become') return 'Only Become is built. Possess, Vessel, and Manifestation wait for their own specs.';
+    if (e.id === null || e.id === undefined){
+      if (inhabited === null) return 'You are nobody already.';
+      inhabited = null; releaseTurn();
+      note('The hand above lifts. Whatever was moving falls still, and goes on by itself.');
+      return 'You are nobody again. The creation goes on without you.';
+    }
     const g = beingById(e.id);
     if (!g || !g.alive || g.species !== 'god') return 'Only a god can be taken, and only while it lives.';
+    if (inhabited !== null && inhabited !== g.id) releaseTurn();
+    inhabited = g.id;
+    note(`Something older than the gods looks out through ${g.name}.`);
     return `You are ${g.name}, ${g.epithet}.`;
+  },
+  /* Choose: take one option from the open matrix. The option is named, never numbered, because a list
+     sorted by score is not stable across a replay. */
+  choose(e){
+    if (!pending) return 'It is nobody\'s turn.';
+    if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    return takeTurn(e.opt);
   },
 };
 function inject(event){
