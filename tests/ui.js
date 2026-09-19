@@ -1294,4 +1294,133 @@ test('the view key reads the chronicle search in both eras, and the search stays
   assert.ok(!/s\.chronSearch/.test(saved), 'the search is not read back from storage');
 });
 
+/* ---------- saves: the file name, the keys, and the view after a load ---------- */
+
+test('saveName makes one lower-case dashed name from the seed and the day', () => {
+  const api = loadUI(['state', 'derive'], ['saveName', 'DAY']);
+  assert.equal(api.saveName('Hollow Moor 52', 11 * api.DAY + 400), 'hearth-hollow-moor-52-day-12.json');
+  assert.equal(api.saveName('hollow-moor-52', 0), 'hearth-hollow-moor-52-day-1.json');
+  assert.equal(api.saveName('  Fern__Vale!! ', 39 * api.DAY), 'hearth-fern-vale-day-40.json');
+  assert.equal(api.saveName('', 0), 'hearth-world-day-1.json');
+  assert.equal(api.saveName(null, 0), 'hearth-world-day-1.json');
+});
+
+test('the key map holds Save, Load, and Continue, and no key is bound twice in one focus', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'saves', 'actions'], KEYS);
+  const row = a => api.KEYMAP.find(k => k.action === a);
+  assert.equal(api.keyName(row('saveWorld')), 'Ctrl+S');
+  assert.equal(api.keyName(row('loadWorldFile')), 'Ctrl+O');
+  assert.equal(api.keyName(row('continueWorld')), 'Alt+C');
+  assert.equal(row('continueWorld').focus, 'dialog:start', 'Continue belongs to the start dialog');
+  assert.deepEqual(keyHit(api, ev('s', { ctrlKey: true }), 'map'), { action: 'saveWorld', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('o', { ctrlKey: true }), 'drawer:people'), { action: 'loadWorldFile', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('o'), 'drawer:people'), { action: 'popOut', arg: undefined }, 'plain O still pops the drawer out');
+  assert.deepEqual(keyHit(api, ev('c', { altKey: true }), 'dialog:start'), { action: 'continueWorld', arg: undefined });
+  const seen = new Map();
+  for (const k of api.KEYMAP){
+    const chord = `${k.focus}|${api.keyName(k)}|${JSON.stringify(k.arg ?? null)}`;
+    assert.ok(!seen.has(chord) || seen.get(chord) === k.action, `${chord} is bound to both ${seen.get(chord)} and ${k.action}`);
+    seen.set(chord, k.action);
+  }
+});
+
+test('the palette lists Save and Load, and the help table prints their keys', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'saves', 'actions'], [...DERIVE, ...KEYS, 'paletteRows']);
+  api.startWorld('r'); api.camp = api.camps[0];
+  const rows = api.paletteRows();
+  for (const label of ['Save world to a file', 'Load world from a file']){
+    const r = rows.find(r => r.label === label);
+    assert.ok(r, `the palette has no row for ${label}`);
+    assert.ok(r.key, `${label} shows no key in the palette`);
+  }
+  /* The help table is every row that is not quiet, so both show there too. */
+  assert.equal(api.KEYMAP.filter(k => k.action === 'saveWorld' && !k.quiet).length, 1);
+  assert.equal(api.KEYMAP.filter(k => k.action === 'loadWorldFile' && !k.quiet).length, 1);
+});
+
+test('the template holds the file picker, the Continue button, and the start dialog’s note line', () => {
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  assert.match(html, /<input type="file" id="loadFile" accept="\.json,application\/json" hidden>/);
+  assert.match(html, /id="continueBtn"[^>]*hidden>Continue the last world<kbd>Alt\+C<\/kbd>/);
+  assert.match(html, /id="startNote"/);
+});
+
+/* The view state the load must put back. The `extra` readers reach the `let` variables of the interface. */
+const VIEW_PEEK = {
+  peek: '() => ({ viewCamp, followId, lvl, lastEra, sw: SW, sh: SH, cursor: { ...cursor }, cur: { ...cur } })',
+  place: '(c, s, f, l) => { cursor = c; cur = s; followId = f; lvl = l; }',
+};
+const LOAD_API = ['ui', 'onLoad', 'inject', 'takeSnapshot', 'dayOf', 'ZMIN', 'ZMAX'];
+
+test('a load puts the view back: one camp, nobody followed, no cards, and the cursor inside the new world', () => {
+  const small = loadUI(['state', 'derive', 'keys', 'saves', 'actions'], LOAD_API, VIEW_PEEK);
+  small.startWorld('r');
+  const snap = JSON.parse(JSON.stringify(small.takeSnapshot()));
+  const api = loadUI(['state', 'derive', 'keys', 'saves', 'actions'], LOAD_API, VIEW_PEEK);
+  api.startWorld('r', { sw: 12, sh: 8 });
+  assert.ok(api.W > small.W, 'the second world must be the bigger one');
+  api.place({ x: api.W - 1, y: api.H - 1, z: api.ZMAX }, { sx: 11, sy: 7 }, 4242, api.ZMAX);
+  api.ui.windows = [{ id: 1, kind: 'inspect', target: { being: 4242 }, x: 0, y: 0, w: 10, h: 10 }];
+  api.ui.focus = 'window:1'; api.ui.row.people = 6; api.ui.pulses = [{ text: 'old' }]; api.ui.seenTick = 99;
+  api.ui.autosaveDay = 0;
+  const answer = api.inject({ source: 'player', act: 'load', snapshot: snap });
+  assert.match(answer, /^The world is as it was on day \d+\.$/);
+  api.onLoad();
+  const v = api.peek();
+  assert.equal(v.viewCamp, api.camps[0], 'viewCamp is the loaded world’s first camp');
+  assert.equal(api.camp, api.camps[0]);
+  assert.equal(v.followId, null, 'a followed person of the old world');
+  assert.deepEqual(api.ui.windows, [], 'an inspector of the old world stayed open');
+  assert.equal(api.ui.focus, 'map');
+  assert.equal(api.ui.row.people, 0);
+  assert.deepEqual(api.ui.pulses, []);
+  assert.equal(api.ui.seenTick, -1);
+  assert.ok(v.cursor.x < api.W && v.cursor.y < api.H, `the cursor is outside the loaded world: ${v.cursor.x},${v.cursor.y}`);
+  assert.ok(v.cur.sx < v.sw && v.cur.sy < v.sh, 'the open sector is outside the loaded world');
+  assert.ok(v.lvl <= api.ZMAX && v.lvl >= api.ZMIN);
+  assert.equal(v.lastEra, api.era, 'the frame would take the loaded world for a settle');
+  assert.equal(api.ui.autosaveDay, api.dayOf(), 'a loaded world autosaves at once');
+});
+
+test('a refused load changes neither the world nor the view', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'saves', 'actions'], LOAD_API, VIEW_PEEK);
+  api.startWorld('r');
+  api.place({ x: 5, y: 6, z: 0 }, { sx: 1, sy: 1 }, 7, 0);
+  const before = api.tick;
+  const answer = api.inject({ source: 'player', act: 'load', snapshot: { version: 99 } });
+  assert.match(answer, /version/);
+  assert.equal(api.tick, before);
+  assert.equal(api.peek().followId, 7, 'the view moved after a refusal');
+});
+
+test('saves.js loads in Node and its storage answers without a browser', async () => {
+  const api = loadUI(['state', 'derive', 'keys', 'saves'], ['writeSaveFile', 'readSaveFile', 'putAutosave', 'getAutosave']);
+  assert.equal(api.writeSaveFile('x.json', '{}'), 'This page cannot write a file.', 'no Blob, no download, one sentence');
+  assert.equal(await api.putAutosave('{}'), false, 'no database, no autosave');
+  assert.equal(await api.getAutosave(), null);
+  assert.deepEqual(await api.readSaveFile(null), { error: 'This file cannot be read.' });
+});
+
+/* These four each need a document, which these tests do not have, so each is held to its source. */
+test('the page says what it asked for, tells the player when a save fails, and stops on a fault', () => {
+  const actions = fs.readFileSync('src/ui/actions.js', 'utf8');
+  const main = fs.readFileSync('src/ui/main.js', 'utf8');
+  const dialogs = fs.readFileSync('src/ui/dialogs.js', 'utf8');
+  /* A sandbox can refuse the download with no error, so the line cannot claim the file was written. */
+  assert.match(actions, /say\(writeSaveFile\(name, text\) \|\| `Saving \$\{name\}\.`\)/);
+  assert.doesNotMatch(actions, /Saved as/);
+  /* An autosave that cannot be taken is said once, not swallowed. */
+  assert.match(actions, /This world cannot be saved, so there is no autosave\./);
+  assert.match(actions, /console\.warn\('The autosave could not be taken: '/);
+  /* A refusal shows the plain sentence and puts the reason in the console. */
+  assert.match(actions, /console\.warn\('The save was refused: ' \+ lastLoadFault\)/);
+  /* A throw inside a step pauses the game and says so. The frame loop itself runs on. */
+  assert.match(main, /catch \(e\)\{ onFault\(e\); \}/);
+  assert.match(actions, /function onFault/);
+  assert.match(actions, /The world stopped on a fault\. Load a save or make a new world\./);
+  /* A slot without a real tick is no slot, in both places that read one. */
+  assert.match(dialogs, /typeof lastSave\.tick === 'number' && Number\.isFinite\(lastSave\.tick\)/);
+  assert.match(actions, /typeof lastSave\.tick !== 'number' \|\| !Number\.isFinite\(lastSave\.tick\)/);
+});
+
 module.exports = { loadUI };

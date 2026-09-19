@@ -1,7 +1,22 @@
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
 function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNote(''); showContinue(); ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+/* One line inside the start dialog, for an answer that the foot behind it would hide. An empty line hides it. */
+function startNote(text){ const p = $('startNote'); if (!p) return; p.textContent = text; p.hidden = !text; }
+/* The Continue button, shown only when the autosave slot holds a world. The save is outside data, so its
+   seed goes in as text, never as markup, and a slot without a real tick is no slot: it would say "day NaN".
+   The key comes from the key map, so the button cannot drift from it. */
+function showContinue(){
+  const b = $('continueBtn'); if (!b) return;
+  const ok = !!lastSave && typeof lastSave.tick === 'number' && Number.isFinite(lastSave.tick);
+  b.hidden = !ok;
+  if (!ok) return;
+  const row = KEYMAP.find(k => k.button === 'continueBtn');
+  b.textContent = `Continue ${lastSave.seed}, day ${Math.floor(Number(lastSave.tick) / DAY) + 1}`;
+  const k = document.createElement('kbd'); k.textContent = row ? keyName(row) : '';
+  b.appendChild(k);
+}
 let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
 function muteChoice(k){

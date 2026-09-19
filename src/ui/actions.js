@@ -54,7 +54,131 @@ function newWorld(seed){
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
   viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  /* A new world has no autosave of its own, so its first day writes one. */
+  ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* ---------- saves ----------
+   The player's own file, the one autosave slot, and the view after a world arrives from either.
+   The storage sits in saves.js. The door is the only way a save enters the world. */
+
+/* Write the world to a file the player keeps. */
+function saveWorld(){
+  if (inAges()){ say('The world is not made yet. There is nothing to save.'); return; }
+  let text;
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){ console.warn('The world could not be saved: ' + (e && e.message)); say('This world cannot be saved.'); return; }
+  const name = saveName(seedText, tick);
+  /* The page hands the file to the browser and is never told what became of it. A sandbox can refuse
+     the download without an error, so the line says what was asked for, not what came of it. */
+  say(writeSaveFile(name, text) || `Saving ${name}.`);
+}
+
+/* Open the file picker. The input's change handler carries on in openSaveFile. */
+function loadWorldFile(){
+  try { $('loadFile').click(); }
+  catch (e){ say('This page cannot open a file.'); }
+}
+
+/* A file the player chose. A file that is not a save says so and changes nothing. */
+function openSaveFile(file){
+  readSaveFile(file).then(r => {
+    if (r.error){ say(r.error); return; }
+    loadWorld(r.snapshot);
+  });
+}
+
+/* The one way a snapshot enters. The door answers with a sentence either way, so the log says whether
+   the world changed: a load that lands appends an entry of its own, and a refusal appends nothing. */
+function loadWorld(snapshot, note){
+  const last = doorLog[doorLog.length - 1];
+  const answer = inject({ source: 'player', act: 'load', snapshot });
+  const landed = doorLog[doorLog.length - 1] !== last;
+  if (landed) onLoad();
+  /* The player gets the plain sentence. Whoever has the console open gets the reason the save threw. */
+  else if (lastLoadFault) console.warn('The save was refused: ' + lastLoadFault);
+  /* A world that arrived says so in the foot, over the new valley. A refusal goes where the caller asks. */
+  if (landed || !note) say(answer); else note(answer);
+  return landed;
+}
+
+/* The view after a load. Everything it remembers points at the world that was replaced, and the new
+   world can be a smaller one, so this puts the view back on the ground as onSettle does. */
+function onLoad(){
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  viewCamp = camps[0]; camp = camps[0];
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  /* A row index, a followed person, and an open card all name a being of the old world. */
+  followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  cursor = { x: clamp(cursor.x, 0, W - 1), y: clamp(cursor.y, 0, H - 1), z: clamp(cursor.z, ZMIN, ZMAX) };
+  cur = { sx: clamp(cur.sx, 0, SW - 1), sy: clamp(cur.sy, 0, SH - 1) };
+  lvl = clamp(lvl, ZMIN, ZMAX);
+  /* A save is always of the days, so the frame must not take the loaded world for a settle. */
+  lastEra = era;
+  /* The loaded day is already saved. The next dawn writes the slot again. */
+  ui.autosaveDay = dayOf();
+  /* The rest is the page. The tests run this function with no canvas and no dialog behind it. */
+  if (!wcv) return;
+  wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  ocv.width = W * WS; ocv.height = H * WS;
+  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setView('loc', secOf(cursor.x, cursor.y));
+}
+
+/* One autosave slot, written at the first frame of each new day. It is the whole world, so a page
+   that cannot store one says so once and plays on. */
+function autosave(){
+  ui.autosaveDay = dayOf();
+  let text;
+  /* A world the snapshot cannot name is not a silent failure. It is said once, as a slot that cannot
+     be written is, and the reason goes to the console. */
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){
+    console.warn('The autosave could not be taken: ' + (e && e.message));
+    if (ui.autosaveFaultWarned) return;
+    ui.autosaveFaultWarned = true;
+    say('This world cannot be saved, so there is no autosave. The game plays on.');
+    return;
+  }
+  putAutosave(text).then(ok => {
+    if (ok || ui.autosaveWarned) return;
+    ui.autosaveWarned = true;
+    say('This page cannot keep an autosave. The game plays on.');
+  });
+}
+
+/* A step threw. The world is left where it stopped, the game pauses, and one plain sentence says so.
+   The fault goes to the console for whoever is looking. The frame loop itself keeps running. */
+function onFault(e){
+  /* onFault runs inside the frame loop's own try. A throw in here must not stop the next frame from
+     being queued, so the body gets its own try, with a bare console.error as the last resort. */
+  try {
+    console.error(e);
+    acc = 0;
+    setPaused(true);
+    say('The world stopped on a fault. Load a save or make a new world.');
+  } catch (e2){ console.error(e2); }
+}
+
+/* The autosave read once when the page opens, parsed here and kept for the start dialog. */
+let lastSave = null;
+function offerContinue(){
+  getAutosave().then(text => {
+    if (!text) return;
+    try { lastSave = JSON.parse(text); }
+    catch (e){ return; }
+    /* The slot is outside data. A save without a real tick would offer "day NaN", so it is no save. */
+    if (!lastSave || typeof lastSave !== 'object' || lastSave.era !== 'days' || typeof lastSave.tick !== 'number' || !Number.isFinite(lastSave.tick)){ lastSave = null; return; }
+    showContinue();
+  });
+}
+
+/* Continue the last world, from the start dialog. A refusal stays in the dialog. */
+function continueWorld(){
+  if (!lastSave){ startNote('There is no world to continue.'); return; }
+  if (loadWorld(lastSave, startNote)) closeDialogs();
 }
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
@@ -159,6 +283,9 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  saveWorld(){ saveWorld(); },
+  loadWorldFile(){ loadWorldFile(); },
+  continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
     if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }

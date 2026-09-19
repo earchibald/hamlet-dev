@@ -55,6 +55,9 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
+  autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
+  autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */

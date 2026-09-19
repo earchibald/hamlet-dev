@@ -6,6 +6,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, and the chronicle), clock (the calendar, the units, and every duration and rate), field (the countries and their boundaries), marks (what a god did to a country), world, path, camps, tasks (the TASKS table, the tick executor, and human work), beings, species, fae, goals, recipes, weather, gods (the primal gods and the ages), settle (from marks to tiles), main, door. `door.js` is the one way in from outside: `inject(event)`.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
+- `src/sim/snapshot.js`: the whole world as plain JSON. `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`. The door's `load` act calls `loadSnapshot`.
 - `src/ui/`: the canvas interface. Reads state, draws, handles tools. Never changes the rules. Plain scripts in one scope like `src/sim/`, joined by `src/ui/index.js`. `derive.js` and `keys.js` have no DOM and are tested in `tests/ui.js`. View state changes in `actions.js`, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`.
 - `src/page.template.html`: the page shell. `__SIM__` and `__UI__` are replaced by `build.js`.
 - `dist/hearth-sim.html`: the built single file. It is what gets published as the Claude artifact. Keep it working. Run `node build.js` after every change to `src/`.
@@ -23,6 +24,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/settle.js`: the painters, the founding sites, the creatures, the bodies, and the tile check. Fast.
 - `tests/clock.js`: the unit helpers, the table's values, and a lint: no bare time literal in a rule. Fast.
 - `tests/tasks.js`: the table, the executor, that every task and offer is plain data, and that no file holds a closure task. Fast.
+- `tests/snapshot.js`: the streams, `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`, the oracle (save mid-run, load, run on), and the guard that every top-level `let` or `var` is saved or listed with a reason, and every top-level `const` container is named or listed as frozen. Fast.
 - `npm run fast` runs them all.
 
 ## Rules of work
@@ -33,6 +35,9 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - The engine step is pure. Every outside act enters by `inject()` in `src/sim/door.js` and is logged. A seed, its options, and its log replay the same story.
 - A duration or a rate goes in `CLOCK` in `src/sim/clock.js`, or in a `SPECIES`, `LIFE`, or `RECIPES` row written in the unit helpers or in days. `tests/clock.js` fails on a bare one.
 - A task is a plain record. Its behaviour goes in `TASKS` in `src/sim/tasks.js`. Name a thing by id or by coordinates, never by reference.
+- A field that points at another record goes in `REFS` in `src/sim/snapshot.js`. `tests/snapshot.js` fails on one that is missing.
+- A new top-level `let` or `var` in `src/sim/` goes in `SAVED_STATE` or `NOT_SAVED` in `src/sim/snapshot.js`. A new top-level `const` that holds a container goes in `KNOWN_CONSTS` or `FROZEN_TABLES` in `tests/snapshot.js`.
+- State lives in plain objects and arrays. A `Map` or a `Set` a snapshot must save is a fault the guard reports.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
