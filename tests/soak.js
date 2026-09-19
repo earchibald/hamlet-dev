@@ -11,7 +11,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runDays, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod, replayGod } = require('./lib/run');
+const { load } = require('../src/sim');
+const { DAY, runDays, collect, runOn, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod, replayGod } = require('./lib/run');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -105,6 +106,29 @@ for (const seed of SEEDS){
     });
   });
 }
+
+/* The seventh: the snapshot held to the golden record. The world is saved halfway through, loaded into
+   a fresh sim, and run on to day 70. Its story, from the first line to the last, must be the straight
+   run's, which is what the golden line for this seed already holds. It runs the cheapest of the six
+   seeds, and it reads the golden line; it never writes one. A run that is not the default run has no
+   golden line to answer to, so it skips, as the six seeds' own golden test does. */
+const SAVE_SEED = 'x', SAVE_DAY = 35;
+test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells the same story to day ${DEFAULT_DAYS}`,
+  { skip: !isDefault ? 'not the default run' : !golden[SAVE_SEED] ? `no golden line for seed ${SAVE_SEED} yet` : false }, t => {
+  const t0 = Date.now(), half = SAVE_DAY * DAY;
+  const a = load(); a.startWorld(SAVE_SEED);
+  const ca = collect(a); ca.drain(); runOn(a, 0, half, ca);
+  const snap = JSON.parse(JSON.stringify(a.takeSnapshot()));
+  const b = load();
+  assert.equal(b.loadSnapshot(snap), null, 'the save was refused');
+  const cb = collect(b); cb.skipPresent();
+  runOn(b, half, DEFAULT_DAYS * DAY - half, cb);
+  const events = ca.events.concat(cb.events), fp = fingerprint(b, events);
+  t.diagnostic(`${SAVE_SEED}: ${Date.now() - t0} ms, saved on day ${SAVE_DAY}, ${events.length} chronicle lines`);
+  const g = golden[SAVE_SEED];
+  const diffs = Object.keys(fp).filter(k => JSON.stringify(g[k]) !== JSON.stringify(fp[k]));
+  assert.deepEqual(diffs, [], `the world saved on day ${SAVE_DAY} and loaded told another story. The snapshot lost or rebuilt something.`);
+});
 
 test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
   t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);

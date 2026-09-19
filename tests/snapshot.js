@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { load, FILES } = require('../src/sim/index.js');
-const { runDays } = require('./lib/run.js');
+const { runDays, collect, runOn, fingerprint } = require('./lib/run.js');
 
 test('a stream gives the numbers it gave before', () => {
   const api = load(); const f = api.mulberry32(12345);
@@ -136,6 +136,89 @@ test('a world of another size loads into a sim of the default size', () => {
   const small = load(); small.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 3000; i++) small.step();
   const api = load(); api.startWorld('x'); assert.equal(api.loadSnapshot(through(small.takeSnapshot())), null);
   assert.equal(api.W, small.W); for (let i = 0; i < 500; i++) api.step();
+});
+
+/* ---------- the oracle ---------- */
+/* The round trip proves a save can be read back. The oracle proves the save was whole: run N steps,
+   save, load into a fresh sim, and run both worlds on for M more. The loaded world must tell the
+   same story, line for line, and end holding the same snapshot. The last part is the strong one: it
+   compares the streams, the caches, and every record, so a piece of state the save lost shows up
+   here even when the story has not yet noticed it.
+
+   The steps are counted on from the save, not from zero, because the script god reads the loop index. */
+function oracle(seed, N, M, opts = {}, before = null){
+  const a = load(); a.startWorld(seed, opts);
+  const ca = collect(a); ca.drain(); runOn(a, 0, N, ca);
+  const at = before ? before(a, ca, N) : N;
+  const midTask = a.beings.filter(b => b.alive && b.task && b.task.path && b.task.path.length).length;
+  const working = a.beings.filter(b => b.alive && b.task && b.task.progress > 0).length;
+  const denless = a.beings.filter(b => b.alive && b.oldDen && !b.den).length;
+  const snap = through(a.takeSnapshot());
+  const b = load(); assert.equal(b.loadSnapshot(snap), null);
+  const cb = collect(b); cb.skipPresent();
+  const cut = ca.events.length;
+  runOn(a, at, M, ca); runOn(b, at, M, cb);
+  return { a, b, after: ca.events.slice(cut), loaded: cb.events, midTask, working, denless, snap };
+}
+/* What the two worlds must share once both have run on. */
+function sameStory(o){
+  assert.ok(o.midTask > 0 && o.working > 0, 'nobody was walking and nobody was at work at the save; pick another step');
+  assert.deepEqual(o.loaded.map(e => e.text), o.after.map(e => e.text));
+  assert.deepEqual(fingerprint(o.b, o.loaded), fingerprint(o.a, o.after));
+  /* The two snapshots are compared twice: by value, which says what differs, and then as text, which
+     also holds the two worlds to the same key order in every object. */
+  const ja = JSON.stringify(o.a.takeSnapshot()), jb = JSON.stringify(o.b.takeSnapshot());
+  assert.deepStrictEqual(JSON.parse(jb), JSON.parse(ja));
+  assert.ok(jb === ja, 'the two worlds hold the same state, but one writes an object\'s keys in another order');
+}
+/* What each case was picked for is in the comment beside it. The steps are kept as low as the case
+   allows, because each one runs its world once whole and then twice more from the save. */
+const SMALL = { sw: 8, sh: 5 };
+const CASES = [
+  ['r', 12400, 8000, {}],        // one camp founds a second after the load, and a storm rolls in
+  ['x', 12400, 4000, {}],        // another valley, two storms after the load
+  ['gamma', 30300, 2000, {}],    // a grown valley: two camps, huts, and a spear
+  ['alpha', 20000, 3000, SMALL], // a small valley with snares and pitfalls in the ground, and two camps
+];
+for (const [seed, N, M, opts] of CASES)
+  test(`seed ${seed}: saved at step ${N}, loaded, and run on, the story is the straight run's`, t => {
+    const o = oracle(seed, N, M, opts);
+    t.diagnostic(`${seed}: ${o.midTask} walking, ${o.working} at work, ${o.a.camps.length} camps, ${o.after.length} lines after the save`);
+    sameStory(o);
+  });
+
+/* A burning world. Every soak seed has fireCount 0 at the save, so the fire path would go untested:
+   spreadFire walks the surface and then `raised`, and draws from rng for each tile beside a burning
+   one. The woods are lit through the door, before the save, so the loaded world inherits the fire. */
+function lightTheWoods(a, ca, N){
+  const trees = a.world.filter(t => t.feature === 'tree' && t.fire === 0);
+  const high = a.raised.filter(t => t.fire === 0 && (t.feature === 'tree' || t.feature === 'hollow' || t.ground === 'grass'));
+  assert.ok(trees.length > 6 && high.length > 3, 'this world was meant to have woods and tiles off the surface that burn');
+  for (const t of trees.slice(0, 6)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: 0 });
+  for (const t of high.slice(0, 3)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: t.z });
+  runOn(a, N, 60, ca);   // long enough for the fire to spread, short enough that it still burns
+  return N + 60;
+}
+test('a world saved while the woods burn runs on as the straight run does', t => {
+  const o = oracle('r', 6000, 3000, SMALL, lightTheWoods);
+  const alight = lv => lv.filter(t => t && t.fire > 0).length;
+  const offSurface = o.snap.levels.reduce((n, lv, i) => n + (i === o.a.ZOFF ? 0 : alight(lv)), 0);
+  t.diagnostic(`fire at the save: ${o.snap.fireCount} tiles, ${offSurface} of them off the surface; grove anger ${JSON.stringify(o.a.groves.map(g => g.anger))}`);
+  assert.ok(o.snap.fireCount > 0, 'the fire was out before the save');
+  assert.ok(offSurface > 0, 'nothing off the surface was alight, so the raised walk in spreadFire went untested');
+  sameStory(o);
+});
+
+/* A wolf den dug after the load. digDen reads startRegion through rimExits, and startRegion is a Set
+   of about thirty thousand numbers that the save carries whole. A world that digs no den after the
+   load would never touch it. This small valley clears a den at tick 4994 and digs a new one at 7994. */
+test('a world that digs a wolf den after the load runs on as the straight run does', t => {
+  const o = oracle('r', 6000, 2500, SMALL);
+  const dug = o.loaded.filter(e => /dug a new den/.test(e.text));
+  t.diagnostic(`${o.denless} wolves were den-less at the save; after the load: ${dug.map(e => e.text).join(' ')}`);
+  assert.equal(dug.length, 1, 'no den was dug after the load, so startRegion and rimExits went untested');
+  assert.equal(o.b.startRegion.size, o.a.startRegion.size);
+  sameStory(o);
 });
 
 /* The guard: every piece of top-level state is either saved or listed with the reason it is not.
