@@ -75,7 +75,7 @@ TASKS.fetchEmber = { type: 'ember',
     if (pit.fuel <= 0) return 'fail';
     if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
     pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
-    log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major');
+    log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major', 'fire');
     addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
     return 'done';
   }] };
@@ -210,8 +210,8 @@ Object.assign(TASKS, {
       if (t.progress < CLOCK.work.fish) return 'continue';
       if (rng() < Math.min(0.75, 0.22 + a.skills.hunt * 0.06 + a.traits.patience * 0.18)){
         a.carrying = { kind: 'fish', count: 1 }; gainXp(a, 'hunt'); camp.fished++;
-        if (camp.fished === 1) log(`${a.name} lands a fish.`, [a], 'good');
-        else if (camp.fished === 10 || camp.fished === 50 || camp.fished % 100 === 0) log(`${a.name} lands the camp's ${camp.fished}th fish.`, [a], 'good');
+        if (camp.fished === 1) log(`${a.name} lands a fish.`, [a], 'good', 'fish');
+        else if (camp.fished === 10 || camp.fished === 50 || camp.fished % 100 === 0) log(`${a.name} lands the camp's ${camp.fished}th fish.`, [a], 'good', 'fish');
         addThought(a, 'fish', 'Caught a fish', 3, CLOCK.thought.fish); return chain(a, t, startTask(a, 'deliver')) || 'done'; }
       addThought(a, 'nofish', 'Nothing bit', -1, CLOCK.thought.nofish); return 'done';
     }] },
@@ -368,7 +368,7 @@ TASKS.huntDeer = { type: 'hunt',
     const d = beingById(t.args.deer);
     if (!d || !d.alive || ++t.progress > CLOCK.chase.deer + a.skills.hunt * CLOCK.chase.deerPerSkill){ a.carrying = null; addThought(a, 'missed', 'The deer got away', -3, CLOCK.thought.missed); a.xp.hunt = (a.xp.hunt || 0) + 1; return 'fail'; }
     if (near(a, d) <= 2){
-      if (rng() < 0.3 + a.skills.hunt * 0.12){ d.hp = 0; die(d, 'was speared'); a.carrying = null; gainXp(a, 'hunt'); addThought(a, 'kill', 'Brought down a deer', 12, CLOCK.thought.kill); drift(a, 'bravery', 0.02); log(`${a.name} brings down a deer with the spear.`, campHumans(), 'major');
+      if (rng() < 0.3 + a.skills.hunt * 0.12){ d.hp = 0; die(d, 'was speared'); a.carrying = null; gainXp(a, 'hunt'); addThought(a, 'kill', 'Brought down a deer', 12, CLOCK.thought.kill); drift(a, 'bravery', 0.02); log(`${a.name} brings down a deer with the spear.`, campHumans(), 'major', 'deer');
         const it = items.find(i => i.kind === 'venison' && i.x === d.x && i.y === d.y); if (it){ removeItem(it); a.carrying = { kind: 'venison', count: 1 }; return chain(a, t, startTask(a, 'deliver')) || 'done'; } return 'done'; }
       d.skills.wary = Math.min(3, (d.skills.wary || 0) + 1); addThought(d, 'escaped', 'A hunter missed', -6, CLOCK.thought.escaped); failTask(d); startTask(d, 'flee'); t.progress += CLOCK.chase.deerMissed;
     }
@@ -386,7 +386,7 @@ TASKS.driveOff = { type: 'guard',
   stops: [(a, t) => {
     const [px, py] = t.args.at; const w = beingById(t.args.wolf);
     if (!a.carrying){ if (nearAt(a, px, py) > 1) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.guardEmber }; t.label = 'Running at the wolf with fire'; }
-    if (!w || !w.alive || nearAt(w, ...camp.pit) > 22 || ++t.progress > CLOCK.chase.guard){ a.carrying = null; if (w && w.alive && nearAt(w, ...camp.pit) > 22){ if (tick - camp.guardLogged > CLOCK.cooldown.guardLine){ camp.guardLogged = tick; log(`${a.name} chases the wolf off into the dark with a burning branch.`, campHumans(), 'good'); } addThought(a, 'brave', 'Drove off a wolf', 8, CLOCK.thought.brave); drift(a, 'bravery', 0.03); for (const h of campHumans()) if (h !== a) addThought(h, 'guarded', `${a.name} drove off a wolf`, 4, CLOCK.thought.guarded); } return 'done'; }
+    if (!w || !w.alive || nearAt(w, ...camp.pit) > 22 || ++t.progress > CLOCK.chase.guard){ a.carrying = null; if (w && w.alive && nearAt(w, ...camp.pit) > 22){ if (tick - camp.guardLogged > CLOCK.cooldown.guardLine){ camp.guardLogged = tick; log(`${a.name} chases the wolf off into the dark with a burning branch.`, campHumans(), 'good', 'wolf'); } addThought(a, 'brave', 'Drove off a wolf', 8, CLOCK.thought.brave); drift(a, 'bravery', 0.03); for (const h of campHumans()) if (h !== a) addThought(h, 'guarded', `${a.name} drove off a wolf`, 4, CLOCK.thought.guarded); } return 'done'; }
     if (near(a, w) <= 2){ addThought(w, 'burned', 'A human came at me with fire', -20, CLOCK.thought.burnedWolf); w.cooldown.raid = tick + CLOCK.cooldown.wolfBurned; w.cooldown.wander = tick + CLOCK.cooldown.wolfWanders; w.shyOf = camp; failTask(w); startTask(w, 'flee'); }
     const q = bfs(a.x, a.y, a.z, (x, y, z) => z === w.z && dist(x, y, w.x, w.y) <= 2, 500, a); if (!q) return 'continue'; t.path = q.slice(0, 3); return 'continue';
   }],
@@ -506,7 +506,7 @@ TASKS.clearDen = { type: 'guard',
       }
     }
     c.cleared = camp; c.clearedAt = tick; c.story.push(`${camp.name} drove the ${c.owner === 'wolf' ? 'wolves' : 'foxes'} out with fire.`);
-    log(`${a.name} and ${mate.name} drive the ${c.owner === 'wolf' ? 'wolves' : 'foxes'} from the den with fire and the spear.`, campHumans(), 'major');
+    log(`${a.name} and ${mate.name} drive the ${c.owner === 'wolf' ? 'wolves' : 'foxes'} from the den with fire and the spear.`, campHumans(), 'major', 'wolf');
     addThought(a, 'cleared', 'Drove the beasts out of their den', 10, CLOCK.thought.cleared); addThought(mate, 'cleared', 'Stood with a brand at the den', 8, CLOCK.thought.cleared); drift(a, 'bravery', 0.04); drift(mate, 'bravery', 0.02);
     const [sx, sy] = camp.stashTile;
     const mq = pathToStop(mate, sx, sy, 1);

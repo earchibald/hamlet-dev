@@ -452,10 +452,12 @@ test('the valley takes its name from the lore, at forty', () => {
 
 /* ---------- the held hooks: what the real loop does ---------- */
 
-/* One 70-day run on seed r, shared by every test below that needs a whole season of play.
-   A run of that length costs about twenty seconds, so it is made once and kept. */
+/* One 70-day run, shared by every test below that needs a whole season of play. A run of that
+   length costs about twenty seconds, so it is made once and kept. Seed alpha is the one of the
+   six that reaches every tag: it drives wolves off, it meets the sprites, it spears deer, it
+   fishes, and it fires pots. Seed r never sees a wolf in seventy days. */
 let RUN70 = null;
-const run70 = () => RUN70 || (RUN70 = runDays('r', 70));
+const run70 = () => RUN70 || (RUN70 = runDays('alpha', 70));
 
 test('a death stamps the tick and carries a tag the event table can read', () => {
   const api = world();

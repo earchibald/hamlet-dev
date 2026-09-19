@@ -31,7 +31,7 @@ const RECIPES = [
   { id: 'kiln', title: 'Build the kiln', stage: 'crafts', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: strides(120), makes: { struct: 'kiln' }, score: 42,
     verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
   { id: 'pot', title: 'Fire pots', stage: 'crafts', after: 'kiln', needs: { clay: 3, stick: 2 }, place: 'kiln', skill: 'craft', work: strides(50), makes: { item: 'pot', n: 1 }, counts: 'fired', standing: { stash: 'pot', n: 3 }, score: 38,
-    verb: 'fires', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
+    verb: 'fires', tag: 'pot', blurb: 'Three lumps of clay and two sticks a firing. Each pot holds six more drinks at camp, and with a pot berries keep twice as long.' },
   { id: 'garden', title: 'Plant a garden', stage: 'crafts', after: 'axe', needs: { cuttings: 4 }, tools: ['axe'], place: 'garden', skill: 'gather', work: strides(80), makes: { garden: true }, score: 36,
     verb: 'plants', done: 'Four bushes by the fire, grown from cuttings. They grow berries like any bush, and feed rabbits like any bush.', blurb: 'Four cuttings from wild bushes, planted on open ground near the fire. Berries close to home. A garden that burns or dies is planted again.' },
   { id: 'pitfall', title: 'Dig a deer pit', stage: 'crafts', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: strides(90), makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 34,
@@ -148,7 +148,7 @@ TASKS.craft = workKind({
     takeNeeds(r.needs);
     if (r.skill) gainXp(a, r.skill);
     if (result !== 'logged')
-      log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${r.makes.n > 1 ? ITEMS[r.makes.item].plural : ITEMS[r.makes.item].name}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
+      log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${r.makes.n > 1 ? ITEMS[r.makes.item].plural : ITEMS[r.makes.item].name}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info', r.tag || null);
   }
 });
 /* The recipe goals sit on the panel after the hand-written ladder and before the standing wolf guard.

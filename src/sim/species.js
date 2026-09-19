@@ -63,7 +63,7 @@ Object.assign(TASKS, {
       const g = goTo(a, t, sx, sy, 1); if (g) return g;
       const prev = camp; camp = c;
       const k = c.stash.carcass > 0 ? 'carcass' : c.stash.fish > 0 ? 'fish' : c.stash.cooked > 0 ? 'cooked' : c.stash.smoked > 0 ? 'smoked' : null;
-      if (k){ stashTake(k); a.needs.food = 100; a.cooldown.raid = tick + CLOCK.cooldown.raid; if (tick - c.wolfLogged > CLOCK.cooldown.wolfLine){ c.wolfLogged = tick; log(`A wolf slips into the dark camp and takes the ${ITEMS[k].name} from the stash.`, campHumans(), 'bad'); } for (const h of campHumans()) addThought(h, 'wolf', 'A wolf came into camp in the night', -12, CLOCK.thought.wolf); }
+      if (k){ stashTake(k); a.needs.food = 100; a.cooldown.raid = tick + CLOCK.cooldown.raid; if (tick - c.wolfLogged > CLOCK.cooldown.wolfLine){ c.wolfLogged = tick; log(`A wolf slips into the dark camp and takes the ${ITEMS[k].name} from the stash.`, campHumans(), 'bad', 'wolf'); } for (const h of campHumans()) addThought(h, 'wolf', 'A wolf came into camp in the night', -12, CLOCK.thought.wolf); }
       camp = prev; return 'done';
     }] },
   stalk: { type: 'stalk',
@@ -77,7 +77,7 @@ Object.assign(TASKS, {
     stops: [(a, t) => {
       const h = beingById(t.args.who);
       if (!h || !h.alive || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
+      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
       const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
     }] },
   herd: { type: 'wander',
