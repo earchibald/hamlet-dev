@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const { runDays, scriptGod, replayGod, fingerprint } = require('./lib/run');
+const { runDays, runOn, collect, scriptGod, replayGod, fingerprint } = require('./lib/run');
 
 test('an unknown act or source is refused and not logged', () => {
   const api = load(); api.startWorld('r');
@@ -162,4 +162,69 @@ test('an event that carries a tick must arrive at that tick', () => {
   assert.deepEqual(api.doorLog, []);
   assert.match(api.inject({ source: 'player', act: 'poke', id: a.id, tick: api.tick }), new RegExp(`^${a.name} looks up, then (goes to .+|gets to it)\\.$`));
   assert.deepEqual(api.doorLog, [{ source: 'player', act: 'poke', id: a.id, tick: api.tick }]);
+});
+
+test('a load through the door puts the saved world in place, and logs one bare entry at the new tick', () => {
+  const rec = runDays('r', 4, null, scriptGod);
+  const snap = JSON.parse(JSON.stringify(rec.api.takeSnapshot()));
+
+  const api = load(); api.startWorld('x');
+  const msg = api.inject({ source: 'player', act: 'load', snapshot: snap });
+  assert.equal(msg, `The world is as it was on day ${rec.api.dayOf()}.`);
+  assert.equal(api.tick, rec.api.tick);
+  assert.equal(api.beings.length, rec.api.beings.length);
+  assert.deepEqual(api.doorLog, [...snap.doorLog, { source: 'player', act: 'load', tick: api.tick }]);
+});
+
+test('a refused load leaves the state and the log untouched', () => {
+  const api = load(); api.startWorld('r');
+  api.inject({ source: 'player', act: 'poke', id: api.firstPerson().id });
+  const before = JSON.stringify(api.takeSnapshot()), beforeLog = JSON.stringify(api.doorLog), tickBefore = api.tick;
+  const msg = api.inject({ source: 'player', act: 'load', snapshot: {} });
+  assert.equal(typeof msg, 'string');
+  assert.notEqual(msg, 'The world is as it was on day 1.');
+  assert.equal(JSON.stringify(api.takeSnapshot()), before);
+  assert.equal(JSON.stringify(api.doorLog), beforeLog);
+  assert.equal(api.tick, tickBefore);
+});
+
+test('a load from an unknown source is refused as every act is', () => {
+  const rec = runDays('r', 4, null, scriptGod);
+  const snap = JSON.parse(JSON.stringify(rec.api.takeSnapshot()));
+  const api = load(); api.startWorld('x');
+  assert.equal(api.inject({ source: 'weather', act: 'load', snapshot: snap }), 'Nothing answers.');
+  assert.deepEqual(api.doorLog, []);
+});
+
+test('a story with a load in it replays: the load passes through inject, and a replay run tells the same story without sending it to the door', () => {
+  const SAVE_STEP = 9000, TOTAL_STEP = 14000;
+
+  const rec = runDays('r', SAVE_STEP / 1000, null, scriptGod);
+  const cut = rec.events.length;
+  const snap = JSON.parse(JSON.stringify(rec.api.takeSnapshot()));
+
+  const b = load(); b.startWorld('x');
+  assert.equal(b.inject({ source: 'player', act: 'load', snapshot: snap }), `The world is as it was on day ${b.dayOf()}.`);
+  assert.deepEqual(b.doorLog, [...snap.doorLog, { source: 'player', act: 'load', tick: b.tick }]);
+
+  const cb = collect(b); cb.skipPresent();
+  runOn(b, SAVE_STEP, TOTAL_STEP - SAVE_STEP, cb, scriptGod);
+
+  const replay = b.replay;
+  assert.equal(replay.seed, 'r');
+  assert.equal(replay.log.filter(e => e.act === 'load').length, 1);
+
+  /* A fresh sim replays the whole merged log from tick 0. `inject` is watched, so a `load` entry
+     that slipped past `logGod` and reached the door would be caught here, not only by a mismatched
+     fingerprint. */
+  const c = load(); c.startWorld(replay.seed, replay.options);
+  let loadSentToDoor = false;
+  const realInject = c.inject;
+  c.inject = e => { if (e.act === 'load') loadSentToDoor = true; return realInject(e); };
+  const cc = collect(c); cc.drain();
+  const rg = replayGod(replay);
+  for (let i = 0; i < TOTAL_STEP; i++){ c.step(); rg(c); cc.drain(); }
+
+  assert.equal(loadSentToDoor, false, 'the replay sent the load entry to the door');
+  assert.deepEqual(fingerprint(b, cb.events), fingerprint(c, cc.events.slice(cut)));
 });

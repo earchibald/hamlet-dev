@@ -13,10 +13,11 @@ function scriptGod(api, i){
 }
 /* A god that replays a log: every event goes through the door at its own tick, in order, and nothing
    else happens. The door refuses an event that arrives at the wrong tick, so an event this god has
-   let slip past is an error here, never a silent drop. */
+   let slip past is an error here, never a silent drop. A `load` entry is passed over: it carries no
+   snapshot of its own, and a replay tells the saved world's story by stepping through, not by loading. */
 function logGod(log){
   let k = 0;
-  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
+  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.act === 'load') continue; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
 }
 /* A god built from a replay record ({ seed, options, log }): replays its log. Meant to be used with
    runDays(replay.seed, days, onTick, replayGod(replay), replay.options), so a seed, its options,
