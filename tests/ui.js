@@ -791,4 +791,191 @@ test('a folded stage names its idle goals, and says nothing more when it is unfo
   assert.equal(api.foldLine({ idleTitles: ['Stock food'] }, true), '', 'an unfolded stage shows the rows themselves');
 });
 
+/* ---------- the ages in motion ----------
+   The tween's four pure functions, and the drawing itself run in Node over a recording canvas. Five of the
+   gesture kinds never fire on the seeds tests/ages.js runs, so every kind is drawn from a record built here. */
+
+const TWEENS = ['tweenTier', 'gestureSlice', 'pointAt', 'lineSoFar', 'TWEEN', 'AGE_MS', 'SPEEDS'];
+
+test('the tiers of the tween come off the length in milliseconds, in order down the pace ladder', () => {
+  const api = loadUI(['state', 'derive'], TWEENS);
+  assert.deepEqual(api.SPEEDS.map(p => api.tweenTier(api.AGE_MS / p)), ['full', 'figure', 'walk', 'none']);
+  /* Each tier holds from its own length up to the next. */
+  assert.equal(api.tweenTier(api.TWEEN.full), 'full');
+  assert.equal(api.tweenTier(api.TWEEN.full - 1), 'figure');
+  assert.equal(api.tweenTier(api.TWEEN.figure), 'figure');
+  assert.equal(api.tweenTier(api.TWEEN.figure - 1), 'walk');
+  assert.equal(api.tweenTier(api.TWEEN.walk), 'walk');
+  assert.equal(api.tweenTier(api.TWEEN.walk - 1), 'none');
+  assert.equal(api.tweenTier(0), 'none');
+});
+
+test('every gesture of an age has a slice inside the tween, and every slice ends with it', () => {
+  const api = loadUI(['state', 'derive'], TWEENS);
+  for (const n of [1, 2, 3, 7, 10]){
+    for (let i = 0; i < n; i++){
+      assert.equal(api.gestureSlice(i, n, 0), 0, `gesture ${i} of ${n} has run before the tween began`);
+      assert.equal(api.gestureSlice(i, n, 1), 1, `gesture ${i} of ${n} does not finish with the tween`);
+      for (const f of [-1, 0.1, 0.25, 0.5, 0.9, 2]){
+        const s = api.gestureSlice(i, n, f);
+        assert.ok(s >= 0 && s <= 1, `slice ${s} of gesture ${i} of ${n} at ${f} is outside the tween`);
+      }
+    }
+    /* The starts are staggered, in the order the gods acted, over no more than a third of the tween. */
+    const run = [];
+    for (let i = 0; i < n; i++) run.push(api.gestureSlice(i, n, 0.5));
+    for (let i = 1; i < n; i++) assert.ok(run[i] < run[i - 1], `gesture ${i} of ${n} does not follow the one before it`);
+    assert.ok(api.gestureSlice(n - 1, n, api.TWEEN.stagger) >= 0, 'the last gesture has started by the end of the stagger');
+  }
+});
+
+test('a walk and a stroke give their ends, and a gesture with no anchor draws nothing', () => {
+  const api = loadUI(['state', 'derive'], TWEENS); api.startCreation('r');
+  const a = 0, b = 5 * api.W + 3;
+  assert.deepEqual(api.pointAt(a, b, 0), { x: 0, y: 0 });
+  assert.deepEqual(api.pointAt(a, b, 1), { x: 3, y: 5 });
+  assert.deepEqual(api.pointAt(a, b, 0.5), { x: 1.5, y: 2.5 });
+  assert.deepEqual(api.pointAt(a, b, -3), { x: 0, y: 0 }, 'a fraction below zero holds at the start');
+  assert.deepEqual(api.pointAt(a, b, 9), { x: 3, y: 5 }, 'a fraction above one holds at the end');
+  /* A birth has no `from`: the star is already where it belongs. */
+  assert.deepEqual(api.pointAt(null, b, 0), { x: 3, y: 5 });
+  assert.equal(api.pointAt(a, null, 1), null);
+  const line = [1, 2, 3, 4];
+  assert.deepEqual(api.lineSoFar(line, 0), []);
+  assert.deepEqual(api.lineSoFar(line, 1), line);
+  assert.deepEqual(api.lineSoFar(line, 0.5), [1, 2]);
+  assert.deepEqual(api.lineSoFar([], 1), []);
+  assert.deepEqual(api.lineSoFar(null, 1), []);
+  assert.deepEqual(line, [1, 2, 3, 4], 'the record is not touched');
+});
+
+/* A canvas that draws nothing and keeps the list of what it was asked to draw. */
+function recordCtx(){
+  const calls = [];
+  const note = name => (...a) => { calls.push(name); return a; };
+  const c = { calls, measureText: () => ({ width: 40 }) };
+  for (const k of ['setTransform', 'clearRect', 'fillRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = note(k);
+  for (const k of ['fillStyle', 'strokeStyle', 'globalAlpha', 'lineWidth', 'font', 'textAlign', 'textBaseline']) Object.defineProperty(c, k, { set(v){ /* ink is not drawing */ }, get(){ return ''; } });
+  return c;
+}
+/* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
+function fieldRig(seed, ages){
+  const api = loadUI(['state', 'derive', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', ...TWEENS], {
+    setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; }',
+    setPace: '(v) => { pace = v; }',
+    setAcc: '(v) => { acc = v; }',
+  });
+  const P = {};
+  for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
+  const wctx = recordCtx(), octx = recordCtx();
+  const ocv = { width: 100, height: 100, getContext: () => octx };
+  global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => recordCtx() }), querySelector: () => null };
+  api.startCreation(seed);
+  for (let k = 0; k < ages && api.era === 'gods'; k++) api.step();
+  api.setUp({ wctx, ocv, octx, P });
+  /* One draw fills the cache, and one age follows it, so the next draw has a field to fade from. That is
+     what a running page does: the first age of a world snaps, and every age after it tweens. */
+  api.drawField(); api.step();
+  return { api, wctx };
+}
+
+test('the field draws every gesture kind, including the five no seed makes, and touches no rule', () => {
+  const { api, wctx } = fieldRig('r', 6);
+  const live = api.liveRegions(), r = live[0], other = live[1] || live[0];
+  const [a, b] = api.gods();
+  const head = { god: a.id, age: api.age, from: r.tiles[0], to: r.tiles[r.tiles.length >> 1], said: null, weighed: null };
+  const rows = [
+    { ...head, kind: 'split', near: r.id, far: other.id, line: r.tiles.slice(0, 8), pole: a.pole, other: b ? b.pole : a.pole },
+    { ...head, kind: 'claim', region: r.id, pole: a.pole },
+    { ...head, kind: 'make', region: r.id, species: 'rabbit' },
+    { ...head, kind: 'raise', region: r.id, step: 1, of: 2, value: 1 },
+    { ...head, kind: 'dig', region: r.id, step: 1, of: 2, value: 1 },
+    { ...head, kind: 'flow', path: [r.tiles[0], other.tiles[0], r.tiles[1]] },
+    { ...head, kind: 'pool', region: r.id, under: false },
+    { ...head, kind: 'burn', region: r.id },
+    { ...head, kind: 'wash', region: r.id, value: 'freeze' },
+    { ...head, kind: 'wash', region: r.id, value: 'hide' },
+    { ...head, kind: 'wash', region: r.id, value: 'show' },
+    { ...head, kind: 'battle', region: r.id, other: b ? b.id : a.id, otherFrom: other.tiles[0], winner: b ? b.id : a.id, loser: a.id, scar: 'burned' },
+    { ...head, kind: 'twist', region: r.id, species: 'rabbit' },
+    { ...head, kind: 'mingle', region: r.id, with: b ? b.id : a.id, otherFrom: other.tiles[0] },
+    { ...head, kind: 'sleep', region: r.id, body: 'hill' },
+    { ...head, kind: 'born', region: r.id, pole: a.pole, from: null },
+    { ...head, kind: 'unmade', region: r.id },
+    { ...head, kind: 'backstop', region: r.id, lack: 'dry' },
+  ];
+  /* The five kinds no seed of tests/ages.js reaches are drawn here, from a record built by hand. */
+  for (const k of ['burn', 'battle', 'twist', 'unmade', 'backstop']) assert.ok(rows.some(rec => rec.kind === k), `${k} is not in the record`);
+  const state = () => JSON.stringify({ gods: api.gods().map(g => [g.id, g.at, g.region]), legends: api.legends.length, ages: api.creation.ages });
+  const before = state();
+  for (const rec of rows){
+    api.creation.gestures.length = 0; api.creation.gestures.push(rec);
+    for (const f of [0, 0.2, 0.5, 0.8, 1]){
+      api.setAcc(f);
+      wctx.calls.length = 0;
+      assert.doesNotThrow(() => api.drawField(), `${rec.kind} at ${f}`);
+      assert.ok(wctx.calls.length > 0, `${rec.kind} at ${f} drew nothing at all`);
+    }
+  }
+  assert.equal(state(), before, 'the drawing changed the rules');
+});
+
+test('a gesture with a line and a decision draws more than one without them', () => {
+  const { api, wctx } = fieldRig('r', 6);
+  const live = api.liveRegions(), r = live[0], g = api.gods()[0];
+  const head = { god: g.id, age: api.age, from: r.tiles[0], to: r.tiles[2], said: null, weighed: null, region: r.id, pole: g.pole };
+  const count = rec => { api.creation.gestures.length = 0; api.creation.gestures.push(rec); api.setAcc(0.15); wctx.calls.length = 0; api.drawField(); return wctx.calls.length; };
+  const plain = count({ ...head, kind: 'claim' });
+  const said = count({ ...head, kind: 'claim', said: 0 });
+  assert.ok(api.legends[0], 'the creation wrote no legend to caption');
+  assert.ok(said > plain, 'a line that was written prints no caption');
+  const weighed = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
+  assert.ok(weighed > plain, 'a decision shows no intent cue at the slow tier');
+  /* The cue is the first thing dropped as the pace rises. */
+  api.setPace(4);
+  const fast = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
+  const fastPlain = count({ ...head, kind: 'claim' });
+  assert.equal(fast, fastPlain, 'the intent cue still draws below the slow tier');
+});
+
+test('at the fastest pace the field is the picture it was, and no gesture draws', () => {
+  const { api, wctx } = fieldRig('x', 6);
+  const r = api.liveRegions()[0], g = api.gods()[0];
+  const rec = { kind: 'claim', god: g.id, age: api.age, from: r.tiles[0], to: r.tiles[1], said: null, weighed: null, region: r.id, pole: g.pole };
+  api.setPace(64); api.setAcc(0.5);
+  api.creation.gestures.length = 0;
+  wctx.calls.length = 0; api.drawField();
+  const quiet = wctx.calls.join(',');
+  api.creation.gestures.push(rec);
+  wctx.calls.length = 0; api.drawField();
+  assert.equal(wctx.calls.join(','), quiet, 'a gesture drew something at the fastest pace');
+  /* One image, not two: at this pace there is no cross-fade. */
+  assert.equal(wctx.calls.filter(c => c === 'drawImage').length, 1);
+  /* At the slowest pace the same age draws the field as it was, and the new one over it. */
+  api.setPace(1); api.setAcc(0.5);
+  wctx.calls.length = 0; api.drawField();
+  assert.ok(wctx.calls.filter(c => c === 'drawImage').length >= 2, 'no cross-fade at the slow pace');
+  /* A frame that ran two or more ages has nothing to fade from, so it snaps. */
+  api.step(); api.step(); api.setAcc(0.5);
+  wctx.calls.length = 0; api.drawField();
+  assert.equal(wctx.calls.filter(c => c === 'drawImage').length, 1, 'a frame that ran two ages faded');
+});
+
+test('a god stands on a tile of a live country, so its star is drawn on the ground it holds', () => {
+  const api = loadUI(['state', 'derive'], ['standsIn']);
+  api.startCreation('beta');
+  let guard = 0;
+  while (api.era === 'gods' && guard++ < 40){
+    api.step();
+    if (api.era !== 'gods') break;
+    for (const g of api.gods()){
+      if (g.status === 'dead' || g.at === null || g.at === undefined) continue;
+      if (!api.standsIn(g)) continue;
+      /* An act may leave a god on a neighbour of its own country; settleHome walks it home at the head of
+         the next age. Either way the anchor is a real tile of a country that is still live. */
+      assert.ok(api.liveRegions().some(q => q.tiles.includes(g.at)), `${g.name} stands on no live country in age ${api.age}`);
+    }
+  }
+});
+
 module.exports = { loadUI };

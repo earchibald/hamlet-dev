@@ -4256,8 +4256,15 @@ let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', wor
 /* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
 const AGE_MS = 2000;
+/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
+   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
+/* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
+   field and the new one over it, so only the countries that changed appear to change. */
+let ocv2, octx2, fieldAge = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -4345,6 +4352,40 @@ function godRows(){
 function agesDue(acc, dt, pace){
   const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
+}
+
+/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+   They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
+
+/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
+   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+   caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
+function tweenTier(ms){
+  if (ms >= TWEEN.full) return 'full';
+  if (ms >= TWEEN.figure) return 'figure';
+  if (ms >= TWEEN.walk) return 'walk';
+  return 'none';
+}
+/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
+   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
+   the order is the chronicle's order, and the last one still finishes. */
+function gestureSlice(i, n, f){
+  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
+  return clamp((f - start) / (1 - start), 0, 1);
+}
+/* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
+   is nowhere to draw, and with no `from` the star is already where it belongs. */
+function pointAt(from, to, f){
+  if (to === null || to === undefined) return null;
+  const bx = to % W, b = { x: bx, y: (to - bx) / W };
+  if (from === null || from === undefined) return b;
+  const ax = from % W, a = { x: ax, y: (from - ax) / W }, t = clamp(f, 0, 1);
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+/* How much of a line is stroked. Nothing at 0, the whole line at 1. */
+function lineSoFar(line, f){
+  if (!line || !line.length) return [];
+  return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
 /* The mean of a list of #rrggbb colours, as rgb(). */
@@ -4805,42 +4846,225 @@ function drawWorldCache(){
 /* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
 /* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
-function drawBoundaries(g, alpha){
+function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
+    if (skip && skip.has(b.id)) continue;
     g.fillStyle = P[BOUNDARY_INK[b.pole] || 'field-line']; g.globalAlpha = BOUNDARY_INK[b.pole] ? 1 : alpha;
     for (const i of b.tiles){ const x = i % W, y = (i - x) / W; g.fillRect(x * WS, y * WS, WS, WS); }
   }
   g.globalAlpha = 1;
 }
-function drawFieldCache(){
+/* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+function drawFieldCache(skip = null){
   octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.clearRect(0, 0, ocv.width, ocv.height);
   for (const r of liveRegions()){
     octx.fillStyle = fieldColor(r, P);
     for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
     if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
   }
-  drawBoundaries(octx, 0.7);
+  drawBoundaries(octx, 0.7, skip);
 }
-function drawField(){
-  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
-  if (key !== fieldKey){ drawFieldCache(); fieldKey = key; }
-  wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.drawImage(ocv, 0, 0);
-  /* A god has no tile in the ages. It is drawn in the middle of the country it stands in. Gods that share a country stand side by side. */
-  const at = new Map();
-  for (const g of gods()){ if (g.status === 'dead') continue; const r = standsIn(g); if (!r) continue; if (!at.has(r.id)) at.set(r.id, []); at.get(r.id).push(g); }
-  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
-  for (const [id, list] of at){
-    const b = regionById(id).bbox, cx = (b.x0 + b.x1 + 1) / 2 * WS, cy = (b.y0 + b.y1 + 1) / 2 * WS;
-    list.forEach((g, k) => {
-      const x = cx + (k - (list.length - 1) / 2) * 46;
-      wctx.globalAlpha = g.status === 'awake' ? 1 : 0.55;
-      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
-      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, x, cy); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, x, cy);
-      wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
-      wctx.strokeText(g.name, x, cy + 14); wctx.fillStyle = P.select; wctx.fillText(g.name, x, cy + 14);
-    });
+
+/* ---- the ages in motion ----
+   An age is one step of the rules, so the state is already the new state when the tween begins. The view
+   holds the field as it was, fades the new one in over it, and draws each god's gesture across the same
+   fraction. The clock is `acc`, which main.js already keeps: the tween is a function of that fraction and
+   not of elapsed frames, so a tab that slept wakes and the drawing jumps with the state. */
+
+/* Where each god's star was left when the last age ended. An act often leaves a god on a neighbour of its
+   own country, and settleHome walks it home at the head of the next age. The record then begins somewhere
+   the star is not, so the star walks home first and walks out after. */
+let godLast = new Map(), godEnds = new Map();
+const tweenEase = f => f * f * (3 - 2 * f);
+const tileSpot = i => i === null || i === undefined ? null : { x: (i % W + 0.5) * WS, y: ((i - i % W) / W + 0.5) * WS };
+const spotOf = p => p ? { x: (p.x + 0.5) * WS, y: (p.y + 0.5) * WS } : null;
+function tweenRing(p, r, ink, alpha, width = 2){
+  if (!p) return;
+  wctx.globalAlpha = clamp(alpha, 0, 1); wctx.strokeStyle = ink; wctx.lineWidth = width;
+  wctx.beginPath(); wctx.arc(p.x, p.y, Math.max(1, r), 0, 7); wctx.stroke(); wctx.globalAlpha = 1;
+}
+/* A wash that spreads from the anchor over the country it acts on, by steps away from that tile. */
+function washTiles(rec, f, ink, alpha, hatch){
+  const r = rec.region === null || rec.region === undefined ? null : regionById(rec.region); if (!r || rec.to === null) return;
+  const ax = rec.to % W, ay = (rec.to - ax) / W;
+  let far = 1;
+  for (const i of r.tiles){ const x = i % W, d = Math.abs(x - ax) + Math.abs((i - x) / W - ay); if (d > far) far = d; }
+  const reach = far * f;
+  wctx.globalAlpha = alpha; wctx.fillStyle = ink;
+  for (const i of r.tiles){
+    const x = i % W, y = (i - x) / W;
+    if (hatch && (x + y) % 4 !== 0) continue;
+    if (Math.abs(x - ax) + Math.abs(y - ay) <= reach) wctx.fillRect(x * WS, y * WS, WS, WS);
   }
   wctx.globalAlpha = 1;
+}
+/* The three washes are one gesture kind and differ by the ink they use. */
+const WASH_INK = { freeze: 'field-cold', hide: 'field-dark', show: 'field-light' };
+/* Where a god's star stands while its gesture runs. The walk home takes the first part of the slice, and
+   only when the record begins somewhere the star was not left. */
+function walkPoint(rec, f){
+  const was = godLast.has(rec.god) ? godLast.get(rec.god) : rec.from;
+  if (was === null || was === undefined || rec.from === null || was === rec.from) return pointAt(rec.from, rec.to, f);
+  const home = 0.35;
+  return f < home ? pointAt(was, rec.from, f / home) : pointAt(rec.from, rec.to, (f - home) / (1 - home));
+}
+/* One gesture's own figure, at the fraction of its slice that has run. */
+function drawGesture(rec, f){
+  const q = tileSpot(rec.to), e = tweenEase(f);
+  if (rec.kind === 'split'){
+    /* Over the twenty-four seeds of tests/ages.js no cut leaves a gap of more than two tiles, so the sorted
+       line reads as one stroke and is drawn as one. */
+    wctx.fillStyle = P['field-line'];
+    for (const i of lineSoFar(rec.line, e)){ const x = i % W, y = (i - x) / W; wctx.fillRect(x * WS, y * WS, WS, WS); }
+    return;
+  }
+  if (rec.kind === 'flow'){
+    /* Two flows in five run between countries that do not lie in a straight line, so a line from anchor to
+       anchor would cross a country the water never entered. Each country lights in turn instead. */
+    const n = rec.path.length;
+    rec.path.forEach((i, k) => { const s = clamp(e * n - k, 0, 1); if (s > 0) tweenRing(tileSpot(i), 3 + 16 * s, P['field-wet'], 1 - s * 0.5, 2); });
+    return;
+  }
+  if (!q) return;
+  if (rec.kind === 'claim') tweenRing(q, 4 + 26 * e, P['field-' + rec.pole] || P.select, 1 - e, 2);
+  else if (rec.kind === 'make' || rec.kind === 'twist'){
+    const sp = SPECIES[rec.species];
+    wctx.save(); wctx.translate(q.x, q.y - 16 * (1 - e)); if (rec.kind === 'twist') wctx.rotate((1 - e) * 0.9);
+    wctx.globalAlpha = e; wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+    wctx.font = '700 16px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(sp.glyph, 0, 0);
+    wctx.fillStyle = rec.kind === 'twist' ? P['field-scar'] : P.sprite; wctx.fillText(sp.glyph, 0, 0);
+    wctx.restore(); wctx.globalAlpha = 1;
+  }
+  else if (rec.kind === 'raise') tweenRing(q, 3 + 24 * e, P['field-above'], 1 - e, 2);
+  else if (rec.kind === 'dig') tweenRing(q, 27 - 24 * e, P['field-below'], 1 - e, 2);
+  else if (rec.kind === 'pool') tweenRing(q, 3 + 18 * e, P['field-wet'], 1, 2);
+  else if (rec.kind === 'burn') washTiles(rec, e, P['field-scar'], 1, true);
+  else if (rec.kind === 'wash') washTiles(rec, e, P[WASH_INK[rec.value]] || P['field-line'], 0.5, false);
+  else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
+  else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
+}
+/* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
+   stay whole, and it is trimmed only when even two rows will not hold it. */
+function drawCaption(text, p){
+  if (!p) return;
+  const per = Math.max(24, Math.floor((W * WS - 24) / 7)), rows = [];
+  let rest = String(text);
+  while (rest.length && rows.length < 2){
+    if (rest.length <= per){ rows.push(rest); rest = ''; break; }
+    let cut = rest.lastIndexOf(' ', per); if (cut < per * 0.6) cut = per;
+    rows.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+  }
+  if (!rows.length) return;
+  if (rest) rows[rows.length - 1] = rows[rows.length - 1].slice(0, per - 1) + '…';
+  wctx.font = '500 11px "JetBrains Mono", ui-monospace, Menlo, monospace';
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  let w = 0; for (const t of rows) w = Math.max(w, wctx.measureText(t).width + 10);
+  const h = rows.length * 14 + 4;
+  const x = clamp(p.x, w / 2 + 2, W * WS - w / 2 - 2), y = clamp(p.y + 30, h / 2 + 2, H * WS - h / 2 - 2);
+  wctx.globalAlpha = 0.75; wctx.fillStyle = P.void; wctx.fillRect(x - w / 2, y - h / 2, w, h); wctx.globalAlpha = 1;
+  wctx.fillStyle = P.select;
+  rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
+}
+function drawField(){
+  const span = AGE_MS / pace, tier = tweenTier(span);
+  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
+  if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
+  if (key !== fieldKey){
+    /* The field last drawn becomes the field the new one fades in over. A new world, a thrown-back valley,
+       and a frame that ran two or more ages have nothing to fade from, so they snap. */
+    fieldJump = !fieldKey || creation.discards !== fieldDiscards || age !== fieldAge + 1;
+    if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
+    godLast = godEnds; godEnds = new Map();
+    fieldKey = key; fieldAge = age; fieldDiscards = creation.discards; fieldSkip = null;
+  }
+  /* A paused world and a world behind a dialog hold still, so the tween holds at its end and nothing sits
+     half drawn. The two fastest tiers, and a jump, are the same case. */
+  const still = paused || anyDialogOpen();
+  const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  const slices = recs.map((rec, i) => gestureSlice(i, recs.length, f));
+  const figures = f < 1 && (tier === 'full' || tier === 'figure');
+
+  /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
+  const skip = new Set();
+  if (figures) recs.forEach((rec, i) => {
+    if (rec.kind !== 'split' || slices[i] >= 1) return;
+    const b = boundaries.find(q => q.a === rec.near && q.b === rec.far); if (b) skip.add(b.id);
+  });
+  const skipKey = [...skip].sort().join(',');
+  if (skipKey !== fieldSkip){ drawFieldCache(skip); fieldSkip = skipKey; }
+
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (f < 1){ wctx.drawImage(ocv2, 0, 0); wctx.globalAlpha = tweenEase(f); wctx.drawImage(ocv, 0, 0); wctx.globalAlpha = 1; }
+  else wctx.drawImage(ocv, 0, 0);
+
+  /* The intent cue: what the god weighed before it acted, at the slow tier and in the first part of the
+     gesture's own slice. It replays a decision already taken; it does not ask the rules to look ahead. */
+  if (tier === 'full' && f < 1) recs.forEach((rec, i) => {
+    const s = slices[i]; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
+    const fade = (1 - s / TWEEN.cue) * 0.7;
+    for (const o of rec.weighed.opts){
+      const r = regionById(o.region); if (!r) continue;
+      wctx.globalAlpha = o.type === rec.weighed.picked ? fade : fade * 0.45;
+      wctx.strokeStyle = P.select; wctx.lineWidth = 2;
+      wctx.strokeRect(r.bbox.x0 * WS + 1, r.bbox.y0 * WS + 1, (r.bbox.x1 - r.bbox.x0 + 1) * WS - 2, (r.bbox.y1 - r.bbox.y0 + 1) * WS - 2);
+    }
+    wctx.globalAlpha = 1;
+    const g = beingById(rec.god), p = tileSpot(rec.from === null ? rec.to : rec.from);
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(rec.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+  });
+
+  /* The act's own figure, one per gesture, each in its own slice. */
+  if (figures) recs.forEach((rec, i) => { if (slices[i] > 0) drawGesture(rec, slices[i]); });
+
+  /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
+  const moving = new Map();
+  if (f < 1 && tier !== 'none') recs.forEach((rec, i) => {
+    const s = slices[i]; if (s <= 0) return;
+    const p = walkPoint(rec, s);
+    const beaten = rec.kind === 'battle' && rec.loser === rec.god;
+    if (p) moving.set(rec.god, { p, end: rec.to,
+      alpha: rec.kind === 'born' ? s : rec.kind === 'unmade' ? 1 - s : rec.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
+    /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
+       never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
+    if ((rec.kind === 'battle' || rec.kind === 'mingle') && rec.otherFrom !== null && rec.otherFrom !== undefined){
+      const back = s < 0.5 ? pointAt(rec.otherFrom, rec.to, s * 2) : pointAt(rec.to, rec.otherFrom, s * 2 - 1);
+      const lost = rec.kind === 'battle' && rec.loser === rec.other;
+      if (back) moving.set(rec.other, { p: back, end: rec.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+    }
+  });
+  const spots = [];
+  for (const g of gods()){
+    const m = moving.get(g.id);
+    if (!m && g.status === 'dead') continue;
+    const at = g.at === null || g.at === undefined ? null : { x: g.at % W, y: (g.at - g.at % W) / W };
+    let p = m ? m.p : at;
+    if (!p){ const r = standsIn(g); if (!r) continue; p = { x: (r.bbox.x0 + r.bbox.x1) / 2, y: (r.bbox.y0 + r.bbox.y1) / 2 }; }
+    godEnds.set(g.id, m ? m.end : g.at);
+    const s = spotOf(p);
+    spots.push({ g, x: s.x, y: s.y, alpha: m ? m.alpha : g.status === 'awake' ? 1 : 0.55 });
+  }
+  /* Two stars are nudged apart only when their pixels are within the glyph's own width. */
+  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k]; if (Math.abs(s.x - o.x) < 22 && Math.abs(s.y - o.y) < 16){ s.x = o.x + 22; s.y = o.y; } } });
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  for (const s of spots){
+    wctx.globalAlpha = clamp(s.alpha, 0, 1);
+    wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
+  }
+  wctx.globalAlpha = 1;
+  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
+  if (figures){
+    const said = recs.filter((rec, i) => rec.said !== null && rec.said !== undefined && legends[rec.said] && slices[i] > 0);
+    const pick = said.slice().reverse().find(rec => legends[rec.said].kind === 'major') || said[said.length - 1];
+    if (pick) drawCaption(legends[pick.said].text, tileSpot(pick.to));
+  }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
