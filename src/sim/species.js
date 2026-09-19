@@ -152,8 +152,9 @@ Object.assign(TASKS, {
       return true;
     },
     stops: [(a, t) => {
-      const kin = beingById(t.args.kin); if (!kin || !kin.alive) return 'fail';
-      a.needs.social = Math.min(100, a.needs.social + 30); kin.needs.social = Math.min(100, kin.needs.social + 20); return 'done';
+      /* The old task held the kin itself and never asked whether it still lived. Kin that has left the list gets nothing; the rest is as it was. */
+      const kin = beingById(t.args.kin);
+      a.needs.social = Math.min(100, a.needs.social + 30); if (kin) kin.needs.social = Math.min(100, kin.needs.social + 20); return 'done';
     }] },
   /* At night, a gnome with a bench borrows one made thing from a camp stash within 40 tiles. Never from a warded camp. */
   borrow: { type: 'borrow',
