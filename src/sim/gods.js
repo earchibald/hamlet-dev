@@ -581,15 +581,19 @@ function takeTurn(opt){
   creation.choices.push({ age: pending.age, god: g.id, opts: pending.opts, picked: row.type, byPlayer: true });
   pending = null;
   agePass();
-  withGodRng(() => { if (ageDecide()) ageEnd(); });
-  settleIfDue();
+  /* The act is applied and the age has moved past the god. It is not resumed here. A step resumes it,
+     and a step is the only thing that advances an age, whoever asked for the act. The player's choice
+     is then one act among the age's acts, and a view that plays one act at a time plays it like any
+     other instead of watching the rest of the age go by while it draws the one it was given.
+     Pacing stays out of the door: the door carries the act and nothing about the rate it is drawn at,
+     so a log still replays the same story. */
   return `You ${row.type}. ${g.name} acts.`;
 }
 
 /* The player leaves, or the god whose turn was open is gone. This only closes the open turn: it does
-   not resume the age. `takeTurn` is the one path that resumes, so there is no second copy of that
-   logic to keep in step with it. The engine's own next `step()` finds `agePos` still standing and
-   carries the age on from where it stood, through `ageDecide`. */
+   not resume the age. Nothing resumes an age but a step, which finds `agePos` still standing and
+   carries the age on from where it stood, through `ageDecide`. `takeTurn` closes its turn the same
+   way and for the same reason, so there is one rule and no copy of it to keep in step. */
 function releaseTurn(){
   pending = null;
 }
@@ -628,20 +632,38 @@ function tellIfGone(){
    with, and a god born mid-age waits for the next age exactly as it always did.
    `agePos.prepared` and `agePos.opts` belong to the god at `agePos.i` alone: settleHome, godNeeds,
    and the drawn matrix run or are drawn once for that god, however many times its turn is opened
-   and abandoned before the age moves past it. */
-function ageDecide(){
+   and abandoned before the age moves past it.
+
+   Two things stop the age, and `false` means either of them. A turn is open and waits on the player,
+   or `oneAct` was asked for and one god has acted. `pending` tells them apart: it is set for the
+   first and null for the second. Both leave `agePos` standing and both resume through this function,
+   so there is one copy of the loop and one copy of the invariant above.
+
+   With `oneAct` this stops being a once-an-age entry point and becomes a once-an-act one. Anything
+   put at the head of it runs per act from then on. `tellIfGone` is written to bear that: it is
+   idempotent through `inhabitedTold`, it draws no random number, and its line is the better for
+   arriving when the god goes rather than at the end of the age. Anything added beside it must be
+   read against the same three tests. */
+function ageDecide(oneAct){
   tellIfGone();
   const list = agePos.list;
   while (agePos.i < list.length){
     const g = list[agePos.i];
+    let acted = false;
     if (g.status === 'awake'){
       if (!agePos.prepared){ settleHome(g); godNeeds(g); abandonUnfinished(g); agePos.prepared = true; }
       /* The player's god with a free choice stops the age here. A god carrying an act has no choice
          to make, so it carries on and the turn does not open. */
       if (inhabited && g.id === inhabited.id && !g.task && runUntil === null){ openTurn(g); return false; }
       decideGod(g, agePos.opts);
+      acted = true;
     }
     agePass();
+    /* After `agePass`, never before it: a return with the position unmoved resumes into the same god
+       with `prepared` already true, and `decideGod` runs a second time against a matrix drawn once.
+       Only for a god that acted: an asleep god is passed over, and stopping there hands the view a
+       beat in which nothing happened. */
+    if (oneAct && acted) return false;
   }
   return true;
 }
@@ -672,10 +694,14 @@ function endAges(){ if (era !== 'days') return; agePos = null; pending = null; r
    ages, and `endAges` does nothing then, so the player keeps the run and the stops they set. */
 function settleIfDue(){ if (!settleNow) return; settleNow = false; settle(); endAges(); }
 
-function ageStep(){
+/* One age, or with `oneAct` one god of it. The age's close is never divided: `ageEnd` unmakes the
+   gods that hold nothing and only then reads the rest gate, so a view that drew between the two
+   would show gods already gone against a gate that still counts them, and `strain` and `outgrown`
+   read that same gate. The close is one beat or it is none. */
+function ageStep(oneAct){
   withGodRng(() => {
     if (!agePos) ageBegin();
-    if (!ageDecide()) return;
+    if (!ageDecide(oneAct)) return;
     ageEnd();
   });
   settleIfDue();

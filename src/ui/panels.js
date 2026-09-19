@@ -63,17 +63,17 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
   const c = $('count-goals'); if (c) c.textContent = '';
   if (inAges()){ el.innerHTML = '<div class="muted">No goals yet. The valley is not made.</div>'; return; }
   el.innerHTML = rows.map((r, i) => {
-    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); const line = foldLine(s, ui.unfold[s.id] || ui.showAll); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span>${line ? `<span class="fold" title="${esc(line)}">${line}</span>` : ''}</div>`; }
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); const line = foldLine(s, ui.unfold[s.id] || ui.showAll); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span>${line ? `<span class="fold" title="${esc(line)}">${esc(line)}</span>` : ''}</div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
     const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
-    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
+    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${esc(st.text)}</span></div>`;
   }).join('');
 }
 /* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
@@ -84,7 +84,7 @@ function renderChronicle(el){
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
   const c = $('count-chronicle'); if (c) c.textContent = ` · ${rows.length}`;
-  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
+  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${esc(r.e.kind)} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${esc(r.e.when)}</span> ${esc(r.e.text)}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
   if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
@@ -95,7 +95,7 @@ function renderCamp(el){
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
     ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
@@ -110,8 +110,8 @@ function renderLegends(el){
   const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
   let when = null;
   el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
-    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
-    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+    const head = r.e.when !== when ? `<li class="age">${esc(r.e.when)}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${esc(r.e.kind)} ${rowClass('legends', i)}" data-i="${i}">${esc(r.e.text)}</li>`;
   }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
 }
 /* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
@@ -127,11 +127,11 @@ function chipFootLine(chip){
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
 function renderFoot(){
-  const phrase = `<span class="muted">${cursorPhrase()}</span>`;
-  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
+  const phrase = `<span class="muted">${esc(cursorPhrase())}</span>`;
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${esc(ui.note.text)}</span>`; return; }
   ui.note = null;
   const chip = footChip();
   const e = chronicle[0];
-  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`);
+  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }

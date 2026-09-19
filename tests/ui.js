@@ -183,6 +183,64 @@ test('state lines: a mauled person is told the wolves keep off, and only a livin
   assert.deepEqual(api.stateLines(null), [], 'nobody carries none');
 });
 
+/* Every sink that writes save-borne text into innerHTML. A hand-edited save is the only way markup
+   reaches them, and the sim never writes any, but the escape belongs at the sink all the same. */
+const TAG = '<img src=x onerror="boom()">';
+const SINK_FILES = ['state', 'derive', 'keys', 'saves', 'map', 'timeline', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions'];
+const SINK_NAMES = [...new Set([...DERIVE, 'gaugeHTML', 'chipHTML', 'winTitle', 'esc', 'renderPeople', 'renderGoals', 'renderChronicle', 'renderCamp', 'renderLegends', 'renderFoot', 'fullName'])];
+const cell = () => ({ innerHTML: '', dataset: {}, textContent: '' });
+function clean(html, where){
+  assert.equal(html.includes('<img'), false, `${where} let the tag through`);
+  assert.ok(html.includes('&lt;img'), `${where} did not escape the tag`);
+}
+
+test('the drawers, the strip, the foot, and a window title escape text a save file can carry', () => {
+  const api = loadUI(SINK_FILES, SINK_NAMES); api.startWorld('r');
+  api.camp = api.camps[0];
+
+  clean(api.gaugeHTML('hearth', { level: 'good', v: 0.5, text: TAG }), 'the hearth gauge');
+  clean(api.chipHTML({ n: 1, level: 'bad', text: TAG }), 'an alert chip');
+
+  const a = api.campHumans()[0];
+  a.name = TAG; a.status = TAG;
+  clean(api.winTitle({ kind: 'inspect', target: { being: a.id } }), 'a window title');
+  const people = cell(); withPage(() => api.renderPeople(people));
+  clean(people.innerHTML, 'the People drawer');
+
+  api.camp.site = api.camp.site || [1, 1]; api.camp.siteReason = TAG;
+  api.ui.showAll = true;
+  const goals = cell(); withPage(() => api.renderGoals(goals));
+  clean(goals.innerHTML, 'the Goals drawer');
+
+  api.chronicle.unshift({ tick: 0, when: TAG, text: TAG, kind: TAG });
+  api.ui.chronFilter = 'all';
+  const chron = cell(); withPage(() => api.renderChronicle(chron));
+  clean(chron.innerHTML, 'the Chronicle drawer');
+
+  api.legends.push({ when: TAG, text: TAG, kind: TAG });
+  const legends = cell(); withPage(() => api.renderLegends(legends));
+  clean(legends.innerHTML, 'the Legends drawer');
+
+  api.camp.tools[TAG] = true;
+  const camp = cell(); withPage(() => api.renderCamp(camp));
+  clean(camp.innerHTML, 'the Camp drawer');
+
+  withPage(() => { api.ui.open = []; api.renderFoot(); clean(global.document.getElementById('foot').innerHTML, 'the foot'); });
+});
+
+test('esc covers four characters, not the single quote, and no attribute in src/ui is single-quoted', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'strip'], ['esc']);
+  assert.equal(api.esc('<b>&"</b>'), '&lt;b&gt;&amp;&quot;&lt;/b&gt;');
+  assert.equal(api.esc("it's"), "it's", "esc leaves the single quote, and the comment at esc says so");
+  /* That is safe only while every attribute is built with double quotes. The day one is written with
+     single quotes, esc stops protecting it and says nothing. This is the guard the comment names. */
+  for (const f of ui.FILES){
+    const src = fs.readFileSync(`src/ui/${f}.js`, 'utf8');
+    const bad = src.match(/<[a-z][^>]*\s[a-z-]+='/g);
+    assert.equal(bad, null, `${f}.js builds an attribute with single quotes: ${bad && bad[0]}`);
+  }
+});
+
 test('the view key changes when the world does, and holds still when nothing does', () => {
   const api = day21(); const k1 = api.viewKey();
   assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');

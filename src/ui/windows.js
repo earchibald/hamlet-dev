@@ -2,7 +2,7 @@
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
      no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
      can run past that room where the bare biome word never did, so the title keeps the biome word, as
