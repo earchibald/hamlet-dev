@@ -319,6 +319,9 @@ const GOALS = [
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
     offers(a){ if (!camp.pit || camp.rack) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the rack', score: 30, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 2, 3); if (!site) return [];
       return [{ label: 'build the drying rack', score: 45, task: { kind: 'buildRack', args: { at: site } } }]; } },
+  /* The aim of 8 and SEASON_DAYS are set apart, and today they happen to match, so "one strip a day"
+     holds. Plan G4 retunes the clock, and a season that is no longer eight days makes this sentence
+     false in words as the old one was false in digits. Read it again with G4. */
   { id: 'smoke', title: 'Smoke meat for lean days', stage: 'food', after: 'rack', standing: true,
     state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS} days long, and the bushes give nothing then. That is one strip a day.` }; },
     offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
