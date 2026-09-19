@@ -5,13 +5,15 @@
 // later files are written in its units. tasks.js declares TASKS before beings.js,
 // species.js, and fae.js add their kinds to it. Function calls between files are
 // free, because function declarations hoist across the joined script.
+// snapshot.js comes after main.js and before door.js, because the door's load act
+// calls it and it reads no other file's tables at load time.
 //
 // build.js inlines source() into the page. Tests call load() to run the sim
 // in Node, where the same script runs inside one function.
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
+const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -21,6 +23,7 @@ function source(){
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
   mulberry32, streamState, setStreamState,
+  SNAPSHOT_VERSION, REFS, REF_KINDS, TILE_DEFAULTS, SAVED_STATE, NOT_SAVED, takeSnapshot, unnamedRefs,
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,

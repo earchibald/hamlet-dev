@@ -91,6 +91,10 @@ const BIOMES = {
   ash:     { name: 'Burnt ground' },
 };
 const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
+/* Every field a fresh tile has besides x, y, z, and ground, with the value it starts at. makeTile spreads
+   this table, and a snapshot leaves out a field that still equals its default. The two read one table, so
+   they cannot drift. The key order is the order makeTile gave these fields. */
+const TILE_DEFAULTS = { feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null };
 
 /* Seeded random numbers. A stream's whole state is one 32-bit number, and a snapshot reads it and sets it. */
 function mulberry32(a){
