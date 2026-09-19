@@ -140,7 +140,7 @@ So: do not drop the floors and do not promise to keep them. Task 4 measures seco
 - Game text is plain English, one idea per sentence. Documents follow the house style: one idea per sentence, 25 words at most, active voice, one word for one meaning, paragraphs of six sentences or fewer, a summary table at the top.
 - The budgets: a tick-tier world day in under 5 s in Node on seed `r` at day 3 and at day 50 of the long run, before the skip; after task 4, a world day in which little happens costs far less, and task 4 reports the figure rather than assuming one. `npm run fast` in about its present time; the soak in about two minutes.
 - Commit messages are a plain sentence. End each with:
-  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and
+  `Co-Authored-By: <the model actually running the task> <noreply@anthropic.com>` and
   `Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn`
 
 ## The design every task follows
