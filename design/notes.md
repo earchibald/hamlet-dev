@@ -577,6 +577,34 @@ It was built as an instrument before a feature. The ages do not read to a player
 - **The age is in the stamp.** An age is the step in the gods era and the tick stands still, so every act of every age carried the same stamp. The door stamps the age there. The days era is unchanged.
 - **Every god's choice is kept.** `decideGod` always built the matrix, what it picked, and what failed; the next age threw it away. It is appended to `creation.choices` instead, one entry for each god that decided in each age. No new scoring and no new draw. This is what the timeline will read.
 
+### The timeline, and what it said about the ages (E2)
+
+E2 put the record on the screen. The band is a third row of the `.app` grid, under the map. **The foot did not move**: it is absolutely positioned inside `.mapbox` and belongs to the map, whose cursor it names, so the order down the screen is the strip, the map with the foot floating at its bottom, then the timeline.
+
+- **Folded**, one row: every act of the creation in age order, each prefixed by whose it was. **Unfolded**, `T`: a row for each god and a row for the rest gate.
+- **A column is an age.** Every row carries one cell for every age in the span, blank where that god did not act, at a fixed width. The first draft packed the cells from the left, so a god who acted three times had its cells under a god who acted ten, and reading down a column meant nothing. That is the whole value of the unfolded view, and no test caught it; it was found by measuring the page.
+- **The zoom is its own time axis.** `[` and `]` show more or fewer ages while the band holds focus, and stay the map's level keys everywhere else. The band takes a focus name of its own, and the dispatcher already runs focused rows before `any` rows.
+- **A chip opens its matrix in the foot**: what that god weighed, each option's score, which the ground refused, and which was taken.
+- **Which row was taken is derived, not stored.** `decideGod` walks the options in order, marks each one that cannot land, and returns on the first that lands, so for a record the engine wrote the taken row is the first row with no `failed` flag. That rule does **not** hold for a record a player made: `takeTurn` applies any row by name and marks only that one. So the view derives the taken row only when the record is not `byPlayer`. **E3 must record which row a player took**, or the foot cannot mark it.
+- The band builds nodes and sets `textContent`; no string out of the simulation is parsed as markup there. The foot is the usual `panels.js` HTML string, and every simulation string in it passes through `esc`.
+
+**What the band said about the ages.** The question E2 existed to answer was why the creation does not read to someone watching it. Three seeds run to settle:
+
+| Seed | Ages | Gods | Born in age | Decisions |
+|---|---|---|---|---|
+| gamma | 19 | 8 | 1, 2, 3, 4, 5, 7, 7, 10 | 78 |
+| r | 21 | 6 | 1, 2, 3, 4, 13, 14 | 73 |
+| beta | 19 | 8 | 1, 2, 3, 5, 5, 8, 12, 13 | 85 |
+
+The fault is not that the information was missing. It is that it was never held still.
+
+- A creation is about **eighty decisions by up to eight actors**, and at pace 1 an age is two seconds, so the whole thing is over in **about forty seconds**. That is half a second a decision.
+- **The cast grows while you watch.** The pantheon goes from one god to six or eight, and nothing on the map ever said so. The staircase of blanks down the left of the unfolded band is the birth order, and it is information a watcher never had.
+- **A third of every creation is one act.** `split` is 26 of 78 on gamma, 19 of 73 on r, and 39 of 85 on beta: 33, 26, and 46 per cent. It is the commonest act on two of the three seeds, and on `r` it ties with `make` at 19 apiece. On the map a split looks like a country dividing, every time, so the act that happens most is the act that looks most alike.
+- **Each god has a habit**, and the habit is legible only across ages: on gamma, Morrow only ever moves water, Nyr only ever divides, Veyl spends most of its time finishing multi-age work.
+
+So the timeline is not a convenience. It is the only thing in the interface that holds a decision still long enough to be read, and the only place a god's habit is visible at all. Whether it is *enough* is a question for playing it, and the answer belongs here when it is known.
+
 **The gate.** A creation the player steered by taking the best row every turn is the creation `startWorld` runs alone, line for line, on all twenty-four seeds of `tests/ages.js`. Every age suspends and resumes on that path, and the test counts the turns it opened and fails if none did. `tests/become.js` holds the rest: the acts and their refusals, the bars, the reuse of a matrix across a suspend, exactly one decision for a god whose turn was abandoned, and a creation run entirely on autopilot.
 
 **Not built, and named so nobody assumes it.** God-era replay. `doorLog` carries the age, but `replayGod` in `tests/lib/run.js` selects by tick, every god-era act shares one tick, and `runDays` starts after settle. A steered creation is logged; nothing replays it yet. Also not built: a stop on an event, which needs an `event` kind on every chronicle line, and that is G section 7.

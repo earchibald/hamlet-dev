@@ -13,6 +13,21 @@ function loadUI(files, names, extra = {}){
   return new Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 
+/* Some actions paint the page as well as change the state. These tests have no browser, so the few
+   page entry points those actions reach are stubbed for the length of one call, then taken away.
+   The stubs are free names in the joined scope, so the global object is where they go. */
+function withPage(fn){
+  const el = { hidden: false, innerHTML: '', textContent: '', dataset: {}, style: {},
+    classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
+    setAttribute(){}, appendChild(){}, replaceChildren(){}, scrollIntoView(){},
+    querySelector(){ return null; }, querySelectorAll(){ return []; } };
+  global.document = { getElementById: () => el, querySelector: () => el, querySelectorAll: () => [], createElement: () => el, body: el };
+  const page = { paints: 0 };
+  global.renderUI = () => { page.paints++; }; global.renderFoot = () => {}; global.hideTip = () => {};
+  try { return fn(page); }
+  finally { delete global.document; delete global.renderUI; delete global.renderFoot; delete global.hideTip; }
+}
+
 test('every UI file joins with the sim into one script that compiles', () => {
   assert.doesNotThrow(() => new Function(sim.source() + '\n' + ui.source()));
 });
@@ -176,7 +191,7 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
@@ -250,7 +265,7 @@ test('the palette lists every static action', () => {
 
 test('every key map row has a focus the dispatcher knows', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
-  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog'].includes(k.focus) || k.focus.startsWith('dialog:'), `${k.key} has focus ${k.focus}`);
+  for (const k of api.KEYMAP) assert.ok(['any', 'map', 'drawer', 'window', 'dialog', 'timeline'].includes(k.focus) || k.focus.startsWith('dialog:'), `${k.key} has focus ${k.focus}`);
 });
 
 test('drawer rows: goals rows are the visible goals in stage order, people rows are trouble first', () => {
@@ -273,6 +288,116 @@ test('persist and restore keep the open drawers, the mutes, and the speed, and c
   assert.deepEqual(api.ui.open, ['goals']); assert.ok(api.ui.mutes.has('cold'));
   delete global.localStorage;
   assert.doesNotThrow(() => api.persist()); assert.doesNotThrow(() => api.restore());
+});
+
+test('the fold and the zoom are remembered, and the opened chip is not', () => {
+  const api = loadUI(['state'], ['persist', 'restore', 'ui']);
+  const src = String(api.persist);
+  assert.match(src, /timelineFold/, 'the fold is a preference');
+  assert.match(src, /timelineZoom/, 'the zoom is a preference');
+  assert.doesNotMatch(src, /timelineChip/, 'the opened chip names one act of one creation and is not remembered');
+});
+
+/* A real round trip through the stored shape. Storage is the one input the page does not control:
+   another version, another tab, or a hand-edited store can hold anything. */
+test('a stored zoom in range comes back, and one out of range is refused', () => {
+  const api = loadUI(['state', 'derive', 'keys'], ['ui', 'persist', 'restore', 'TL_ZOOM_MAX', 'STORE_KEY']);
+  const store = {};
+  global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  try {
+    api.ui.timelineZoom = 3; api.persist();
+    api.ui.timelineZoom = 0; api.restore();
+    assert.equal(api.ui.timelineZoom, 3, 'a stored zoom in range comes back');
+    for (const bad of [api.TL_ZOOM_MAX + 1, -1, 1.5, '2', null, NaN]){
+      const s = JSON.parse(store[api.STORE_KEY]); s.timelineZoom = bad;
+      store[api.STORE_KEY] = JSON.stringify(s);
+      api.ui.timelineZoom = 2; api.restore();
+      assert.equal(api.ui.timelineZoom, 2, `a stored zoom of ${bad} is refused`);
+    }
+  } finally { delete global.localStorage; }
+});
+
+test('the timeline actions stay inside their bounds, and the same chip twice closes it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui', 'TL_ZOOM_MAX']);
+  withPage(() => {
+    api.ui.timelineFold = true;
+    api.ACTIONS.foldTimeline();
+    assert.equal(api.ui.timelineFold, false);
+    api.ACTIONS.foldTimeline();
+    assert.equal(api.ui.timelineFold, true);
+    api.ui.timelineZoom = 0;
+    api.ACTIONS.zoomTimelineIn();
+    assert.equal(api.ui.timelineZoom, 0, 'it never goes below the default');
+    for (let n = 0; n < 40; n++) api.ACTIONS.zoomTimelineOut();
+    assert.equal(api.ui.timelineZoom, api.TL_ZOOM_MAX, 'it never goes past the widest');
+  });
+  api.ACTIONS.openChip('4:3');
+  assert.equal(api.ui.timelineChip, '4:3');
+  api.ACTIONS.openChip('4:3');
+  assert.equal(api.ui.timelineChip, null, 'the same chip twice closes it');
+});
+
+test('the three timeline actions paint at once, as their neighbours do', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui']);
+  withPage(page => {
+    for (const name of ['foldTimeline', 'zoomTimelineOut', 'zoomTimelineIn']){
+      const before = page.paints;
+      api.ACTIONS[name]();
+      assert.ok(page.paints > before, `${name} leaves the band for the next frame tick`);
+    }
+  });
+});
+
+/* The band's own map from a button id to an action is a plain string table. A renamed action would
+   leave it pointing at nothing, and the band's buttons would go quiet with no error. */
+test('every timeline button names an action that exists', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions', 'timeline'], ['TL_BUTTONS', 'ACTIONS']);
+  const ids = Object.keys(api.TL_BUTTONS);
+  assert.deepEqual(ids, ['foldTl', 'tlOut', 'tlIn'], 'the band has three buttons');
+  for (const id of ids) assert.equal(typeof api.ACTIONS[api.TL_BUTTONS[id]], 'function', `${id} names ${api.TL_BUTTONS[id]}`);
+});
+
+test('a click in the band takes its focus through an action, not by hand', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['ACTIONS', 'ui']);
+  api.ui.focus = 'map';
+  api.ACTIONS.focusTimeline();
+  assert.equal(api.ui.focus, 'timeline');
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  /* An assignment, not a comparison: drawTimeline reads ui.focus to mark the band. */
+  assert.doesNotMatch(src, /ui\.focus\s*=[^=]/, 'the band changes the focus through ACTIONS');
+});
+
+test('the band shows its own focus, since ui.focus is not the browser’s', () => {
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  assert.match(src, /classList\.toggle\('focus'/, 'drawTimeline marks the focused band as a drawer is marked');
+  const page = fs.readFileSync('src/page.template.html', 'utf8');
+  assert.match(page, /#timeline\.focus\{/, 'the page has a rule for the focused band');
+});
+
+test('the timeline keys change meaning by focus, and do not take the level keys away', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.equal(keyHit(api, ev('['), 'map').action, 'levelDown', 'the map keeps its levels');
+  assert.equal(keyHit(api, ev(']'), 'map').action, 'levelUp');
+  assert.equal(keyHit(api, ev('['), 'timeline').action, 'zoomTimelineOut', 'the timeline zooms while it holds focus');
+  assert.equal(keyHit(api, ev(']'), 'timeline').action, 'zoomTimelineIn');
+  assert.equal(keyHit(api, ev('t'), 'timeline').action, 'foldTimeline', 'T folds from anywhere');
+  assert.equal(keyHit(api, ev('t'), 'map').action, 'foldTimeline');
+});
+
+test('the timeline joins the focus cycle only while the ages run, and Escape leaves it', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'focusRing', 'startCreation', 'era', 'step']);
+  api.startCreation('gamma', {});
+  assert.ok(api.focusRing().includes('timeline'), 'the ages show the band');
+  assert.equal(keyHit(api, ev('Escape'), 'timeline').action, 'back');
+  let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+  assert.ok(!api.focusRing().includes('timeline'), 'the days era has no band to focus');
+});
+
+test('every timeline button has a key', () => {
+  const api = loadUI(['state', 'keys'], ['KEYMAP']);
+  for (const id of ['foldTl', 'tlOut', 'tlIn'])
+    assert.ok(api.KEYMAP.some(r => r.button === id), `${id} has no key`);
 });
 
 const CURSOR = [...DERIVE, 'cursor', 'cursorAfter', 'cursorPhrase', 'W', 'H', 'LW', 'LH'];
@@ -682,7 +807,7 @@ function domStub(){
     style: {}, dataset: {}, children: [], scrollTop: 0, offsetWidth: 220, offsetHeight: 140, className: '',
     classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
     setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
-    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){},
+    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){}, replaceChildren(){}, append(){},
     showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
     getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
   };
@@ -756,6 +881,247 @@ test('a mark keeps a reason that is not the stock one, and a country names the g
   pole.why = `${g.name} made it dry.`;
   assert.ok(!api.countryLine(r).includes(`by ${g.name} ${g.epithet}`), 'a reason that names the god is not doubled');
   assert.ok(api.countryLine(r).includes(g.name));
+});
+
+const TL_API = ['timelineModel', 'chipMatrix', 'timelineSpan', 'ui', 'creation', 'age', 'era', 'gods', 'startCreation', 'step'];
+
+test('the timeline folds to one row of the creation in age order', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  const m = api.timelineModel();
+  assert.equal(m.shown, true);
+  assert.equal(m.folded, true);
+  assert.equal(m.rows.length, 1, 'folded is one row');
+  assert.equal(m.rows[0].id, 'all');
+  assert.equal(m.now, api.age);
+  const ages = m.rows[0].cells.map(c => c.age);
+  assert.deepEqual(ages, [...ages].sort((a, b) => a - b), 'cells run in age order');
+  for (const c of m.rows[0].cells) assert.match(c.chip, /^\d+:\d+$/, 'every cell names its entry');
+});
+
+test('unfolded, the timeline is a row for each god and a row for the gate', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const m = api.timelineModel();
+  assert.equal(m.folded, false);
+  assert.equal(m.rows[m.rows.length - 1].id, 'gate', 'the gate is the last row');
+  const godIds = api.gods().map(g => g.id);
+  for (const r of m.rows.slice(0, -1)) assert.ok(godIds.includes(r.id), 'every other row is a god');
+  assert.ok(m.rows.length > 1);
+});
+
+test('unfolded, every row has one cell per age in the span, so a column names one age down every lane', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const m = api.timelineModel();
+  const span = m.to - m.from + 1;
+  for (const r of m.rows){
+    assert.equal(r.cells.length, span, `row ${r.id} has one cell per age`);
+    assert.deepEqual(r.cells.map(c => c.age), Array.from({ length: span }, (_, i) => m.from + i), `row ${r.id} runs from age ${m.from} to ${m.to}`);
+  }
+  /* Two rows read at the same index are the same age, so a column means something: reading down it
+     shows what several gods did in that one age. */
+  for (let i = 0; i < span; i++){
+    const ages = m.rows.map(r => r.cells[i].age);
+    assert.ok(ages.every(a => a === ages[0]), `index ${i} names one age across every row`);
+  }
+  /* Where a god did nothing that age, the cell is a blank placeholder, not a missing one. */
+  const someBlank = m.rows.slice(0, -1).some(r => r.cells.some(c => c.blank));
+  assert.ok(someBlank, 'at least one god has a blank age somewhere in an eight-age creation');
+});
+
+test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  const before = api.timelineModel();
+  assert.equal(before.now, 0, 'no age has run yet');
+  assert.equal(before.from, 1); assert.equal(before.to, 1);
+  for (let n = 0; n < 8; n++) api.step();
+  const after = api.timelineModel();
+  assert.equal(after.to, after.now, 'to is the live age once the creation has run');
+  const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
+  assert.match(src, /m\.now === 0 \? 'Before the first age' : `Age \$\{m\.from\} to \$\{m\.to\}`/, 'the head prints the span, and says so plainly before the first age');
+});
+
+test('a chip opens the matrix that produced it, unsorted and unscored by the view', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  const rec = api.creation.choices.find(c => !c.continued && c.picked);
+  const m = api.chipMatrix(`${rec.age}:${rec.god}`);
+  assert.equal(m.age, rec.age);
+  assert.equal(m.picked, rec.picked);
+  assert.equal(typeof m.name, 'string');
+  assert.deepEqual(m.opts.map(o => o.score), rec.opts.map(o => o.score), 'the view neither sorts nor scores');
+  assert.equal(api.chipMatrix('9999:1'), null, 'a chip that names nothing opens nothing');
+});
+
+test('an opened chip says who weighed what, and what it took', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation', 'step']);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  assert.equal(api.footChip(), null, 'nothing is open');
+  const rec = api.creation.choices.find(c => !c.continued && c.picked && c.opts.length > 1);
+  api.ui.timelineChip = `${rec.age}:${rec.god}`;
+  const f = api.footChip();
+  assert.match(f.head, new RegExp(`Age ${rec.age}`));
+  assert.match(f.head, new RegExp(rec.picked));
+  assert.equal(f.rows.length, Math.min(4, rec.opts.length), 'at most four rows');
+  assert.equal(f.rows[0].type, rec.opts[0].type, "in the record's own order");
+  assert.equal(typeof f.rows[0].score, 'number');
+});
+
+/* decideGod walks its options in order and marks every one it cannot land as failed, so the taken
+   row is always the first row with no failed flag, on a record that has a picked type. This holds
+   for the engine's own choices: decideGod tries options strictly in order and stops at the first
+   that lands. It cannot hold for a player's choice: takeTurn lets the player take any option by
+   name, at any index, and marks failed only the rows actually tried, so an earlier untried row
+   would misread as taken. These shapes do not reliably occur in a short creation, so the records
+   are built directly. */
+test('the taken row is the first option that did not fail', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', opts: [
+    { type: 'dig', score: 25, failed: true }, { type: 'dig', score: 23 }, { type: 'split', score: 19 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.deepEqual(f.rows.map(r => !!r.taken), [false, true, false]);
+});
+
+test('a player-taken record marks no row taken, even with no failed rows', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', byPlayer: true, opts: [
+    { type: 'dig', score: 25 }, { type: 'split', score: 19 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'the view does not guess which row a player took');
+});
+
+/* decideGod's continued push writes only { age, god, continued: true, type }; it carries no opts. */
+test('a continued record marks no row taken', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, continued: true, type: 'dig' }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'nothing is marked taken');
+});
+
+test('a record where every option failed marks no row taken', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: null, opts: [
+    { type: 'dig', score: 25, failed: true }, { type: 'split', score: 19, failed: true } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.ok(f.rows.every(r => !r.taken), 'nothing landed, so nothing is marked taken');
+});
+
+test('the taken row shows even when several failed options push it past the four-row cap', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation']);
+  api.startCreation('gamma', {});
+  api.creation.choices = [{ age: 3, god: 1, picked: 'dig', opts: [
+    { type: 'dig', score: 30, failed: true }, { type: 'dig', score: 28, failed: true },
+    { type: 'dig', score: 26, failed: true }, { type: 'dig', score: 24, failed: true },
+    { type: 'dig', score: 22, failed: true }, { type: 'dig', score: 20 } ] }];
+  api.ui.timelineChip = '3:1';
+  const f = api.footChip();
+  assert.equal(f.rows.length, 4, 'the cap holds');
+  assert.ok(f.rows.some(r => r.taken && r.score === 20), 'the taken row is one of the four shown');
+});
+
+test('the zoom sets the span, and the default keeps the near ages large', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  assert.deepEqual(api.timelineSpan(0, 20), { from: 9, to: 20 }, 'the default shows the last twelve');
+  assert.deepEqual(api.timelineSpan(1, 20), { from: 1, to: 20 }, 'one step out doubles it, clamped at age one');
+  assert.deepEqual(api.timelineSpan(0, 3), { from: 1, to: 3 }, 'a young creation is never cut short');
+  assert.equal(api.timelineSpan(9, 400).from, 1, 'the widest shows the whole creation');
+});
+
+test('the band is not shown once the valley is made', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
+  assert.equal(api.era, 'days');
+  assert.equal(api.timelineModel().shown, false, 'the creation is over');
+});
+
+/* The gate is the one thing on the band that reads `creation.gate`, and it is the whole point of the
+   creation, so its words are held here and not only its place. */
+test('the gate row says whether the world will hold, and what it still wants', () => {
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  api.ui.timelineFold = false;
+  const gateRow = () => { const rows = api.timelineModel().rows; const r = rows[rows.length - 1]; assert.equal(r.id, 'gate'); return r; };
+  api.creation.gate = { ok: true, lack: null };
+  assert.equal(gateRow().cells[gateRow().cells.length - 1].text, 'the world will hold');
+  api.creation.gate = { ok: false, lack: 'a country that is wet' };
+  assert.equal(gateRow().cells[gateRow().cells.length - 1].text, 'wants a country that is wet');
+  api.creation.gate = null;
+  const r = gateRow();
+  assert.equal(r.cells[r.cells.length - 1].text, 'not weighed yet');
+  assert.ok(r.cells.length > 1, 'an eight-age creation spans more than one age');
+  assert.ok(r.cells.slice(0, -1).every(c => c.blank), 'the gate is about now, so every earlier age is blank');
+  assert.ok(r.cells.every(c => c.chip === null), 'no cell of the gate row opens a matrix');
+});
+
+test('a cell says what the god did, and only the folded row says who', () => {
+  const api = loadUI(['state', 'derive'], [...TL_API, 'tlCellText']);
+  api.startCreation('gamma', {});
+  api.step();
+  const g = api.gods()[0];
+  assert.equal(api.tlCellText({ age: 1, god: g.id, continued: true }, false), 'carries on');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: 'split' }, false), 'split');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: null }, false), 'finds nothing it can do');
+  assert.equal(api.tlCellText({ age: 1, god: g.id, continued: true }, true), `${g.name}: carries on`);
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: 'split' }, true), `${g.name}: split`);
+  assert.equal(api.tlCellText({ age: 1, god: g.id, picked: null }, true), `${g.name}: finds nothing it can do`);
+  assert.equal(api.tlCellText({ age: 1, god: -1, picked: 'split' }, true), 'split', 'a god that is gone is not named');
+});
+
+/* The two the settle must undo. `creation.choices` outlives the ages, so nothing in the chip or the
+   focus falls away on its own. Both are held here across the era boundary, where they slipped. */
+const SETTLE_API = ['ui', 'onSettle', 'startCreation', 'step', 'era', 'footChip', 'creation', 'chronicle', 'focusRing', 'keyAction', 'ACTIONS'];
+function agesRun(){
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], SETTLE_API);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  return api;
+}
+function runToDays(api){
+  let n = 0; while (api.era === 'gods' && n++ < 4000) api.step();
+  assert.equal(api.era, 'days', 'the creation must reach the valley');
+}
+
+test('a chip opened in the ages is closed by the settle, and the foot goes back to the chronicle', () => {
+  const api = agesRun();
+  const rec = api.creation.choices.find(c => !c.continued && c.picked);
+  api.ui.timelineChip = `${rec.age}:${rec.god}`;
+  assert.ok(api.footChip(), 'the chip prints in the foot during the ages');
+  runToDays(api);
+  assert.ok(api.footChip(), 'the record outlives the ages, so only the settle can close the chip');
+  withPage(() => api.onSettle());
+  assert.equal(api.ui.timelineChip, null, 'the settle closes the chip');
+  assert.equal(api.footChip(), null, 'the foot has no chip left to print');
+  assert.ok(api.chronicle.length, 'so the newest chronicle line is what the foot prints');
+});
+
+test('a focus left on the band does not outlive the settle, and [ changes the level again', () => {
+  const api = agesRun();
+  api.ui.focus = 'timeline';
+  runToDays(api);
+  assert.ok(!api.focusRing().includes('timeline'), 'the band has left the focus ring');
+  assert.equal(keyHit(api, ev('['), 'timeline').action, 'zoomTimelineOut', 'a focus left on the band still zooms it');
+  withPage(() => api.onSettle());
+  assert.equal(api.ui.focus, 'map', 'the settle puts the focus back on the map');
+  assert.equal(keyHit(api, ev('['), api.ui.focus).action, 'levelDown', 'the level keys are the map’s again');
 });
 
 /* The feedback pass, round three. */
@@ -1047,9 +1413,11 @@ test('a load puts the view back: one camp, nobody followed, no cards, and the cu
   api.ui.windows = [{ id: 1, kind: 'inspect', target: { being: 4242 }, x: 0, y: 0, w: 10, h: 10 }];
   api.ui.focus = 'window:1'; api.ui.row.people = 6; api.ui.pulses = [{ text: 'old' }]; api.ui.seenTick = 99;
   api.ui.autosaveDay = 0;
+  api.ui.timelineChip = '3:2';
   const answer = api.inject({ source: 'player', act: 'load', snapshot: snap });
   assert.match(answer, /^The world is as it was on day \d+\.$/);
   api.onLoad();
+  assert.equal(api.ui.timelineChip, null, 'a load closes an opened chip');
   const v = api.peek();
   assert.equal(v.viewCamp, api.camps[0], 'viewCamp is the loaded world’s first camp');
   assert.equal(api.camp, api.camps[0]);
@@ -1105,6 +1473,24 @@ test('the page says what it asked for, tells the player when a save fails, and s
   /* A slot without a real tick is no slot, in both places that read one. */
   assert.match(dialogs, /typeof lastSave\.tick === 'number' && Number\.isFinite\(lastSave\.tick\)/);
   assert.match(actions, /typeof lastSave\.tick !== 'number' \|\| !Number\.isFinite\(lastSave\.tick\)/);
+});
+
+test('the frame repaints when the timeline changes', () => {
+  const api = loadUI(['state', 'derive'], ['viewKey', 'ui', 'startCreation', 'step']);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 6; n++) api.step();
+  const a = api.viewKey();
+  api.ui.timelineFold = !api.ui.timelineFold;
+  assert.notEqual(api.viewKey(), a, 'the fold is in the key');
+  const b = api.viewKey();
+  api.ui.timelineChip = '3:2';
+  assert.notEqual(api.viewKey(), b, 'the opened chip is in the key');
+});
+
+test('the timeline builds nodes and never parses markup', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '../src/ui/timeline.js'), 'utf8');
+  /* An assignment, not the word: the file's own comment names innerHTML to warn the next reader off it. */
+  assert.doesNotMatch(src, /\.innerHTML\b/, 'the band sets textContent, so no sim string is parsed as markup');
 });
 
 module.exports = { loadUI };

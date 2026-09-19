@@ -273,9 +273,105 @@ function drawerRows(id){
   return [];
 }
 
+/* ---------- the timeline ----------
+   The record of the creation, laid flat under the map. It reads `creation.choices`, which the sim
+   keeps: one entry for each god that decided in each age, with that god's whole scored option list,
+   what it picked, and what failed to apply. The view neither sorts nor scores. Nothing here reaches
+   into a rule, and nothing here changes one. */
+
+/* How many ages the band covers. Zoom 0 is the default and keeps the near ages large; each step out
+   doubles the span. The span never begins before age one, and never ends before the live age. */
+const TL_SPAN = 12, TL_ZOOM_MAX = 9;
+function timelineSpan(zoom, now){
+  const want = TL_SPAN * Math.pow(2, Math.max(0, Math.min(TL_ZOOM_MAX, zoom)));
+  return { from: Math.max(1, now - want + 1), to: Math.max(1, now) };
+}
+
+/* One cell's words. A carried act says so. A free choice names what it took, or says the ground
+   refused every option it had. */
+function tlCellText(rec, withWho){
+  const g = beingById(rec.god);
+  const who = withWho && g ? `${g.name}: ` : '';
+  if (rec.continued) return `${who}carries on`;
+  if (!rec.picked) return `${who}finds nothing it can do`;
+  return `${who}${rec.picked}`;
+}
+
+/* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
+   cell, blank so timeline.js can draw it and give it the filled cell's own width. */
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+
+function timelineModel(){
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  if (!inAges() || !creation || !creation.choices) return empty;
+  const now = age;
+  const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
+  if (ui.timelineFold !== false){
+    return { shown: true, folded: true, from, to, now, marks: [],
+      rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
+  }
+  /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
+     where the row has something to show and blank where it does not. That is the whole point of the
+     unfolded view, so a player can read down a column and see what several gods did at once. */
+  const rows = [];
+  for (const g of gods()){
+    const mine = inSpan.filter(c => c.god === g.id);
+    if (!mine.length && g.status !== 'awake') continue;
+    const byAge = new Map(mine.map(r => [r.age, r]));
+    const cells = [];
+    for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
+    rows.push({ id: g.id, label: g.name, cells });
+  }
+  /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
+     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
+     about now, so it sits under the now-line, in the last cell of the span; every earlier age is blank. */
+  const gate = creation.gate;
+  const gateCells = [];
+  for (let a = from; a <= to; a++){
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+  }
+  rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
+  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+}
+
+/* One chip, opened. The matrix is the record's own, in the record's own order. */
+function chipMatrix(key){
+  if (!key || !creation || !creation.choices) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  const rec = creation.choices.find(c => c.age === a && c.god === id);
+  if (!rec) return null;
+  const g = beingById(rec.god);
+  return { age: rec.age, god: rec.god, name: g ? g.name : 'someone gone', picked: rec.picked || null,
+    byPlayer: !!rec.byPlayer, continued: !!rec.continued, opts: rec.opts || [] };
+}
+
+/* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop.
+   decideGod walks its options in order and marks every one it cannot land as failed, so for a record
+   the engine wrote, the taken row is the first option that is not failed: that is the order the
+   engine tried them in. A player, by contrast, takes an option by name at any index, and only that
+   row's `failed` flag is ever set; an earlier untried row would then wrongly read as the one taken.
+   So for a `byPlayer` record no row is marked taken here — the head already says the hand was the
+   player's. A continued record, or one where every option failed, has no taken row either. Where a
+   taken row exists it always shows, even when several failed options would push it past the four-row
+   cap: then the first three rows show, and the taken row takes the fourth place in place of whichever
+   row it would have displaced. */
+function footChip(){
+  const m = chipMatrix(ui.timelineChip);
+  if (!m) return null;
+  const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
+  const hand = m.byPlayer ? ', by your hand' : '';
+  const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
+  const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
+  const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+}
+
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
@@ -337,7 +433,10 @@ function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.
 /* Where Tab goes: the map, each docked drawer in order, then each window in order. */
 function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
-  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+  /* The timeline is out of the ring once a world is settled: `creation` is still set, but the ages are over
+     and the band has nothing live to show. Before any world is made the band is not shown either, so Tab
+     must not stop on it. */
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`), ...(inAges() ? ['timeline'] : [])];
 }
 
 /* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
