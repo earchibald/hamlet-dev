@@ -48,6 +48,9 @@ function settle(){
   }
   placeBodies();
   era = 'days';
+  /* The valley is final, and the era has turned, so the old names land on a map that will not be
+     repainted and no name line can fall into the legends. */
+  if (!lore) nameTheLand();
   const a = firstPerson();
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
 }

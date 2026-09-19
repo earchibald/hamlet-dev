@@ -98,10 +98,101 @@ test('an old word is sayable: it never carries a forbidden pair, and it is one t
   }
 });
 
+/* The land is named at settle, so a fresh world has already spent some of the meanings.
+   What is left plus what the land holds is the whole table, and each is used once. */
 test('every meaning is used once, and a name with no meaning left is not given', () => {
   const api = world();
-  const taken = [];
-  for (let k = 0; k < api.LAND_WORDS.length; k++){ const r = api.newOldName(); assert.ok(r, `ran out after ${k}`); taken.push(r.meaning); }
+  const taken = api.nameThings().flatMap(t => (t.names || []).map(r => r.meaning)).filter(Boolean);
+  assert.ok(taken.length > 0, 'the land was named with no meanings at all');
+  for (let k = taken.length; k < api.LAND_WORDS.length; k++){ const r = api.newOldName(); assert.ok(r, `ran out after ${k}`); taken.push(r.meaning); }
   assert.equal(new Set(taken).size, taken.length, 'a meaning was used twice');
+  assert.equal(taken.length, api.LAND_WORDS.length);
   assert.equal(api.newOldName(), null, 'with no meaning left there is no name');
+});
+
+/* The old names on the land. `nameTheLand` runs at the end of a final settle, so a fresh
+   world already carries them. The great water is a river where a wet god drew one, and a
+   lake where none did: of the six soak seeds only alpha has a painted river. */
+test('every world gets the lore of a lost people: what they built, what took them, a sky, and the sprites', () => {
+  const api = world();
+  const m = api.lore;
+  assert.match(m.people, /^the \w+$/);
+  assert.ok(api.LORE_BUILT.includes(m.built)); assert.ok(api.LORE_TOOK.includes(m.took));
+  assert.ok(api.SKY_MEANINGS.includes(m.sky.meaning)); assert.ok(api.SPRITE_MEANINGS.includes(m.sprites.meaning));
+  assert.ok(m.sky.text.length > 1 && m.sprites.text.length > 1);
+  const again = world();
+  assert.deepEqual(again.lore, m, 'the same seed tells the same lore');
+});
+
+test('every hill, cave, and grove carries an old name with a meaning, and no meaning is used twice', () => {
+  for (const seed of SEEDS){
+    const api = world(seed);
+    const things = [...api.hills, ...api.caves.filter(c => api.OLD_CAVE_KINDS.includes(c.kind)), ...api.groves];
+    const seen = new Set();
+    for (const t of things){
+      const r = t.names && t.names[0];
+      assert.ok(r, `${seed}: something on the land has no old name`);
+      assert.equal(r.tongue, 'old'); assert.ok(r.meaning, `${r.text} means nothing`);
+      assert.equal(seen.has(r.meaning), false, `${seed}: ${r.meaning} twice`);
+      seen.add(r.meaning);
+      assert.equal(t.nameKnown, false, 'an old name starts unknown');
+    }
+    const big = api.river || api.stillWater;
+    assert.ok(big, `${seed}: the valley has no water at all`);
+    assert.ok(api.nameOf(big), `${seed}: the water has no name`);
+    assert.equal(seen.has(big.names[0].meaning), false, `${seed}: the water shares a meaning`);
+    assert.ok(api.ponds.length >= 1, `${seed}: no ponds found`);
+    assert.ok(api.ponds.every(p => !api.nameOf(p)), 'ponds wait for the living');
+    assert.equal(api.nameOf(api.valley), null, 'the valley waits for the living');
+  }
+});
+
+test('a painted river carries fords, and a valley with no painted river carries a lake and none', () => {
+  const alpha = world('alpha');
+  assert.ok(alpha.river, 'alpha has a painted river');
+  assert.equal(alpha.river.kind, 'river');
+  assert.equal(alpha.stillWater, null, 'a valley with a river needs no lake');
+  assert.ok(alpha.fords.length >= 1, 'alpha has at least one ford');
+  assert.ok(alpha.fords.filter(f => alpha.nameOf(f)).length >= 1, 'no ford was named');
+  const r = world('r');
+  assert.equal(r.river, null, 'seed r has no painted river');
+  assert.equal(r.fords.length, 0, 'no river, no fords');
+  assert.equal(r.stillWater.kind, 'lake', 'the largest body is the lake');
+  assert.ok(r.stillWater.tiles.length > 12, 'the lake is bigger than a pond');
+});
+
+test('no two things in a world share a name', () => {
+  for (const seed of SEEDS){
+    const api = world(seed);
+    const texts = api.nameThings().flatMap(t => (t.names || []).map(r => r.text.toLowerCase()));
+    assert.equal(new Set(texts).size, texts.length, `${seed}: a name is used twice`);
+  }
+});
+
+test('standing on a hill learns its old name once, and the line says what it means', () => {
+  const api = world();
+  const h = api.hills[0], t = api.world[h.tiles[0]];
+  const a = api.firstPerson();
+  a.x = t.x; a.y = t.y; a.z = 0;
+  api.learnNamesHere(a);
+  assert.equal(h.nameKnown, true);
+  const line = api.chronicle.find(l => l.text.includes(api.nameOf(h)));
+  assert.ok(line, 'the chronicle says nothing about the marks');
+  assert.ok(line.text.includes(h.names[0].meaning), 'the line does not say what the name means');
+  assert.equal(line.kind, 'info');
+  const n = api.chronicle.length;
+  api.learnNamesHere(a);
+  assert.equal(api.chronicle.length, n, 'a learned name is learned once');
+});
+
+test('drawing water learns the name of the water, and a burrow keeps no old name', () => {
+  const api = world();
+  const big = api.stillWater;
+  const wet = big.tiles.find(t => api.nearFind(t.x, t.y, q => q.ground !== 'water' && api.passable(q.x, q.y, 0)));
+  const dry = api.nearFind(wet.x, wet.y, q => q.ground !== 'water' && api.passable(q.x, q.y, 0));
+  const a = api.firstPerson();
+  a.x = dry.x; a.y = dry.y; a.z = 0;
+  api.learnNamesHere(a);
+  assert.equal(big.nameKnown, true, 'the water is still unknown');
+  for (const c of api.caves) if (c.kind === 'burrow') assert.equal(api.nameOf(c), null, 'a burrow carries no old name');
 });
