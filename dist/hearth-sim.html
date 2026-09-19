@@ -6569,8 +6569,11 @@ const ui = {
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
+  playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
+/* The creation ages still tick on this ladder for now. With a beat of 1000 ms, steps 16 and 64 both
+   render as tier 'none' and cannot be told apart. A later change replaces this with PACES. */
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
 
@@ -6639,7 +6642,12 @@ function beatsDue(acc, dt, pace){
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
-/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+/* Whether the drawing holds at the end of its beat instead of playing. A world the player paused between
+   beats holds, so nothing sits half drawn. A world the player stepped plays its beat and then holds, which
+   is the whole of what Step is for. A dialog holds everything. */
+function beatStill(dialogOpen){ return dialogOpen || (paused && !ui.playing); }
+
+/* ---- the act in motion ---- The pure parts of the tween. map.js draws; these three say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
 /* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run
@@ -8522,7 +8530,9 @@ function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return;
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
-  step(){ setPaused(true); step(); renderUI(true); },
+  /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; step(true); ui.playing = true; } else step(); renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
@@ -8628,9 +8638,15 @@ function frame(now){
   if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
       else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
+  }
+  /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
+     full tier whatever the pace says: Step is the reading mode, and the pace buttons govern running. */
+  if (ui.playing && !anyDialogOpen()){
+    acc = clamp(acc + dt / BEAT_MS, 0, 1);
+    if (acc >= 1) ui.playing = false;
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
   try {

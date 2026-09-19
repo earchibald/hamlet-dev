@@ -246,7 +246,9 @@ function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return;
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
-  step(){ setPaused(true); step(); renderUI(true); },
+  /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; step(true); ui.playing = true; } else step(); renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },

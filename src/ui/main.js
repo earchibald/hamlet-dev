@@ -7,9 +7,15 @@ function frame(now){
   if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
       else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
+  }
+  /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
+     full tier whatever the pace says: Step is the reading mode, and the pace buttons govern running. */
+  if (ui.playing && !anyDialogOpen()){
+    acc = clamp(acc + dt / BEAT_MS, 0, 1);
+    if (acc >= 1) ui.playing = false;
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
   try {

@@ -40,6 +40,11 @@ function beatsDue(acc, dt, pace){
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
+/* Whether the drawing holds at the end of its beat instead of playing. A world the player paused between
+   beats holds, so nothing sits half drawn. A world the player stepped plays its beat and then holds, which
+   is the whole of what Step is for. A dialog holds everything. */
+function beatStill(dialogOpen){ return dialogOpen || (paused && !ui.playing); }
+
 /* ---- the act in motion ---- The pure parts of the tween. map.js draws; these three say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 

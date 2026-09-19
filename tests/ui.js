@@ -1897,4 +1897,18 @@ test('the timeline builds nodes and never parses markup', () => {
   assert.doesNotMatch(src, /\.innerHTML\b/, 'the band sets textContent, so no sim string is parsed as markup');
 });
 
+test('a stepped beat plays: the world is paused, and the beat still has a fraction to draw', () => {
+  /* paused is a plain let, not part of DERIVE's list, so a live accessor is spliced in here to set it
+     from the test, the same way fieldRig's setPace/setAcc reach acc and pace in map.js's tests. */
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatStill', 'get paused(){ return paused; }, set paused(v){ paused = v; }']);
+  api.paused = true; api.ui.playing = true;
+  assert.equal(api.beatStill(false), false, 'a beat the player stepped plays while paused');
+  api.ui.playing = false;
+  assert.equal(api.beatStill(false), true, 'a world paused between beats holds where it stands');
+  api.paused = false; api.ui.playing = false;
+  assert.equal(api.beatStill(false), false, 'a running world always plays');
+  api.ui.playing = true;
+  assert.equal(api.beatStill(true), true, 'a dialog holds everything, a stepped beat included');
+});
+
 module.exports = { loadUI };
