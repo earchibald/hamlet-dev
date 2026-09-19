@@ -557,7 +557,9 @@ test('every gesture the map can draw has a mark and a word, so a new act cannot 
     assert.ok(Array.isArray(m.paths) && m.paths.length, `${k} has no strokes`);
     for (const d of m.paths) assert.match(d, /^M[\d.\s]/, `${k} has a stroke that does not start with a move`);
   }
-  assert.equal(api.markFor('wash'), api.markFor('freeze'), 'a wash takes the mark of the act it is');
+  assert.equal(api.markFor('wash', 'freeze'), api.markFor('freeze'), 'a wash takes the mark of the act it is');
+  assert.equal(api.markFor('wash', 'hide'), api.markFor('hide'));
+  assert.equal(api.markFor('nonesuch'), null, 'an unknown kind draws nothing rather than guessing');
 });
 
 test('a mark is one word, and the word is the act in the third person', () => {
@@ -611,9 +613,9 @@ const MARKS = {
 function markFor(kind, value){ return MARKS[kind === 'wash' ? value : kind] || null; }
 ```
 
-Note the test calls `markFor('wash')` with no value and expects the `freeze` row; give `markFor` a default
-of `'freeze'` for `value`, and say why in a comment: freeze is the commonest wash and the only one a
-`wash` record can carry without a value in older saves.
+`markFor` takes no default for `value`. A `wash` record always carries the act it is — `WASH_INK` in
+`src/ui/map.js` already keys off `rec.value` — so a missing value is a fault to see, not to paper over.
+An unknown kind returns null and `drawMark` draws nothing.
 
 - [ ] **Step 4: Join it and draw it**
 
