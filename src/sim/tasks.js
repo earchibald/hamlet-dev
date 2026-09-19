@@ -14,9 +14,9 @@ function startFetchEmber(a){
       const pit = pitTile().struct; a.carrying = null;
       if (pit.fuel <= 0) return 'fail';
       if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
-      pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + 700;
+      pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
       log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major');
-      addThought(a, 'rekindled', 'Brought fire home', 10, 1200); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, 1000);
+      addThought(a, 'rekindled', 'Brought fire home', 10, 1200); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
       return 'done';
     } };
   return true;

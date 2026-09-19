@@ -47,7 +47,7 @@ function nearestFire(x, y, r, z = 0){
 /* Count a resource in a sector. Cached for 100 ticks. */
 function sectorCount(s, key, pred){
   const ck = key + ':' + secIdx(s.sx, s.sy);
-  const c = resCache.get(ck); if (c && tick - c.t < 100) return c.n;
+  const c = resCache.get(ck); if (c && tick - c.t < CLOCK.every.resourceCount) return c.n;
   let n = 0;
   for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (pred(world[idx(x, y)], x, y)) n++;
   resCache.set(ck, { t: tick, n }); return n;
@@ -295,7 +295,7 @@ function hollowUnderHill(sc, h){
     }
     if (c.tiles.length < 3){ for (const t of c.tiles){ t.cave = null; t.ground = 'rock'; } exit.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
     if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
-    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - 300 * DAY;
+    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - days(300);
     c.story.push('The oldest hollow in the valley.');
     /* Old pines stand on the hill above the hollow. Slopes and rock stay bare. keepsPaths only looks at a tile's own
        ring, which is not enough on the narrow floor around a tall hill's core: a run of trees can still wall off a
@@ -305,7 +305,7 @@ function hollowUnderHill(sc, h){
     /* A pine must not stand where a slope lands, or the way up the hill leads nowhere. */
     const lands = t => DIRS.some(([dx, dy]) => { const u = hasTile(t.x + dx, t.y + dy, t.z - 1) ? tileAt(t.x + dx, t.y + dy, t.z - 1) : null; return u && u.slope; });
     for (const t of hillFloors) if (!t.feature && !lands(t) && rng() < 0.3 && keepsPaths(t)){
-      t.feature = 'tree'; t.planted = tick - (60 + rint(60)) * DAY;
+      t.feature = 'tree'; t.planted = tick - days(60 + rint(60));
       const anchor = hillFloors.find(f => f.feature !== 'tree');
       const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
       if (!region || !hillFloors.every(f => f.feature === 'tree' || region.has(idx3(f.x, f.y, f.z)))){ t.feature = null; t.planted = undefined; }
@@ -572,7 +572,7 @@ function paintTile(t, biome, e, f){
       if (rng() < 0.05) loose = 'stick';
       break;
   }
-  if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
+  if (t.feature === 'tree') t.planted = tick - rint(days(100)); else if (t.feature === 'bush') t.planted = tick - rint(days(60));
   if (loose) t.loose = loose;
 }
 /* Every tile of the surface, from its country's biome. Levels are made fresh. */
@@ -685,14 +685,14 @@ function placeGrove(within, mark){
   const t = best.t;
   /* The hollow is solid, so it stands before the ring is vetted. A pine judged beside an open centre can wall off
      a tile that the hollow then seals in. */
-  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
+  t.feature = 'hollow'; t.planted = tick - days(300); t.berries = 0;
   /* The ways around the hollow as they stand. A pine may not make them worse, but dense old forest that was
      already tight is not the grove's doing. */
   const openAround = keepsPaths(t);
   if (trees.length < 8) for (const [dx, dy] of RING){
     const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
     if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
-    q.feature = 'tree'; q.planted = tick - 60 * DAY;
+    q.feature = 'tree'; q.planted = tick - days(60);
     /* The hollow keeps two open sides, so the sprites have a door and a way back to it. The ways around the hollow
        must still meet once the pine stands, or the pine and the hollow together seal a pocket. */
     if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2 || (openAround && !keepsPaths(t))){ q.feature = null; delete q.planted; }
@@ -710,29 +710,29 @@ function placeGrove(within, mark){
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
-  for (let k = 0; k < 60; k++){
+  for (let k = 0; k < CLOCK.plant.samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
-      const age = (tick - (t.planted || 0)) / DAY;
-      if (age > 60 && rng() < 0.01){ t.feature = null; t.berries = 0; t.garden = null; t.ground = t.ground === 'grass' ? 'soil' : t.ground; continue; }
-      const g = { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }[seasonOf()] * (age < 3 ? 0 : age > 48 ? 0.5 : 1);
-      if (isWinter()){ if (t.berries > 0 && rng() < 0.15) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
-      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
+      const age = tick - (t.planted || 0);
+      if (age > CLOCK.plant.bushOld && rng() < CLOCK.plant.bushDies){ t.feature = null; t.berries = 0; t.garden = null; t.ground = t.ground === 'grass' ? 'soil' : t.ground; continue; }
+      const g = CLOCK.plant.berryGrow[seasonOf()] * (age < CLOCK.plant.bushYoung ? 0 : age > CLOCK.plant.bushTired ? 0.5 : 1);
+      if (isWinter()){ if (t.berries > 0 && rng() < CLOCK.plant.berryWither) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
+      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= CLOCK.plant.bushSeedsFrom && rng() < CLOCK.plant.bushSeeds){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
     }
-    else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12 && saplingMayGrow(t)) t.feature = 'tree'; }
-    else if (t.feature === 'mushrooms'){ if (t.shrooms < 4 && rng() < 0.3) t.shrooms++; }
+    else if (t.feature === 'sapling'){ if (tick - t.planted > CLOCK.plant.saplingGrown && saplingMayGrow(t)) t.feature = 'tree'; }
+    else if (t.feature === 'mushrooms'){ if (t.shrooms < 4 && rng() < CLOCK.plant.shroomGrow) t.shrooms++; }
     else if (t.feature === 'tree'){
-      if (weather.storm && (tick - (t.planted || 0)) / DAY > 100 && rng() < 0.03){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
-      if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
+      if (weather.storm && tick - (t.planted || 0) > CLOCK.plant.pineOld && rng() < CLOCK.plant.pineFalls){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
+      if (rng() < CLOCK.plant.stickDrops){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
     else if (!t.feature){
-      if (t.ground === 'ash' && rng() < 0.05) t.ground = 'grass';
-      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < 0.004 && !t.mouth && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
+      if (t.ground === 'ash' && rng() < CLOCK.plant.ashHeals) t.ground = 'grass';
+      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < CLOCK.plant.saplingSprouts && !t.mouth && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
     }
   }
 }
   /* Old carcasses rot. */
 function rotCarcasses(){
-  if (tick % 50 === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? 1500 : i.kind === 'fish' ? 600 : 900) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
+  if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */
 function steps(x, y, z, out){

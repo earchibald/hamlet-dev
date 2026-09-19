@@ -25,7 +25,7 @@ const GOALS = [
         t.struct = { type: 'firepit', fuel: 200, lit: false };
         for (const [dx, dy] of RING){ const q = tileAt(t.x + dx, t.y + dy); if (q.ground === 'grass') q.ground = 'soil'; }
         camp.pit = [t.x, t.y]; gainXp(a, 'build');
-        if (camp.coals > tick){ t.struct.lit = true; camp.everLit = true; camp.nextArrival = tick + 900; log(`${a.name} finishes the fire pit and blows the carried coals to life. A second hearth burns.`, campHumans(), 'major'); }
+        if (camp.coals > tick){ t.struct.lit = true; camp.everLit = true; camp.nextArrival = tick + CLOCK.arrival.secondHearth; log(`${a.name} finishes the fire pit and blows the carried coals to life. A second hearth burns.`, campHumans(), 'major'); }
         else log(`${a.name} finishes the fire pit and clears the grass around it. The wood is laid. It only needs a spark.`, [a], 'major');
         addThought(a, 'pit', 'Built a proper fire pit', 6, 800);
       }) });

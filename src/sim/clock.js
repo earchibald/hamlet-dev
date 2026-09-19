@@ -31,8 +31,64 @@ const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
 const CLOCK = {
   rate: {
     pitBurn: tickRate(0.25),   // fuel the lit pit burns
+    lightningLit: tickRate(0.0006), lightningOut: tickRate(0.0035),   // near a camp in a storm, hearth lit or out
+    strayLightning: tickRate(0.0008),
   },
   limit: {
     ember: ticks(420),        // how long a carried ember lives
+    poked: ticks(400),        // how long a poked being stays startled
+  },
+  /* How often a rule looks. A rule runs when tick % every is 0, or is the `At` entry beside it. */
+  every: {
+    spoil: ticks(100),          // the stash is checked for spoiled food
+    fae: ticks(300),            // a camp's favour with the sprites does its work
+    prune: ticks(200),          // the dead leave the list of beings
+    carcassRot: ticks(50),      // old carcasses are checked
+    godsRest: days(1),          // the sleeping gods are kept rested
+    resourceCount: ticks(100),  // a sector's resource count is cached this long
+  },
+  cooldown: {
+    rotLine: ticks(600),        // between two chronicle lines about spoiled food
+  },
+  food: {
+    cookedKeeps: ticks(1800), berriesKeep: ticks(3500),
+    carcassKeeps: ticks(900), venisonKeeps: ticks(1500), fishKeeps: ticks(600),
+  },
+  birth: { every: ticks(400), chance: 0.35, gap: days(16) },
+  arrival: {
+    first: ticks(700), firstSpread: ticks(600),   // after lightning lights the first hearth
+    firstByHand: ticks(700),                      // after a person lights it
+    secondHearth: ticks(900),                     // after carried coals light a new camp's pit
+    wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
+    chance: 0.7, villageChance: 0.85,
+  },
+  party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },
+  storm: {
+    first: ticks(1500), firstSpread: ticks(2000),
+    length: ticks(150), lengthSpread: ticks(300),
+    gap: ticks(2000), summerGap: ticks(4000), gapSpread: ticks(3000),
+  },
+  fire: {
+    burn: tickRate(1),           // fuel a burning tile loses
+    stormQuench: tickRate(2),    // more, in rain
+    spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
+    strikeFuel: 240,            // a lightning strike smoulders at least this long at `burn`
+  },
+  plant: {
+    samples: 60,                // random tiles looked at each tick. Each chance below is for one look.
+    bushOld: days(60), bushDies: 0.01,
+    bushYoung: days(3), bushTired: days(48),
+    berryGrow: { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }, berryWither: 0.15,
+    bushSeedsFrom: days(5), bushSeeds: 0.012,
+    saplingGrown: days(12), shroomGrow: 0.3,
+    pineOld: days(100), pineFalls: 0.03, stickDrops: 0.02,
+    ashHeals: 0.05, saplingSprouts: 0.004,
+  },
+  thought: {
+    journey: ticks(2000), parting: ticks(1200), joined: ticks(1500), newcomer: ticks(800),
+    fireout: ticks(800), village: ticks(3000),
+    birthParent: ticks(3000), birthCamp: ticks(1500),
+    hearth: ticks(1000), poked: ticks(400),
+    over: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };

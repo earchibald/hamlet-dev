@@ -21,36 +21,36 @@ function spreadFire(){
 }
 /* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
 function burnTile(t){
-  t.fire--;
+  t.fire -= CLOCK.fire.burn;
   for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
   if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
   for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
-  if (weather.storm) t.fire -= 2;
+  if (weather.storm) t.fire -= CLOCK.fire.stormQuench;
   if (t.fire <= 0) burnOut(t);
 }
 function spreadTo(nx, ny, nz, mult){
   if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
-  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? 0.012 : 0.08) * mult) ignite(nb);
+  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
-  if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + 150 + rint(300); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
-  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? 4000 : 2000) + rint(3000); }
+  if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
+  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 }
 /* Lightning near the camp, only in storms. More often when the hearth is out. */
 function tryLightning(){
   if (camp.site && weather.storm){
     const out = camp.pit && !pitLit();
-    if (rng() < (out ? 0.0035 : 0.0006)){
+    if (rng() < (out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
-      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, 240); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
+      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
     }
   }
 }
 /* A stray strike anywhere in the world. */
 function strayLightning(){
-  if (weather.storm && rng() < 0.0008){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+  if (weather.storm && rng() < CLOCK.rate.strayLightning){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
 }

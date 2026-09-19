@@ -44,6 +44,17 @@ test('the hearth and the ember read the table', () => {
   assert.equal(api.CLOCK.limit.ember, 420);
 });
 
+test('the camp rules and the cellular systems read the table', () => {
+  const C = load().CLOCK;
+  assert.equal(C.every.spoil, 100); assert.equal(C.every.fae, 300); assert.equal(C.every.prune, 200); assert.equal(C.every.carcassRot, 50);
+  assert.deepEqual(C.birth, { every: 400, chance: 0.35, gap: 16000 });
+  assert.deepEqual(C.arrival, { first: 700, firstSpread: 600, firstByHand: 700, secondHearth: 900, wait: 900, spread: 900, chance: 0.7, villageChance: 0.85 });
+  assert.deepEqual(C.storm, { first: 1500, firstSpread: 2000, length: 150, lengthSpread: 300, gap: 2000, summerGap: 4000, gapSpread: 3000 });
+  assert.equal(C.food.cookedKeeps, 1800); assert.equal(C.food.berriesKeep, 3500);
+  assert.equal(C.rate.lightningLit, 0.0006); assert.equal(C.rate.lightningOut, 0.0035); assert.equal(C.rate.strayLightning, 0.0008);
+  assert.equal(C.plant.samples, 60); assert.equal(C.plant.bushOld, 60000);
+});
+
 /* ---------- the lint: no bare time literal in a rule ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* Each rule finds a place where time is used. A match is bare when it still holds a number. */
@@ -74,11 +85,12 @@ const EVENT_CHANCES = [
 /* The ratchet. A file listed here may still hold this many bare literals. A file not listed holds none.
    Each task of the plan removes its files. The close removes the ratchet. */
 const PENDING = {
-  world: 21, camps: 19, beings: 56, species: 72, fae: 39, tasks: 43, goals: 41, recipes: 11, weather: 5, gods: 2, settle: 1, main: 5,
+  beings: 56, species: 72, fae: 39, tasks: 41, goals: 40, recipes: 11, settle: 1,
 };
 
-/* A comparison with zero is not a duration, and a digit inside a name is not a number. */
-const hasNumber = s => /\d/.test(s.replace(/[!=]==\s*0\b/g, '').replace(/\b[A-Za-z_]\w*/g, ''));
+/* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
+   fallback default is not a duration either. */
+const hasNumber = s => /\d/.test(s.replace(/[!=]==\s*0\b/g, '').replace(/\|\|\s*0\)/g, ')').replace(/\b[A-Za-z_]\w*/g, ''));
 function bareIn(file){
   let src = fs.readFileSync(path.join(SIM, file + '.js'), 'utf8');
   const out = [];

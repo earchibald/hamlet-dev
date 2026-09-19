@@ -430,9 +430,65 @@ const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
 const CLOCK = {
   rate: {
     pitBurn: tickRate(0.25),   // fuel the lit pit burns
+    lightningLit: tickRate(0.0006), lightningOut: tickRate(0.0035),   // near a camp in a storm, hearth lit or out
+    strayLightning: tickRate(0.0008),
   },
   limit: {
     ember: ticks(420),        // how long a carried ember lives
+    poked: ticks(400),        // how long a poked being stays startled
+  },
+  /* How often a rule looks. A rule runs when tick % every is 0, or is the `At` entry beside it. */
+  every: {
+    spoil: ticks(100),          // the stash is checked for spoiled food
+    fae: ticks(300),            // a camp's favour with the sprites does its work
+    prune: ticks(200),          // the dead leave the list of beings
+    carcassRot: ticks(50),      // old carcasses are checked
+    godsRest: days(1),          // the sleeping gods are kept rested
+    resourceCount: ticks(100),  // a sector's resource count is cached this long
+  },
+  cooldown: {
+    rotLine: ticks(600),        // between two chronicle lines about spoiled food
+  },
+  food: {
+    cookedKeeps: ticks(1800), berriesKeep: ticks(3500),
+    carcassKeeps: ticks(900), venisonKeeps: ticks(1500), fishKeeps: ticks(600),
+  },
+  birth: { every: ticks(400), chance: 0.35, gap: days(16) },
+  arrival: {
+    first: ticks(700), firstSpread: ticks(600),   // after lightning lights the first hearth
+    firstByHand: ticks(700),                      // after a person lights it
+    secondHearth: ticks(900),                     // after carried coals light a new camp's pit
+    wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
+    chance: 0.7, villageChance: 0.85,
+  },
+  party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },
+  storm: {
+    first: ticks(1500), firstSpread: ticks(2000),
+    length: ticks(150), lengthSpread: ticks(300),
+    gap: ticks(2000), summerGap: ticks(4000), gapSpread: ticks(3000),
+  },
+  fire: {
+    burn: tickRate(1),           // fuel a burning tile loses
+    stormQuench: tickRate(2),    // more, in rain
+    spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
+    strikeFuel: 240,            // a lightning strike smoulders at least this long at `burn`
+  },
+  plant: {
+    samples: 60,                // random tiles looked at each tick. Each chance below is for one look.
+    bushOld: days(60), bushDies: 0.01,
+    bushYoung: days(3), bushTired: days(48),
+    berryGrow: { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }, berryWither: 0.15,
+    bushSeedsFrom: days(5), bushSeeds: 0.012,
+    saplingGrown: days(12), shroomGrow: 0.3,
+    pineOld: days(100), pineFalls: 0.03, stickDrops: 0.02,
+    ashHeals: 0.05, saplingSprouts: 0.004,
+  },
+  thought: {
+    journey: ticks(2000), parting: ticks(1200), joined: ticks(1500), newcomer: ticks(800),
+    fireout: ticks(800), village: ticks(3000),
+    birthParent: ticks(3000), birthCamp: ticks(1500),
+    hearth: ticks(1000), poked: ticks(400),
+    over: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
 
@@ -601,7 +657,7 @@ function nearestFire(x, y, r, z = 0){
 /* Count a resource in a sector. Cached for 100 ticks. */
 function sectorCount(s, key, pred){
   const ck = key + ':' + secIdx(s.sx, s.sy);
-  const c = resCache.get(ck); if (c && tick - c.t < 100) return c.n;
+  const c = resCache.get(ck); if (c && tick - c.t < CLOCK.every.resourceCount) return c.n;
   let n = 0;
   for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (pred(world[idx(x, y)], x, y)) n++;
   resCache.set(ck, { t: tick, n }); return n;
@@ -849,7 +905,7 @@ function hollowUnderHill(sc, h){
     }
     if (c.tiles.length < 3){ for (const t of c.tiles){ t.cave = null; t.ground = 'rock'; } exit.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
     if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
-    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - 300 * DAY;
+    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - days(300);
     c.story.push('The oldest hollow in the valley.');
     /* Old pines stand on the hill above the hollow. Slopes and rock stay bare. keepsPaths only looks at a tile's own
        ring, which is not enough on the narrow floor around a tall hill's core: a run of trees can still wall off a
@@ -859,7 +915,7 @@ function hollowUnderHill(sc, h){
     /* A pine must not stand where a slope lands, or the way up the hill leads nowhere. */
     const lands = t => DIRS.some(([dx, dy]) => { const u = hasTile(t.x + dx, t.y + dy, t.z - 1) ? tileAt(t.x + dx, t.y + dy, t.z - 1) : null; return u && u.slope; });
     for (const t of hillFloors) if (!t.feature && !lands(t) && rng() < 0.3 && keepsPaths(t)){
-      t.feature = 'tree'; t.planted = tick - (60 + rint(60)) * DAY;
+      t.feature = 'tree'; t.planted = tick - days(60 + rint(60));
       const anchor = hillFloors.find(f => f.feature !== 'tree');
       const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
       if (!region || !hillFloors.every(f => f.feature === 'tree' || region.has(idx3(f.x, f.y, f.z)))){ t.feature = null; t.planted = undefined; }
@@ -1126,7 +1182,7 @@ function paintTile(t, biome, e, f){
       if (rng() < 0.05) loose = 'stick';
       break;
   }
-  if (t.feature === 'tree') t.planted = tick - rint(100 * DAY); else if (t.feature === 'bush') t.planted = tick - rint(60 * DAY);
+  if (t.feature === 'tree') t.planted = tick - rint(days(100)); else if (t.feature === 'bush') t.planted = tick - rint(days(60));
   if (loose) t.loose = loose;
 }
 /* Every tile of the surface, from its country's biome. Levels are made fresh. */
@@ -1239,14 +1295,14 @@ function placeGrove(within, mark){
   const t = best.t;
   /* The hollow is solid, so it stands before the ring is vetted. A pine judged beside an open centre can wall off
      a tile that the hollow then seals in. */
-  t.feature = 'hollow'; t.planted = tick - 300 * DAY; t.berries = 0;
+  t.feature = 'hollow'; t.planted = tick - days(300); t.berries = 0;
   /* The ways around the hollow as they stand. A pine may not make them worse, but dense old forest that was
      already tight is not the grove's doing. */
   const openAround = keepsPaths(t);
   if (trees.length < 8) for (const [dx, dy] of RING){
     const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
     if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
-    q.feature = 'tree'; q.planted = tick - 60 * DAY;
+    q.feature = 'tree'; q.planted = tick - days(60);
     /* The hollow keeps two open sides, so the sprites have a door and a way back to it. The ways around the hollow
        must still meet once the pine stands, or the pine and the hollow together seal a pocket. */
     if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2 || (openAround && !keepsPaths(t))){ q.feature = null; delete q.planted; }
@@ -1264,29 +1320,29 @@ function placeGrove(within, mark){
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
 /* Plants grow, seed, and die. Sixty random tiles a tick. */
 function growPlants(){
-  for (let k = 0; k < 60; k++){
+  for (let k = 0; k < CLOCK.plant.samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
-      const age = (tick - (t.planted || 0)) / DAY;
-      if (age > 60 && rng() < 0.01){ t.feature = null; t.berries = 0; t.garden = null; t.ground = t.ground === 'grass' ? 'soil' : t.ground; continue; }
-      const g = { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }[seasonOf()] * (age < 3 ? 0 : age > 48 ? 0.5 : 1);
-      if (isWinter()){ if (t.berries > 0 && rng() < 0.15) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
-      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= 5 && rng() < 0.012){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
+      const age = tick - (t.planted || 0);
+      if (age > CLOCK.plant.bushOld && rng() < CLOCK.plant.bushDies){ t.feature = null; t.berries = 0; t.garden = null; t.ground = t.ground === 'grass' ? 'soil' : t.ground; continue; }
+      const g = CLOCK.plant.berryGrow[seasonOf()] * (age < CLOCK.plant.bushYoung ? 0 : age > CLOCK.plant.bushTired ? 0.5 : 1);
+      if (isWinter()){ if (t.berries > 0 && rng() < CLOCK.plant.berryWither) t.berries--; } else if (t.berries < 5 && rng() < g) t.berries++;
+      if ((seasonOf() === 'autumn' || seasonOf() === 'spring') && age >= CLOCK.plant.bushSeedsFrom && rng() < CLOCK.plant.bushSeeds){ const q = nearFind(t.x, t.y, q => q.ground === 'grass' && !q.feature && !q.struct && !itemAt(q.x, q.y) && !nearFind(q.x, q.y, z => z.feature === 'bush' && z !== t, RING), RING); if (q){ q.feature = 'bush'; q.berries = 0; q.planted = tick; } }
     }
-    else if (t.feature === 'sapling'){ if ((tick - t.planted) / DAY > 12 && saplingMayGrow(t)) t.feature = 'tree'; }
-    else if (t.feature === 'mushrooms'){ if (t.shrooms < 4 && rng() < 0.3) t.shrooms++; }
+    else if (t.feature === 'sapling'){ if (tick - t.planted > CLOCK.plant.saplingGrown && saplingMayGrow(t)) t.feature = 'tree'; }
+    else if (t.feature === 'mushrooms'){ if (t.shrooms < 4 && rng() < CLOCK.plant.shroomGrow) t.shrooms++; }
     else if (t.feature === 'tree'){
-      if (weather.storm && (tick - (t.planted || 0)) / DAY > 100 && rng() < 0.03){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
-      if (rng() < 0.02){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
+      if (weather.storm && tick - (t.planted || 0) > CLOCK.plant.pineOld && rng() < CLOCK.plant.pineFalls){ t.feature = null; addItem('log', t.x, t.y); addItem('stick', t.x, t.y); addItem('stick', t.x, t.y); if (camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 20)) log('An old pine comes down in the storm.', []); continue; }
+      if (rng() < CLOCK.plant.stickDrops){ const q = nearFind(t.x, t.y, q => passable(q.x, q.y) && !q.feature && !itemAt(q.x, q.y) && !q.struct, RING); if (q) addItem('stick', q.x, q.y); } }
     else if (!t.feature){
-      if (t.ground === 'ash' && rng() < 0.05) t.ground = 'grass';
-      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < 0.004 && !t.mouth && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
+      if (t.ground === 'ash' && rng() < CLOCK.plant.ashHeals) t.ground = 'grass';
+      else if (t.ground === 'grass' && !t.struct && !itemAt(t.x, t.y) && rng() < CLOCK.plant.saplingSprouts && !t.mouth && nearFind(t.x, t.y, q => q.feature === 'tree', RING) && !camps.some(c => c.site && dist(t.x, t.y, ...c.site) <= 5)){ t.feature = 'sapling'; t.planted = tick; }
     }
   }
 }
   /* Old carcasses rot. */
 function rotCarcasses(){
-  if (tick % 50 === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? 1500 : i.kind === 'fish' ? 600 : 900) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
+  if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */
 function steps(x, y, z, out){
@@ -1359,13 +1415,13 @@ const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r
 
 function stashAdd(kind, n){
   camp.stash[kind] = (camp.stash[kind] || 0) + n;
-  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
+  if (camp.rot[kind]){ const life = (kind === 'cooked' ? CLOCK.food.cookedKeeps : CLOCK.food.berriesKeep) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
 }
 function stashTake(kind, n = 1){ camp.stash[kind] = Math.max(0, camp.stash[kind] - n); if (camp.rot[kind]) camp.rot[kind].splice(0, n); }
 function spoilFood(){
   let lost = 0;
   for (const kind in camp.rot){ const keep = camp.rot[kind].filter(t => t > tick); lost += camp.rot[kind].length - keep.length; camp.rot[kind] = keep; camp.stash[kind] = Math.min(camp.stash[kind], keep.length); }
-  if (lost && tick - camp.rotLogged > 600){ camp.rotLogged = tick; log(`Some food in the stash has gone off. Smoked meat would have kept.`, campHumans(), 'bad'); }
+  if (lost && tick - camp.rotLogged > CLOCK.cooldown.rotLine){ camp.rotLogged = tick; log(`Some food in the stash has gone off. Smoked meat would have kept.`, campHumans(), 'bad'); }
 }
 const stashFood = () => camp.stash.berries + camp.stash.cooked + camp.stash.smoked;
 const foodTarget = () => (seasonOf() === 'autumn' ? 12 : isWinter() ? 10 : 6) + (camp.storehouse ? 6 : 0) + campHumans().length;
@@ -1456,12 +1512,12 @@ function startFoundCamp(leader){
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
   const mate = mates[0]; if (!mate) return false;
   const old = camp, nc = makeCamp(`${leader.name}'s camp`);
-  nc.target = secCenter(target); nc.coals = tick + 6000;
-  const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + 3000); } };
+  nc.target = secCenter(target); nc.coals = tick + CLOCK.party.coalsLast;
+  const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + CLOCK.party.foodKeeps); } };
   take('smoked', 3); take('berries', 3); take('stick', 4);
   old.sentParty = `${leader.name} and ${mate.name}`;
-  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, 2000); }
-  for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, 1200);
+  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
+  for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
   return startJoin(leader);
 }
@@ -1481,7 +1537,7 @@ function startJoin(a){
   a.task = { type: 'travel', label: c.site ? 'Walking toward the smoke' : 'Walking to the new valley', path: p,
     arrive(a, t){ if (nearAt(a, cx, cy) > within){ const q = legPath(a, cx, cy, within); if (!q) return 'fail'; t.path = q; return 'continue'; }
       a.homeless = false;
-      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, 1500); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, 800); }
+      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
       else log(`${a.name} reaches the new valley.`, [a]);
       return 'done'; } };
   return true;
@@ -1495,18 +1551,18 @@ function updateCamps(){
     if (pt && pt.struct.lit){
       camp.outSince = 0;
       const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
-      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
+      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, CLOCK.thought.fireout); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
     }
-    if (tick % 100 === 0) spoilFood();
-    if (tick % 300 === 0) faeTick();
-    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, 3000); }
+    if (tick % CLOCK.every.spoil === 0) spoilFood();
+    if (tick % CLOCK.every.fae === 0) faeTick();
+    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
     /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
        A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
        the land feeds, and winter, when nothing can be gathered, then killed it together. */
-    if (tick % 400 === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= foodTarget() && rng() < 0.35){
-      const hs = campHumans().filter(h => stage(h) === 'adult' && tick - h.lastChild > 16 * DAY);
+    if (tick % CLOCK.birth.every === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= foodTarget() && rng() < CLOCK.birth.chance){
+      const hs = campHumans().filter(h => stage(h) === 'adult' && tick - h.lastChild > CLOCK.birth.gap);
       let pair = null;
       for (const p of hs) for (const q of hs) if (p.id < q.id && (p.opinions[q.id] || 0) >= 35 && (q.opinions[p.id] || 0) >= 35 && (!pair || (p.opinions[q.id] + q.opinions[p.id]) > pair.v)) pair = { p, q, v: p.opinions[q.id] + q.opinions[p.id] };
       if (pair){
@@ -1514,16 +1570,16 @@ function updateCamps(){
         c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
         for (const t in c.traits) c.traits[t] = clamp(Math.round(((pair.p.traits[t] + pair.q.traits[t]) / 2 + (rng() - 0.5) * 0.3) * 100) / 100, 0, 1);
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
-        for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, 3000); }
-        for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, 1500);
+        for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
+        for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [c, pair.p, pair.q], 'major');
       }
     }
     tryLightning();
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
-      camp.nextArrival = tick + 900 + rint(900);
-      if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? 0.85 : 0.7)){
+      camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
+      if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? CLOCK.arrival.villageChance : CLOCK.arrival.chance)){
         const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
         const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
         const ok = edges.filter(i => region.has(i));
@@ -2303,9 +2359,9 @@ function startFetchEmber(a){
       const pit = pitTile().struct; a.carrying = null;
       if (pit.fuel <= 0) return 'fail';
       if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
-      pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + 700;
+      pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
       log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major');
-      addThought(a, 'rekindled', 'Brought fire home', 10, 1200); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, 1000);
+      addThought(a, 'rekindled', 'Brought fire home', 10, 1200); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
       return 'done';
     } };
   return true;
@@ -2724,7 +2780,7 @@ const GOALS = [
         t.struct = { type: 'firepit', fuel: 200, lit: false };
         for (const [dx, dy] of RING){ const q = tileAt(t.x + dx, t.y + dy); if (q.ground === 'grass') q.ground = 'soil'; }
         camp.pit = [t.x, t.y]; gainXp(a, 'build');
-        if (camp.coals > tick){ t.struct.lit = true; camp.everLit = true; camp.nextArrival = tick + 900; log(`${a.name} finishes the fire pit and blows the carried coals to life. A second hearth burns.`, campHumans(), 'major'); }
+        if (camp.coals > tick){ t.struct.lit = true; camp.everLit = true; camp.nextArrival = tick + CLOCK.arrival.secondHearth; log(`${a.name} finishes the fire pit and blows the carried coals to life. A second hearth burns.`, campHumans(), 'major'); }
         else log(`${a.name} finishes the fire pit and clears the grass around it. The wood is laid. It only needs a spark.`, [a], 'major');
         addThought(a, 'pit', 'Built a proper fire pit', 6, 800);
       }) });
@@ -3147,38 +3203,38 @@ function spreadFire(){
 }
 /* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
 function burnTile(t){
-  t.fire--;
+  t.fire -= CLOCK.fire.burn;
   for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
   if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
   for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
-  if (weather.storm) t.fire -= 2;
+  if (weather.storm) t.fire -= CLOCK.fire.stormQuench;
   if (t.fire <= 0) burnOut(t);
 }
 function spreadTo(nx, ny, nz, mult){
   if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
-  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? 0.012 : 0.08) * mult) ignite(nb);
+  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
-  if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + 150 + rint(300); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
-  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? 4000 : 2000) + rint(3000); }
+  if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
+  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 }
 /* Lightning near the camp, only in storms. More often when the hearth is out. */
 function tryLightning(){
   if (camp.site && weather.storm){
     const out = camp.pit && !pitLit();
-    if (rng() < (out ? 0.0035 : 0.0006)){
+    if (rng() < (out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
-      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, 240); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
+      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
     }
   }
 }
 /* A stray strike anywhere in the world. */
 function strayLightning(){
-  if (weather.storm && rng() < 0.0008){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+  if (weather.storm && rng() < CLOCK.rate.strayLightning){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
 }
 
 /* ---------- the primal gods ----------
@@ -3186,7 +3242,7 @@ function strayLightning(){
    tile. Gods come into being from contrasts: the seed makes the first, and every other is made by a
    lack. In the gods era a step is an age; every awake god scores its acts over the live regions and
    does the best one, eldest first. Everything here draws from the gods' own stream. */
-SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: 0, zmin: 0, zmax: 0, perTick: false };
+SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: ticks(0), zmin: 0, zmax: 0, perTick: false };
 LIFE.god = { adult: 0, old: Infinity, life: Infinity, death: 'killable' };
 const GOD_NAMES = ['Ondru', 'Sael', 'Ashka', 'Veyl', 'Morrow', 'Ilse', 'Thrum', 'Kesh', 'Ubbe', 'Nyr', 'Tamsa', 'Orun'];
 const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet', dry: 'who is Dry', hot: 'who is Hot', cold: 'who is Cold', still: 'who is Still', moving: 'who Moves', light: 'who is Light', dark: 'who is Dark' };
@@ -3267,7 +3323,7 @@ function offend(r, g, contrast){
   const who = new Set(r.marks.filter(mine).map(m => m.by));
   for (const id of who){ const o = beingById(id); if (!o || o.status !== 'awake') continue;
     o.needs.calm = clamp(o.needs.calm - 20, 0, 100); o.opinions[g.id] = clamp((o.opinions[g.id] || 0) - 10, -100, 100);
-    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, 4); setRelation(o, g); }
+    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, CLOCK.thought.over); setRelation(o, g); }
 }
 
 /* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */
@@ -3610,7 +3666,7 @@ function runAges(max = options.ageLimit * 2 + 2){ let n = 0; while (era === 'god
 
 /* Once a day, the sleeping gods stir in their bodies. Built here so the fingerprint moves once; the waking rules
    come after the time model (spec section 5). Draws nothing yet. */
-function godsTick(){ if (tick % DAY !== 0) return; withGodRng(() => { for (const g of gods()) if (g.status === 'asleep') g.needs.rest = 100; }); }
+function godsTick(){ if (tick % CLOCK.every.godsRest !== 0) return; withGodRng(() => { for (const g of gods()) if (g.status === 'asleep') g.needs.rest = 100; }); }
 
 /* ---------- settle: from marks to tiles ----------
    When the last god sleeps, the marks become a valley. Painters run in a fixed order, each reading marks and
@@ -3846,7 +3902,7 @@ function resetState(seed, opts){
   seedText = String(seed); rng = mulberry32(hashSeed(seedText));
   tick = Math.round(hours(7)); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
-  camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: 1500 + rint(2000) };
+  camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
   goalPriority = {};
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
@@ -3866,14 +3922,14 @@ function lightTile(x, y, z = 0){
     const p = t.struct; camp = camps.find(c => c.pit && c.pit[0] === x && c.pit[1] === y) || camp;
     if (p.lit) return 'The fire is already burning.';
     if (p.fuel <= 0) return 'The pit is empty. It needs wood laid in it first.';
-    p.lit = true; if (!camp.everLit){ camp.everLit = true; log('Lightning strikes the pit. The wood catches, and the camp has a hearth.', campHumans(), 'major'); camp.nextArrival = tick + 700 + rint(600); }
+    p.lit = true; if (!camp.everLit){ camp.everLit = true; log('Lightning strikes the pit. The wood catches, and the camp has a hearth.', campHumans(), 'major'); camp.nextArrival = tick + CLOCK.arrival.first + rint(CLOCK.arrival.firstSpread); }
     else log('Lightning strikes the pit again. The fire is lit.', [], 'good');
-    for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, 1000);
+    for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
     return 'The fire pit is lit.';
   }
   if (t.fire > 0) return 'It is already burning.';
   if (!ignite(t)) return 'Nothing here will burn.';
-  t.fire = Math.max(t.fire, 240);
+  t.fire = Math.max(t.fire, CLOCK.fire.strikeFuel);
   log(`Lightning strikes ${t.feature === 'tree' ? 'a pine' : 'the ground'}${t.z > 0 ? ' on the hill' : ''}. Something is burning.`, humans().filter(h => nearAt(h, t.x, t.y, t.z) <= 40), 'bad');
   return 'Lightning. Something is burning, and it will smoulder a while.';
 }
@@ -3882,7 +3938,7 @@ function poke(a){
   /* A sleeping god is a being in the list like any other, and a nudge would startle it awake and set it wandering.
      What wakes a god is its own rule, and it is not built yet (the spec's section 5). Until then the door refuses. */
   if (a.species === 'god') return `${a.name} sleeps on, ${a.epithet}. A nudge from above does not wake a god.`;
-  if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + 400; addThought(a, 'poked', 'Felt a nudge from above', 2, 400); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
+  if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + CLOCK.limit.poked; addThought(a, 'poked', 'Felt a nudge from above', 2, CLOCK.thought.poked); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
   failTask(a); a.asleep = false; a.task = null; START.flee(a) || START.wander(a); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
 
@@ -3906,7 +3962,7 @@ function step(){
   if (era === 'gods') return ageStep();
   tick++; updateWorld(); camp = camps[0];
   for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
-  if (tick % 200 === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
+  if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }
 
 /* ---------- the door ----------
