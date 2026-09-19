@@ -4,7 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runDays, DAY } = require('./lib/run');
 
-const EMPTY = /^The last person in the valley is dead\./;
+/* Read the meaning, not the sentence: the line says the last person is dead. The rest of it may be reworded. */
+const EMPTY = /last person in the valley is dead/;
 const WANDERER = /comes over the hills alone/;
 const SMOKE = /^Someone saw the smoke\./;
 const WAIT = 10;   // CLOCK.arrival.afterTheLast, in days
@@ -34,6 +35,9 @@ test('the chronicle says the valley is empty, and one wanderer comes over the hi
   assert.equal(gone.length, 1, 'the chronicle says the people are gone exactly once');
   assert.equal(gone[0].kind, 'major');
   assert.equal(dayOfLine(gone[0]), emptied, 'the line comes on the day of the last death');
+  /* The pit burns its remaining fuel down untended, so the smoke arrival can still fire after this line.
+     The line must say what is true as it is written, and promise nothing about the smoke. */
+  assert.ok(!/smoke/i.test(gone[0].text), 'the line promises something about the smoke that a burning pit can disprove');
 
   const came = linesLike(events, WANDERER);
   assert.equal(came.length, 1, 'exactly one wanderer');
