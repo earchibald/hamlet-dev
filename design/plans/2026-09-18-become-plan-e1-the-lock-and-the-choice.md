@@ -482,6 +482,20 @@ test('what the player does is a chronicle line and never a legend', () => {
   assert.match(api.chronicle[0].text, /looks out through/);
 });
 
+test('a suspended age resumes through the gods the age began with', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn is open');
+  const was = api.agePos.list;
+  const top = api.pending.opts[0];
+  api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: top.type, region: top.region } });
+  /* The age either finished, which clears the position, or it ran on through the same list. */
+  assert.ok(api.agePos === null || api.agePos.list === was, 'the age never retook its list of gods');
+});
+
 test('the door refuses what is not built and what is not open', () => {
   const api = load(); api.startCreation('gamma', {});
   api.step();
@@ -578,14 +592,26 @@ function takeTurn(opt){
 function releaseTurn(){ pending = null; }
 ```
 
-- [ ] **Step 4: Suspend the age at the inhabited god**
+- [ ] **Step 4: Suspend the age at the inhabited god, and snapshot the gods once an age**
+
+`gods()` is `beings.filter(b => b.species === 'god')` — a fresh array on every call, not a live one. The original age loop called it once, so a god born mid-age by a `split` act was not reached until the next age. Task 3 kept that by taking the list once at the top of `ageDecide`. That is no longer enough: from this task on, `ageDecide` returns early and is called again to resume, and a second call would take a second, later snapshot that could include a god born during the player's own act. The snapshot moves to `agePos`, where it is taken once an age.
+
+In `src/sim/gods.js`, in `ageBegin`, replace the last line:
+
+```js
+  agePos = { i: 0, list: gods() };
+```
 
 In `src/sim/gods.js`, replace `ageDecide` from Task 3:
 
 ```js
+/* The gods of this age, as they stood when it began, and where we are among them. The list is taken
+   once an age and never retaken, so a suspended age resumes through the same gods the age started
+   with, and a god born mid-age waits for the next age exactly as it always did. */
 function ageDecide(){
-  while (agePos.i < gods().length){
-    const g = gods()[agePos.i];
+  const list = agePos.list;
+  while (agePos.i < list.length){
+    const g = list[agePos.i];
     if (g.status === 'awake'){
       /* The player's god with a free choice stops the age here. A god carrying an act has no choice
          to make, so it carries on and the turn does not open. */
