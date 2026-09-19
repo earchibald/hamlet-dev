@@ -160,6 +160,57 @@ test('leaving hands the creation back, and it runs on', () => {
   assert.equal(api.pending, null, 'leaving closes the open turn');
   assert.equal(api.inhabited, null);
   const ageWas = api.age;
+  /* Leaving does not resume the age by itself: it only closes the turn. The next step finishes the
+     age that was already open, and only the step after that begins a new one. */
+  api.step();
+  assert.equal(api.age, ageWas, 'the first step after leaving only finishes the open age');
   api.step();
   assert.ok(api.age > ageWas, 'the ages run again');
+});
+
+test('switching gods mid-turn never leaves pending naming a different god than inhabited', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g1 = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g1.id });
+  api.step();
+  assert.ok(api.pending, 'the first turn is open');
+  const g2 = api.awakeGods().find(g => g.id !== g1.id);
+  if (g2){
+    api.inject({ source: 'player', act: 'become', id: g2.id });
+    assert.ok(api.pending === null || api.pending.god === api.inhabited,
+      'pending, if any, names the same god as inhabited');
+    assert.equal(api.inhabited, g2.id);
+  }
+});
+
+test('leaving mid-turn and stepping on decides that god exactly once for that age', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  const ageAtTurn = api.age;
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn is open');
+  api.inject({ source: 'player', act: 'become', id: null });
+  api.step();
+  api.step();
+  const entries = api.creation.choices.filter(c => c.god === g.id && c.age === ageAtTurn && !c.continued);
+  assert.equal(entries.length, 1, 'the abandoned turn was decided exactly once, not redrawn and redecided');
+});
+
+test('leaving mid-turn and becoming the same god again reopens the identical matrix', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn is open');
+  const firstOpts = api.pending.opts;
+  api.inject({ source: 'player', act: 'become', id: null });
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn reopened for the same god');
+  assert.deepEqual(api.pending.opts, firstOpts, 'the matrix was reused, not redrawn');
+  assert.equal(api.step(), 'The turn is yours.');
 });
