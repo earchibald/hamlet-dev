@@ -208,7 +208,10 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] Tune against the long run on three seeds until a camp's first ten days read as today's do: a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10. Change a value only in the table, and log each change with its reason.
 - [ ] Write the report: for each seed, today's golden line beside the new three-day line; the long run's counts beside today's at the same world age of the camp; every value whose world-time meaning moved by more than a factor of two, with the reason; seconds a world day at day 3 and day 50; the floors that were removed and where G5 puts them back.
 - [ ] The notes gain a section on the real clock, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
+- [ ] Watch the doomed line. `lineIsDoomed()` in `src/sim/camps.js` holds on zero ticks of all six seeds for 70 days today, measured by dev-coordinator, and every seed does fall to one living person. The hearth condition is the only thing that prevents it. This retune changes when a pit goes out, so the rule can start to fire. Report it in the long run if it does. Issue 25's proposed gate on more than one person having lived is free either way: the smallest number who ever lived on any seed is 29.
 - [ ] Do not bless. Open the pull request with the report, and tell dev-coordinator that it waits for the user.
+
+**An option, not a task.** Nothing catches prose that states a duration. `tests/clock.js` reads rules, not strings, so issue 37 and the six strings above all passed it. A lint that flags a number word beside "day", "days", "winter" or "year" in a player-facing string would have caught all seven. It would also be noisy. Offer it to the user with the report; do not build it inside G4.
 
 ## Self-review
 
