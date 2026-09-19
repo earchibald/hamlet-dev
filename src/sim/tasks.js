@@ -341,7 +341,12 @@ TASKS.join = { type: 'travel',
     const c = a.camp;
     a.homeless = false;
     /* A camp with no name record yet is "the camp". The test is the record, not its text. */
-    if (c.site){ log(`${a.name} arrives at ${campNameOf(c)} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
+    /* Nobody welcomes a walker into an empty camp, and there is no fire to welcome them by. A camp
+       can stand empty at this moment two ways: the founder of a new line walks into ground nobody
+       holds, and the wanderer walks into a camp whose people are all dead. Neither is welcomed. */
+    const met = beings.some(b => b.species === 'human' && b.alive && b.camp === c && b !== a);
+    if (c.site && met){ log(`${a.name} arrives at ${campNameOf(c)} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
+    else if (c.site) log(`${a.name} reaches ${campNameOf(c)}. Nobody is there to meet them.`, [a], 'major');
     else log(`${a.name} reaches the new valley.`, [a]);
     return 'done';
   }] };

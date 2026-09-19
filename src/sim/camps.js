@@ -114,10 +114,20 @@ function foundingSites(){
     aroundSector(s, looseCount('stick')) >= need.stick &&
     aroundSector(s, wet) > 0);
 }
+/* How far apart two camps stand, in sectors. A new camp keeps this much ground from every camp that
+   already has a site, so two lines do not share one stretch of valley floor. The founding party and
+   the new line over the hills both read it. */
+const CAMPS_APART = 3;
+/* The sectors a new camp may take: a founding site far enough from every camp that has one. The
+   caller sorts them, and the two callers sort them differently, so no order is set here. */
+const campSites = () => foundingSites().filter(s => camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= CAMPS_APART));
 function startFoundCamp(leader){
   const here = secOf(...camp.site);
   const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
-  const cands = foundingSites().filter(s => camps.every(c => !c.site || dist(secOf(...(c.site)).sx, secOf(...(c.site)).sy, s.sx, s.sy) >= 3) && region.has(idx3(...secCenter(s), 0)));
+  /* The party walks there carrying coals, so it takes the nearest ground that will do, and this sort
+     draws nothing. The sort in `theLoneFounder` breaks its ties with `rng()`; that tiebreak belongs to
+     that sort alone. Give the two one shared sort and every seed's golden record moves. */
+  const cands = campSites().filter(s => region.has(idx3(...secCenter(s), 0)));
   if (!cands.length) return false;
   const target = cands.sort((p, q) => dist(p.sx, p.sy, here.sx, here.sy) - dist(q.sx, q.sy, here.sx, here.sy))[0];
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
@@ -151,15 +161,16 @@ function shelterSite(){
 const campNameOf = c => c && nameOf(c) ? c.name : 'the camp';
 const campName = () => campNameOf(camp);
 
-/* A stranger walks in from a reachable edge of the world and makes for `camp`. Returns the person,
-   or null when no edge of the world can reach the camp's site. */
-function comeOverTheHills(){
-  const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
+/* A stranger walks in from a reachable edge of the world and makes for `home`. Returns the person,
+   or null when no edge of the world can reach that camp's site. The camp is an argument, not the
+   global one the tick loop holds: a caller brings a person to a camp of its own choosing. */
+function comeOverTheHills(home){
+  const region = reachable(home.site[0], home.site[1], 0, NZ * W * H);
   const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
   const ok = edges.filter(i => region.has(i));
   if (!ok.length) return null;
   const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
-  const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
+  const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = home; beings.push(b);
   lineageFor(b, { edge: x === 0 ? 'west' : x === W - 1 ? 'east' : y === 0 ? 'north' : 'south' });
   return b;
 }
@@ -178,55 +189,74 @@ function afterTheLast(){
   }
   if (tick < wanderAt || isWinter()) return;
   const home = camps.find(c => c.site); if (!home) return;
-  camp = home;
-  const b = comeOverTheHills(); if (!b) return;
+  const b = comeOverTheHills(home); if (!b) return;
   wanderAt = 0;
-  log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campName()} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
+  log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campNameOf(home)} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
 }
 
-/* The line that cannot go on. A birth needs two adults who like each other, so one person alone can
-   never make a second. The count of one says that already, so nothing counts the adults again.
-   A valley down to one living person is finished, and the smoke arrival cannot save it either,
-   because a cold pit makes no smoke.
+/* One person alone beside a hearth they have let go cold. A birth needs two adults who like each
+   other, so one person alone can never make a second. The count of one says that already, so nothing
+   counts the adults again. The smoke cannot help them either, because a cold pit makes no smoke.
    One person with the fire out is not enough on its own. A camp is briefly down to one person with a
    cold pit often enough: mid-winter, mid-journey, a founding party on the road. So the hearth must
-   have been cold a long while, and every hearth in the valley must be cold. `outSince` is the tick a
-   pit went out, and it is 0 while the pit burns. */
-function lineIsDoomed(){
+   have been cold a long while. `outSince` is the tick a pit went out, and it is 0 while the pit burns.
+   The hearths counted are the hearths of the living, which today is the one camp the last person
+   keeps. Written that way it stays true once a second line burns a fire of its own elsewhere. */
+function aloneByAColdHearth(){
   const hs = humans();
   if (hs.length !== 1) return false;
-  const hearths = camps.filter(c => c.pit);
+  const hearths = camps.filter(c => c.pit && hs.some(h => h.camp === c));
   if (!hearths.length) return false;
   return hearths.every(c => { const t = tileAt(c.pit[0], c.pit[1]); return !!(t && t.struct && !t.struct.lit && c.outSince && tick - c.outSince >= CLOCK.arrival.afterTheDoomed); });
 }
 
-/* The wanderer who comes to the last of a line. The chronicle says the line is doomed, and one
-   stranger crosses the hills after the same wait as after the last death, outside winter. They meet
-   somebody alive, which is a different meeting from a cold hearth among bones.
+/* The last of a line, and the valley that goes on without them. Nobody is sent to rescue the one who
+   lets the fire die: they keep their hermitage, and the chronicle says the line ends with them. The
+   valley is a different matter. After the same wait as after the last death, and outside winter, a
+   founder walks in over the hills far away and starts a camp of their own. The two may meet later by
+   ordinary movement, as any two camps' people do. Nothing here arranges it.
    Only the count of the people holds the wait open. If the last one dies, `afterTheLast` takes the
-   valley over, and this rule drops its wait rather than run a second one beside it. If a stranger
-   arrives, the valley is two again and the wait is over. */
-function theDoomedLine(){
+   valley over, and this rule drops its wait rather than run a second one beside it. Once the founder
+   is in, the valley is two again and the wait is over.
+   The new ground is the farthest that will do, not the nearest: the new line should not tread on the
+   hermit on its first day. Ties go to `rng()`, as `shelterSite` settles its ties. */
+function theLoneFounder(){
   if (humans().length !== 1){ doomAt = 0; return; }
   const last = humans()[0];
   if (!doomAt){
-    if (!lineIsDoomed()) return;
+    if (!aloneByAColdHearth()) return;
     doomAt = tick + CLOCK.arrival.afterTheLast;
-    log(`${last.name} is the only person left in the valley. The hearth is cold. No child comes of one person alone.`, [last], 'major');
+    log(`${last.name} lets the hearth go cold and does not light it again. No child comes of one person alone. This line ends with them.`, [last], 'major');
     return;
   }
   if (tick < doomAt || isWinter()) return;
-  const home = camps.find(c => c.site); if (!home) return;
-  camp = home;
-  const b = comeOverTheHills(); if (!b) return;
-  doomAt = 0;
-  log(`${b.name} comes over the hills to ${campName()}. No smoke called them. ${last.name} is not the last of the people now.`, [b, last], 'major');
+  /* One new line at a time. A camp begun this way is marked, and while anyone of it still lives the
+     valley gets no third camp out of the hills. The mark is a field on the camp, so an old save that
+     has never seen one simply reads it as absent. */
+  if (camps.some(c => c.overTheHills && humans().some(h => h.camp === c))) return;
+  const here = secOf(last.x, last.y);
+  const cands = campSites().map(s => ({ s, sc: dist(s.sx, s.sy, here.sx, here.sy) + rng() })).sort((p, q) => q.sc - p.sc);
+  if (!cands.length) return;
+  const nc = makeCamp('The new camp');
+  for (const { s } of cands){
+    /* `setSite` names the camp from whoever stands near it when the camp has no founder yet. The new
+       camp has nobody in it, so that finds no one and gives no name; the founder names it below. */
+    const prev = camp; camp = nc; setSite(...secCenter(s)); camp = prev;
+    const b = comeOverTheHills(nc);
+    if (!b) continue;   // no edge of the world reaches that ground; try the next
+    nc.overTheHills = true;
+    nameFoundersCamp(nc, b);
+    doomAt = 0;
+    log(`${b.name} comes over the hills into the ${s.name.toLowerCase()} and stops there. No smoke called them. They do not know that ${last.name} keeps a cold hearth on the far side of the valley.`, [b], 'major');
+    return;
+  }
+  camps.pop();   // no ground the world's edge can reach; the camp record goes with it
 }
 
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
   afterTheLast();
-  theDoomedLine();
+  theLoneFounder();
   for (const c of camps){
     camp = c;
     const pt = pitTile();
@@ -268,7 +298,7 @@ function updateCamps(){
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
       if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? CLOCK.arrival.villageChance : CLOCK.arrival.chance)){
-        const b = comeOverTheHills();
+        const b = comeOverTheHills(camp);
         if (b) log(`Someone saw the smoke. ${b.name} comes over the hills toward ${campName()}.`, [b], 'major');
       }
     }
