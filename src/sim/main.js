@@ -35,7 +35,7 @@ function lightTile(x, y, z = 0){
   if (t.fire > 0) return 'It is already burning.';
   if (!ignite(t)) return 'Nothing here will burn.';
   t.fire = Math.max(t.fire, CLOCK.fire.strikeFuel);
-  log(`Lightning strikes ${t.feature === 'tree' ? 'a pine' : 'the ground'}${t.z > 0 ? ' on the hill' : ''}. Something is burning.`, humans().filter(h => nearAt(h, t.x, t.y, t.z) <= 40), 'bad');
+  log(`Lightning strikes ${t.feature === 'tree' ? 'a pine' : 'the ground'}${t.z > 0 ? ' on the hill' : ''}. Something is burning.`, humans().filter(h => nearAt(h, t.x, t.y, t.z) <= 40), 'bad', 'fire');
   return 'Lightning. Something is burning, and it will smoulder a while.';
 }
 function poke(a){

@@ -392,8 +392,10 @@ function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
-function log(text, who = [], kind = 'info'){
-  const e = { tick, when: stamp(), text, kind };
+/* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
+   for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
+function log(text, who = [], kind = 'info', tag = null){
+  const e = { tick, when: stamp(), text, kind, tag, camp: camp ? camp.id : null };
   if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
   for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
@@ -2116,7 +2118,7 @@ function updateCamps(){
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
         for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
         for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
-        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major');
+        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
     tryLightning();
@@ -3773,7 +3775,7 @@ function tryLightning(){
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
-      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
+      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
     }
   }
 }
@@ -4479,7 +4481,7 @@ function lightTile(x, y, z = 0){
   if (t.fire > 0) return 'It is already burning.';
   if (!ignite(t)) return 'Nothing here will burn.';
   t.fire = Math.max(t.fire, CLOCK.fire.strikeFuel);
-  log(`Lightning strikes ${t.feature === 'tree' ? 'a pine' : 'the ground'}${t.z > 0 ? ' on the hill' : ''}. Something is burning.`, humans().filter(h => nearAt(h, t.x, t.y, t.z) <= 40), 'bad');
+  log(`Lightning strikes ${t.feature === 'tree' ? 'a pine' : 'the ground'}${t.z > 0 ? ' on the hill' : ''}. Something is burning.`, humans().filter(h => nearAt(h, t.x, t.y, t.z) <= 40), 'bad', 'fire');
   return 'Lightning. Something is burning, and it will smoulder a while.';
 }
 function poke(a){

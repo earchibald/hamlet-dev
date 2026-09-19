@@ -280,3 +280,45 @@ test('a site set with nobody named as the actor (the door\'s path) still gets a 
   assert.equal(c.founder, a.id);
   assert.equal(c.names[0].by, a.id);
 });
+
+/* Two data stamps: a tag on a line, and the tick of a death. Only the part of the task that
+   lives outside the six files under the phase split (tasks, beings, species, fae, goals,
+   recipes) is done here: `log`'s tag and camp, and the tags on the lines in weather.js,
+   camps.js's updateCamps, and main.js's lightTile. The death stamp and the wolf, sprite,
+   den, ember, deer, fish, and pot tags live in those forbidden files and are deferred. */
+test('every chronicle line carries a tag field and the camp it belongs to', () => {
+  const api = world();
+  api.camp = api.camps[0];
+  api.log('A plain line.', [], 'info');
+  /* world() runs startWorld, which ends in the days era, so a fresh line never carries the
+     gods-era `age` field; that only appears on a line logged during creation, before a test
+     can reach it. The key list here is exact for that reason. */
+  assert.deepEqual(Object.keys(api.chronicle[0]).sort(), ['camp', 'kind', 'tag', 'text', 'tick', 'when']);
+  assert.equal(api.chronicle[0].tag, null);
+  assert.equal(api.chronicle[0].camp, api.camps[0].id);
+  api.log('A wolf slips into the dark camp.', [], 'bad', 'wolf');
+  assert.equal(api.chronicle[0].tag, 'wolf');
+});
+
+test('lightTile tags the line it logs when lightning sets a tree or the ground alight', () => {
+  const api = world();
+  const tree = api.world.find(t => t.feature === 'tree' && t.fire <= 0);
+  assert.ok(tree, 'no unlit tree to strike');
+  api.lightTile(tree.x, tree.y, tree.z);
+  assert.equal(api.chronicle[0].tag, 'fire');
+  assert.match(api.chronicle[0].text, /^Lightning strikes/);
+});
+
+test('the lines the event table reads carry their tags in a real run', () => {
+  /* Seed r gives only the weather-lightning 'fire' tag inside 20 days; the wolf, sprite, den,
+     ember, deer, and fish tags all live in files the phase split forbids editing right now, so
+     the only other tag this phase can produce is 'birth', which this seed reaches by day 40. */
+  const { events } = runDays('r', 40);
+  const tags = new Set(events.filter(e => e.tag).map(e => e.tag));
+  assert.ok(tags.size >= 2, `only ${[...tags].join(', ')}`);
+  for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'deer', 'fish', 'pot'].includes(e.tag), `${e.tag}: ${e.text}`);
+  for (const e of events){
+    if (e.text.includes(' is born to ')) assert.equal(e.tag, 'birth', e.text);
+    if (e.text.includes('Something is burning')) assert.equal(e.tag, 'fire', e.text);
+  }
+});

@@ -46,7 +46,7 @@ function tryLightning(){
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
-      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad'); }
+      if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
     }
   }
 }

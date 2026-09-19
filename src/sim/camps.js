@@ -183,7 +183,7 @@ function updateCamps(){
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
         for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
         for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
-        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major');
+        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
     tryLightning();

@@ -132,8 +132,10 @@ function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
-function log(text, who = [], kind = 'info'){
-  const e = { tick, when: stamp(), text, kind };
+/* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
+   for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
+function log(text, who = [], kind = 'info', tag = null){
+  const e = { tick, when: stamp(), text, kind, tag, camp: camp ? camp.id : null };
   if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
   for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
