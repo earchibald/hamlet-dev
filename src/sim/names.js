@@ -425,18 +425,24 @@ function loreCandidates(base){
     { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
   ];
 }
-/* The valley's route to the sky's word and the sprites' word. Both are sources, so
-   `scoreCandidates` never lets their plain text score above zero; only a distinct form may
-   carry them, and these compounds are that form. The people's own name has no such fallback,
-   because it needs none: naming after the people stays bare. */
+/* The one shape a source's own word may take once `scoreCandidates` will not let it score
+   above zero bare, keyed by the kind of thing being named. A kind with no row here has no
+   distinct form, so a source's bare word is dropped for it, exactly as it always was: a hill
+   cannot be a "Vale of". A source added later to `lore.sources` gets this shape at every kind
+   listed here with no other change. */
+const DISTINCT_FORM = {
+  valley: source => `Vale of ${source.text}`,
+};
+
+/* The valley's other fallback: the people's own name, in the one shape that still lets it win
+   once its bare text is already held by something else. This is not the source rule — the
+   people are the one exception the ruling names, so their bare word is never rewritten — it
+   only needs somewhere to land when that bare text is unavailable. */
 const VALLEY_FALLBACK_BASE = 20;
 function valleyFallbacks(){
   if (!lore) return [];
-  const b = VALLEY_FALLBACK_BASE;
   return [
-    { text: `Vale of ${lore.sky.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
-    { text: `Vale of ${lore.sprites.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
-    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: b, why: 'for the people who were here first' },
+    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: VALLEY_FALLBACK_BASE, why: 'for the people who were here first' },
   ];
 }
 /* ---------- events ----------
@@ -491,23 +497,33 @@ const eventName = entry => nameOf(entry);
 function candidatesFor(kind, by, place){
   return [...landCandidates(place), ...eventCandidates(camp, kind), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
-/* Score, drop duplicates, and sort. A text another thing already owns scores zero, and so
-   does a source's own bare word (`lore.sources`): it may only be offered in a distinct
-   form, such as the compounds in `valleyFallbacks`. The people are not a source here, so
-   their own name still scores in bare form. */
-function scoreCandidates(cands, by, thing){
+/* Score, drop duplicates, and sort. A text another thing already owns scores zero. A source's
+   own bare word (`lore.sources`) is never offered as itself: where this kind has a distinct
+   form (`DISTINCT_FORM`), the candidate is rewritten into that form and keeps the score its
+   bare text would have had, so it competes exactly as the bare text would have; where the
+   kind has none, the candidate is dropped, as before. The people are not a source here, so
+   their own name still scores, and sorts, bare. The tie-break sorts on `sortText`, the text
+   the candidate would have shown bare, so a source's word that would have won bare still wins
+   once it is rewritten into its distinct form. */
+function scoreCandidates(cands, by, thing, kind){
   const seen = new Set(), out = [];
   const owned = lore && lore.sources ? new Set(lore.sources.map(s => s.text.toLowerCase())) : null;
+  const form = DISTINCT_FORM[kind];
   for (const c of cands){
-    const key = c.text.toLowerCase();
+    const bareKey = c.text.toLowerCase();
+    let cand = c, bareOwnedNoForm = false;
+    if (owned && owned.has(bareKey)){
+      if (form){ const source = lore.sources.find(s => s.text.toLowerCase() === bareKey); cand = { ...c, text: form(source), sortText: c.text }; }
+      else bareOwnedNoForm = true;
+    }
+    const key = cand.text.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const owner = nameIndex.get(key);
-    const bareOwned = owned && owned.has(key);
-    c.score = (owner && owner !== thing) || bareOwned ? 0 : Math.round((c.base + (c.recency || 0)) * axisMult(c.axis, by) * 10) / 10;
-    out.push(c);
+    cand.score = bareOwnedNoForm || (owner && owner !== thing) ? 0 : Math.round((cand.base + (cand.recency || 0)) * axisMult(cand.axis, by) * 10) / 10;
+    out.push(cand);
   }
-  return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));
+  return out.sort((p, q) => q.score - p.score || (p.sortText || p.text).localeCompare(q.sortText || q.text));
 }
 /* The most sociable living member at the place, or the only one there is. */
 function namerFor(place){
@@ -527,7 +543,7 @@ function nameThing(thing, kind, by, place, extra = []){
   const pool = kind === 'valley' ? extra
     : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event')]
     : [...extra, ...candidatesFor(kind, by, place)];
-  const scored = scoreCandidates(pool, by, thing);
+  const scored = scoreCandidates(pool, by, thing, kind);
   const top = scored[0];
   if (!top || top.score <= 0) return null;
   if (thing.names && thing.names.length && thing.names[0].text === top.text) return thing.names[0];

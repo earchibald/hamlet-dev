@@ -655,9 +655,11 @@ test('the valley line never says the name twice', () => {
   const line = api.chronicle.find(e => e.text.includes('gives the whole valley a name'));
   assert.ok(line, 'the valley was not named');
   assert.equal(line.text.split(rec.text).length - 1, 1, `${line.text} says ${rec.text} twice`);
-  /* Every lore reason, and every fallback, reads without its own text in it. */
+  /* Every lore reason, and every fallback, reads without its own text in it. The sky's and the
+     sprites' compounds are no longer separate fallback rows: scoreCandidates rewrites their bare
+     lore candidate into that shape instead, so valleyFallbacks now carries only the people's. */
   const rows = [...api.loreCandidates(40), ...api.valleyFallbacks()];
-  assert.equal(rows.length, 6, 'the lore offers three texts and three fallbacks');
+  assert.equal(rows.length, 4, 'the lore offers three texts and one fallback');
   for (const r of rows) assert.equal(r.why.includes(r.text), false, `${r.text}: ${r.why}`);
 });
 
@@ -697,6 +699,19 @@ test('the valley is named even when every lore text is already taken, and the na
   assert.equal(api.valley.names[0].scores[0].axis, 'lore', 'the fallback is still a lore name');
   const texts = api.nameThings().flatMap(t => (t.names || []).map(r => r.text.toLowerCase()));
   assert.equal(new Set(texts).size, texts.length, 'a name is used twice');
+});
+
+/* Important review finding on task 2: a bare source word used to be struck to zero and dropped,
+   never rewritten, so the valley's pool fell straight through to the people's bare name, which
+   outscores a fallback compound (40 vs 20). Measured on seed r at day 45: the bare sky's word
+   ("Sadrumo") would have won the tie-break over the people's bare word ("Ska") before either rule
+   ran, so a source rule that keeps its score, not one that starts it over at a fallback's base,
+   must let it win still, in its distinct form. This fails on a79cd29 (the valley took "Ska") and
+   passes after the fix (the valley takes "Vale of Sadrumo"). */
+test('a source word that would have won bare wins in its distinct form, measured on seed r', () => {
+  const { api } = runDays('r', 45);
+  const n = api.nameOf(api.valley);
+  assert.equal(n, `Vale of ${api.lore.sky.text}`, `seed r's valley took ${n}, not the sky's compound`);
 });
 
 test('the first camp that is a village names the valley, even when it is not the first camp in the list', () => {
