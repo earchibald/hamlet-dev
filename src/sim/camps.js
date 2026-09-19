@@ -11,13 +11,13 @@ const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r
 
 function stashAdd(kind, n){
   camp.stash[kind] = (camp.stash[kind] || 0) + n;
-  if (camp.rot[kind]){ const life = (kind === 'cooked' ? 1800 : 3500) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
+  if (camp.rot[kind]){ const life = (kind === 'cooked' ? CLOCK.food.cookedKeeps : CLOCK.food.berriesKeep) * (isWinter() ? 2 : 1) * (camp.storehouse ? 2 : 1) * (kind === 'berries' && camp.stash.pot > 0 ? 2 : 1); for (let k = 0; k < n; k++) camp.rot[kind].push(tick + life); }
 }
 function stashTake(kind, n = 1){ camp.stash[kind] = Math.max(0, camp.stash[kind] - n); if (camp.rot[kind]) camp.rot[kind].splice(0, n); }
 function spoilFood(){
   let lost = 0;
   for (const kind in camp.rot){ const keep = camp.rot[kind].filter(t => t > tick); lost += camp.rot[kind].length - keep.length; camp.rot[kind] = keep; camp.stash[kind] = Math.min(camp.stash[kind], keep.length); }
-  if (lost && tick - camp.rotLogged > 600){ camp.rotLogged = tick; log(`Some food in the stash has gone off. Smoked meat would have kept.`, campHumans(), 'bad'); }
+  if (lost && tick - camp.rotLogged > CLOCK.cooldown.rotLine){ camp.rotLogged = tick; log(`Some food in the stash has gone off. Smoked meat would have kept.`, campHumans(), 'bad'); }
 }
 const stashFood = () => camp.stash.berries + camp.stash.cooked + camp.stash.smoked;
 const foodTarget = () => (seasonOf() === 'autumn' ? 12 : isWinter() ? 10 : 6) + (camp.storehouse ? 6 : 0) + campHumans().length;
@@ -108,12 +108,12 @@ function startFoundCamp(leader){
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
   const mate = mates[0]; if (!mate) return false;
   const old = camp, nc = makeCamp(`${leader.name}'s camp`);
-  nc.target = secCenter(target); nc.coals = tick + 6000;
-  const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + 3000); } };
+  nc.target = secCenter(target); nc.coals = tick + CLOCK.party.coalsLast;
+  const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + CLOCK.party.foodKeeps); } };
   take('smoked', 3); take('berries', 3); take('stick', 4);
   old.sentParty = `${leader.name} and ${mate.name}`;
-  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, 2000); }
-  for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, 1200);
+  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
+  for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
   return startJoin(leader);
 }
@@ -133,7 +133,7 @@ function startJoin(a){
   a.task = { type: 'travel', label: c.site ? 'Walking toward the smoke' : 'Walking to the new valley', path: p,
     arrive(a, t){ if (nearAt(a, cx, cy) > within){ const q = legPath(a, cx, cy, within); if (!q) return 'fail'; t.path = q; return 'continue'; }
       a.homeless = false;
-      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, 1500); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, 800); }
+      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
       else log(`${a.name} reaches the new valley.`, [a]);
       return 'done'; } };
   return true;
@@ -146,19 +146,19 @@ function updateCamps(){
     const pt = pitTile();
     if (pt && pt.struct.lit){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= PIT_BURN * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
-      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, CLOCK.thought.fireout); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
     }
-    if (tick % 100 === 0) spoilFood();
-    if (tick % 300 === 0) faeTick();
-    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, 3000); }
+    if (tick % CLOCK.every.spoil === 0) spoilFood();
+    if (tick % CLOCK.every.fae === 0) faeTick();
+    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
     /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
        A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
        the land feeds, and winter, when nothing can be gathered, then killed it together. */
-    if (tick % 400 === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= foodTarget() && rng() < 0.35){
-      const hs = campHumans().filter(h => stage(h) === 'adult' && tick - h.lastChild > 16 * DAY);
+    if (tick % CLOCK.birth.every === 0 && camp.shelter && (seasonOf() === 'spring' || seasonOf() === 'summer') && stashFood() >= foodTarget() && rng() < CLOCK.birth.chance){
+      const hs = campHumans().filter(h => stage(h) === 'adult' && tick - h.lastChild > CLOCK.birth.gap);
       let pair = null;
       for (const p of hs) for (const q of hs) if (p.id < q.id && (p.opinions[q.id] || 0) >= 35 && (q.opinions[p.id] || 0) >= 35 && (!pair || (p.opinions[q.id] + q.opinions[p.id]) > pair.v)) pair = { p, q, v: p.opinions[q.id] + q.opinions[p.id] };
       if (pair){
@@ -166,16 +166,16 @@ function updateCamps(){
         c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
         for (const t in c.traits) c.traits[t] = clamp(Math.round(((pair.p.traits[t] + pair.q.traits[t]) / 2 + (rng() - 0.5) * 0.3) * 100) / 100, 0, 1);
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
-        for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, 3000); }
-        for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, 1500);
+        for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
+        for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [c, pair.p, pair.q], 'major');
       }
     }
     tryLightning();
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
-      camp.nextArrival = tick + 900 + rint(900);
-      if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? 0.85 : 0.7)){
+      camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
+      if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? CLOCK.arrival.villageChance : CLOCK.arrival.chance)){
         const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
         const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
         const ok = edges.filter(i => region.has(i));

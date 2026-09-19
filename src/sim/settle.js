@@ -105,7 +105,7 @@ function undoSettle(lack){
   if (last){
     last.status = 'awake'; last.asleep = false; last.needs.rest = 60;
     for (const r of liveRegions()) r.marks = r.marks.filter(m => !(m.kind === 'rest' && m.value === last.id));
-    addThought(last, 'wouldnothold', 'The world would not hold', -10, 4);
+    addThought(last, 'wouldnothold', 'The world would not hold', -10, CLOCK.thought.wouldnothold);
     log(`${last.name} wakes. The world would not hold a life: it lacks ${lack}. The ages go on.`, [last], 'bad');
   } else log(`The world would not hold a life: it lacks ${lack}. The ages go on.`, [], 'bad');
 }

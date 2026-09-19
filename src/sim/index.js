@@ -1,7 +1,8 @@
 // The simulation core as one script, assembled from the files below.
 // The files are plain scripts that share one scope. They are joined in this
 // order, and the order matters: core.js declares the constants and state the
-// others read at load time, and beings.js declares START before species.js
+// others read at load time. clock.js comes next, because the tables of the
+// later files are written in its units. beings.js declares START before species.js
 // and fae.js add their actions to it. Function calls between files are free,
 // because function declarations hoist across the joined script.
 //
@@ -10,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
+const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -20,6 +21,7 @@ function source(){
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, START, SPECIES, GROUND, ITEMS, LIFE,
+  CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startPickFibre, startFish, startGather, startBuild, startClearDen, startDeliver, addItem, removeItem, stashAdd,
   runTask, updateBeing, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, sectorCount, looseCount,

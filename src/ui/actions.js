@@ -116,7 +116,7 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */

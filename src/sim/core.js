@@ -7,10 +7,11 @@
    The core is split into files under src/sim/. They are plain
    scripts that share one scope, joined in the order listed in
    src/sim/index.js. This file holds the constants, the data
-   tables, the seeded random numbers, the shared state, time,
-   and the chronicle. Every other file reads these.
+   tables, the seeded random numbers, the shared state and the
+   chronicle. The calendar and every duration are in clock.js.
+   Every other file reads these.
    ============================================================ */
-const LW = 28, LH = 20, DAY = 1000, TPS = 12;
+const LW = 28, LH = 20;
 /* World size in sectors and the level range are start options. startWorld sets them before anything is allocated. */
 let SW = 10, SH = 6, W = SW * LW, H = SH * LH;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
@@ -89,7 +90,7 @@ const BIOMES = {
   river:   { name: 'Riverside' },
   ash:     { name: 'Burnt ground' },
 };
-const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140, PIT_BURN = 0.25, EMBER_LIFE = 420;
+const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
 
 /* Seeded random numbers. */
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -116,7 +117,6 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
    of the run. godRng is the gods' own stream. */
 let era = 'days', age = 0, pulseAge = null, godRng = null, legends = [], creation = null, field = null, boundaries = [];
 
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 /* The ladder in stages. The panel groups goals by these, in this order. */
 const STAGES = [
   { id: 'fire',       label: 'Fire' },
@@ -127,11 +127,6 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
-const hourOf = () => ((tick % DAY) / DAY) * 24;
-const dayOf = () => Math.floor(tick / DAY) + 1;
-const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
