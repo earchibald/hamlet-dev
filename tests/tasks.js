@@ -172,8 +172,9 @@ test('a record does not share an array with the offer or the camp', () => {
 
 /* ---------- one mode: no file holds a closure task ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
-/* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
-const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
+/* `arrive` and `cleanup` as a method or a field, not as a word in a comment. `start: ` followed by a function or an
+   offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
+const OLD = /\b(arrive|cleanup)\s*[(:]|\.(arrive|cleanup)\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 test('no file holds a closure task', () => {
   const held = FILES.filter(f => new RegExp(OLD.source).test(fs.readFileSync(path.join(SIM, f + '.js'), 'utf8')));
   assert.deepEqual(held, []);

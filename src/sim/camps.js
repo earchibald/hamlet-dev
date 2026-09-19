@@ -127,8 +127,44 @@ function shelterSite(){
   return best ? [best.x, best.y] : null;
 }
 
+/* The camp's name as the chronicle says it. The first camp has no name of its own yet. */
+const campName = () => camp.name === 'The first camp' ? 'the camp' : camp.name;
+
+/* A stranger walks in from a reachable edge of the world and makes for `camp`. Returns the person,
+   or null when no edge of the world can reach the camp's site. */
+function comeOverTheHills(){
+  const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
+  const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
+  const ok = edges.filter(i => region.has(i));
+  if (!ok.length) return null;
+  const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
+  const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
+  return b;
+}
+
+/* The valley after the last person. The smoke arrival cannot fire, because a cold pit makes no smoke,
+   and that is why the camp cannot save itself. So the world offers one slower way in. When nobody
+   lives in the valley, a lone wanderer crosses the hills without being called, outside winter, and
+   finds the hearth cold. The run does not end: the animals, the sprites, and the weather go on. */
+function afterTheLast(){
+  if (!beings.some(b => b.species === 'human')) return;   // no person has lived here yet
+  if (humans().length){ wanderAt = 0; return; }
+  if (!wanderAt){
+    wanderAt = tick + CLOCK.arrival.afterTheLast;
+    log('The last person in the valley is dead. No one is left to tend a fire. No smoke will call anyone here.', [], 'major');
+    return;
+  }
+  if (tick < wanderAt || isWinter()) return;
+  const home = camps.find(c => c.site); if (!home) return;
+  camp = home;
+  const b = comeOverTheHills(); if (!b) return;
+  wanderAt = 0;
+  log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campName()} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
+}
+
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
+  afterTheLast();
   for (const c of camps){
     camp = c;
     const pt = pitTile();
@@ -164,14 +200,8 @@ function updateCamps(){
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
       if (pitLit() && stashFood() >= foodTarget() && campHumans().length < 4 + bedsFor() && !isWinter() && rng() < (camp.village ? CLOCK.arrival.villageChance : CLOCK.arrival.chance)){
-        const region = reachable(camp.site[0], camp.site[1], 0, NZ * W * H);
-        const edges = []; for (let x = 0; x < W; x++){ edges.push(idx3(x, 0, 0), idx3(x, H - 1, 0)); } for (let y = 0; y < H; y++){ edges.push(idx3(0, y, 0), idx3(W - 1, y, 0)); }
-        const ok = edges.filter(i => region.has(i));
-        if (ok.length){
-          const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
-          const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
-          log(`Someone saw the smoke. ${b.name} comes over the hills toward ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [b], 'major');
-        }
+        const b = comeOverTheHills();
+        if (b) log(`Someone saw the smoke. ${b.name} comes over the hills toward ${campName()}.`, [b], 'major');
       }
     }
   }

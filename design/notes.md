@@ -113,6 +113,10 @@ Fishing stops once the food goal is met. A raw fish counts as two meals toward t
 
 A camp takes a newcomer or bears a child only while the stock food goal is met. Beds alone let a village grow to twenty mouths, and winter, when the bushes are bare and nothing can be gathered, then starved them together.
 
+The smoke is what calls a newcomer, so a camp with a cold pit calls nobody. That is right, and it is also why a camp cannot save itself once the last person is dead. So the world has a second, slower way in. When no person is alive in the valley, the chronicle says so at once, and a lone wanderer crosses the hills ten days later, uncalled. Winter holds the wanderer back, as it holds back the arrival that follows the smoke. The wanderer arrives at a reachable edge of the world, homeless, and joins the old camp's site like any newcomer. They find the hearth cold and the bones of the people who lived there. The wait is `CLOCK.arrival.afterTheLast`.
+
+This is the world's rule, not a god's deed. It writes no legend, because the gods era is over at settle. It does not end the run either: the animals, the sprites, the gnomes, the weather, and everything the people built go on without them. The fire does not go out the moment the last person falls, so the smoke arrival can still bring people for as long as the fuel lasts. The wanderer is the floor under that, not a replacement for it.
+
 Spoilage: cooked meat 1800 ticks, berries 3500, doubled in winter and doubled by a storehouse. Smoked meat keeps.
 
 ## 9. Fire as the loop
