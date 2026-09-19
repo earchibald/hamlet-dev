@@ -358,6 +358,39 @@ test('a hearth that has burned three days gets the camp a plain name, kept with 
   assert.equal(api.chronicle.length, n, 'a camp is named once at the hearth');
 });
 
+/* Task 3 review, Important finding: the assertion above only checks that a drawn line is SOME
+   member of CAMP_NAMED_LINES. It would still pass if the pool had collapsed to one line, or if
+   an entry were dropped or duplicated, because a single draw can never see the rest of the pool.
+   These two tests give it that sight: one calls every builder directly to prove all seven are
+   distinct and sit at the index the pool has for them, the other drives real hearth-naming
+   across the six soak seeds to prove the live draw actually varies, not just the table. */
+test('every one of the seven camp-named lines is a distinct, reachable line', () => {
+  const api = load();
+  const built = api.CAMP_NAMED_LINES.map(f => f('Coldwater', 'the well went bad'));
+  assert.equal(api.CAMP_NAMED_LINES.length, 7, 'the pool must hold seven lines');
+  assert.equal(new Set(built).size, 7, 'two entries in the pool produce the same line');
+  api.CAMP_NAMED_LINES.forEach((f, i) => {
+    assert.equal(f('Coldwater', 'the well went bad'), built[i], `entry ${i} is not stable at its own index`);
+  });
+});
+
+test('the six soak seeds do not all draw the same camp-named line', () => {
+  /* Comparing the rendered chronicle text alone would pass even with the draw broken to
+     always return index 0: two seeds give different camp names and reasons, so the same
+     template still renders two different sentences. What must vary is the INDEX into the
+     pool, so this looks up which entry produced the line, not the text it produced. */
+  const indices = SEEDS.map(seed => {
+    const { api, c } = hearthCamp(seed);
+    api.nameCampAtHearth(c);
+    const r = c.names[0];
+    const line = api.chronicle.find(e => api.CAMP_NAMED_LINES.some(f => e.text === f(r.text, r.why)));
+    assert.ok(line, `${seed}: no hearth-named line was logged`);
+    return api.CAMP_NAMED_LINES.findIndex(f => f(r.text, r.why) === line.text);
+  });
+  assert.equal(indices.length, SEEDS.length, 'every seed should reach a hearth-named line');
+  assert.ok(new Set(indices).size > 1, `all six seeds drew the same pool entry: index ${indices[0]}`);
+});
+
 test('a village keeps its name at sixty, and the line says it is a village now', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
