@@ -149,6 +149,29 @@ test('what a being last chose is plain data', () => {
   for (const b of api.beings) if (b.alive && b.lastChoice) assert.deepEqual(plain(b.lastChoice, 'lastChoice'), []);
 });
 
+test('two people may break one fallen rock, and the second to finish does not fall over', () => {
+  const api = load(); api.startWorld('x');
+  const c = api.caves.find(c => c.blocked); assert.ok(c, 'seed x holds a cave with a fallen rock');
+  const b = c.blocked, rock = [b.x, b.y, b.z], cave = api.caves.indexOf(c);
+  const spot = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [b.x + dx, b.y + dy, b.z]).find(([x, y, z]) => api.hasTile(x, y, z) && api.passable(x, y, z));
+  assert.ok(spot, 'a floor tile lies beside the rock');
+  const first = api.firstPerson(), second = api.makeBeing('human', spot[0], spot[1], 'Second', 0);
+  second.camp = first.camp; api.beings.push(second); api.camp = first.camp;
+  if (!api.camp.stashTile) api.camp.stashTile = [first.x, first.y];
+  for (const p of [first, second]){ api.failTask(p); p.x = spot[0]; p.y = spot[1]; p.z = spot[2]; assert.ok(api.startTask(p, 'clearRock', { cave, rock }), 'the work starts'); assert.deepEqual(plain(p.task), []); }
+  for (let k = 0; k < 400 && (first.task || second.task); k++) for (const p of [first, second]) if (p.task && p.task.kind === 'clearRock' && p.task.stop === 0) api.runTask(p); else if (p.task) api.failTask(p);
+  assert.equal(c.blocked, null); assert.equal(api.tileAt(...rock).ground, 'stone');
+});
+
+test('a record does not share an array with the offer or the camp', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(); api.failTask(a);
+  const at = [a.x, a.y, a.z], args = { at, within: 0 };
+  api.TASKS.holdStill = { type: 'travel', begin: () => ({ label: 'Holding still' }), stops: [() => 'done'] };
+  assert.ok(api.startTask(a, 'holdStill', args));
+  assert.notEqual(a.task.args.at, at); assert.deepEqual(a.task.args.at, at);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */

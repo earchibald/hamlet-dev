@@ -350,7 +350,7 @@ const GOALS = [
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
       const near = caves.filter(c => c.kind === 'water' && dist(c.exit.x, c.exit.y, ...camp.site) <= 40); const out = [];
       for (const c of near){
-        if (c.blocked && camp.tools.axe) out.push({ label: 'clear the fallen rock', score: 40, task: { kind: 'brand', args: { label: 'Going down to the fallen rock', next: { kind: 'clearRock', args: { cave: caves.indexOf(c) } } } } });
+        if (c.blocked && camp.tools.axe) out.push({ label: 'clear the fallen rock', score: 40, task: { kind: 'brand', args: { label: 'Going down to the fallen rock', next: { kind: 'clearRock', args: { cave: caves.indexOf(c), rock: [c.blocked.x, c.blocked.y, c.blocked.z] } } } } });
         else if (!c.blocked && !c.searched && (!c.claimed || !beings.some(b => b.alive && b.id === c.claimed))) out.push({ label: 'search the cave with a brand', score: 36 + a.traits.curiosity * 20, task: { kind: 'brand', args: { label: 'Going into the dark', next: { kind: 'searchCave', args: { cave: caves.indexOf(c) } } } } });
       }
       return out;

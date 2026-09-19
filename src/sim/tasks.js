@@ -18,7 +18,8 @@ function setTask(a, kind, args, fields){
 }
 function startTask(a, kind, args = {}){
   const K = TASKS[kind]; if (!K) throw new Error(`No task kind '${kind}'.`);
-  const own = { ...args }, f = K.begin(a, own); if (!f) return false;
+  /* A deep copy: an offer may name a camp's own pit or site array, and a record must not share it. */
+  const own = JSON.parse(JSON.stringify(args)), f = K.begin(a, own); if (!f) return false;
   return f === true ? true : setTask(a, kind, own, f);
 }
 /* Run the current stop once. */
@@ -437,7 +438,9 @@ TASKS.searchCave = { type: 'search',
    is noticed rather than cleared a second time. */
 TASKS.clearRock = { type: 'work',
   begin(a, args){
-    const c = caves[args.cave]; const b = c.blocked; if (!b) return false;
+    /* args.rock is the fallen rock's tile, fixed when the offer was made, as the old task held it. Two people
+       may work one rockfall; the second to finish breaks a rock that is already broken, as it always did. */
+    const b = tileAt(...args.rock);
     /* Either side of the rock may be a real floor tile, but only the near side is reachable
        while the rock still blocks the passage. Try each candidate and keep the one with a path. */
     const spots = DIRS.map(([dx, dy]) => hasTile(b.x + dx, b.y + dy, b.z) ? tileAt(b.x + dx, b.y + dy, b.z) : null).filter(t => t && passable(t.x, t.y, t.z));
@@ -450,7 +453,7 @@ TASKS.clearRock = { type: 'work',
   stops: [(a, t) => {
     const [sx, sy, sz] = t.args.spot;
     if (nearAt(a, sx, sy, sz) > 0){ const q = pathToStop(a, sx, sy, 0, sz); if (!q) return 'fail'; t.path = q; return 'continue'; }
-    const c = caves[t.args.cave], b = c.blocked;
+    const c = caves[t.args.cave], b = tileAt(...t.args.rock);
     t.label = `Breaking the fallen rock (${Math.min(99, Math.floor(t.progress / CLOCK.work.breakRockfall * 100))}%)`; t.progress += workSpeed(a, 'build'); if (t.progress < CLOCK.work.breakRockfall) return 'continue';
     b.ground = 'stone'; c.blocked = null; c.story.push(`${a.name} cleared the rock.`); gainXp(a, 'build'); addItem('rock', sx, sy, sz);
     log(`${a.name} breaks through the fallen rock. The passage runs on into the dark.`, campHumans(), 'good'); a.carrying = null;
