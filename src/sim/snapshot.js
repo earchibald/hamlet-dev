@@ -33,6 +33,9 @@ const REFS = {
 /* The lists that own their records, and the type of record each holds. A record met along one of these
    paths is at home, not pointed at, so the encoder writes it whole. */
 const REF_HOMES = { camp: { snares: 'snare', pitfalls: 'pit' }, region: { marks: 'mark' }, field: { regions: 'region' } };
+/* Fields the snapshot leaves out because the loader rebuilds them, with the reason. The guard walks
+   past these; nothing else may hold a Map, a Set, or a record the snapshot does not name. */
+const REF_DERIVED = { field: { byId: 'rebuilt from field.regions' } };
 
 /* Scratch for one snapshot: the identity maps, the mark table, and the line table. It lives only
    inside takeSnapshot and unnamedRefs. */
@@ -60,12 +63,18 @@ function markTable(){
 
 /* How each kind of target is named, and how a loader reads that name back. `stage` is the loader's
    half-built world: it holds the arrays camps, caves, hills, groves, sectors and lines, a regionById
-   map, and a tileAt(i) that finds a staged tile by its idx3 number. */
+   map, and a tileAt(i) that finds a staged tile by its idx3 number.
+
+   The general rule: every kind here assumes its record lives in one list for ever, and names it by
+   its place in that list. A kind whose records can leave their list in play needs a stray path, or
+   the world becomes unsavable the moment one leaves. `grove` has one, because burnOut takes a grove
+   out of `groves` while its sprites still point at it. Before you add a kind, ask what removes a
+   record of it, and whether anything can still hold the record after. */
 const REF_KINDS = {
   camp:   { toId: c => snapIndex('camps', camps, c, 'camp'),       fromId: (i, s) => at(s.camps, i, 'camp') },
   cave:   { toId: c => snapIndex('caves', caves, c, 'cave'),       fromId: (i, s) => at(s.caves, i, 'cave') },
   hill:   { toId: h => snapIndex('hills', hills, h, 'hill'),       fromId: (i, s) => at(s.hills, i, 'hill') },
-  grove:  { toId: g => snapIndex('groves', groves, g, 'grove'),    fromId: (i, s) => at(s.groves, i, 'grove') },
+  grove:  { toId: g => groveId(g),                                 fromId: (i, s) => i !== null && typeof i === 'object' ? at(s.strayGroves, i.stray, 'grove') : at(s.groves, i, 'grove') },
   sector: { toId: s => snapIndex('sectors', sectors, s, 'sector'), fromId: (i, s) => at(s.sectors, i, 'sector') },
   line:   { toId: e => snapIndex('lines', lineList(), e, 'chronicle line'), fromId: (i, s) => at(s.lines, i, 'chronicle line') },
   lines:  { toId: a => a.map(REF_KINDS.line.toId), fromId: (a, s) => a.map(i => REF_KINDS.line.fromId(i, s)) },
@@ -112,6 +121,20 @@ const REF_KINDS = {
   },
 };
 function at(list, i, what){ const r = list && list[i]; if (!r) throw new Error(`This save names a ${what}, ${i}, that is not in it.`); return r; }
+/* A grove in `groves` is named by its place. A grove that has left the list is a stray: burnOut takes
+   a grove out of `groves` when its hollow pine burns, and its sprites keep pointing at it until the
+   last of them dies. A stray is written whole into the snapshot's `strayGroves`, once, and named
+   `{ stray: i }`. The loader hands every sprite of that grove the one staged object, because the
+   rules compare a sprite's grove by identity. */
+function groveId(g){
+  const i = snapMap('groves', groves).get(g);
+  if (i !== undefined) return i;
+  if (!SNAP_IX) throw new Error('A snapshot cannot name this grove: it is in no groves list.');
+  const stray = SNAP_IX.strayGroves || (SNAP_IX.strayGroves = { at: new Map(), list: [] });
+  let k = stray.at.get(g);
+  if (k === undefined){ k = stray.list.length; stray.at.set(g, k); stray.list.push(null); stray.list[k] = encode(g, 'grove'); }
+  return { stray: k };
+}
 /* A snare and a pitfall live in a camp's own list, and each knows its camp. */
 function ownedId(rec, list, what){
   const c = rec.camp && snapMap('camps', camps).has(rec.camp) ? rec.camp : camps.find(q => q[list].includes(rec));
@@ -216,7 +239,16 @@ const SAVED_STATE = {
   namePool: 'namePool', godNamePool: 'godNamePool', gestureFallbacks: 'gestureFallbacks',
   creation: 'creation', field: 'field', boundaries: 'boundaries',
   resCache: 'resCache', startRegion: 'startRegion', doorLog: 'doorLog',
+  inhabited: 'inhabited', inhabitedTold: 'inhabitedTold',
 };
+/* The value of every saved global, by its snapshot name. The guard walks these, and a test holds this
+   table to SAVED_STATE, so a new saved global is walked without anyone remembering to add it here. */
+function savedValues(){
+  return { seed: seedText, options, tick, nextId, fireCount, wanderAt, doomAt, era, age, pulseAge,
+    rng, godRng, levels, raised, hills, caves, sectors, groves, camps, campNow: camp, beings, items, corpses,
+    chronicle, legends, weather, goalPriority, namePool, godNamePool, gestureFallbacks,
+    creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold };
+}
 /* Which global the snapshot leaves out, and why. Each of these comes back from something else. */
 const NOT_SAVED = {
   SW: 'derived from options', SH: 'derived from options', W: 'derived from options', H: 'derived from options',
@@ -226,6 +258,9 @@ const NOT_SAVED = {
   deciding: 'lives inside one god act', saidFrom: 'lives inside one god act', settleNow: 'lives inside one age step',
   replayHead: 'derived from the seed and the options', tileCheckImpl: 'a test seam',
   SNAP_IX: 'scratch, lives inside one snapshot',
+  agePos: 'lives only in the ages', pending: 'lives only in the ages',
+  runUntil: 'lives only in the ages', stops: 'lives only in the ages',
+  lastLoadFault: 'the reason the last load was refused, not world state',
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
@@ -234,7 +269,7 @@ function takeSnapshot(){
   SNAP_IX = {};
   try {
     const lines = lineList(), lineId = e => REF_KINDS.line.toId(e);
-    return {
+    const snap = {
       version: SNAPSHOT_VERSION, seed: seedText, options: clean(options),
       tick, nextId, fireCount, wanderAt, doomAt, era, age, pulseAge,
       rng: streamState(rng), godRng: godRng ? streamState(godRng) : null,
@@ -260,7 +295,11 @@ function takeSnapshot(){
       resCache: [...resCache].map(([k, v]) => [k, clean(v)]),
       startRegion: startRegion ? [...startRegion] : null,
       doorLog: clean(doorLog),
+      inhabited: inhabited ? clean(inhabited) : null, inhabitedTold,
     };
+    /* Last, because encoding the rest is what finds them. */
+    snap.strayGroves = SNAP_IX.strayGroves ? SNAP_IX.strayGroves.list : [];
+    return snap;
   } finally { SNAP_IX = null; }
 }
 
@@ -281,6 +320,14 @@ function snapArray(v, what){ snapNeed(Array.isArray(v), what); return v; }
 function snapObj(v, what){ snapNeed(v !== null && typeof v === 'object' && !Array.isArray(v), what); return v; }
 function snapNum(v, what){ snapNeed(typeof v === 'number' && Number.isFinite(v), what); return v; }
 function snapText(v, what){ snapNeed(typeof v === 'string', what); return v; }
+/* A whole count, never negative, and small enough that adding to it stays exact. */
+function snapCount(v, what){ snapNeed(Number.isSafeInteger(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER / 2, what); return v; }
+/* A key the rules index blindly. A save that names one the table lacks would kill the page a step later. */
+function snapKey(v, table, what){ snapNeed(typeof v === 'string' && Object.prototype.hasOwnProperty.call(table, v), what); return v; }
+/* A field added to the snapshot after version 1 is read as optional, with the value a world that never
+   had it holds. The version rises only when the meaning of a field already saved changes. A rebuilt
+   page must not turn every player's autosave into a refusal. */
+function snapOpt(v, fallback){ return v === undefined ? fallback : v; }
 
 /* Turn every id the plan names back into the staged record it names. A key the save does not hold
    stays missing, and a null stays null. The record's keys are written in place, so their order holds. */
@@ -317,6 +364,8 @@ function decodeSnapshot(snap){
     for (let i = 0; i < area; i++){
       if (lv[i] === null || lv[i] === undefined){ out[i] = null; continue; }
       const c = snapCopy(snapObj(lv[i], 'tile')), x = i % w;
+      snapKey(c.ground, GROUND, 'tile ground');
+      if (c.feature !== undefined && c.feature !== null) snapKey(c.feature, FEATURES, 'tile feature');
       out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...c };
     }
     return out;
@@ -326,18 +375,32 @@ function decodeSnapshot(snap){
   /* Then every list of records, whole, with the ids still in place. */
   stage.lines = stageList(snap.lines, 'line', 'lines');
   stage.camps = stageList(snap.camps, 'camp', 'camps');
-  for (const c of stage.camps){ snapArray(c.snares, 'snares'); snapArray(c.pitfalls, 'pitfalls'); }
+  /* A camp's own plain objects and places. The rules read each without looking first. */
+  const spot = (v, what) => { if (v === null || v === undefined) return; snapArray(v, what); snapNeed(v.length === 2, what); snapNeed(Number.isInteger(v[0]) && v[0] >= 0 && v[0] < w && Number.isInteger(v[1]) && v[1] >= 0 && v[1] < h, what); };
+  for (const c of stage.camps){
+    snapArray(c.snares, 'snares'); snapArray(c.pitfalls, 'pitfalls');
+    for (const k of ['stash', 'fae', 'rot', 'tools', 'gnomes']) snapObj(c[k], 'camp ' + k);
+    for (const k of ['pit', 'stashTile', 'site']) spot(c[k], 'camp ' + k);
+  }
   stage.hills = stageList(snap.hills, 'hill', 'hills');
   stage.caves = stageList(snap.caves, 'cave', 'caves');
   stage.sectors = stageList(snap.sectors, 'sector', 'sectors');
   stage.groves = stageList(snap.groves, 'grove', 'groves');
+  stage.strayGroves = stageList(snapOpt(snap.strayGroves, []), 'grove', 'strayGroves');
   stage.beings = stageList(snap.beings, 'being', 'beings');
+  for (const a of stage.beings) snapKey(a.species, SPECIES, 'being species');
   stage.items = stageList(snap.items, 'item', 'items');
+  for (const it of stage.items) snapKey(it.kind, ITEMS, 'item kind');
   stage.boundaries = stageList(snap.boundaries, 'boundary', 'boundaries');
   stage.corpses = snapCopy(snapArray(snap.corpses, 'corpses'));
   stage.field = snap.field === null ? null : { regions: stageList(snapObj(snap.field, 'field').regions, 'region', 'regions'), root: snap.field.root, byId: new Map() };
   stage.regionById = new Map();
-  if (stage.field) for (const r of stage.field.regions){ snapArray(r.marks, 'marks'); snapNum(r.id, 'region id'); stage.regionById.set(r.id, r); }
+  /* A region's tiles fill regionOf, an array of W * H. An index outside it would write past the end. */
+  if (stage.field) for (const r of stage.field.regions){
+    snapArray(r.marks, 'marks'); snapNum(r.id, 'region id');
+    for (const i of snapArray(r.tiles, 'region tiles')) snapNeed(Number.isInteger(i) && i >= 0 && i < area, 'region tiles');
+    stage.regionById.set(r.id, r);
+  }
   stage.creation = snap.creation === null ? null : snapCopy(snapObj(snap.creation, 'creation'));
 
   /* Then every id becomes the one record it names. fromId throws on an id that names nothing. */
@@ -346,6 +409,7 @@ function decodeSnapshot(snap){
   for (const c of stage.caves) resolveRefs(c, 'cave', stage);
   for (const hl of stage.hills) resolveRefs(hl, 'hill', stage);
   for (const g of stage.groves) resolveRefs(g, 'grove', stage);
+  for (const g of stage.strayGroves) resolveRefs(g, 'grove', stage);
   for (const s of stage.sectors) resolveRefs(s, 'sector', stage);
   for (const a of stage.beings) resolveRefs(a, 'being', stage);
   for (const it of stage.items) resolveRefs(it, 'item', stage);
@@ -362,9 +426,12 @@ function decodeSnapshot(snap){
   stage.doorLog = snapCopy(snapArray(snap.doorLog, 'doorLog'));
 
   /* Last the plain values. */
-  stage.tick = snapNum(snap.tick, 'tick'); stage.nextId = snapNum(snap.nextId, 'nextId');
+  stage.tick = snapCount(snap.tick, 'tick'); stage.nextId = snapCount(snap.nextId, 'nextId');
   stage.fireCount = snapNum(snap.fireCount, 'fireCount');
   stage.wanderAt = snapNum(snap.wanderAt, 'wanderAt'); stage.doomAt = snapNum(snap.doomAt, 'doomAt');
+  stage.inhabited = snapOpt(snap.inhabited, null);
+  if (stage.inhabited !== null) stage.inhabited = snapCopy(snapObj(stage.inhabited, 'inhabited'));
+  stage.inhabitedTold = !!snapOpt(snap.inhabitedTold, false);
   stage.age = snapNum(snap.age, 'age');
   stage.pulseAge = snap.pulseAge === null ? null : snapNum(snap.pulseAge, 'pulseAge');
   stage.rng = snapNum(snap.rng, 'rng'); stage.godRng = snap.godRng === null ? null : snapNum(snap.godRng, 'godRng');
@@ -398,21 +465,33 @@ function commitSnapshot(s){
   rng = mulberry32(0); setStreamState(rng, s.rng);
   godRng = s.godRng === null ? null : mulberry32(0);
   if (godRng) setStreamState(godRng, s.godRng);
+  inhabited = s.inhabited; inhabitedTold = s.inhabitedTold;
   /* These three live inside one step and start a step as beginCreation leaves them. */
   deciding = null; saidFrom = 0; settleNow = false;
+  /* The ages are over in a loaded world, so nothing of the ages is left standing. A load can arrive
+     while a god's turn is open, and step() answers 'The turn is yours.' for as long as pending is set. */
+  agePos = null; pending = null; runUntil = null; stops = [];
   resetDoor(); doorLog = s.doorLog;
 }
 
+/* Why the last load was refused, in the words the fault threw. The player sees the plain sentence;
+   this is for whoever is looking at the console. It is not world state, so no snapshot holds it. */
+let lastLoadFault = null;
+
 /* Load a whole world from a snapshot. Returns null when it loaded, or the sentence that says why not. */
 function loadSnapshot(snap){
+  lastLoadFault = null;
   if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return 'This save cannot be read.';
-  if (snap.version !== SNAPSHOT_VERSION) return `This save is version ${snap.version}. This world reads version ${SNAPSHOT_VERSION}.`;
+  if (snap.version !== SNAPSHOT_VERSION){
+    if (typeof snap.version !== 'number' || !Number.isFinite(snap.version)) return 'This file is not a save this world can read.';
+    return `This save is version ${snap.version}. This world reads version ${SNAPSHOT_VERSION}.`;
+  }
   if (snap.era !== 'days') return 'This save was taken before the world was made. Only a made world can be loaded.';
   const wrong = checkOptions(snap.options);
   if (wrong) return wrong;
   let stage;
   try { stage = decodeSnapshot(snap); }
-  catch (e){ return 'This save cannot be read.'; }
+  catch (e){ lastLoadFault = e && e.message ? e.message : String(e); return 'This save cannot be read.'; }
   commitSnapshot(stage);
   return null;
 }
@@ -433,32 +512,51 @@ function registry(){
   if (field) for (const r of field.regions){ put(r, 'region'); for (const m of r.marks) put(m, 'mark'); }
   for (const b of boundaries) put(b, 'boundary');
   for (const e of lineList()) put(e, 'line');
+  /* A stray grove is in no list, so the sprites that still point at it are the only way to reach it. */
+  for (const a of beings) if (a.grove && !reg.has(a.grove)) put(a.grove, 'grove');
   return reg;
 }
+/* The saved globals the guard walks itself. The record lists are left out: every record in one is
+   already walked under its own type, and walking the list would name each of them a reference.
+   resCache is a Map and startRegion a Set, and the encoder holds each as entries; the values of
+   resCache are walked below. */
+const WALK_HOME = { levels: 1, raised: 1, hills: 1, caves: 1, sectors: 1, groves: 1, camps: 1, campNow: 1,
+  beings: 1, items: 1, chronicle: 1, legends: 1, boundaries: 1, creation: 1, field: 1, resCache: 1, startRegion: 1 };
 /* Walk every record and report each field that points at another record and is not named in REFS.
    A new field that holds a reference fails the test in tests/snapshot.js until someone names it. */
 function unnamedRefs(){
   SNAP_IX = {};
   try {
     const reg = registry(), out = new Set();
+    /* One step of the walk. It reports a reference REFS does not name, and it reports anything a
+       snapshot cannot hold: a Map, a Set, or any other object that is not plain data. The encoder
+       turns a Map or a Set into {}, and a round trip then agrees because both sides lost it, so the
+       guard must name it here instead. */
+    const step = (v, type, path, seen, named, homes) => {
+      if (v === null || typeof v !== 'object') return;
+      if (named[path] !== undefined || homes[path] !== undefined) return;
+      if ((REF_DERIVED[type] || {})[path] !== undefined) return;
+      const where = path ? type + '.' + path : type;
+      const kind = reg.get(v);
+      if (kind !== undefined){ out.add(where + ' -> ' + kind); return; }
+      if (seen.has(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)){ for (const x of v) step(x, type, path + '[]', seen, named, homes); return; }
+      if (v instanceof Map || v instanceof Set){ out.add(where + ' -> a Map or a Set, which a snapshot cannot hold'); return; }
+      if (Object.getPrototypeOf(v) !== Object.prototype){ out.add(where + ' -> not plain data, which a snapshot cannot hold'); return; }
+      for (const k of Object.keys(v)) step(v[k], type, path ? path + '.' + k : k, seen, named, homes);
+    };
     const walk = (rec, type) => {
       const named = REFS[type] || {}, homes = REF_HOMES[type] || {};
-      const step = (v, path, seen) => {
-        if (v === null || typeof v !== 'object') return;
-        if (named[path] !== undefined || homes[path] !== undefined) return;
-        const kind = reg.get(v);
-        if (kind !== undefined){ out.add(type + '.' + path + ' -> ' + kind); return; }
-        if (seen.has(v)) return;
-        seen.add(v);
-        if (Array.isArray(v)){ for (const x of v) step(x, path + '[]', seen); return; }
-        if (Object.getPrototypeOf(v) !== Object.prototype) return;
-        for (const k of Object.keys(v)) step(v[k], path + '.' + k, seen);
-      };
-      for (const k of Object.keys(rec)) step(rec[k], k, new Set());
+      for (const k of Object.keys(rec)) step(rec[k], type, k, new Set(), named, homes);
     };
     for (const [rec, type] of reg) walk(rec, type);
     if (creation) walk(creation, 'creation');
     if (field) walk(field, 'field');
+    /* Every other saved global, under its own name. A new one is walked the day it joins the table. */
+    const vals = savedValues();
+    for (const name of Object.keys(vals)) if (!WALK_HOME[name]) step(vals[name], name, '', new Set(), {}, {});
+    for (const [k, v] of resCache) step(v, 'resCache', '[' + k + ']', new Set(), {}, {});
     return [...out].sort();
   } finally { SNAP_IX = null; }
 }
