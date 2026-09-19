@@ -215,7 +215,11 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
   <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
+  <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
+  <p class="muted" id="startNote" hidden></p>
 </dialog>
+<!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
+<input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
@@ -5227,6 +5231,8 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
+  autosaveWarned: false, /* true once the page has said it cannot keep an autosave */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
@@ -5628,6 +5634,13 @@ function paletteMatch(query, rows){
   return hit.sort((a, b) => score(a) - score(b));
 }
 
+/* The name of a save file. The seed goes to lower case, and each run of anything else becomes one
+   dash. A seed of nothing but punctuation leaves no name, so it is called the world. */
+function saveName(seed, t){
+  const s = String(seed == null ? '' : seed).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'world';
+  return `hearth-${s}-day-${Math.floor(t / DAY) + 1}.json`;
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -5698,6 +5711,11 @@ const KEYMAP = [
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
+  /* Save and Load take Ctrl, as New world does. Neither has a button: the strip is full, and the palette lists both. */
+  { key: 's',          ctrl: true, focus: 'any', action: 'saveWorld', label: 'Save world to a file' },
+  { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
+  /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
+  { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
@@ -5749,6 +5767,81 @@ function keyName(k){
   /* Shift shows on a named key and on a letter or a digit. `?` and `>` already carry it in the character. */
   const shift = k.shift && (k.key.length > 1 || /^[a-z0-9]$/i.test(k.key));
   return `${k.meta ? '\u2318' : ''}${k.ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${k.alt ? 'Alt+' : ''}${key}`;
+}
+
+/* Storage for saves, and nothing else. No view state changes here, and no DOM at load time.
+   The built page is published as a sandboxed artifact, where a download, a file picker, or a
+   database may all be blocked. Every call sits in a try, every error event is answered, and each
+   function resolves with a plain value instead of throwing. A page that cannot store still plays. */
+const SAVE_DB = 'hearth', SAVE_STORE = 'saves', AUTOSAVE_KEY = 'autosave';
+/* The object URL is freed on the next turn of the loop, after the click has taken the file. */
+const SAVE_FREE_MS = 1000;
+
+/* Hand the player a file. Returns null when the download started, or the sentence to show. */
+function writeSaveFile(name, text){
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* already gone */ } }, SAVE_FREE_MS);
+    return null;
+  } catch (e) { return 'This page cannot write a file.'; }
+}
+
+/* Read a chosen file. Resolves with { snapshot } or { error }. It never rejects. */
+function readSaveFile(file){
+  return new Promise(resolve => {
+    try {
+      const r = new FileReader();
+      r.onerror = () => resolve({ error: 'This file cannot be read.' });
+      r.onabort = () => resolve({ error: 'This file cannot be read.' });
+      r.onload = () => { try { resolve({ snapshot: JSON.parse(r.result) }); } catch (e) { resolve({ error: 'This file is not a save.' }); } };
+      r.readAsText(file);
+    } catch (e) { resolve({ error: 'This file cannot be read.' }); }
+  });
+}
+
+/* The one database. Resolves with the database, or with null when there is none to be had. */
+function saveDb(){
+  return new Promise(resolve => {
+    try {
+      if (typeof indexedDB === 'undefined' || !indexedDB){ resolve(null); return; }
+      const req = indexedDB.open(SAVE_DB, 1);
+      req.onupgradeneeded = () => { try { if (!req.result.objectStoreNames.contains(SAVE_STORE)) req.result.createObjectStore(SAVE_STORE); } catch (e) { /* the transaction fails below */ } };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+
+/* Write the one autosave slot. Resolves true when it was kept, false when it was not. */
+function putAutosave(text){
+  return saveDb().then(db => new Promise(resolve => {
+    if (!db){ resolve(false); return; }
+    try {
+      const tx = db.transaction(SAVE_STORE, 'readwrite');
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+      tx.objectStore(SAVE_STORE).put(text, AUTOSAVE_KEY);
+    } catch (e) { resolve(false); }
+  })).catch(() => false);
+}
+
+/* Read the one autosave slot. Resolves with the text, or with null when the slot is empty or shut. */
+function getAutosave(){
+  return saveDb().then(db => new Promise(resolve => {
+    if (!db){ resolve(null); return; }
+    try {
+      const tx = db.transaction(SAVE_STORE, 'readonly'), req = tx.objectStore(SAVE_STORE).get(AUTOSAVE_KEY);
+      req.onsuccess = () => resolve(typeof req.result === 'string' ? req.result : null);
+      req.onerror = () => resolve(null);
+      tx.onerror = () => resolve(null);
+      tx.onabort = () => resolve(null);
+    } catch (e) { resolve(null); }
+  })).catch(() => null);
 }
 
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
@@ -6495,7 +6588,20 @@ function renderFoot(){
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
 function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNote(''); showContinue(); ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+/* One line inside the start dialog, for an answer that the foot behind it would hide. An empty line hides it. */
+function startNote(text){ const p = $('startNote'); if (!p) return; p.textContent = text; p.hidden = !text; }
+/* The Continue button, shown only when the autosave slot holds a world. The save is outside data, so its
+   seed goes in as text, never as markup. The key comes from the key map, so the button cannot drift from it. */
+function showContinue(){
+  const b = $('continueBtn'); if (!b) return;
+  b.hidden = !lastSave;
+  if (!lastSave) return;
+  const row = KEYMAP.find(k => k.button === 'continueBtn');
+  b.textContent = `Continue ${lastSave.seed}, day ${Math.floor(Number(lastSave.tick) / DAY) + 1}`;
+  const k = document.createElement('kbd'); k.textContent = row ? keyName(row) : '';
+  b.appendChild(k);
+}
 let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
 function muteChoice(k){
@@ -6588,7 +6694,105 @@ function newWorld(seed){
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
   viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  /* A new world has no autosave of its own, so its first day writes one. */
+  ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* ---------- saves ----------
+   The player's own file, the one autosave slot, and the view after a world arrives from either.
+   The storage sits in saves.js. The door is the only way a save enters the world. */
+
+/* Write the world to a file the player keeps. */
+function saveWorld(){
+  if (inAges()){ say('The world is not made yet. There is nothing to save.'); return; }
+  let text;
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){ say('This world cannot be saved.'); return; }
+  const name = saveName(seedText, tick);
+  say(writeSaveFile(name, text) || `Saved as ${name}.`);
+}
+
+/* Open the file picker. The input's change handler carries on in openSaveFile. */
+function loadWorldFile(){
+  try { $('loadFile').click(); }
+  catch (e){ say('This page cannot open a file.'); }
+}
+
+/* A file the player chose. A file that is not a save says so and changes nothing. */
+function openSaveFile(file){
+  readSaveFile(file).then(r => {
+    if (r.error){ say(r.error); return; }
+    loadWorld(r.snapshot);
+  });
+}
+
+/* The one way a snapshot enters. The door answers with a sentence either way, so the log says whether
+   the world changed: a load that lands appends an entry of its own, and a refusal appends nothing. */
+function loadWorld(snapshot, note){
+  const last = doorLog[doorLog.length - 1];
+  const answer = inject({ source: 'player', act: 'load', snapshot });
+  const landed = doorLog[doorLog.length - 1] !== last;
+  if (landed) onLoad();
+  /* A world that arrived says so in the foot, over the new valley. A refusal goes where the caller asks. */
+  if (landed || !note) say(answer); else note(answer);
+  return landed;
+}
+
+/* The view after a load. Everything it remembers points at the world that was replaced, and the new
+   world can be a smaller one, so this puts the view back on the ground as onSettle does. */
+function onLoad(){
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  viewCamp = camps[0]; camp = camps[0];
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  /* A row index, a followed person, and an open card all name a being of the old world. */
+  followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  cursor = { x: clamp(cursor.x, 0, W - 1), y: clamp(cursor.y, 0, H - 1), z: clamp(cursor.z, ZMIN, ZMAX) };
+  cur = { sx: clamp(cur.sx, 0, SW - 1), sy: clamp(cur.sy, 0, SH - 1) };
+  lvl = clamp(lvl, ZMIN, ZMAX);
+  /* A save is always of the days, so the frame must not take the loaded world for a settle. */
+  lastEra = era;
+  /* The loaded day is already saved. The next dawn writes the slot again. */
+  ui.autosaveDay = dayOf();
+  /* The rest is the page. The tests run this function with no canvas and no dialog behind it. */
+  if (!wcv) return;
+  wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
+  ocv.width = W * WS; ocv.height = H * WS;
+  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setView('loc', secOf(cursor.x, cursor.y));
+}
+
+/* One autosave slot, written at the first frame of each new day. It is the whole world, so a page
+   that cannot store one says so once and plays on. */
+function autosave(){
+  ui.autosaveDay = dayOf();
+  let text;
+  try { text = JSON.stringify(takeSnapshot()); }
+  catch (e){ return; }
+  putAutosave(text).then(ok => {
+    if (ok || ui.autosaveWarned) return;
+    ui.autosaveWarned = true;
+    say('This page cannot keep an autosave. The game plays on.');
+  });
+}
+
+/* The autosave read once when the page opens, parsed here and kept for the start dialog. */
+let lastSave = null;
+function offerContinue(){
+  getAutosave().then(text => {
+    if (!text) return;
+    try { lastSave = JSON.parse(text); }
+    catch (e){ return; }
+    if (!lastSave || typeof lastSave !== 'object' || lastSave.era !== 'days'){ lastSave = null; return; }
+    showContinue();
+  });
+}
+
+/* Continue the last world, from the start dialog. A refusal stays in the dialog. */
+function continueWorld(){
+  if (!lastSave){ startNote('There is no world to continue.'); return; }
+  if (loadWorld(lastSave, startNote)) closeDialogs();
 }
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
@@ -6693,6 +6897,9 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  saveWorld(){ saveWorld(); },
+  loadWorldFile(){ loadWorldFile(); },
+  continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
     if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
@@ -6727,6 +6934,9 @@ function frame(now){
   }
   if (lastEra === 'gods' && !inAges()) onSettle();
   lastEra = era;
+  /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
+     take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
+  if (!inAges() && dayOf() > ui.autosaveDay) autosave();
   if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
   camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
   draw();
@@ -6761,6 +6971,9 @@ function initUI(){
     ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
+  /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
+  $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
+  $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
@@ -6798,7 +7011,9 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
+       that is how Alt+C continues the last world while the cursor sits in the seed box. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput' && !(e.ctrlKey || e.altKey || e.metaKey)) return;
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;
@@ -6811,6 +7026,8 @@ function initUI(){
   setTool('inspect');
   newWorld(randomSeed());
   if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
+  offerContinue();
   openStart();
   requestAnimationFrame(frame);
 }
