@@ -54,8 +54,8 @@ test('a slope joins the ground to the floor above, and a cliff does not', () => 
   assert.ok(up, 'no path up the slope');
   assert.deepEqual(up[0], [x0 - 1, y0 + 1, 0]);
   assert.deepEqual(up[1], [x0, y0 + 1, 1]);
-  const leg = api.legPath(walker, x0 + 1, y0 + 1, 0, 1);
-  assert.ok(leg && leg.length === up.length, 'legPath should climb too');
+  const leg = api.pathToStop(walker, x0 + 1, y0 + 1, 0, 1);
+  assert.ok(leg && leg.length === up.length, 'pathToStop should climb too');
   api.tileAt(x0 - 1, y0 + 1).slope = false;
   assert.equal(api.bfs(walker.x, walker.y, 0, (x, y, z) => z === 1, 500, walker), null, 'a cliff should block');
   const region = api.reachable(walker.x, walker.y, 0, 200);
@@ -141,7 +141,7 @@ test('a person walks up the slope, stands on the floor, and drops a stick there'
   const a = api.firstPerson(); a.x = x0 - 2; a.y = y0 + 1; a.z = 0; a.asleep = false; a.homeless = false;
   const path = api.bfs(a.x, a.y, 0, (x, y, z) => z === 1 && x === x0 + 1 && y === y0 + 1, 500, a);
   assert.ok(path, 'no path up');
-  a.task = { type: 'wander', label: 'Climbing', path, arrive: () => 'done', started: api.tick, key: 'wander', fast: true };
+  a.task = { type: 'wander', label: 'Climbing', path, kind: 'wander', stop: 0, started: api.tick, key: 'wander', fast: true };
   for (let k = 0; k < path.length; k++) api.runTask(a);
   assert.equal(a.z, 1, 'the person should be on the floor above');
   assert.equal(api.tileAt(a.x, a.y, a.z).ground, 'stone');
@@ -386,25 +386,25 @@ test('below the surface without a brand it is too dark to work, and walking is s
   makeCave3(api, x0, y0);
   const a = api.firstPerson(); a.x = x0 + 2; a.y = y0; a.z = -1; a.asleep = false; a.carrying = null; a.thoughts = []; a.cooldown = {};
   for (const k in a.needs) a.needs[k] = 90;
-  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   api.updateBeing(a);
   assert.ok(a.thoughts.some(t => t.key === 'dark'), 'a dark thought');
   assert.equal(a.inDark, true);
   /* Compare the task itself, not whether there is one: a failed task is replaced at once by the next choice. */
-  const deeper = { type: 'wander', label: 'Groping deeper', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  const deeper = { type: 'wander', label: 'Groping deeper', path: [[x0 + 1, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   a.task = deeper;
   api.updateBeing(a); assert.notEqual(a.task, deeper, 'a task that stays below fails again, thought or no thought');
-  const out = { type: 'wander', label: 'Feeling for the light', path: [[x0 + 1, y0, -1], [x0, y0, -1], [x0 - 1, y0, 0]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  const out = { type: 'wander', label: 'Feeling for the light', path: [[x0 + 1, y0, -1], [x0, y0, -1], [x0 - 1, y0, 0]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   a.task = out;
   api.updateBeing(a); assert.equal(a.task, out, 'a walk that ends in the light is allowed');
   /* Set the walker back at the far end of the passage: the speed is measured over two steps, wherever the last task left them. */
   a.x = x0 + 2; a.y = y0; a.z = -1;
   let moved = 0;
-  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   for (let k = 0; k < 4; k++){ const bx = a.x; api.runTask(a); if (a.x !== bx) moved++; }
   assert.equal(moved, 2, 'two steps in four calls: half speed');
   a.x = x0 + 2; a.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; a.thoughts = [];
-  const lit = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], arrive: () => 'done', started: api.tick, key: 'wander' };
+  const lit = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   a.task = lit;
   api.updateBeing(a);
   assert.ok(!a.thoughts.some(t => t.key === 'dark'), 'a brand lights the way');

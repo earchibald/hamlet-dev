@@ -30,7 +30,7 @@ test('some soak seed digs a wolf den', () => { assert.ok(seedWithWolfDen(), 'no 
 function doOffer(api, a, label, ticks = 2000){
   const o = api.offersFor(a).find(o => o.label === label || o.label.startsWith(label));
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
-  assert.ok(o.start(a), `offer "${label}" would not start`);
+  assert.ok(api.startTask(a, o.task.kind, o.task.args), `offer "${label}" would not start`);
   a.task.started = api.tick; a.task.key = label;
   for (let k = 0; k < ticks && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null, `"${label}" did not finish in ${ticks} ticks`);
@@ -81,7 +81,7 @@ test('a cave is claimed once the search begins; interrupted, it releases and not
   api.beings.push(mate);
   api.tick = 9 * 1000;
   const o = api.offersFor(a).find(o => o.label === 'search the cave with a brand');
-  assert.ok(o, 'no search offer'); assert.ok(o.start(a));
+  assert.ok(o, 'no search offer'); assert.ok(api.startTask(a, o.task.kind, o.task.args));
   a.task.started = api.tick; a.task.key = 'search the cave with a brand';
   for (let k = 0; k < 3000 && a.task && a.task.type !== 'search'; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.ok(a.task && a.task.type === 'search', 'never reached the search task');
@@ -165,7 +165,7 @@ test('the party keeps its brands lit until home, and the guard goal leaves a jus
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
   api.tick = 9 * 1000;
   const o = api.offersFor(a).find(o => o.label.startsWith('clear the den with brands'));
-  assert.ok(o, 'no den-clearing offer'); assert.ok(o.start(a));
+  assert.ok(o, 'no den-clearing offer'); assert.ok(api.startTask(a, o.task.kind, o.task.args));
   a.task.started = api.tick; a.task.key = 'clear the den with brands';
   let k = 0;
   for (; k < 6000 && !(a.task === null && mate.task === null); k++){
@@ -192,7 +192,8 @@ test('the party keeps its brands lit until home, and the guard goal leaves a jus
 test('withBrand ends with no live ember when the chain does not start', () => {
   const { api, a, c } = readyCamp();
   api.tick = 9 * 1000;
-  assert.ok(api.withBrand(a, 'Testing', () => false));
+  api.TASKS.never = { type: 'work', begin: () => false, stops: [() => 'done'] };
+  assert.ok(api.withBrand(a, 'Testing', { kind: 'never', args: {} }));
   for (let k = 0; k < 20 && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null);
   assert.equal(a.carrying, null);

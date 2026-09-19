@@ -35,8 +35,8 @@ function reachable(sx, sy, sz, cap = 4000){
   }
   return seen;
 }
-/* One leg of a long walk. Far targets are approached in steps of about 16 tiles. */
-function legPath(a, tx, ty, within, tz = 0){
+/* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
+function pathToStop(a, tx, ty, within, tz = 0){
   if (nearAt(a, tx, ty, tz) <= within) return [];
   const goal = (x, y, z) => z === tz && dist(x, y, tx, ty) <= within;
   let p = bfs(a.x, a.y, a.z, goal, 4000, a);
