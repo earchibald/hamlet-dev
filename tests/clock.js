@@ -81,6 +81,16 @@ test('the animals, the sprites, and the gnomes read the table', () => {
   assert.equal(api.SPECIES.human.decay.food, 0.035); assert.equal(api.SPECIES.sprite.stride, 1);
 });
 
+test('human work reads the table', () => {
+  const api = load(), C = api.CLOCK;
+  assert.equal(C.work.firepit, 70); assert.equal(C.work.knapAxe, 70); assert.equal(C.work.leanTo, 110); assert.equal(C.work.storehouse, 140); assert.equal(C.work.hut, 120);
+  assert.equal(C.work.feedFire, 6); assert.equal(C.work.checkSnare, 4); assert.equal(C.work.fish, 110); assert.equal(C.work.cutTree, 60);
+  assert.equal(C.chase.deer, 220); assert.equal(C.chase.deerPerSkill, 40); assert.equal(C.chase.deerMissed, 40); assert.equal(C.chase.guard, 200);
+  assert.equal(C.limit.guardEmber, 500); assert.equal(C.limit.hearthProven, 3000);
+  assert.equal(C.cooldown.sparks, 150); assert.equal(C.cooldown.wolfBurned, 2500); assert.equal(C.cooldown.wolfDriven, 3000);
+  assert.equal(api.RECIPES.find(r => r.id === 'workshop').work, 140);
+});
+
 /* ---------- the lint: no bare time literal in a rule ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* Each rule finds a place where time is used. A match is bare when it still holds a number. */
@@ -116,12 +126,14 @@ const EVENT_CHANCES = [
   'rng() < 0.45 + a.skills.hunt * 0.1',   // the spear's hit on a sprite
   'rng() < 0.5',                          // one gift roll of a sprite's visit, and two of the prank's rolls
   "rng() < 0.5 ? 'cord' : 'moss'",        // the other gift roll of a sprite's visit, picking cord over moss
+  'rng() < Math.min(0.75, 0.22 + a.skills.hunt * 0.06 + a.traits.patience * 0.18',   // the fish that bites at the end of a cast
+  'rng() < 0.3 + a.skills.hunt * 0.12',   // the spear's hit on a deer
+  'rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25',   // the sparks that take
+  'rng() < 0.4 + a.traits.patience * 0.4',   // the rocks that prove to be firestones
 ];
 /* The ratchet. A file listed here may still hold this many bare literals. A file not listed holds none.
    Each task of the plan removes its files. The close removes the ratchet. */
-const PENDING = {
-  tasks: 41, goals: 40, recipes: 11, settle: 1,
-};
+const PENDING = {};
 
 /* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
    fallback default is not a duration either. */

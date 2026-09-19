@@ -46,6 +46,8 @@ const CLOCK = {
     hurtRemembered: ticks(600),       // a wound names the cause of death this long
     swarm: ticks(4000), swarmReturn: ticks(1500), blight: ticks(5000),
     gnomeHolds: days(2),              // a borrowed thing comes back after this
+    guardEmber: ticks(500),           // how long the brand lasts while driving off a wolf
+    hearthProven: days(3),            // an unbroken hearth streak this long counts as established
   },
   /* Warmth a person loses each tick, by where and when. */
   cold: { under: tickRate(0.012), winterNight: tickRate(0.06), winterDay: tickRate(0.025), summer: tickRate(0), night: tickRate(0.012), day: tickRate(0.003) },
@@ -55,6 +57,19 @@ const CLOCK = {
     sit: strides(90), sitChat: strides(25), sitTeach: strides(30), sitTeachAt: strides(15),
     standStill: strides(20), doze: strides(60),
     eatCarcass: strides(25), eatShrooms: strides(8), denRest: strides(60), kinChat: strides(20),
+  },
+  /* How much work a job takes. A worker adds workSpeed to the job's progress each stride, and
+     workSpeed is 1 for a person with no skill, so an entry is the strides the job takes them. */
+  work: {
+    firepit: strides(70), feedFire: strides(6), strikeSparks: strides(40), mossLight: strides(10), layFire: strides(15),
+    butcherDeer: strides(60), cookFish: strides(25), cookCatch: strides(35),
+    setSnare: strides(30), checkSnare: strides(4), rearmSnare: strides(10), haulDeer: strides(12),
+    knapAxe: strides(70), testRocks: strides(50), spear: strides(50), waterskin: strides(60),
+    leanTo: strides(110), storehouse: strides(140), hut: strides(120),
+    offeringStone: strides(30), leaveBerries: strides(8), wardPosts: strides(60),
+    rack: strides(50), smokeMeat: strides(45), smokeFish: strides(40),
+    fish: strides(110), quarry: strides(25), breakRockfall: strides(60), cutTree: strides(60), fillWaterskin: strides(12),
+    berryEvery: strides(6), fibreEvery: strides(8), clayEvery: strides(10), cuttingsEvery: strides(6),
   },
   /* How often a rule looks. A rule runs when tick % every is 0, or is the `At` entry beside it. */
   every: {
@@ -70,6 +85,10 @@ const CLOCK = {
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
     disturb: ticks(1000),             // between two counts of one person in a gnome burrow
     raid: ticks(1200), stalk: ticks(2000), wolfLine: ticks(300),
+    sparks: ticks(150),               // between two tries at striking sparks into the tinder
+    guardLine: ticks(800),            // between two chronicle lines about the same wolf chase
+    wolfBurned: ticks(2500), wolfWanders: ticks(600),   // a wolf driven off with fire keeps away, then wanders again
+    wolfDriven: ticks(3000),          // a den cleared with fire stays clear this long
   },
   food: {
     cookedKeeps: ticks(1800), berriesKeep: ticks(3500),
@@ -100,6 +119,7 @@ const CLOCK = {
   chase: {
     wolf: strides(140), wolfPerSkill: strides(30), stalk: strides(160),
     spearSprite: strides(90),
+    deer: strides(220), deerPerSkill: strides(40), deerMissed: strides(40), guard: strides(200),
   },
   arrival: {
     first: ticks(700), firstSpread: ticks(600),   // after lightning lights the first hearth
@@ -149,5 +169,14 @@ const CLOCK = {
     spriteGrove: ticks(900), spriteCamp: ticks(700), giftTaken: ticks(1500),
     faefire: ticks(1000), pinched: ticks(900), stolen: ticks(800), prank: ticks(1500),
     mosslight: ticks(400), intruderSprite: ticks(1500), inhollow: ticks(600),
+    ember: ticks(500), rekindled: ticks(1200), find: ticks(2500), bones: ticks(1200),
+    fish: ticks(500), nofish: ticks(300), quarryfae: ticks(900),
+    missed: ticks(500), kill: ticks(1500), brave: ticks(1200), guarded: ticks(800),
+    burnedWolf: ticks(1500),   // a wolf driven off with fire
+    searched: ticks(2000), driven: ticks(3000), cleared: ticks(2500), grovecut: ticks(800),
+    axeMade: ticks(1500), axeCut: ticks(3000),
+    pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
+    clothes: ticks(1500), garden: ticks(1500),
+    wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
