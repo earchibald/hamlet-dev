@@ -41,6 +41,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - State lives in plain objects and arrays. A `Map` or a `Set` a snapshot must save is a fault the guard reports.
 - Naming moves no being and no item, adds no thought, and changes no need; only `chronicle` and `chronicleLines` may move for naming work.
 - A rule never reads a name's text to decide anything. It reads data tables instead.
+- Text a player reads, and developer documentation, goes through a review panel before it lands. Dispatch three or more Sonnet reviewers on the text alone. Each one judges three things: does it sound human, is it plain English, is it readable. Rewrite on their findings. This applies to every element of gameplay, not only to a batch of new phrases.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
