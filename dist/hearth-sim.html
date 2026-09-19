@@ -5179,7 +5179,10 @@ function decodeSnapshot(snap){
       const c = snapCopy(snapObj(lv[i], 'tile')), x = i % w;
       snapKey(c.ground, GROUND, 'tile ground');
       if (c.feature !== undefined && c.feature !== null) snapKey(c.feature, FEATURES, 'tile feature');
-      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...c };
+      /* x, y, and z come from the tile's index, never from the saved copy: a hand-edited save
+         must not move a tile by forging its own position inside it. */
+      const { x: _x, y: _y, z: _z, ...rest } = c;
+      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...rest };
     }
     return out;
   });
@@ -5554,7 +5557,8 @@ const ui = {
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
-  autosaveWarned: false, /* true once the page has said it cannot keep an autosave */
+  autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
+  autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
@@ -7101,8 +7105,8 @@ function autosave(){
   try { text = JSON.stringify(takeSnapshot()); }
   catch (e){
     console.warn('The autosave could not be taken: ' + (e && e.message));
-    if (ui.autosaveWarned) return;
-    ui.autosaveWarned = true;
+    if (ui.autosaveFaultWarned) return;
+    ui.autosaveFaultWarned = true;
     say('This world cannot be saved, so there is no autosave. The game plays on.');
     return;
   }
@@ -7116,10 +7120,14 @@ function autosave(){
 /* A step threw. The world is left where it stopped, the game pauses, and one plain sentence says so.
    The fault goes to the console for whoever is looking. The frame loop itself keeps running. */
 function onFault(e){
-  console.error(e);
-  acc = 0;
-  setPaused(true);
-  say('The world stopped on a fault. Load a save or make a new world.');
+  /* onFault runs inside the frame loop's own try. A throw in here must not stop the next frame from
+     being queued, so the body gets its own try, with a bare console.error as the last resort. */
+  try {
+    console.error(e);
+    acc = 0;
+    setPaused(true);
+    say('The world stopped on a fault. Load a save or make a new world.');
+  } catch (e2){ console.error(e2); }
 }
 
 /* The autosave read once when the page opens, parsed here and kept for the start dialog. */
@@ -7282,17 +7290,21 @@ function frame(now){
       else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
   }
-  if (lastEra === 'gods' && !inAges()) onSettle();
-  lastEra = era;
-  /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
-     take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
-  if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-  if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
-  camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  draw();
-  /* Pulses read every goal's state. Once a render, not once a frame. */
-  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
-  requestAnimationFrame(frame);
+  /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
+  try {
+    if (lastEra === 'gods' && !inAges()) onSettle();
+    lastEra = era;
+    /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
+       take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
+    if (!inAges() && dayOf() > ui.autosaveDay) autosave();
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    draw();
+    /* Pulses read every goal's state. Once a render, not once a frame. */
+    if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
+  } finally {
+    requestAnimationFrame(frame);
+  }
 }
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);

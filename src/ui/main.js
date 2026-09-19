@@ -11,17 +11,21 @@ function frame(now){
       else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
   }
-  if (lastEra === 'gods' && !inAges()) onSettle();
-  lastEra = era;
-  /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
-     take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
-  if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-  if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
-  camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
-  draw();
-  /* Pulses read every goal's state. Once a render, not once a frame. */
-  if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
-  requestAnimationFrame(frame);
+  /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
+  try {
+    if (lastEra === 'gods' && !inAges()) onSettle();
+    lastEra = era;
+    /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
+       take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
+    if (!inAges() && dayOf() > ui.autosaveDay) autosave();
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    draw();
+    /* Pulses read every goal's state. Once a render, not once a frame. */
+    if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
+  } finally {
+    requestAnimationFrame(frame);
+  }
 }
 function initUI(){
   dpr = Math.min(2, window.devicePixelRatio || 1);

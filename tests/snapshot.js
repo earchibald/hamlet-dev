@@ -86,6 +86,19 @@ test('a world with pitfalls in it round-trips and keeps each pitfall in its tile
   }
   assert.deepStrictEqual(through(api.takeSnapshot()), through(was.takeSnapshot()));
 });
+/* A hand-edited save can carry a forged x, y, or z inside a tile. The tile's index must still win, so a
+   forged position cannot move a tile to a place it never held. */
+test('a forged x on a saved tile loads, and the tile keeps the x its index gives', () => {
+  const was = load(); was.startWorld('r', { sw: 8, sh: 5 });
+  const snap = through(was.takeSnapshot());
+  const lv = snap.levels[was.ZOFF], i = lv.findIndex(t => t);
+  /* A saved tile holds no x of its own. The index gives it. */
+  const realX = i % was.W;
+  lv[i].x = realX + 1; lv[i].y = 9999; lv[i].z = 3;
+  const api = load(); assert.equal(api.loadSnapshot(snap), null);
+  const t = api.levels[api.ZOFF][i];
+  assert.equal(t.x, realX); assert.equal(t.y, (i - realX) / was.W); assert.equal(t.z, 0);
+});
 test('a loaded world has its derived state', () => {
   const api = loadedWorld(), was = lateWorld();
   assert.equal(api.tick, was.tick); assert.equal(api.W, was.W); assert.equal(api.world, api.levels[api.ZOFF]);
@@ -222,7 +235,7 @@ test('a world that digs a wolf den after the load runs on as the straight run do
 });
 
 /* A late save of a world of the default size. The three cases above are early or small, so a grown
-   valley with a gnome burrow holding a thing and four camps went untested. */
+   valley with a gnome burrow holding a thing and two camps went untested. */
 test('a grown valley of the default size, saved late, runs on as the straight run does', t => {
   const o = oracle('beta', 13779, 2500, {});
   /* The preconditions are read off the save, not off the world after it ran on: a burrow gives up

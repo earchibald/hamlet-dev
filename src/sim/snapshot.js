@@ -366,7 +366,10 @@ function decodeSnapshot(snap){
       const c = snapCopy(snapObj(lv[i], 'tile')), x = i % w;
       snapKey(c.ground, GROUND, 'tile ground');
       if (c.feature !== undefined && c.feature !== null) snapKey(c.feature, FEATURES, 'tile feature');
-      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...c };
+      /* x, y, and z come from the tile's index, never from the saved copy: a hand-edited save
+         must not move a tile by forging its own position inside it. */
+      const { x: _x, y: _y, z: _z, ...rest } = c;
+      out[i] = { x, y: (i - x) / w, z, ground: c.ground, ...TILE_DEFAULTS, ...rest };
     }
     return out;
   });

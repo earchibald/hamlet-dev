@@ -137,8 +137,8 @@ function autosave(){
   try { text = JSON.stringify(takeSnapshot()); }
   catch (e){
     console.warn('The autosave could not be taken: ' + (e && e.message));
-    if (ui.autosaveWarned) return;
-    ui.autosaveWarned = true;
+    if (ui.autosaveFaultWarned) return;
+    ui.autosaveFaultWarned = true;
     say('This world cannot be saved, so there is no autosave. The game plays on.');
     return;
   }
@@ -152,10 +152,14 @@ function autosave(){
 /* A step threw. The world is left where it stopped, the game pauses, and one plain sentence says so.
    The fault goes to the console for whoever is looking. The frame loop itself keeps running. */
 function onFault(e){
-  console.error(e);
-  acc = 0;
-  setPaused(true);
-  say('The world stopped on a fault. Load a save or make a new world.');
+  /* onFault runs inside the frame loop's own try. A throw in here must not stop the next frame from
+     being queued, so the body gets its own try, with a bare console.error as the last resort. */
+  try {
+    console.error(e);
+    acc = 0;
+    setPaused(true);
+    say('The world stopped on a fault. Load a save or make a new world.');
+  } catch (e2){ console.error(e2); }
 }
 
 /* The autosave read once when the page opens, parsed here and kept for the start dialog. */
