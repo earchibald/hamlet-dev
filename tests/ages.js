@@ -27,6 +27,11 @@ function creationOf(seed){
 }
 
 const rows = [];
+/* The work one creation may cost. Measured over the 24 seeds: 14 to 31 ages and 0 to 4 discards, with
+   6 discards over all of them. Each cap is about twice the measured worst, and the age cap is far under
+   the 200-age backstop, so a rule that makes a creation grind fails here before the backstop hides it. */
+const AGE_CAP = 60, SUM_DISCARDS = 24;
+const work = { ages: 0, discards: 0, gestures: 0 };
 /* The gesture record, counted across every seed. The design claims every act writes a usable mark, so
    the fallback to the heart of a country should never fire; and it sets no cap on the gestures in one
    age until there is a real number to set it against. These two tables are that number. */
@@ -38,7 +43,8 @@ for (const seed of SEEDS){
     for (const n of perAge) ages[n] = (ages[n] || 0) + 1;
     for (const rec of gestures) kinds[rec.kind] = (kinds[rec.kind] || 0) + 1;
     const c = api.creation;
-    const line = `${seed.padEnd(14)} ages ${String(c.ages).padStart(3)}  gods ${gs.length}  asleep ${gs.filter(g => g.status === 'asleep').length}  dead ${gs.filter(g => g.status === 'dead').length}  regions ${api.liveRegions().length}  scars ${scars}  backstops ${c.backstops}  ${ms} ms  contrasts ${contrasts.join(',')}  made ${species.join(',')}`;
+    work.ages += c.ages; work.discards += c.discards; work.gestures += gestures.length;
+    const line = `${seed.padEnd(14)} ages ${String(c.ages).padStart(3)}  gods ${gs.length}  asleep ${gs.filter(g => g.status === 'asleep').length}  dead ${gs.filter(g => g.status === 'dead').length}  regions ${api.liveRegions().length}  scars ${scars}  backstops ${c.backstops}  discards ${c.discards}  gestures ${String(gestures.length).padStart(3)}  ${ms} ms  contrasts ${contrasts.join(',')}  made ${species.join(',')}`;
     rows.push(line); t.diagnostic(line);
     if (process.env.VERBOSE) for (const e of api.legends) t.diagnostic(`${e.when}: ${e.text}`);
     assert.equal(api.era, 'days', 'the era never flipped');
@@ -51,7 +57,14 @@ for (const seed of SEEDS){
     assert.ok(species.includes('human'), 'no people');
     assert.ok(species.some(sp => api.SPECIES[sp].prey), 'nothing to eat');
     assert.ok(api.legends.length >= 5);
-    assert.ok(ms < 3000, `${ms} ms is too slow for a creation`);
+    /* What a creation costs, counted in work, not in time. The clock reading above is a diagnostic:
+       it moved with the machine and went red when a neighbouring test run was busy. Two numbers
+       carry the cost instead. An age is one step of the gods. A discard repaints the whole world,
+       so it costs about as much as the ages before it; gamma, the slowest seed, takes four. Both
+       caps sit well above every measured seed and well under the backstop, so a creation that
+       grinds goes red on any machine. */
+    assert.ok(c.ages <= AGE_CAP, `${c.ages} ages is too much work for a creation`);
+    assert.ok(c.discards < api.MAX_DISCARDS, `${c.discards} discards: the world was repainted too often`);
     if (SOAK_SEEDS.includes(seed)) assert.equal(c.backstops, 0, 'the backstop fired on a soak seed');
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'height').length), 'nothing raised');
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'depth').length), 'nothing dug');
@@ -70,6 +83,10 @@ test('the gesture record over every seed', t => {
   t.diagnostic(`the most in one age: ${counts[counts.length - 1]}`);
   const fell = Object.keys(fallbacks).sort();
   t.diagnostic(`anchor fallbacks: ${fell.length ? fell.map(k => `${k} ${fallbacks[k]}`).join(', ') : 'none'}`);
+  /* The work over every seed. A per-seed cap misses a change that adds one discard to every seed, so
+     the discards are capped across the seeds together as well. The sum is 6 today. */
+  t.diagnostic(`work over ${SEEDS.length} seeds: ages ${work.ages}, discards ${work.discards}, gestures ${work.gestures}`);
+  if (!process.env.SEEDS) assert.ok(work.discards <= SUM_DISCARDS, `${work.discards} discards over ${SEEDS.length} seeds (want <= ${SUM_DISCARDS})`);
   /* Every act in the table leaves a row, and every row is one of the kinds the design names. */
   const KNOWN = ['split', 'claim', 'make', 'raise', 'dig', 'flow', 'pool', 'burn', 'wash', 'battle', 'twist', 'mingle', 'sleep', 'born', 'unmade', 'backstop'];
   for (const k of acts) assert.ok(KNOWN.includes(k), `an unknown gesture kind: ${k}`);
