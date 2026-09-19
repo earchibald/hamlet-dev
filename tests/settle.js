@@ -175,6 +175,9 @@ test('every made species has a living member in its country, and nothing unmade 
     if (made.has(sp)) assert.ok(alive.length >= 1, `the ${api.SPECIES[sp].plural} were made and none lives`);
     else assert.equal(alive.length, 0, `the ${api.SPECIES[sp].plural} were never made and yet live`);
   }
+  /* A hunter's `most` caps the whole valley, so the makings after the cap put nothing on the ground. The test
+     spends the same budget in the same order the painter does, and only asks for creatures while it lasts. */
+  const budget = {};
   for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')){
     if (m.value === 'human') continue;
     /* Sprites stand at their grove's door, which is a tile just off the hill and may fall over the country's
@@ -183,10 +186,55 @@ test('every made species has a living member in its country, and nothing unmade 
       assert.ok(api.groves.some(g => api.regionAt(g.x, g.y) === r), `the ${api.SPECIES[m.value].plural} made in country ${r.id} have no grove`);
       continue;
     }
+    const how = api.SPAWN[m.value];
     const here = api.beings.filter(b => b.alive && b.species === m.value && b.z === 0 && api.regionAt(b.x, b.y) === r);
     const denned = api.beings.filter(b => b.alive && b.species === m.value && b.z !== 0);
+    if (how && how.most !== undefined){
+      const spent = budget[m.value] || 0;
+      if (spent >= how.most) continue;
+      budget[m.value] = spent + Math.min(how.n, how.most - spent);
+    }
     assert.ok(here.length + denned.length >= 1, `the ${api.SPECIES[m.value].plural} made in country ${r.id} are not there`);
   }
+  /* No species goes over its cap, and no den is dug for nobody. */
+  for (const sp in api.SPAWN){
+    const how = api.SPAWN[sp]; if (!how || how.most === undefined) continue;
+    const n = api.beings.filter(b => b.alive && b.species === sp).length;
+    assert.ok(n <= how.most, `${n} ${api.SPECIES[sp].plural} at settle, and the table allows ${how.most}`);
+  }
+  for (const c of api.caves.filter(c => c.kind === 'den')){
+    assert.ok(api.beings.some(b => b.alive && b.den === c), `a den was dug and nothing lives in it`);
+  }
+});
+
+/* The cap on the hunters. Seed birch-crag-41 runs 82 ages and marks twenty-six wolf makings and nine fox
+   makings. Without the cap the valley began with fifty-two wolves, and four of them mauled one person in three
+   ticks. The legends still tell of every making; the valley holds the pair and the three. */
+test('a long creation still brings down one wolf pair and three foxes', () => {
+  const api = load(); api.startWorld('birch-crag-41', { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200 });
+  const marks = {};
+  for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')) marks[m.value] = (marks[m.value] || 0) + 1;
+  assert.ok(marks.wolf > api.SPAWN.wolf.most, `seed birch-crag-41 marked only ${marks.wolf} wolf makings; pick another seed`);
+  assert.ok(marks.fox > api.SPAWN.fox.most, `seed birch-crag-41 marked only ${marks.fox} fox makings; pick another seed`);
+  const alive = sp => api.beings.filter(b => b.alive && b.species === sp).length;
+  assert.equal(alive('wolf'), api.SPAWN.wolf.most);
+  assert.equal(alive('fox'), api.SPAWN.fox.most);
+  /* Every den that stands has owners. A making the cap turned away digs no den at all. */
+  for (const c of api.caves.filter(c => c.kind === 'den')) assert.ok(api.beings.some(b => b.alive && b.den === c), 'a den was dug for nobody');
+  /* The valley says so once for each species the cap held back, and the prey are not held back at all. A settle
+     that was thrown back leaves its own lines behind, as its "the last of the gods sleeps" line does, so the
+     count is one a species a settle. */
+  const said = api.chronicle.filter(e => /came down into the valley/.test(e.text)).map(e => e.text);
+  const settles = api.chronicle.filter(e => /The last of the gods sleeps/.test(e.text)).length;
+  for (const sp of ['wolf', 'fox']) assert.equal(said.filter(t => t.includes(api.SPECIES[sp].plural)).length, settles, `the ${api.SPECIES[sp].plural} cap is not in the chronicle once a settle`);
+  for (const sp of ['rabbit', 'deer']) assert.equal(said.filter(t => t.includes(api.SPECIES[sp].plural)).length, 0, `the ${api.SPECIES[sp].plural} were capped and they should not be`);
+});
+
+/* A seed whose creation never fills a country twice says nothing about a cap, and loses nothing to it. */
+test('a short creation loses nothing to the cap and says nothing of it', () => {
+  const api = load(); api.startWorld('alpha');
+  assert.equal(api.beings.filter(b => b.alive && b.species === 'wolf').length, api.SPAWN.wolf.n);
+  assert.equal(api.chronicle.filter(e => /came down into the valley/.test(e.text)).length, 0);
 });
 
 /* Nothing the gods did not make wanders in. The day era refills the wild with rabbits, deer, foxes and wolves,
