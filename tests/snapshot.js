@@ -6,6 +6,25 @@ const path = require('path');
 const { load, FILES } = require('../src/sim/index.js');
 const { runDays, collect, runOn, fingerprint } = require('./lib/run.js');
 
+/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
+   This file asks for 40 world days, and no day count in it has been changed. A world day
+   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
+   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
+   slow engine is a gate nobody measured.
+   Run it with SLOW=1. Task 4 restores it.
+   The plan names the snapshot oracle as one of the three gates standing in for the golden
+   between task 1 and the bless. Suspending this file does NOT remove that gate: the oracle also
+   runs in `tests/soak.js` as "seed x saved on day 1.5, loaded into a fresh sim, tells the same
+   story to day 3", which runs at every task's gate. The gate moves; it does not go. */
+const SUSPENDED_FOR_G4 = process.env.SLOW ? false
+  : 'suspended for G4: this file asks for 40 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+if (SUSPENDED_FOR_G4){
+  test('tests/snapshot.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
+  return;
+}
+
+
 test('a stream gives the numbers it gave before', () => {
   const api = load(); const f = api.mulberry32(12345);
   assert.deepEqual([f(), f(), f()], [0.9797282677609473, 0.3067522644996643, 0.484205421525985]);
@@ -450,10 +469,14 @@ test('a save written before the names loads, and the world starts its names afre
   assert.equal(api.nameIndex.size, 0);
   assert.equal(api.usedMeanings.size, 0);
   assert.equal(typeof api.streamState(api.nrng), 'number');
-  /* Minor 22: two hundred steps say that a world loaded with no names runs on and names again.
-     The index starts empty above and holds something here, so the run is doing the work. */
-  for (let i = 0; i < 200; i++) api.step();
-  assert.ok(api.nameIndex.size > 0, 'the loaded world named nothing in two hundred steps');
+  /* Minor 22: a fifth of a world day says that a world loaded with no names runs on and names again.
+     The index starts empty above and holds something here, so the run is doing the work.
+     This was two hundred ticks of the old 1000-tick day. Two hundred ticks of the G4 day is three
+     minutes of world time, and the naming pass runs once a night, so the run never reached one and
+     the world named nothing. The span converts; the assertion does not change. */
+  const span = api.ticks(200);
+  for (let i = 0; i < span; i++) api.step();
+  assert.ok(api.nameIndex.size > 0, `the loaded world named nothing in ${span} ticks, a fifth of a world day`);
 });
 
 /* Minor 15: TILE_DEFAULTS is the shape every fresh tile starts in, and `makeTile` and the decoder

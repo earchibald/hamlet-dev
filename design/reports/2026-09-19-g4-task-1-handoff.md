@@ -1,18 +1,19 @@
-# G4 task 1: state, findings, and what is owed
+# G4 task 1: the calendar, the markers, the walk, and the soak's new shape
 
-Written 2026-09-19 as a handoff. Task 1 is **most of the way done and not finished**. This is also
-the start of task 1's own report; finish it here rather than starting a new file.
+Task 1's report. Started 2026-09-19 as a handoff at `afdbe49`, finished the same day. The handoff's
+five owed items are closed and two findings were added after it was written, one of them a live
+regression. Read the findings before the table: findings 2 and 5 are the same class of fault, caught
+twice in one task, and the second was invisible to the gate the first one built.
 
 | | |
 |---|---|
-| Branch | `tiers-g4`, pushed |
+| Branch | `tiers-g4` |
 | Worktree | `/Users/earchibald/Worktrees/hamlet-g4` |
-| Head | `afdbe49` |
-| Branched from | dev at `d3bcfcb`; dev has since moved to `a311825` |
-| Plan | `design/plans/2026-09-19-tiers-plan-g4-the-retune.md`, on this branch |
+| Plan | `/Users/earchibald/Worktrees/hamlet-g4/design/plans/2026-09-19-tiers-plan-g4-the-retune.md` |
+| Branched from | dev at `d3bcfcb`; dev `a311825` merged in, clean |
 | Soak | **green**: 73 tests, 64 pass, 0 fail, 9 skipped, 5 min 5 s |
-| `tests/clock.js` | **green**: 19 of 19 |
-| Rest of the fast suite | red in places, by design, see "What is owed" |
+| `tests/clock.js` | **green**: 21 of 21, two of them new gates from finding 5 |
+| Rest of the fast suite | see "The suite, measured": every measurable failure converted to green, six files suspended for G4 with no day count changed |
 
 ## Where the plan lives now
 
@@ -33,10 +34,14 @@ can be checked without a world at all. `SEASON_DAYS` is gone.
 **Wall time left the sim.** `TPS` is now `TICKS_A_SECOND` in `src/ui/state.js`. Speed is view state
 and never passes the door.
 
-**Every legacy marker is a converter.** An old tick is 86.4 world seconds and an old stride is two
-of those. `ticks` and `strides` multiply **and round**; `tickRate` and `strideRate` divide. This is
-a rebasing, not a reading: every marked value keeps exactly the world meaning it already had, and
-the marker still says nobody has decided what it should be.
+**Every legacy marker is a converter, except one.** An old tick is 86.4 world seconds and an old
+stride is two of those. `ticks` and `strides` multiply **and round**; `tickRate` and `strideRate`
+divide. This is a rebasing, not a reading: every marked value keeps exactly the world meaning it
+already had, and the marker still says nobody has decided what it should be.
+
+`lookRate` is the exception and it does **not** convert. A chance for one look is not a chance a
+tick: the rule draws a number of looks, that count carries the world time, and the chance rides on
+top of it unchanged. Converting one of these divides it a second time, which is finding 5.
 
 **The walk.** `stride` is a speed in tiles a tick, one for a walk and two at a run, read in
 `runTask`. The old stride gate is gone: it ran a being's whole head on one tick in `stride`, so one
@@ -49,7 +54,7 @@ times less, which no per-field default can rescue.
 **The soak is six seeds for three world days**, with the 70-day run behind `LONG=1` on one seed, and
 answers to `tests/soak-working.json`. `tests/soak-golden.json` is untouched and no task writes it.
 
-## The four findings worth carrying
+## The six findings worth carrying
 
 ### 1. The rates had to convert, or the world would have broken silently
 
@@ -123,26 +128,266 @@ as a gate and is not one.
 One trap caught: the six-seed sums were gathered **inside** the `camps grow` assertion, so skipping
 it would have stopped the counting and left the sum floors below seeing zero and passing.
 
-## What is owed before task 1 closes
+### 5. A count is a whole number too, and a chance for one look is not a chance a tick
 
-1. **The version 1 save tests.** Three tests in `tests/snapshot.js` load v1 fixtures and now get a
-   refusal. That is correct behaviour and the plan ruled it. They must assert the refusal rather than
-   the load. This is a *reading*, not a renumber.
-2. **The rest of the mechanical test conversions.** Last full measurement, at `433938a`, before the
-   `tests/lib/run.js` fix: `ui` 118/125, `tasks` 21/23, `door` 14/15, `terrain` 61/63. Re-measure
-   first — the runner fix and the rounding fix have both landed since and will have recovered an
-   unknown number of them.
-3. **Merge dev `a311825`.** It carries PR #61, the two raw NUL bytes in `tests/clock.js` written as
-   the escape `\0`. Behaviour-preserving by construction, golden unmoved, before-numbers unaffected.
-   `tests/clock.js` has been edited heavily on this branch, so expect to resolve a conflict.
-4. **The 31 chances.** The plan's task 1 asks for each chance-a-tick to be rewritten as an hourly
-   rate rolled with `rollFor(rate, 1)`. This was **deliberately not done**, and the deviation must be
-   named in the report. Making `tickRate` a converter preserves every value's world meaning exactly
-   and keeps the marker, which is what the plan's own marker rule asks for; rewriting 31 values as
-   hourly rates is 31 readings that task 1 does not own. If the next context disagrees, that is a
-   fair call to revisit — but revisit it deliberately, not by assuming it was an oversight.
-5. **Finish this report** and name every test left red with its reason. A task that leaves a test red
-   and does not name it has removed a gate silently.
+The second regression of the same class as finding 2, found after the handoff was written, on a
+branch whose soak was green and whose `tests/clock.js` was green including its new whole-number rule.
+
+`CLOCK.plant.samples` is looks a tick. It was 60 and the converter made it `tickRate(60)`, which is
+0.694. `growPlants` spends it as `for (let k = 0; k < samples; k++)`, and a `for` bound truncates a
+fraction, so the loop ran **once** a tick rather than 0.694 times. That alone was a 1.44 times
+overshoot and harmless. The second half was not. Every one of the eleven chances in the plant block
+had been converted by `tickRate` as though it were a chance a tick. Each is a chance for **one
+look**, and the look count already carries the world time, so each was divided by 86.4 a second time.
+
+The two compounded to about sixty times fewer plant events a world day. Measured, seed `r`, one
+world day, against dev `a311825`:
+
+| | dev | `tiers-g4` before | after the fix |
+|---|---|---|---|
+| berries | +134 | **-91** | +144 |
+| bushes seeded | +21 | **0** | +18 |
+| saplings sprouted | +49 | **1** | +39 |
+
+Berries went **down** because growth had stopped while people kept picking. Nothing went red.
+
+**Why the existing gates could not see it.** Finding 2's gate asserts every duration in `CLOCK` is a
+whole number of ticks. That is a rule about durations, and this fault was in a count and in a chance.
+More to the point, **every value in the table was correct on both sides of this fault.** The fault
+was in how two correct numbers were used together. No lint on the table could have caught it, and
+the whole-number rule that came out of finding 2 would not have caught it either.
+
+**The fix.** `lookRate` is a new marker in `src/sim/clock.js` that deliberately does **not** convert,
+and the eleven plant chances carry it. A marker that does nothing is normally the mistake the marker
+test exists to catch, so the exception is asserted by name in `tests/clock.js` rather than left to
+the absence of an assertion. `growPlants` now draws a whole number of looks from the fractional rate.
+
+**The gate, which matters more than the fix.** It is behavioural, not a lint, because a lint was
+structurally incapable here. `tests/clock.js` calls `growPlants` for a tenth of a world day and
+asserts berries appear: **0 before the fix, 23 after, 24 on dev.** It fails against the old code,
+which is the only evidence that a gate is a gate. A second test splits the two halves so a failure
+says which one broke: the look count is 60,000 a world day within 2 percent, and no chance in the
+plant block carries `tickRate`.
+
+**What the class costs, which is the part worth carrying.** Two regressions of "the rule stopped
+happening" landed inside one task. One was in the task system and one was not. patcher checked the
+scope rather than taking my word for it and found that **none of the eleven per-tick steps in
+`updateWorld` is a task** — `growPlants`, `spreadFire`, `updateWeather`, `updateCamps`,
+`strayLightning`, `rotCarcasses`, `groveTick`, `denTick`, `gnomeTick`, `spawnWildlife`, `godsTick`.
+So a detector that watches task records cannot see the per-tick engine at all. The shape that caught
+this one generalises and a table lint does not: **call the rule and ask whether it still happens.**
+
+### 6. The suite's cost is one number, and it is the number task 4 exists to move
+
+Finding 3 recorded that sixteen `tests/snapshot.js` failures were one line: `tests/lib/run.js` held
+`const DAY = 1000`, its own copy of the day, so a test asking for seventy days ran for a fifth of
+one. It now reads `load().DAY`.
+
+**A first reading of that was wrong and is corrected here, because the wrong reading argues for
+cutting tests.** It is tempting to say those tests were always fast and wrong, and that the fix
+merely revealed what they cost. They were not. On dev, `src/sim/clock.js` line 4 reads
+`const DAY = 1000, TPS = 12`, and `tests/lib/run.js` read `const DAY = 1000`. **The two matched
+exactly.** A test asking `runDays(..., 70)` on dev got seventy world days and reported seventy. The
+private copy was a duplicated constant — a latent fault, and a real one, which is why finding 3
+records it — but it was not a wrong number until something changed the original.
+
+What changed the original was task 1, on this branch. For the window between the commit that made
+`DAY` 86,400 and the runner fix, every day-denominated test ran a fraction of what it claimed. That
+window is G4-internal and it is closed.
+
+**So the suite's cost is a pure function of one number, and no test grew.** Each file's cost is the
+world days it asks for, which have not changed, multiplied by the seconds a world day, which task 1
+moved and task 4 is built to move back. `tests/names.js` asks for 202 world days, 342 under `SLOW=1`:
+
+| seconds a world day | `tests/names.js` |
+|---|---|
+| dev, about 0.31 s | about 63 seconds |
+| this branch, 15 s measured | about 50 minutes |
+| task 3's budget, under 5 s | about 17 minutes |
+| task 4's target, under 1 s | about 3 minutes |
+
+Every file in the unmeasurable list behaves the same way, which is what the table below shows: each
+is slow in exact proportion to the world time it asks for, and for no interesting reason.
+
+**The two-hour suite is a transient of an unfinished retune, not a new property of the tests.** That
+is why this report recommends cutting nothing. Cutting a day count now would trade a permanent loss
+of coverage for a temporary cost, and it is the same act the soak's floors were deliberately spared:
+a count reduced to fit a slow engine is a gate nobody measured. `tests/names.js`'s 70-day layout
+guard is the one thing in this repository that has caught a moved being or item.
+
+dev-coordinator is taking the shape to the user: the slow files go behind a flag **for the duration
+of G4**, named as suspended with the reason and the flag in the skip message, and they come back at
+task 4. Not cut, not rescaled, not guessed. If task 4 misses the budget, the question becomes real
+then, with a measured number behind it.
+
+## What task 1 closed, of the five things it owed
+
+### 1. The version 1 save tests: ruled, and not as the handoff proposed
+
+The handoff said three tests must assert the refusal rather than the load. That is right for one of
+them and wrong for two, and the difference matters enough to write down.
+
+The plan rules at line 133 that the version rises to 2 and a version 1 save is refused. So
+`the version refusal names both versions` is rebased: it now asserts `SNAPSHOT_VERSION` is 2, that a
+version 1 save is refused with `This save is version 1. This world reads version 2.`, and that a
+version 3 save is refused the same way. The loader's sentence was already generic and needed no
+change.
+
+The other two tests do **not** become refusal tests. Neither loads a v1 fixture from disk. Each takes
+a snapshot of a live world, deletes the fields that a save written before some later work would not
+have held, and asserts it still loads. Their subject is not the version number. It is that **the
+decoder tolerates a save missing fields added after it was written**, which is the same policy line
+133 restates and which did not change when the version rose. Converting them to refusal tests would
+have deleted that coverage and left the branch looking greener. They follow the version up to 2
+instead, and each carries the reason in place.
+
+### 2. The mechanical test conversions
+
+See finding 6 and the table below. The measurement came first because the handoff's numbers were
+taken at `433938a`, before both the runner fix and the rounding fix, and it said so.
+
+### 3. dev `a311825` merged
+
+Clean, no conflict, despite the handoff's warning that `tests/clock.js` had been edited heavily on
+both sides. The two NUL separators are present as the escape `\0` at `tests/clock.js:296` and `:298`,
+and **no raw NUL byte remains**. That was confirmed by reading the file's bytes in Node, not by
+grepping: the first attempt, `git grep -c $'\0'`, reported 300 matching lines, because the shell
+strips a NUL from an argument and the pattern reached git as the empty string, which matches every
+line. A search can fail in the argument layer before the tool runs, and a false positive reads as
+confidently as a true one.
+
+### 4. The 31 chances: the deviation stands, and here is what it costs
+
+The plan's task 1 asks for each chance-a-tick to be rewritten as an hourly rate rolled with
+`rollFor(rate, 1)`. This was not done. The handoff asked the next context to revisit it deliberately
+rather than assume an oversight. I have, and I am keeping the deviation. Three reasons, in order of
+weight.
+
+**It is 31 readings task 1 does not own.** The plan's own marker rule at line 168 says a marked value
+is never converted because it happens to equal a real-unit expression, because the conversion removes
+the flag that says nobody has decided without anybody deciding. Rewriting 31 chances as hourly rates
+is that, 31 times.
+
+**Task 2 re-touches every one of them anyway.** Task 2's checklist rolls every chance inside a
+cellular system with `rollFor(rate, CLOCK.every.cellular)`, and gives spoilage, births, arrivals,
+storms and lightning their own beats. Doing the work in task 1 at `rollFor(rate, 1)` is work task 2
+undoes.
+
+**The arithmetic cost is small and now measured, which it was not before.** The plan's exact
+conversion is `1 - (1 - p) ** (3600 / OLD_TICK)`; `tickRate` divides, which is its linear
+approximation. For every chance rolled once a tick the two differ by **under 0.2 percent**:
+`lightningLit` and `oldAgeDeath` at 0.0006 differ by 0.03 percent, `lightningOut` at 0.0035 by 0.17
+percent, `strayLightning` at 0.0008 by 0.04 percent. The two fire chances are the largest at about 1
+percent. The approximation is only poor for a large `p`, and every value that large in the table is
+an amount, not a chance, where the linear divide is exactly right.
+
+**One thing the deviation did cost, and it is the reason to report it rather than bury it.** Sweeping
+for large conversion error is what led to the plant block, and the plant block was genuinely broken —
+finding 5. So the deviation is not free: it left `tickRate` doing double duty as the amount converter
+and the chance converter, and that is what let eleven per-look chances be converted as per-tick
+chances without anybody noticing. `lookRate` now separates the third case. If a later task does
+rewrite the 31, it should keep that separation rather than collapse it again.
+
+### 5. This report
+
+Finished here, as the handoff directed, rather than started again in a new file.
+
+
+## The suite, measured
+
+Measured on this branch, `node --test` per file, with a 420 s cap. The "before" column is this
+branch as the handoff left it; the "after" column is after task 1's conversions. The handoff's
+numbers were taken at `433938a`, before both the runner fix and the rounding fix, and it said so, so
+everything here was re-measured rather than carried forward.
+
+| file | before | after | seconds | what was wrong |
+|---|---|---|---|---|
+| `clock` | 21/21 | **21/21** | 3 | two gates added by finding 5 |
+| `options` | 5/5 | 5/5 | 2 | — |
+| `field` | 10/10 | 10/10 | 3 | — |
+| `gods` | 31/31 | 31/31 | 5 | — |
+| `become` | 34/34 | 34/34 | 12 | — |
+| `ages` | 76/76 | 76/76 | 51 | — |
+| `chronicle` | 5/5 | 5/5 | 82 | — |
+| `crafts` | 6/14 | **14/14** | 36 | a 600-old-tick budget |
+| `closing` | 8/11 | **11/11** | 61 | old-day literals, old-tick budgets |
+| `dwellers` | 9/18 | **18/18** | 71 | old-day literals; a bare 119 that is now read from `CLOCK` |
+| `tasks` | 21/23 | **23/23** | 273 | a nine-old-day span and its sampling period |
+| `terrain` | 61/63 | **63/63** | 44 | a winter day that is no longer winter; the dark walk |
+| `door` | 13/15 | **15/15** | 476 | two more private copies of the day |
+| `ui` | not measurable | **suspended** | — | asks for 25 world days |
+| `settle` | not measurable | **suspended** | — | asks for 50 world days |
+| `snapshot` | not measurable | **suspended** | — | asks for 40 world days |
+| `wanderer` | not measurable | **suspended** | — | asks for 48 world days |
+| `gnomes` | not measurable | **suspended** | — | asks for 70 world days |
+| `names` | not measurable | **suspended** | — | asks for 202 world days, 342 under `SLOW=1` |
+
+**Every failure converted above was a test counting in old ticks. Not one was a fault in the rules.**
+
+### What is switched off, in one place
+
+The user approved this shape through dev-coordinator: **cut nothing.** These six files are suspended
+for the duration of G4 and **not one day count in them was changed**. Each names itself, its day
+count, the reason and the flag in its own skip message, so a reader of the suite sees what is off and
+what has to become true for it to return.
+
+| file | world days asked for | flag | restored by |
+|---|---|---|---|
+| `tests/names.js` | 202, and 342 under `SLOW=1` | `SLOW=1` | task 4 |
+| `tests/gnomes.js` | 70 | `SLOW=1` | task 4 |
+| `tests/settle.js` | 50 | `SLOW=1` | task 4 |
+| `tests/wanderer.js` | 48 | `SLOW=1` | task 4 |
+| `tests/snapshot.js` | 40 | `SLOW=1` | task 4 |
+| `tests/ui.js` | 25 | `SLOW=1` | task 4 |
+
+Task 4 carries a checkbox to remove every one of these guards and report each file's pass count and
+seconds. Until that box is ticked, `npm run fast` is not the gate it reads as.
+
+**A suspended test that says only "skipped" is indistinguishable from a test nobody wrote.** So each
+skip message gives the reason and the flag: *"this file asks for N world days and a world day costs
+about 15 s on this branch, not dev's 0.31 s. SLOW=1 runs it. Task 4 restores it."* That sentence is
+the difference between a suspension and a quiet deletion.
+
+**One gate moved and did not go.** The plan names the snapshot oracle, `tests/snapshot.js`, as one of
+the three gates standing in for the golden between task 1 and the bless. Suspending that file does
+not remove the oracle: it also runs inside `tests/soak.js` as *"seed x saved on day 1.5, loaded into
+a fresh sim, tells the same story to day 3"*, and the soak runs at every task's gate. This is stated
+rather than left to be noticed, because a gate that quietly has one fewer leg is the fault this whole
+report is about.
+
+### The tests left red, named
+
+**Task 1 leaves no test red.** Every failure it could measure is now green, and every one of them was
+a test counting in old ticks rather than a fault in the rules. What it leaves is six files
+suspended, listed above, whose state is **unknown rather than green**. Nobody should read the suite
+as a clean bill for them.
+
+The three version tests inside `tests/snapshot.js` were run on their own, outside the cap, because
+they are what owed item 1 changed. Two passed at once. **The third failed, and it is worth recording
+why, because it is the same fault a fourth time.** `a save written before the names loads` ends by
+stepping the loaded world and asserting that it names something again. The span was 200 ticks of the
+old day. Two hundred ticks of the G4 day is three minutes of world time, and the naming pass runs
+once a night, so the run never reached one and the world named nothing. The span converts to
+`ticks(200)`, a fifth of a world day, and the assertion is untouched.
+
+That is four separate places where a bare old-tick count survived into this branch: `tests/lib/run.js`,
+two in `tests/door.js`, and this one — plus the thirty-one in the files converted above. Each was
+found by looking, none by a rule. **There is no lint for this**, because a bare tick count is a
+number and a number survives any rebasing, which is finding 1 restated. The only thing that finds
+them is a test that asserts the world did something, and the only reason this one was caught is that
+the file's three version tests were run individually rather than left inside a suspended file.
+
+### The working record moved, deliberately
+
+The plant fix of finding 5 changes what grows in every seed, so every seed's fingerprint moved and
+two record comparisons in `tests/soak.js` went red against `tests/soak-working.json`. That is the fix
+working. The working record is rewritten by this task with `UPDATE_GOLDEN=1 node tests/soak.js`,
+which on this branch writes `tests/soak-working.json` and which `tests/soak.js`'s own failure message
+names as the thing to do when the change is intended.
+
+**`tests/soak-golden.json` is untouched.** No task writes it. Task 11 prepares the bless and the user
+gives it.
+
 
 ## Standing constraints
 
@@ -159,6 +404,35 @@ it would have stopped the counting and left the sum floors below seeing zero and
   release moment. Nothing else comes back to them.
 - Announce a task at its start, not its end. Several sessions run in parallel and a stale statement
   about who owns what cost four duplicate issues this morning.
+- **A search that finds nothing is weak evidence of nothing**, and the argument layer is a place a
+  search can fail before the tool runs. Checking that no raw NUL byte survived the merge,
+  `git grep -c $'\0' -- tests/clock.js` reported 300 matching lines: the shell strips a NUL from an
+  argument, so the pattern reached git as the empty string and matched every line. Reading the file's
+  bytes in Node gave the true answer, zero. Confirm a load-bearing absence by a different KIND of
+  method, not by a second search.
+
+## Rulings received during this task
+
+From **dev-coordinator**, relayed as the user's. They are recorded because they bind the tasks after
+this one, not because task 1 acted on them.
+
+1. **Measure the pinned fraction before tasks 2 and 3 are built.** The skip's payoff has a ceiling
+   set by the share of ticks that must be stepped one at a time, and that share is knowable now for
+   the cost of one run. Union and each cause separately, with a genuine third bucket, on `tiers-g4`.
+   The predicate draws no random number, lives in `NOT_SAVED`, and the fingerprint must be proved
+   identical with the counter on and off. **It is not a gate on task 4**: a predicate that later
+   becomes the rule cannot also be what validates the rule.
+2. **Widened after finding 5.** Before the fire-and-predator percentages, count how many of the
+   eleven per-tick systems in `updateWorld` can be given a next beat at all. If even one cannot, the
+   pinned fraction is 100 percent and the other numbers do not matter. This is reading, not running.
+   It is why `growPlants` takes its look count as a closed form of the tick rather than as a rolled
+   fraction: a roll would spend a random number every tick and leave the system with no next beat.
+3. **`LONG=1` on seed `r` at every task gate** until the suspended floors return. It runs all nine
+   suspended assertions at their original measured values.
+4. **Task 4's timing number goes to the user through dev-coordinator**, with a recommendation.
+5. **The floors decision is made**: every floor stays through G4 and no number is re-tuned during the
+   retune, because re-flooring from a post-G4 measurement derives the floor from the thing it exists
+   to check. Task 1's suspend-rather-than-rescale call is now the standing rule.
 
 ## Peers
 

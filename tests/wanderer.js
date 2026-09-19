@@ -4,6 +4,21 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runDays, DAY } = require('./lib/run');
 
+/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
+   This file asks for 48 world days, and no day count in it has been changed. A world day
+   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
+   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
+   slow engine is a gate nobody measured.
+   Run it with SLOW=1. Task 4 restores it. */
+const SUSPENDED_FOR_G4 = process.env.SLOW ? false
+  : 'suspended for G4: this file asks for 48 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+if (SUSPENDED_FOR_G4){
+  test('tests/wanderer.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
+  return;
+}
+
+
 /* Read the meaning, not the sentence: the line says the last person is dead. The rest of it may be reworded. */
 const EMPTY = /last person in the valley is dead/;
 const WANDERER = /comes over the hills alone/;

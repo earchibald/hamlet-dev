@@ -411,6 +411,13 @@ This task answers ruling 2. It is also the task whose numbers decide the floors,
   - Measure and report. This task tunes nothing toward the number.
 - [ ] **Measure and report, do not decide.** Use two `load()` scopes in one process for the before and after, so the two runs meet the same machine on the same day. Seconds a world day at day 3, day 50, and day 400. Seconds for a 70-day run and for an 800-day run, on one seed and on six. The wall time of `npm run fast` and of the soak. Put the table in the pull request, name the floors that the numbers would let the soak keep, and say plainly which ones still cost more than the budget.
 - [ ] Do not remove a floor. Tell dev-coordinator that the floors question is with the user, and carry on with task 5.
+- [ ] **Restore the six files task 1 suspended.** They are suspended, not cut: every day count in
+  them is exactly as written, and each names itself, its day count and the flag in its skip message.
+  Remove the `SUSPENDED_FOR_G4` guard from `tests/names.js` (202 world days), `tests/gnomes.js` (70),
+  `tests/settle.js` (50), `tests/wanderer.js` (48), `tests/snapshot.js` (40) and `tests/ui.js` (25),
+  and report each one's pass count and seconds. A file that still cannot finish is a finding for the
+  user with a measured number behind it, not a file to cut. Until this box is ticked, `npm run fast`
+  is not the gate it reads as.
 - [ ] Gates as task 1, plus `tests/skip.js`. Commit.
 
 ### Task 5: Work, sleep, and needs in world time
