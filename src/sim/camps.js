@@ -4,6 +4,10 @@ function makeCamp(name){
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
     tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+  /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
+     gets its first name record once someone is there to give it one: at the site (`setSite`),
+     or, failing that, at the hearth (`nameCampAtHearth`). */
+  c.names = []; c.namedAt = 0; c.founder = null; c.villageNamed = 0;
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
@@ -56,6 +60,7 @@ function chooseSite(a){
   if (!best) return false;
   setSite(best.x, best.y);
   camp.siteReason = best.why.join(', ');
+  nameFoundersCamp(camp, a);
   log(`${a.name} picks a spot for the camp: ${best.why.join(', ')}.`, [a], 'major');
   return true;
 }
@@ -63,6 +68,11 @@ function setSite(x, y){
   camp.site = [x, y];
   const st = nearFind(x, y, t => passable(t.x, t.y) && !t.feature, RING) || tileAt(x, y);
   camp.stashTile = [st.x, st.y];
+  /* A site set from any door (the founder's own choice, or the player's) gets a founder
+     record from whoever is there to name it, so a camp raised through `inject()` is
+     never left carrying "The first camp". */
+  const founder = namerFor([x, y]);
+  if (founder) nameFoundersCamp(camp, founder);
 }
 /* A wildfire within reach of the camp, for fetching an ember. */
 function nearbyBlaze(){
@@ -168,7 +178,7 @@ function updateCamps(){
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
         for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
         for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
-        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [c, pair.p, pair.q], 'major');
+        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major');
       }
     }
     tryLightning();
@@ -182,9 +192,10 @@ function updateCamps(){
         if (ok.length){
           const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
           const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
-          log(`Someone saw the smoke. ${b.name} comes over the hills toward ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [b], 'major');
+          log(`Someone saw the smoke. ${b.name} comes over the hills toward ${camp.name}.`, [b], 'major');
         }
       }
     }
   }
+  nameTick();
 }

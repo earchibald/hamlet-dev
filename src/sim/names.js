@@ -247,3 +247,175 @@ function learnNamesHere(a){
   const hollow = nearFind(a.x, a.y, q => q.feature === 'hollow', RING, a.z);
   if (hollow){ const g = groves.find(g => g.x === hollow.x && g.y === hollow.y); if (g) learnName(g, a, 'this grove'); }
 }
+
+/* ---------- the namer ----------
+   One function names anything. It gathers candidates from every axis, scores
+   them by salience and the namer's traits, takes the top, and keeps the whole
+   list on the record. */
+const BIOME_WORD = { meadow: 'meadow', forest: 'pine', rocky: 'stone', wetland: 'reed' };
+/* The landmarks the land axis looks for, each with the word it gives. Rules read this table. */
+const LAND_MARKS = [
+  { word: 'water', test: t => t.ground === 'water' },
+  { word: 'ford',  test: t => !!t.ford },
+  { word: 'reed',  test: t => t.feature === 'reeds' },
+  { word: 'stone', test: t => t.feature === 'boulder' || t.ground === 'rock' },
+  { word: 'pine',  test: t => t.feature === 'tree' || t.feature === 'hollow' },
+  { word: 'hill',  test: t => !!t.hill },
+  { word: 'cave',  test: t => !!t.mouth },
+  { word: 'pool',  test: t => !!t.pond },
+  { word: 'clay',  test: t => !!GROUND[t.ground].clay },
+];
+/* Two words joined: the first word, then the tail of the second. Reedwater, Pinehill, Stoneford. */
+const WORD_TAIL = {
+  water: 'water', reed: 'marsh', stone: 'ford', pine: 'wood', hill: 'hill', ford: 'crossing',
+  pool: 'bank', clay: 'bank', meadow: 'field', cave: 'mouth',
+  ash: 'hill', wolf: 'night', frost: 'hollow', light: 'water', parting: 'ford', grave: 'hill', cradle: 'field',
+  snare: 'wood', pit: 'field', bench: 'stead', kiln: 'hill', hearth: 'stead', roof: 'stead', store: 'stead',
+  rack: 'wood', offering: 'stone', ward: 'wood', fish: 'bend', timber: 'wood', stick: 'wood',
+  berry: 'bank', moss: 'hollow', deer: 'crossing', cutting: 'bank',
+};
+/* An article and a phrase: the Clay Bank, the Reed Marsh. */
+const WORD_PHRASE = {
+  water: 'Water', reed: 'Marsh', stone: 'Ground', pine: 'Wood', hill: 'Hill', ford: 'Crossing',
+  pool: 'Pool', clay: 'Bank', meadow: 'Meadow', cave: 'Mouth',
+  snare: 'Snares', pit: 'Pits', bench: 'Bench', kiln: 'Kiln', hearth: 'Hearth', roof: 'Roofs', store: 'Store',
+  rack: 'Racks', offering: 'Stone', ward: 'Posts', fish: 'Bend', timber: 'Timber', stick: 'Sticks',
+  berry: 'Bushes', moss: 'Moss', deer: 'Crossing', cutting: 'Cuttings',
+};
+const NOTABLE_TAILS = ['Rest', 'Crossing', 'Hearth', 'Ford', 'Hollow', 'Stead'];
+/* One trait bends one axis. Nothing else does. */
+const AXIS_TRAIT = { land: 'patience', event: 'temper', notable: 'sociability', old: 'curiosity', lore: 'curiosity' };
+const axisMult = (axis, by) => { const tr = AXIS_TRAIT[axis]; return tr && by ? 0.7 + by.traits[tr] * 0.6 : 1; };
+
+/* The words this place offers, nearest landmark first, with the biome word last. A sector's
+   biome can be `river` or `ash`, which carries no word of its own. */
+function landWords(x, y){
+  const best = {};
+  for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++){
+    const d = Math.abs(dx) + Math.abs(dy); if (d > 12 || !inb(x + dx, y + dy)) continue;
+    const t = world[idx(x + dx, y + dy)];
+    for (const m of LAND_MARKS) if (m.test(t) && (best[m.word] === undefined || d < best[m.word])) best[m.word] = d;
+  }
+  const words = Object.keys(best).sort((p, q) => best[p] - best[q] || p.localeCompare(q));
+  const bw = BIOME_WORD[sectorOfTile(world[idx(x, y)]).biome];
+  if (bw && !words.includes(bw)) words.push(bw);
+  return words;
+}
+function landCandidates(place){
+  const out = []; if (!place) return out;
+  const words = landWords(place[0], place[1]).slice(0, 3);
+  for (const a of words) for (const b of words){
+    if (a === b || !WORD_TAIL[b]) continue;
+    out.push({ text: cap(a) + WORD_TAIL[b], axis: 'land', base: 30, why: `for the ${a} by the ${b}` });
+  }
+  for (const a of words) if (WORD_PHRASE[a]) out.push({ text: `the ${cap(a)} ${WORD_PHRASE[a]}`, axis: 'land', base: 30, why: `for the ${a} here` });
+  return out;
+}
+/* How much the rest of the camp thinks of someone. */
+const liking = a => humans().filter(h => h !== a && h.camp === a.camp).reduce((n, h) => n + (h.opinions[a.id] || 0), 0);
+function notableCandidates(){
+  const out = [], folk = campHumans(), picks = [];
+  if (camp.founder){ const f = beingById(camp.founder); if (f) picks.push([f, 'who made the camp']); }
+  const eldest = folk.slice().sort((p, q) => p.born - q.born)[0]; if (eldest) picks.push([eldest, 'the eldest here']);
+  const liked = folk.slice().sort((p, q) => liking(q) - liking(p) || p.id - q.id)[0]; if (liked) picks.push([liked, 'the best liked here']);
+  const seen = new Set();
+  for (const [p, why] of picks){
+    if (seen.has(p.id)) continue; seen.add(p.id);
+    out.push({ text: `${p.name}'s ${npick(NOTABLE_TAILS)}`, axis: 'notable', base: 25, why: `for ${p.name}, ${why}` });
+  }
+  return out;
+}
+/* The things with a learned old name near this place. */
+function oldThingsNear(x, y, r){
+  const out = [];
+  for (const h of hills) if (h.nameKnown && dist(h.x, h.y, x, y) <= r) out.push(h);
+  for (const c of caves) if (c.nameKnown && c.exit && dist(c.exit.x, c.exit.y, x, y) <= r) out.push(c);
+  for (const g of groves) if (g.nameKnown && dist(g.x, g.y, x, y) <= r) out.push(g);
+  for (const f of fords) if (f.nameKnown && dist(f.x, f.y, x, y) <= r) out.push(f);
+  const big = river || stillWater;
+  if (big && big.nameKnown && big.tiles.some(t => dist(t.x, t.y, x, y) <= r)) out.push(big);
+  return out;
+}
+function oldCandidates(place){
+  const out = []; if (!place) return out;
+  for (const thing of oldThingsNear(place[0], place[1], 12)){
+    const r = thing.names[0];
+    out.push({ text: r.text, axis: 'old', base: 20, tongue: 'old', meaning: r.meaning, why: `for what ${lore.people} called this place` });
+    out.push({ text: titleCase(r.meaning), axis: 'old', base: 20, why: `for what ${lore.people} called it: ${r.meaning}` });
+  }
+  return out;
+}
+/* The lost people, the sky, and the sprites. Worth more once the camp has met the sprites. */
+function loreCandidates(base){
+  if (!lore) return [];
+  const b = base !== undefined ? base : (camp && camp.fae.known ? 30 : 10);
+  return [
+    { text: titleCase(lore.people.replace(/^the /, '')), axis: 'lore', base: b, why: `for ${lore.people}, who were here first` },
+    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.text}, ${lore.sky.meaning}` },
+    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.text}, ${lore.sprites.meaning}` },
+  ];
+}
+/* Every axis, for the current camp. The event axis joins in a later task. */
+function candidatesFor(kind, by, place){
+  return [...landCandidates(place), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
+}
+/* Score, drop duplicates, and sort. A text another thing already owns scores zero. */
+function scoreCandidates(cands, by, thing){
+  const seen = new Set(), out = [];
+  for (const c of cands){
+    const key = c.text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const owner = nameIndex.get(key);
+    c.score = owner && owner !== thing ? 0 : Math.round((c.base + (c.recency || 0)) * axisMult(c.axis, by) * 10) / 10;
+    out.push(c);
+  }
+  return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));
+}
+/* The most sociable living member at the place, or the only one there is. */
+function namerFor(place){
+  const folk = campHumans();
+  if (!folk.length) return null;
+  const here = place ? folk.filter(h => nearAt(h, place[0], place[1]) <= 12) : folk;
+  return (here.length ? here : folk).slice().sort((p, q) => q.traits.sociability - p.traits.sociability || p.id - q.id)[0];
+}
+/* The one namer. `extra` is the candidates only this moment has. */
+function nameThing(thing, kind, by, place, extra = []){
+  const scored = scoreCandidates([...candidatesFor(kind, by, place), ...extra], by, thing);
+  const top = scored[0];
+  if (!top || top.score <= 0) return null;
+  if (thing.names && thing.names.length && thing.names[0].text === top.text) return thing.names[0];
+  const rec = nameRecord(top.text, { tongue: top.tongue, meaning: top.meaning, why: top.why,
+    by: by ? by.id : 'lost', scores: scored.slice(0, 8).map(c => ({ text: c.text, axis: c.axis, score: c.score })) });
+  if (kind === 'camp') rename(thing, rec); else giveName(thing, rec);
+  return rec;
+}
+/* The one door that changes a camp's name once it has one. It takes a reason. */
+function rename(c, rec){ giveName(c, rec); c.name = rec.text; return rec; }
+
+/* ---------- the camp moments ---------- */
+/* The camp the founder made. Its first record, with the reason. */
+function nameFoundersCamp(c, a){
+  c.founder = a.id;
+  const text = `${a.name}'s camp`;
+  if (nameOf(c) === text) return;
+  rename(c, nameRecord(text, { why: `the camp ${a.name} made`, by: a.id }));
+}
+/* The hearth has burned three days, so the place has a name. */
+function nameCampAtHearth(c){
+  if (c.namedAt || !c.site || c.bestStreak < CLOCK.limit.hearthProven) return;
+  const prev = camp; camp = c;
+  const by = namerFor(c.site);
+  const rec = by ? nameThing(c, 'camp', by, c.site) : null;
+  if (rec){ c.namedAt = tick; log(`They start to call this place ${rec.text}, ${rec.why}.`, campHumans(), 'major'); }
+  camp = prev;
+}
+/* The nightly pass, at the fire. It runs at the end of updateCamps, once a day, at the hour
+   the clock table names. Nothing here draws from the world stream, so the order of the
+   world's own steps never moves. A cheap early return, since this runs every tick. */
+function nameTick(){
+  if (tick % DAY !== CLOCK.names.nameHour) return;
+  const prev = camp;
+  for (const c of camps){ camp = c; nameCampAtHearth(c); }
+  camp = prev;
+}

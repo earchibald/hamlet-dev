@@ -196,3 +196,66 @@ test('drawing water learns the name of the water, and a burrow keeps no old name
   assert.equal(big.nameKnown, true, 'the water is still unknown');
   for (const c of api.caves) if (c.kind === 'burrow') assert.equal(api.nameOf(c), null, 'a burrow carries no old name');
 });
+
+/* A camp that has kept its hearth three days, with a person standing at the site. */
+function hearthCamp(seed = 'r'){
+  const api = load(); api.startWorld(seed);
+  const a = api.firstPerson(), c = api.camps[0]; api.camp = c;
+  api.setSite(a.x, a.y);
+  c.founder = a.id;
+  const t = api.tileAt(...c.site); t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: true }; c.pit = [t.x, t.y];
+  c.everLit = true; c.bestStreak = 3 * api.DAY;
+  a.x = c.stashTile[0]; a.y = c.stashTile[1]; a.z = 0; a.homeless = false; a.asleep = false;
+  return { api, a, c };
+}
+
+test('the camp takes the founder\'s name when the site is chosen, with a reason', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(), c = api.camps[0]; api.camp = c;
+  assert.ok(api.chooseSite(a), 'no site');
+  assert.equal(c.name, `${a.name}'s camp`);
+  assert.equal(api.nameOf(c), c.name);
+  assert.equal(c.names[0].why, `the camp ${a.name} made`);
+  assert.equal(c.names[0].by, a.id);
+  assert.equal(c.founder, a.id);
+});
+
+test('a hearth that has burned three days gets the camp a plain name, kept with its scores', () => {
+  const { api, a, c } = hearthCamp();
+  api.nameCampAtHearth(c);
+  assert.ok(c.namedAt, 'the camp was not named');
+  const r = c.names[0];
+  assert.equal(c.name, r.text);
+  assert.equal(r.by, a.id);
+  assert.ok(r.why, 'a name needs a reason');
+  assert.ok(r.scores && r.scores.length >= 2, 'the candidate list is kept');
+  assert.ok(r.scores[0].score >= r.scores[1].score, 'scores are sorted, top first');
+  assert.ok(api.chronicle.some(e => e.text.includes(`call this place ${r.text}`)), api.chronicle[0].text);
+  assert.deepEqual(api.formerNames(c).map(x => x.text), [`${a.name}'s camp`]);
+  const n = api.chronicle.length; api.nameCampAtHearth(c);
+  assert.equal(api.chronicle.length, n, 'a camp is named once at the hearth');
+});
+
+test('a name already used anywhere in the world scores zero', () => {
+  const { api, a, c } = hearthCamp();
+  const cands = api.candidatesFor('camp', a, c.site);
+  assert.ok(cands.length >= 3, 'the axes gave candidates');
+  api.giveName({}, api.nameRecord(cands[0].text, {}));
+  const scored = api.scoreCandidates(api.candidatesFor('camp', a, c.site), a, c);
+  assert.equal(scored.find(x => x.text === cands[0].text).score, 0);
+});
+
+test('a trait bends its axis from 0.7 to 1.3, and no other', () => {
+  const { api, a } = hearthCamp();
+  a.traits.patience = 0; assert.equal(Math.round(api.axisMult('land', a) * 100) / 100, 0.7);
+  a.traits.patience = 1; assert.equal(Math.round(api.axisMult('land', a) * 100) / 100, 1.3);
+  a.traits.curiosity = 1; a.traits.patience = 0.5;
+  assert.equal(Math.round(api.axisMult('old', a) * 100) / 100, 1.3);
+  assert.equal(Math.round(api.axisMult('lore', a) * 100) / 100, 1.3);
+  assert.equal(api.axisMult('work', a), 1, 'the work axis is not a trait axis');
+});
+
+test('every camp line reads without "The first camp"', () => {
+  const { events } = runDays('r', 12);
+  assert.equal(events.filter(e => e.text.includes('The first camp')).length, 0);
+});
