@@ -3,7 +3,7 @@
 A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds the design, the rules that were tuned by testing, and the bugs already found and fixed. Do not re-derive them.
 
 ## Layout
-- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, and the chronicle), clock (the calendar, the units, and every duration and rate), field (the countries and their boundaries), marks (what a god did to a country), world, path, camps, tasks (the TASKS table, the tick executor, and human work), beings, species, fae, goals, recipes, weather, gods (the primal gods and the ages), settle (from marks to tiles), main, door. `door.js` is the one way in from outside: `inject(event)`.
+- `src/sim/`: the simulation core. No DOM. Everything that decides what happens. It is plain scripts that share one scope, joined in the order in `src/sim/index.js`. One file per system: core (constants, tables, state, and the chronicle), clock (the calendar, the units, and every duration and rate), names (the name record, the old tongue, the namer, and the layout guard), field (the countries and their boundaries), marks (what a god did to a country), world, path, camps, tasks (the TASKS table, the tick executor, and human work), beings, species, fae, goals, recipes, weather, gods (the primal gods and the ages), settle (from marks to tiles), main, door. `door.js` is the one way in from outside: `inject(event)`.
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/sim/snapshot.js`: the whole world as plain JSON. `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`. The door's `load` act calls `loadSnapshot`.
@@ -14,6 +14,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/lib/run.js`: the shared runner. The script god, the event collector, the counters, and the fingerprint.
 - `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
 - `tests/crafts.js`: each recipe through the real offers. Fast.
+- `tests/names.js`: the name record, the two streams, the old tongue, the namer, who names what and when, epithets and fate, and the layout guard against a moved being or item. Fast.
 - `tests/ui.js`: the view model in both eras, the stages, the key map, every button has a key, the field colours, the mark rows, and that a watched creation equals an unwatched one. Run it after every change to `src/ui/`.
 - `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
 - `tests/wanderer.js`: the valley after the last person. The line that says the people are gone, the wanderer who comes, and winter. Fast.
@@ -38,6 +39,8 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - A field that points at another record goes in `REFS` in `src/sim/snapshot.js`. `tests/snapshot.js` fails on one that is missing.
 - A new top-level `let` or `var` in `src/sim/` goes in `SAVED_STATE` or `NOT_SAVED` in `src/sim/snapshot.js`. A new top-level `const` that holds a container goes in `KNOWN_CONSTS` or `FROZEN_TABLES` in `tests/snapshot.js`.
 - State lives in plain objects and arrays. A `Map` or a `Set` a snapshot must save is a fault the guard reports.
+- Naming moves no being and no item, adds no thought, and changes no need; only `chronicle` and `chronicleLines` may move for naming work.
+- A rule never reads a name's text to decide anything. It reads data tables instead.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.
