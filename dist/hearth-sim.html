@@ -1679,7 +1679,7 @@ function afterTheLast(){
   if (humans().length){ wanderAt = 0; return; }
   if (!wanderAt){
     wanderAt = tick + CLOCK.arrival.afterTheLast;
-    log('The last person in the valley is dead. No one is left to tend a fire. No smoke will call anyone here.', [], 'major');
+    log('The last person in the valley is dead. No one is left to feed the fire. The camp stands empty.', [], 'major');
     return;
   }
   if (tick < wanderAt || isWinter()) return;
@@ -4424,8 +4424,10 @@ function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]);
 function paintCreatures(first){
   groves = [];
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
-    const how = SPAWN[m.value]; if (!how) continue;
+    /* The roll records what the gods made. SPAWN decides only who a painter puts on the ground, so a making
+       with no painter of its own, such as the people, still goes on the roll. */
     creation.made[m.value] = true;
+    const how = SPAWN[m.value]; if (!how) continue;
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
     if (how.burrows){ digGnomeBurrows(within); continue; }

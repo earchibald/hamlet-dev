@@ -314,11 +314,12 @@ test('placeFirstPerson returns null when the start country has no ground', () =>
   assert.equal(api.beings.length, was + 1);
 });
 
-/* The roll of what was made names only what a painter puts on the ground. The people come from the settle
-   itself, not from a spawn, so they are never on it. */
-test('the roll of the makings names only what a painter spawns', () => {
+/* The roll of what was made is the roll of the makings, not the roll of the painters. The people are made by a
+   making mark like any other, so they stand on the roll, although the settle places them and no painter does. */
+test('the roll of the makings holds every making, painter or not', () => {
   const api = settled();
-  assert.ok(!api.creation.made.human, 'the people are on the roll of spawned creatures');
+  assert.ok(api.wasMade('human'), 'the people are made and the roll does not say so');
+  assert.ok(api.creation.made.human, 'the people are made and the roll does not say so');
   assert.ok(api.creation.made.rabbit, 'seed r made no rabbits; the rabbit gate would be shut');
-  for (const sp in api.creation.made) assert.ok(api.SPAWN[sp], `${sp} is on the roll and no painter spawns it`);
+  for (const sp in api.creation.made) assert.ok(sp in api.SPAWN, `${sp} is on the roll and SPAWN does not name it`);
 });

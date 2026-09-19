@@ -151,7 +151,7 @@ function afterTheLast(){
   if (humans().length){ wanderAt = 0; return; }
   if (!wanderAt){
     wanderAt = tick + CLOCK.arrival.afterTheLast;
-    log('The last person in the valley is dead. No one is left to tend a fire. No smoke will call anyone here.', [], 'major');
+    log('The last person in the valley is dead. No one is left to feed the fire. The camp stands empty.', [], 'major');
     return;
   }
   if (tick < wanderAt || isWinter()) return;
