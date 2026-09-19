@@ -375,6 +375,9 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;
+/* The valley down to one person. doomAt is 0 unless the line is doomed. It holds the tick a lone
+   wanderer may arrive on once the chronicle has said the line cannot go on. */
+let doomAt = 0;
 /* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
    regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
    of the run. godRng is the gods' own stream. */
@@ -502,6 +505,12 @@ const CLOCK = {
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
     disturb: ticks(1000),             // between two counts of one person in a gnome burrow
     raid: ticks(1200), stalk: ticks(2000), wolfLine: ticks(300),
+    /* Between two maulings of the same person. `stalk` above sits on the wolf, and the valley holds
+       more than one wolf, so it is no floor for the victim at all: four wolves mauled one founder in
+       three ticks. This one sits on the person. It is sized off `rate.heals`, which gives a person
+       0.006 to 0.014 hit points a tick by hardiness. In 4000 ticks that is 24 to 56, against a maul
+       of 20 to 34. A person of middling hardiness wins back 40, more than the worst maul. */
+    stalked: ticks(4000),
     sparks: ticks(150),               // between two tries at striking sparks into the tinder
     guardLine: ticks(800),            // between two chronicle lines about the same wolf chase
     wolfBurned: ticks(2500), wolfWanders: ticks(600),   // a wolf driven off with fire keeps away, then wanders again
@@ -545,6 +554,7 @@ const CLOCK = {
     wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
     chance: 0.7, villageChance: 0.85,
     afterTheLast: days(10),                       // with no person alive in the valley, the wait before a lone wanderer crosses the hills
+    afterTheDoomed: days(10),                     // with one person alive, how long the hearth must be cold before the line counts as doomed
   },
   party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },   // foodKeeps: what the stash keeps is under `food`
   storm: {
@@ -2297,9 +2307,49 @@ function afterTheLast(){
   log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campName()} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
 }
 
+/* The line that cannot go on. A birth needs two adults who like each other, so one person alone can
+   never make a second. A valley down to one living person is finished, and the smoke arrival cannot
+   save it either, because a cold pit makes no smoke.
+   One person with the fire out is not enough on its own. A camp is briefly down to one person with a
+   cold pit often enough: mid-winter, mid-journey, a founding party on the road. So the hearth must
+   have been cold a long while, and every hearth in the valley must be cold. `outSince` is the tick a
+   pit went out, and it is 0 while the pit burns. */
+function lineIsDoomed(){
+  const hs = humans();
+  if (hs.length !== 1) return false;
+  if (hs.filter(h => stage(h) === 'adult').length >= 2) return false;
+  const hearths = camps.filter(c => c.pit);
+  if (!hearths.length) return false;
+  return hearths.every(c => { const t = tileAt(c.pit[0], c.pit[1]); return !!(t && t.struct && !t.struct.lit && c.outSince && tick - c.outSince >= CLOCK.arrival.afterTheDoomed); });
+}
+
+/* The wanderer who comes to the last of a line. The chronicle says the line is doomed, and one
+   stranger crosses the hills after the same wait as after the last death, outside winter. They meet
+   somebody alive, which is a different meeting from a cold hearth among bones.
+   Only the count of the people holds the wait open. If the last one dies, `afterTheLast` takes the
+   valley over, and this rule drops its wait rather than run a second one beside it. If a stranger
+   arrives, the valley is two again and the wait is over. */
+function theDoomedLine(){
+  if (humans().length !== 1){ doomAt = 0; return; }
+  const last = humans()[0];
+  if (!doomAt){
+    if (!lineIsDoomed()) return;
+    doomAt = tick + CLOCK.arrival.afterTheLast;
+    log(`${last.name} is the only person left in the valley. The hearth is cold. No child comes of one person alone.`, [last], 'major');
+    return;
+  }
+  if (tick < doomAt || isWinter()) return;
+  const home = camps.find(c => c.site); if (!home) return;
+  camp = home;
+  const b = comeOverTheHills(); if (!b) return;
+  doomAt = 0;
+  log(`${b.name} comes over the hills to ${campName()}. No smoke called them. ${last.name} is not the last of the people now.`, [b, last], 'major');
+}
+
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
   afterTheLast();
+  theDoomedLine();
   for (const c of camps){
     camp = c;
     const pt = pitTile();
@@ -3389,15 +3439,19 @@ Object.assign(TASKS, {
   stalk: { type: 'stalk',
     begin(a, args){
       if (a.species !== 'wolf' || !isNight() || a.needs.food > 35) return false;
-      const lone = humans().filter(h => !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
+      /* `cooldown.stalked` sits on the person, not on the wolf above, so one more wolf cannot halve
+         the wait between two maulings of the same person. */
+      const lone = humans().filter(h => !(tick < (h.cooldown.stalked || 0)) && !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
       const h = lone.sort((p, q) => near(p, a) - near(q, a))[0]; if (!h) return false;
       args.who = h.id;
       return { label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0 };
     },
     stops: [(a, t) => {
       const h = beingById(t.args.who);
-      if (!h || !h.alive || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
+      /* The wait is read here as well as in the gate. A wolf that set out before another wolf reached
+         the same person is already past the gate, and four of them mauled one founder in three ticks. */
+      if (!h || !h.alive || tick < (h.cooldown.stalked || 0) || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
+      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; h.cooldown.stalked = tick + CLOCK.cooldown.stalked; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
       const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
     }] },
   herd: { type: 'wander',
@@ -5046,8 +5100,13 @@ const SCAR_PAINTERS = { burned: scarBurned, cut: scarCut, drowned: scarDrowned, 
 function paintScars(){ for (const r of liveRegions()) for (const m of marksOf(r, 'scar')){ const p = SCAR_PAINTERS[m.value]; if (p) p(r); } }
 
 /* ---------- the creatures of the makings, and the gods' bodies ---------- */
-/* Who is spawned for a making, and how. Read by paintCreatures. */
-const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true }, wolf: { n: 2, den: true }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
+/* Who is spawned for a making, and how. Read by paintCreatures. `n` is how many one making puts down. `most` is
+   how many the whole valley may hold, over every making of that species. The making act is built to repeat: it
+   makes what no country has, then fills every country of the god's pole that lacks a species of it. A long
+   creation therefore marks the hunters country after country, and without `most` a valley took two wolves for
+   each of twenty-six makings. The hunters are capped at the pair and the three the day era's own stray rule
+   already keeps them near. The prey and the fae are not capped here. */
+const SPAWN = { rabbit: { n: 6 }, deer: { n: 3 }, fox: { n: 1, den: true, most: 3 }, wolf: { n: 2, den: true, most: 2 }, sprite: { grove: true }, gnome: { burrows: true }, human: null };
 /* What the makings named. `creation.made` is written at settle from the same marks the painters read, and it is
    the whole roll of what may live in this world. Nothing the gods did not make wanders in later. */
 function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]); }
@@ -5055,6 +5114,9 @@ function wasMade(sp){ return !!(creation && creation.made && creation.made[sp]);
    could not hold is put out on the open ground. */
 function paintCreatures(first){
   groves = [];
+  /* The species the cap turned away, and how many of each did come down. The order of `liveRegions()` and of
+     `marksOf` fixes which countries get the hunters, so a seed always keeps the same ones. */
+  const short = {}, came = {};
   for (const r of liveRegions()) for (const m of marksOf(r, 'making')){
     /* The roll records what the gods made. SPAWN decides only who a painter puts on the ground, so a making
        with no painter of its own, such as the people, still goes on the roll. */
@@ -5063,11 +5125,21 @@ function paintCreatures(first){
     const within = new Set(r.tiles);
     if (how.grove){ placeGrove(within, m); continue; }
     if (how.burrows){ digGnomeBurrows(within); continue; }
+    /* What the valley still has room for. A table with no `most` has no cap, and every making spawns in full. */
+    const here = how.most === undefined ? how.n : Math.min(how.n, how.most - liveOf(m.value));
+    /* The cap has bitten. Dig no den: nothing would live in it. */
+    if (here <= 0){ short[m.value] = true; continue; }
     let placed = 0;
-    if (how.den){ const c = digDens(within, m.value); if (c) placed = spawnInDens(m.value, how.n, c); }
-    if (placed < how.n) spawnAnimal(m.value, within, how.n - placed, first);
+    if (how.den){ const c = digDens(within, m.value); if (c) placed = spawnInDens(m.value, here, c); }
+    if (placed < here) spawnAnimal(m.value, within, here - placed, first);
+    came[m.value] = liveOf(m.value);
   }
+  /* One line a species, not one a making. The legends still tell of every making; this says what the valley got. */
+  for (const sp in short) log(`The ${SPECIES[sp].plural} were made in country after country. Only ${came[sp] || 0} of them came down into the valley.`, [], 'major');
 }
+/* How many of a species stand in the world now. The cap reads it, so a making that could not place its own
+   creatures leaves room for the next one. */
+function liveOf(sp){ let n = 0; for (const b of beings) if (b.alive && b.species === sp) n++; return n; }
 /* A sleeping god stands at its body: a hill, a cave's deep, the river, a lake, or the ground where it lay down.
    One body holds one god, so every candidate already claimed is passed over, and two gods who slept in the same
    country take the two tiles their own rest marks name. */
@@ -5120,7 +5192,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0;
+  goalPriority = {}; wanderAt = 0; doomAt = 0;
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }

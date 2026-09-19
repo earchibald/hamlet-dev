@@ -69,15 +69,19 @@ Object.assign(TASKS, {
   stalk: { type: 'stalk',
     begin(a, args){
       if (a.species !== 'wolf' || !isNight() || a.needs.food > 35) return false;
-      const lone = humans().filter(h => !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
+      /* `cooldown.stalked` sits on the person, not on the wolf above, so one more wolf cannot halve
+         the wait between two maulings of the same person. */
+      const lone = humans().filter(h => !(tick < (h.cooldown.stalked || 0)) && !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
       const h = lone.sort((p, q) => near(p, a) - near(q, a))[0]; if (!h) return false;
       args.who = h.id;
       return { label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0 };
     },
     stops: [(a, t) => {
       const h = beingById(t.args.who);
-      if (!h || !h.alive || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
+      /* The wait is read here as well as in the gate. A wolf that set out before another wolf reached
+         the same person is already past the gate, and four of them mauled one founder in three ticks. */
+      if (!h || !h.alive || tick < (h.cooldown.stalked || 0) || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
+      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; h.cooldown.stalked = tick + CLOCK.cooldown.stalked; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
       const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
     }] },
   herd: { type: 'wander',
