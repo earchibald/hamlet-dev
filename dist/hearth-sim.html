@@ -1160,22 +1160,22 @@ function valleyFallbacks(){
 /* ---------- events ----------
    A chronicle line whose tag is in this table, and whose kind is major, bad, or a
    death, is an event. The table is keyed on the tag and gives two shapes: a word for
-   a joined name, and a whole phrase. A line without a tag is never a candidate, and
+   a joined name, and three phrases. A line without a tag is never a candidate, and
    old age carries the tag 'old', which is not in the table, so nobody names it. */
 const EVENT_NAMES = {
-  wolf:   { word: 'wolf',    phrase: 'the Night of the Wolf' },
-  fire:   { word: 'ash',     phrase: 'the Night the Fire Ran' },
-  frost:  { word: 'frost',   phrase: 'the Long Frost' },
-  sprite: { word: 'light',   phrase: 'the Night of Lights' },
-  found:  { word: 'parting', phrase: 'the Day They Left' },
-  death:  { word: 'grave',   phrase: 'the Day We Lost One' },
-  birth:  { word: 'cradle',  phrase: 'the Day a Child Came' },
+  wolf:   { word: 'wolf',    phrases: ['the Night of the Wolf', 'the Night the Wolves Came', 'the Night of Teeth'] },
+  fire:   { word: 'ash',     phrases: ['the Night the Fire Ran', 'the Night It Burned', 'the Night the Pine Burned'] },
+  frost:  { word: 'frost',   phrases: ['the Night of the Long Frost', 'the Night the Water Froze', 'the Cold That Stayed'] },
+  sprite: { word: 'light',   phrases: ['the Night of Lights', 'the Night the Valley Glowed', 'the Night Nobody Slept'] },
+  found:  { word: 'parting', phrases: ['the Day They Left', 'the Day the Camp Split', 'the Morning the Camp Was Smaller'] },
+  death:  { word: 'grave',   phrases: ['the Day We Lost One', 'the Day the Hearth Was Quiet', 'the Night the Food Went Cold'] },
+  birth:  { word: 'cradle',  phrases: ['the Day a Child Came', 'the Day the Camp Grew', 'the Morning of the Cradle'] },
 };
 const EVENT_KINDS = ['major', 'bad', 'death'];
 const isEventLine = (e, c) => !!e.tag && !!EVENT_NAMES[e.tag] && EVENT_KINDS.includes(e.kind) && e.camp === c.id;
 /* The camp's own events of the last `eventMemory`, worth 20 and 3 a day of freshness. */
-/* What a camp's recent events offer. The phrase is a night's name ("the Night of the Wolf"), so only
-   an event may take it. A place takes the joined word ("Wolfhill"), which reads as a place. */
+/* What a camp's recent events offer. Each phrase is a night's name ("the Night of the Wolf"), so
+   only an event may take one. A place takes the joined word ("Wolfhill"), which reads as a place. */
 function eventCandidates(c, kind = 'event'){
   const out = [];
   if (!c) return out;
@@ -1185,8 +1185,11 @@ function eventCandidates(c, kind = 'event'){
     if (sinceDays > memoryDays) continue;
     if (!isEventLine(e, c)) continue;
     const t = EVENT_NAMES[e.tag], recency = Math.round((memoryDays - sinceDays) * 3 * 10) / 10;
-    if (kind === 'event') out.push({ text: t.phrase, axis: 'event', base: 20, recency, why: `for ${t.phrase}` });
-    if (WORD_TAIL[t.word]) out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
+    if (kind === 'event'){
+      for (const phrase of t.phrases) out.push({ text: phrase, axis: 'event', base: 20, recency, why: `for ${phrase}` });
+    } else if (WORD_TAIL[t.word]){
+      out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
+    }
   }
   return out;
 }

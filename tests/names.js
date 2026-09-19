@@ -584,43 +584,64 @@ test('the event table names a tagged major line at the fire, and the name reads 
   assert.equal(api.chronicle.length, n, 'an event is named once');
 });
 
-/* Important 6: a night took a place name once the fourteen event texts were spent, so seed r
-   named 89 nights, 75 of them after places, and each took a text the land could have had. */
-test('a night is named from the event table alone, and a night with no text left goes unnamed', () => {
+/* Important 6: a night took a place name once the event texts were spent, so seed r named 89
+   nights, 75 of them after places, and each took a text the land could have had. That bug is gone:
+   eventCandidates now gates the joined word (a place shape, like "Wolfhill") to a place, so a night
+   draws only from its tag's phrases. Wolf now has three phrases, so a second wolf night takes a
+   different one and a third takes the last; a fourth has nothing left. */
+test('a night is named from the event table alone, in three distinct phrases, and a fourth night with no text left goes unnamed', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
+  const phrases = api.EVENT_NAMES.wolf.phrases;
+  const joined = api.cap(api.EVENT_NAMES.wolf.word) + api.WORD_TAIL[api.EVENT_NAMES.wolf.word];
   api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
   const first = api.chronicle[0];
   api.nameEvents(c);
   assert.ok(first.names && first.names.length, 'the first wolf night was not named');
-  const texts = [api.EVENT_NAMES.wolf.phrase, api.cap(api.EVENT_NAMES.wolf.word) + api.WORD_TAIL[api.EVENT_NAMES.wolf.word]];
-  assert.ok(texts.includes(first.names[0].text), `${first.names[0].text} is not an event text`);
-  /* The wolf tag offers two texts, the phrase and the joined word. A third wolf night has
-     nothing left to take, and the camp has already named its wolf night, so it goes unnamed. */
+  assert.ok(phrases.includes(first.names[0].text), `${first.names[0].text} is not one of the wolf phrases`);
+  assert.notEqual(first.names[0].text, joined, 'a night was called a place-shaped joined word');
+
   api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
+  const second = api.chronicle[0];
   api.nameEvents(c);
+  assert.ok(second.names && second.names.length, 'the second wolf night was not named');
+  assert.notEqual(second.names[0].text, first.names[0].text, 'the second wolf night reused the first phrase');
+
   api.log('A wolf comes out of the dark a third time.', [a], 'bad', 'wolf');
   const third = api.chronicle[0];
   api.nameEvents(c);
-  assert.equal(third.names, undefined, `the third night took ${third.names && third.names[0].text}`);
-  assert.equal(api.chronicle[0], third, 'a line was logged for a night that took no name');
+  assert.ok(third.names && third.names.length, 'the third wolf night was not named');
+  assert.equal(new Set([first.names[0].text, second.names[0].text, third.names[0].text]).size, 3,
+    'the three wolf nights did not take three distinct phrases');
+  for (const n of [first, second, third]) assert.ok(phrases.includes(n.names[0].text));
+
+  /* The wolf tag's three phrases are now all taken. A fourth wolf night has nothing left to
+     take, and the camp has already named its earlier ones, so it goes unnamed. */
+  api.log('A wolf comes out of the dark a fourth time.', [a], 'bad', 'wolf');
+  const fourth = api.chronicle[0];
+  api.nameEvents(c);
+  assert.equal(fourth.names, undefined, `the fourth night took ${fourth.names && fourth.names[0].text}`);
+  assert.equal(api.chronicle[0], fourth, 'a line was logged for a night that took no name');
   /* And the pass gives up on it: a line older than a day is never looked at again. */
   api.tick += 2 * api.DAY;
   api.nameEvents(c);
-  assert.equal(third.names, undefined, 'the pass came back to a night it had already passed over');
+  assert.equal(fourth.names, undefined, 'the pass came back to a night it had already passed over');
 });
 
 test('a night is never named after a place', () => {
   const { events } = run70(), api = run70world();
   const named = events.filter(e => e.names && e.names.length);
   assert.ok(named.length > 0, 'no night was named in 70 days');
-  const texts = new Set();
+  const texts = new Set(), joined = new Set();
   for (const k in api.EVENT_NAMES){
     const t = api.EVENT_NAMES[k];
-    texts.add(t.phrase);
-    if (api.WORD_TAIL[t.word]) texts.add(api.cap(t.word) + api.WORD_TAIL[t.word]);
+    for (const phrase of t.phrases) texts.add(phrase);
+    if (api.WORD_TAIL[t.word]) joined.add(api.cap(t.word) + api.WORD_TAIL[t.word]);
   }
-  for (const e of named) assert.ok(texts.has(e.names[0].text), `a night was called ${e.names[0].text}`);
+  for (const e of named){
+    assert.ok(texts.has(e.names[0].text), `a night was called ${e.names[0].text}`);
+    assert.ok(!joined.has(e.names[0].text), `a night carried the place-shaped word ${e.names[0].text}`);
+  }
   assert.ok(named.length <= texts.size, `${named.length} nights from ${texts.size} texts`);
 });
 
@@ -641,24 +662,30 @@ test('a fresher event outscores an older one on recency alone', () => {
   api.chronicle[0].tick = api.tick - 10 * api.DAY;
   api.log('Last night the fire ran.', [a], 'bad', 'fire');
   const cands = api.eventCandidates(c);
-  const fire = cands.find(x => x.text === api.EVENT_NAMES.fire.phrase);
-  const wolf = cands.find(x => x.text === api.EVENT_NAMES.wolf.phrase);
+  const fire = cands.find(x => x.text === api.EVENT_NAMES.fire.phrases[0]);
+  const wolf = cands.find(x => x.text === api.EVENT_NAMES.wolf.phrases[0]);
   assert.ok(fire && wolf, 'both events should be candidates');
   assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
 });
 
-test('the phrase of a night names a night only: a place takes the joined word, never the phrase', () => {
+test('any phrase of a night names a night only: a place takes the joined word, never a phrase', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   api.log('Last night the fire ran.', [a], 'bad', 'fire');
-  const phrase = api.EVENT_NAMES.fire.phrase;
-  assert.ok(api.eventCandidates(c, 'event').some(x => x.text === phrase), 'a night can take the phrase');
+  const phrases = api.EVENT_NAMES.fire.phrases;
+  const eventCands = api.eventCandidates(c, 'event');
+  for (const phrase of phrases) assert.ok(eventCands.some(x => x.text === phrase), `a night cannot take ${phrase}`);
+  const joined = api.cap(api.EVENT_NAMES.fire.word) + api.WORD_TAIL[api.EVENT_NAMES.fire.word];
+  assert.ok(!eventCands.some(x => x.text === joined), 'a night can take the joined word');
   for (const kind of ['camp', 'sector', 'pond']){
     const cands = api.eventCandidates(c, kind);
     assert.ok(cands.length > 0, `a ${kind} gets no word from the event at all`);
-    assert.ok(!cands.some(x => x.text === phrase), `a ${kind} can be called ${phrase}`);
+    assert.ok(cands.every(x => x.text === joined), `a ${kind} pool holds something other than the joined word`);
+    for (const phrase of phrases) assert.ok(!cands.some(x => x.text === phrase), `a ${kind} can be called ${phrase}`);
   }
-  assert.ok(!api.candidatesFor('camp', a, c.site).some(x => x.text === phrase), 'the camp pool holds the phrase');
+  for (const phrase of phrases){
+    assert.ok(!api.candidatesFor('camp', a, c.site).some(x => x.text === phrase), `the camp pool holds ${phrase}`);
+  }
 });
 
 test('a finished snare names the ground the work was done on, from the work and the land', () => {
