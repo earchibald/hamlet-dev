@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
+const FILES = ['core', 'clock', 'names', 'field', 'marks', 'world', 'path', 'camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -27,6 +27,8 @@ const API = `return {
   runTask, updateBeing, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, sectorCount, looseCount,
   legPath, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
+  seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
+  get lore(){ return lore; }, get valley(){ return valley; }, get river(){ return river; }, get ponds(){ return ponds; }, get fords(){ return fords; },
   initField, splitRegion, regionById, liveRegions, regionAt, canSplit, neighboursOf, SECTOR_AREA, liveBoundaries,
   CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
   startCreation, runAges, ageStep, restGate, isStart, isLevel, startCandidates, strain, godOptions, decideGod, godNeeds, settleHome, unmake, GOD_ACTS, GOD_NAMES, EPITHET, BODY, LEAVES, SCAR_OF, MAKES, STRAIN, KINDS, polesThatMake, outgrown, REGIONS_PER_GOD,

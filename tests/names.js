@@ -62,3 +62,46 @@ test('a 70-day run still ends with the baseline beings and items', { skip: !proc
     assert.equal(fp.items, layout[seed].day70.items, `seed ${seed}: items moved by day 70`);
   }
 });
+
+/* A fresh world with the name stream seeded. */
+function world(seed = 'r'){ const api = load(); api.startWorld(seed); return api; }
+
+test('the name stream is a second stream: the same seed gives the same tongue twice, and two seeds differ', () => {
+  const a = world('r'), b = world('r'), c = world('x');
+  const words = api => { const out = []; for (let k = 0; k < 20; k++) out.push(api.oldWord()); return out; };
+  assert.deepEqual(words(b), words(a));
+  assert.notDeepEqual(words(c), words(a));
+});
+
+test('a name is a record with every field the spec names, and the list keeps the old ones', () => {
+  const api = world();
+  const thing = {};
+  api.giveName(thing, api.nameRecord('Reedwater', { why: 'for the reeds along the water', by: 7 }));
+  assert.equal(api.nameOf(thing), 'Reedwater');
+  const r = thing.names[0];
+  assert.deepEqual(Object.keys(r).sort(), ['by', 'meaning', 'scores', 'since', 'text', 'tongue', 'why']);
+  assert.equal(r.tongue, 'plain'); assert.equal(r.meaning, ''); assert.equal(r.by, 7);
+  assert.equal(r.since, api.tick);
+  api.giveName(thing, api.nameRecord('Ashford', { why: 'for the night the fire jumped the ford' }));
+  assert.equal(api.nameOf(thing), 'Ashford');
+  assert.deepEqual(api.formerNames(thing).map(x => x.text), ['Reedwater']);
+  assert.equal(api.nameTaken('reedwater'), true, 'a former name is still taken');
+  assert.equal(api.nameRecordOf('Reedwater').why, 'for the reeds along the water');
+});
+
+test('an old word is sayable: it never carries a forbidden pair, and it is one to three syllables', () => {
+  const api = world();
+  for (let k = 0; k < 400; k++){
+    const w = api.oldWord().toLowerCase();
+    assert.ok(w.length >= 2 && w.length <= 12, w);
+    for (const [on, coda] of api.OLD_FORBID) assert.ok(!w.includes(on + coda), `${w} says ${on}${coda}`);
+  }
+});
+
+test('every meaning is used once, and a name with no meaning left is not given', () => {
+  const api = world();
+  const taken = [];
+  for (let k = 0; k < api.LAND_WORDS.length; k++){ const r = api.newOldName(); assert.ok(r, `ran out after ${k}`); taken.push(r.meaning); }
+  assert.equal(new Set(taken).size, taken.length, 'a meaning was used twice');
+  assert.equal(api.newOldName(), null, 'with no meaning left there is no name');
+});
