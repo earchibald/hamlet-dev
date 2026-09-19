@@ -1081,6 +1081,27 @@ test('the timeline lights exactly one cell: the act now playing, and none once t
   assert.equal(after.length, 0, 'the ages are over and nothing is playing');
 });
 
+test('the timeline lights nothing on an age-end beat: unmake and backstop run after every turn is over', () => {
+  /* `unmake` and `backstop` (src/sim/gods.js, called from `ageEnd`) fire once every god in the age has
+     already had its turn, and neither writes a row to `creation.choices`. A low age limit reaches
+     `backstop` reliably within a handful of ages, on any seed: the gate has no time to resolve on its
+     own, so the eldest awake god is forced to act once the limit is hit. */
+  const api = loadUI(['state', 'derive'], TL_API);
+  api.startCreation('gamma', { ageLimit: 3 });
+  let sawAgeEnd = false;
+  for (let i = 0; i < 50 && api.era === 'gods' && !sawAgeEnd; i++){
+    api.step(true);
+    const gests = api.creation.gestureAge === api.age ? api.creation.gestures : [];
+    const now = gests.length ? gests[gests.length - 1] : null;
+    if (now && (now.kind === 'unmade' || now.kind === 'backstop')){
+      sawAgeEnd = true;
+      const lit = api.timelineModel().rows.flatMap(r => r.cells).filter(c => c && c.playing);
+      assert.equal(lit.length, 0, `no turn is on stage on a ${now.kind} beat, so no cell is lit`);
+    }
+  }
+  assert.ok(sawAgeEnd, 'the run reached an age-end beat within 50 acts');
+});
+
 test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
   const api = loadUI(['state', 'derive'], TL_API);
   api.startCreation('gamma', {});

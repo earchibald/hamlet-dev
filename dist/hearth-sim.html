@@ -7015,11 +7015,18 @@ function timelineModel(){
      gesture in a row), and the birth is credited to the newborn, who has no choices row of its own yet.
      Following `liveGestures().now` would then light nothing, or the wrong row, for exactly the beat
      that gesture draws. The turn itself is what the timeline's rows and the act card both key on, so
-     that is what stays lit until the next god decides. */
+     that is what stays lit until the next god decides.
+     An age-end beat is the exception: `unmake` and `backstop` (gods.js, called from `ageEnd`) run after
+     every god in the age has already had its turn, and neither writes a `choices` row. On that beat the
+     newest gesture this age is `unmade` or `backstop`, and no turn is on stage, so nothing should light:
+     lighting the last turn would name an act that already finished earlier in the same age, while the
+     map is drawing the age-end act instead. */
   const thisAge = creation.choices.filter(c => c.age === age);
   const last = thisAge.length ? thisAge[thisAge.length - 1] : null;
-  const playing = rec => !!last && last.god === rec.god && rec.age === age;
-  const cell = (rec, withWho) => ({ age: rec.age, god: rec.god, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
+  const nowGesture = liveGestures().now;
+  const atAgeEnd = !!nowGesture && (nowGesture.kind === 'unmade' || nowGesture.kind === 'backstop');
+  const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
