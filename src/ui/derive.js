@@ -40,7 +40,7 @@ function beatsDue(acc, dt, pace){
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
-/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+/* ---- the act in motion ---- The pure parts of the tween. map.js draws; these three say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
 /* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run

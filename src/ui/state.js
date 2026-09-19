@@ -66,6 +66,8 @@ const ui = {
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
 };
 const WIN_MAX = 6;
+/* The creation ages still tick on this ladder for now. With a beat of 1000 ms, steps 16 and 64 both
+   render as tier 'none' and cannot be told apart. A later change replaces this with PACES. */
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
 
