@@ -1103,7 +1103,8 @@ test('the two old-age deaths carry two tags and two fates, and neither one names
 
 test('a cold old-age death in a real run is tagged oldCold, and a warm one old', () => {
   const { events } = run70();
-  const cold = events.filter(e => e.kind === 'death' && /died of old age/.test(e.text));
+  /* A gnome's death line says the same words and carries no tag, because a gnome takes no fate. */
+  const cold = events.filter(e => e.kind === 'death' && /died of old age/.test(e.text) && !/^A gnome /.test(e.text));
   const warm = events.filter(e => e.kind === 'death' && /old and warm by the fire/.test(e.text));
   assert.ok(cold.length + warm.length > 0, 'no old-age death in 70 days');
   for (const e of cold) assert.equal(e.tag, 'oldCold', e.text);
