@@ -217,7 +217,44 @@ The field on the world map, in the order it is drawn:
 | A country | The mean of its poles' colours. Grey where it has no pole. |
 | A boundary | A line in the ink colour. A wet boundary is a water line. |
 | A scar | The country is hatched, one tile in four, in the scar colour. |
-| A god | A gold star with its name, in the middle of the country it stands in. A sleeping god is faded. Gods that share a country stand side by side. |
+| A god | A gold star with its name, on its own anchor tile, `g.at`. A sleeping god is faded. Two stars within a glyph's width of each other are nudged apart. |
+
+### The ages in motion
+
+An age is one step of the rules, so the state on screen is the new state when the tween begins. The view holds
+the field as it was, fades the new one in over it, and draws each god's gesture across the same fraction. The
+clock is `acc`, which the frame loop already keeps, so a tab that slept wakes and the drawing jumps with the
+state. `TWEEN` in `src/ui/state.js` holds the numbers. No duration entered `src/sim/`.
+
+The tiers key off the tween's own length, `AGE_MS / pace`, read at run time. No branch names a pace.
+
+| Tween length | What runs | On today's ladder |
+|---|---|---|
+| 1000 ms or more | The intent cue, the walk, the figure, the caption, the cross-fade. | pace 1 |
+| 300 to 1000 ms | The same, without the intent cue. | pace 4 |
+| 100 to 300 ms | The walk and the cross-fade. | pace 16 |
+| Under 100 ms | Nothing. The field snaps, as it did before. | pace 64 |
+
+A paused world, a world behind a dialog, a thrown-back valley, a new world, and a frame that ran two or more
+ages all snap. A hurry ends in the day era, so it snaps by itself.
+
+Four questions the design left open, and what the code answered.
+
+| Question | Answered |
+|---|---|
+| A cross-fade, or a wash that spreads from the anchor? | A cross-fade for the field. A wash draws only as a gesture, for a burn, a freeze, a hiding, and a showing. |
+| May the field read ahead of the picture? | Yes. A hover card names the new state while the fade runs. Holding it back would make the card disagree with the drawer beside it. |
+| Does the flow path cross a country it never entered? | Yes, often: 67 of 166 flows over the twenty-four seeds, one of them for 121 tiles. A line would be a lie, so each country of the path lights in turn. |
+| Does a winding cut read as one stroke? | Yes. Over 784 cuts on those seeds the widest gap between two tiles of a sorted line is two tiles, so the line is stroked. |
+
+Two more things the record made plain. An act often leaves a god on a neighbour of its own country, and
+`settleHome` walks it home at the head of the next age; so the star walks home first and walks out after. A
+battle moves the acting god's anchor to the battle site whether it wins or loses, so only the rival's star
+returns to its own country; a beaten acting god fades where it stands.
+
+The caption is the newest line of the age that is major, else the newest line there is. It prints beside the
+ground it names, over two rows at most. The intent cue is a faint ring on each country the god weighed,
+brightest on the one it picked, and one line under its star: "Ondru weighs three countries."
 
 Hover gives the region card. It names the country by its poles and by the reason on its newest pole mark. The reason names the god. A backstop reason names no god, and then the god's name and epithet follow the reason. The far side of a line takes the other pole, so a god's epithet beside the country's poles would read as a mistake. It gives the size in sectors, the biome the country is becoming, the gods that stand in it, and every reason a god left on it, by age. Enter or a click opens the first live god that stands in the country. The foot says "No god stands here." when none does.
 

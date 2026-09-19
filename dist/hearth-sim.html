@@ -1093,6 +1093,23 @@ const regionById = id => field.byId.get(id);
 const liveRegions = () => field.regions.filter(r => !r.children);
 const regionAt = (x, y) => inb(x, y) ? regionById(regionOf[idx(x, y)]) : null;
 const canSplit = r => !r.children && r.area >= 2 * SECTOR_AREA && !r.marks.some(m => m.kind === 'rest');
+/* The heart of a region: the tile nearest the mean of its tiles' coordinates. A tie goes to the lowest
+   tile index. A region is any shape, and a child of a ragged parent may lie in two pieces, so the mean
+   can fall outside the region; the nearest real tile is taken instead. A god's anchor starts here, and
+   returns here when a split cuts its tile away. It is a scan and a comparison: it draws no random
+   number, so it cannot move a stream. No rule reads it. */
+function heartTile(r){
+  if (!r || !r.tiles.length) return null;
+  let sx = 0, sy = 0;
+  for (const i of r.tiles){ const x = i % W; sx += x; sy += (i - x) / W; }
+  const mx = sx / r.tiles.length, my = sy / r.tiles.length;
+  let best = null, bd = Infinity;
+  for (const i of r.tiles){
+    const x = i % W, y = (i - x) / W, d = (x - mx) * (x - mx) + (y - my) * (y - my);
+    if (d < bd || (d === bd && i < best)){ bd = d; best = i; }
+  }
+  return best;
+}
 /* The live regions that share an edge with r. */
 function neighboursOf(r){
   const seen = new Set();
@@ -3857,11 +3874,73 @@ const awakeGods = () => gods().filter(g => g.status === 'awake');
 const godOf = pole => gods().find(g => g.pole === pole && g.status !== 'dead');
 function withGodRng(fn){ const keep = rng; rng = godRng; try { return fn(); } finally { rng = keep; } }
 
+/* ---------- the gesture record ----------
+   A gesture is what an act looked like: who acted, where it began, where it ended, the line it wrote,
+   and the few numbers the view needs to draw it. `creation.gestures` holds one age of them and is
+   replaced at the head of the next, so it replays that age and nothing else. Marks are history and are
+   kept for ever; a gesture is worth nothing once its age is drawn, so it lives beside the mark and not
+   on it. Every field is plain, a number or a string or an array of numbers, so a snapshot of `creation`
+   carries the list whole. No rule reads a gesture. The recorder draws no random number: the anchors it
+   reads were drawn by `mark()`, and its only scan is `heartTile`. */
+
+/* The god whose apply is running, and the act it picked. The recorder copies a decision only for that
+   god, so a task carried on from an earlier age, a birth, a backstop, and an unmaking carry none. */
+let deciding = null;
+/* Where the legends stood when the act began. An act that said nothing this age names no line. */
+let saidFrom = 0;
+const beginAct = () => { saidFrom = legends.length; };
+/* How often an act left the recorder no anchor, by act. The design claims every act writes a usable
+   mark; this counts the exceptions instead of assuming there are none. */
+let gestureFallbacks = {};
+
+/* The cut's line, ordered so the view can stroke it from one end to the other: along the wider axis,
+   ties broken on the other coordinate and then on the tile index.
+   Caution: `boundary.tiles` is state, not a drawing order. `paintRivers` places a ford by the index
+   along that list and then draws for each tile in its order, so a reorder moves every ford and the
+   people's stream with it. This sorts a copy and never the list itself. */
+function sortLine(tiles){
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (const i of tiles){ const x = i % W, y = (i - x) / W; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const alongX = (x1 - x0) >= (y1 - y0);
+  const along = i => alongX ? i % W : (i - i % W) / W;
+  const across = i => alongX ? (i - i % W) / W : i % W;
+  return tiles.slice().sort((p, q) => along(p) - along(q) || across(p) - across(q) || p - q);
+}
+
+/* Where an act leaves the god. The mark the act wrote says it. A split ends in the middle of its own
+   line, and a flow ends in the last country it ran through. An act that wrote no mark, or a mark with
+   no tile, falls back to the heart of the country it acted on. */
+function gestureTo(g, kind, f, at){
+  if (at !== null && at !== undefined) return at;
+  if (f.line && f.line.length) return f.line[f.line.length >> 1];
+  if (f.path && f.path.length) return f.path[f.path.length - 1];
+  gestureFallbacks[kind] = (gestureFallbacks[kind] || 0) + 1;
+  const r = regionById(f.region !== undefined ? f.region : f.near);
+  return r ? heartTile(r) : g.at;
+}
+/* One gesture, at the end of a successful apply or continue. `at` is private to the call: it is the
+   anchor of the mark the act wrote, and the record keeps it as `to`. */
+function gesture(g, kind, fields){
+  const f = { ...fields }; const at = f.at; delete f.at;
+  if (f.line) f.line = sortLine(f.line);
+  const from = g.at === undefined ? null : g.at;
+  const to = gestureTo(g, kind, f, at);
+  g.at = to;
+  const c = deciding && deciding.g === g && g.lastChoice ? g.lastChoice : null;
+  creation.gestures.push({
+    kind, god: g.id, age, from, to,
+    said: legends.length > saidFrom ? legends.length - 1 : null,
+    weighed: c ? { opts: c.opts.slice(0, 3).map(o => ({ type: o.type, region: o.region, score: o.score })), picked: deciding.type } : null,
+    ...f,
+  });
+}
+
 function makeGod(pole, region, why){
+  beginAct();
   if (!godNamePool.length) godNamePool = shuffle(GOD_NAMES);
   const g = makeBeing('god', 0, 0, null, 0);
   g.name = godNamePool.pop(); g.pole = pole; g.contrast = POLES[pole].contrast; g.epithet = EPITHET[pole];
-  g.status = 'awake'; g.born = age; g.acted = 0;
+  g.status = 'awake'; g.born = age; g.acted = 0; g.at = null;
   g.needs = { expression: 60, company: 60, rest: 90, calm: 80 };
   g.skills = {}; for (const k in GOD_ACTS) g.skills[k] = 0;
   beings.push(g);
@@ -3869,13 +3948,18 @@ function makeGod(pole, region, why){
   /* Every god comes into being holding a country. A god born of a lack takes the largest level one, or the largest there is, and makes it its own. */
   if (!region){ const live = liveRegions(); region = live.filter(isLevel).sort((p, q) => q.area - p.area)[0] || live.slice().sort((p, q) => q.area - p.area)[0]; if (region) setPole(region, pole, g, `${g.name} came into being here.`); }
   g.region = region ? region.id : null;
+  /* A god comes into being at the heart of the country it holds, and nothing walks to get there. */
+  gesture(g, 'born', { region: g.region, pole, at: heartTile(region) });
   return g;
 }
-/* A god stands in a live region. If its region was split, it stands in the child that carries its pole. */
+/* A god stands in a live region. If its region was split, it stands in the child that carries its pole.
+   The god keeps its anchor tile while that tile lies in the region it stands in. A split that cuts the
+   tile away, or an act that left the god standing on a neighbour, returns it to the region's heart. */
 function settleHome(g){
   let r = g.region === null ? null : regionById(g.region);
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   g.region = r ? r.id : null;
+  if (r && (g.at === null || g.at === undefined || regionOf[g.at] !== r.id)) g.at = heartTile(r);
   return r;
 }
 /* Needs fall each age. Expression falls when the pole is scarce. Company falls alone. Rest falls as the
@@ -3935,6 +4019,7 @@ function spendAges(kind, verb, done){
       const r = regionById(t.region); let m = marksOf(r, kind)[0]; if (!m) m = mark(r, kind, 0, g, `${g.name} ${verb === 'raise the land' ? 'raised' : 'dug'} it.`);
       m.value++; t.done++; r.lastBy = g.id; r.lastAge = age;
       if (t.done >= t.left){ g.task = null; log(done(g, m.value), [g], 'major'); }
+      gesture(g, kind === 'height' ? 'raise' : 'dig', { region: r.id, step: t.done, of: t.left, value: m.value, at: m.at });
     },
   };
 }
@@ -3953,6 +4038,8 @@ const GOD_ACTS = {
       cut.a.lastBy = g.id; cut.a.lastAge = age; g.region = cut.a.id;
       if (wasRoot) log(`The Sundering. ${g.name} parts the formless: ${g.pole} from ${other}. There is a here and a there.`, [g], 'major');
       else log(`${g.name} parts a country: ${g.pole} from ${other}.`, [g]);
+      /* The cut is recorded before the far side's god, so the line is drawn before the star fades in on it. */
+      gesture(g, 'split', { near: cut.a.id, far: cut.b.id, line: cut.boundary.tiles, pole: g.pole, other });
       if (!godOf(other)) makeGod(other, cut.b, 'The far side has nobody to hold it.');
       return true;
     },
@@ -3963,7 +4050,7 @@ const GOD_ACTS = {
     poles: null,
     targets(g){ const home = settleHome(g); if (!home) return []; const few = fewStarts(); return [home, ...neighboursOf(home)].filter(r => !hasPole(r, g.pole) && !r.marks.some(m => m.kind === 'rest') && !(few && isStart(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.6 + 5 + rng() * 8,
-    apply(g, r){ offend(r, g, g.contrast); setPole(r, g.pole, g, `${g.name} claimed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} claims a country: it is ${g.pole} now.`, [g]); return true; },
+    apply(g, r){ offend(r, g, g.contrast); const m = setPole(r, g.pole, g, `${g.name} claimed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} claims a country: it is ${g.pole} now.`, [g]); gesture(g, 'claim', { region: r.id, pole: g.pole, at: m.at }); return true; },
   },
   make: {
     poles: Object.keys(MAKES),
@@ -3975,9 +4062,10 @@ const GOD_ACTS = {
     apply(g, r){
       const sp = MAKES[g.pole].find(s => !liveRegions().some(q => hasMark(q, 'making', s))) || MAKES[g.pole].find(s => !hasMark(r, 'making', s));
       if (!sp) return false;
-      mark(r, 'making', sp, g, `${g.name} made the ${SPECIES[sp].label} here.`);
+      const m = mark(r, 'making', sp, g, `${g.name} made the ${SPECIES[sp].label} here.`);
       r.lastBy = g.id; r.lastAge = age;
       log(`${g.name} makes the ${SPECIES[sp].plural}, and sets them in a ${biomeOf(r)} country.`, [g], 'major');
+      gesture(g, 'make', { region: r.id, species: sp, at: m.at });
       return true;
     },
   },
@@ -4004,8 +4092,11 @@ const GOD_ACTS = {
       const len = 2 + rint(3);
       for (let k = 0; k < len; k++){ const next = shuffle(neighboursOf(cur)).find(n => !path.includes(n)); if (!next) break; path.push(next); cur = next; }
       if (path.length < 2) return false;
-      for (const p of path){ mark(p, 'flow', marksOf(p, 'depth').length ? 'under' : 'surface', g, `${g.name} flowed through.`); p.lastBy = g.id; p.lastAge = age; }
+      /* One anchor a country, in the order the water ran, so the view can draw the line it took. */
+      const anchors = [];
+      for (const p of path){ const m = mark(p, 'flow', marksOf(p, 'depth').length ? 'under' : 'surface', g, `${g.name} flowed through.`); p.lastBy = g.id; p.lastAge = age; if (m.at !== null) anchors.push(m.at); }
       log(`${g.name} flows through ${path.length} countries${path.some(p => marksOf(p, 'depth').length) ? ', and under one of them' : ''}.`, [g], 'major');
+      gesture(g, 'flow', { path: anchors });
       return true;
     },
   },
@@ -4013,32 +4104,32 @@ const GOD_ACTS = {
     poles: ['wet', 'still'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'pool') && (hasPole(r, 'wet') || hasPole(r, 'still') || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + 10 + rng() * 8,
-    apply(g, r){ mark(r, 'pool', marksOf(r, 'depth').length ? 'under' : 'surface', g, `${g.name} pooled here.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} pools in a country, and the water is still.`, [g]); return true; },
+    apply(g, r){ const m = mark(r, 'pool', marksOf(r, 'depth').length ? 'under' : 'surface', g, `${g.name} pooled here.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} pools in a country, and the water is still.`, [g]); gesture(g, 'pool', { region: r.id, under: m.value === 'under', at: m.at }); return true; },
   },
   burn: {
     poles: ['hot'],
     /* The last start candidates are not burned while fewer than three remain, as they are not raised. */
     targets: g => { const few = fewStarts(); return liveRegions().filter(r => !marksOf(r, 'scar').length && !(few && isStart(r)) && r.marks.some(m => m.by !== null && m.by !== g.id && !m.inherited)); },
     score: (g, r) => (100 - g.needs.calm) * 0.6 + g.traits.temper * 20 - 30 + rng() * 8,
-    apply(g, r){ offend(r, g); mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} burns a country to ash.`, [g], 'bad'); return true; },
+    apply(g, r){ offend(r, g); const m = mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} burns a country to ash.`, [g], 'bad'); gesture(g, 'burn', { region: r.id, at: m.at }); return true; },
   },
   freeze: {
     poles: ['cold'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'freeze') && (marksOf(r, 'height').length || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + (marksOf(r, 'height').length ? 15 : 0) + rng() * 8,
-    apply(g, r){ mark(r, 'freeze', true, g, `${g.name} froze it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} breathes on a country, and the frost stays.`, [g]); return true; },
+    apply(g, r){ const m = mark(r, 'freeze', true, g, `${g.name} froze it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} breathes on a country, and the frost stays.`, [g]); gesture(g, 'wash', { region: r.id, value: 'freeze', at: m.at }); return true; },
   },
   hide: {
     poles: ['dark'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'hide') && (marksOf(r, 'depth').length || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + (marksOf(r, 'depth').length ? 15 : 0) + rng() * 8,
-    apply(g, r){ mark(r, 'hide', true, g, `${g.name} hid it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} draws the dark over a country, and things hide in it.`, [g]); return true; },
+    apply(g, r){ const m = mark(r, 'hide', true, g, `${g.name} hid it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} draws the dark over a country, and things hide in it.`, [g]); gesture(g, 'wash', { region: r.id, value: 'hide', at: m.at }); return true; },
   },
   show: {
     poles: ['light'],
     targets: g => { const r = settleHome(g); return r ? [r, ...neighboursOf(r)].filter(q => !hasMark(q, 'show')) : []; },
     score: (g, r) => (100 - g.needs.expression) * 0.7 + rng() * 8,
-    apply(g, r){ mark(r, 'show', true, g, `${g.name} showed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} opens a country to the light, and it can be seen from far off.`, [g]); return true; },
+    apply(g, r){ const m = mark(r, 'show', true, g, `${g.name} showed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} opens a country to the light, and it can be seen from far off.`, [g]); gesture(g, 'wash', { region: r.id, value: 'show', at: m.at }); return true; },
   },
   battle: {
     poles: null,
@@ -4051,13 +4142,14 @@ const GOD_ACTS = {
       const win = might(g) > might(v) ? g : v, lose = win === g ? v : g;
       const lost = r.marks.filter(m => m.kind === 'pole' && m.by === lose.id);
       r.marks = r.marks.filter(m => !lost.includes(m));
-      mark(r, 'scar', SCAR_OF[win.pole], win, `${win.name} beat ${lose.name} here.`);
+      const scar = mark(r, 'scar', SCAR_OF[win.pole], win, `${win.name} beat ${lose.name} here.`);
       setPole(r, win.pole, win, `${win.name} won it from ${lose.name}.`);
       r.lastBy = win.id; r.lastAge = age;
       lose.opinions[win.id] = clamp((lose.opinions[win.id] || 0) - 15, -100, 100); win.opinions[lose.id] = clamp((win.opinions[lose.id] || 0) - 5, -100, 100);
       win.needs.calm = clamp(win.needs.calm + 30, 0, 100); lose.needs.calm = clamp(lose.needs.calm - 20, 0, 100);
       for (const p of [g, v]) p.needs.rest = clamp(p.needs.rest - 10, 0, 100);
       log(`${g.name} and ${v.name} fight over a country. ${win.name} wins, and the ground there is ${SCAR_OF[win.pole]}.`, [g, v], 'bad');
+      gesture(g, 'battle', { region: r.id, other: v.id, otherFrom: v.at === undefined ? null : v.at, winner: win.id, loser: lose.id, scar: SCAR_OF[win.pole], at: scar.at });
       return true;
     },
   },
@@ -4067,8 +4159,9 @@ const GOD_ACTS = {
     score: (g, r) => g.traits.curiosity * 25 - 15 + rng() * 8,
     apply(g, r){
       const m = marksOf(r, 'making').find(m => !hasMark(r, 'twist', m.value)); if (!m) return false;
-      mark(r, 'twist', m.value, g, `${g.name} twisted the ${SPECIES[m.value].plural} on the scar.`); r.lastBy = g.id; r.lastAge = age;
+      const t = mark(r, 'twist', m.value, g, `${g.name} twisted the ${SPECIES[m.value].plural} on the scar.`); r.lastBy = g.id; r.lastAge = age;
       log(`${g.name} bends the ${SPECIES[m.value].plural} that live on the scar. They will not be quite like the others.`, [g], 'bad');
+      gesture(g, 'twist', { region: r.id, species: m.value, at: t.at });
       return true;
     },
   },
@@ -4084,11 +4177,12 @@ const GOD_ACTS = {
     score: (g, r) => (100 - g.needs.company) * 0.7 + g.traits.sociability * 20 + (liveRegions().some(q => hasMark(q, 'making', 'human')) ? 0 : 30) + rng() * 8,
     apply(g, r){
       const o = awakeGods().find(o => o !== g && g.rel[o.id] === 'lover' && o.contrast !== g.contrast); if (!o) return false;
-      setPole(r, g.pole, g, `${g.name} and ${o.name} mingled here.`); setPole(r, o.pole, o, `${g.name} and ${o.name} mingled here.`);
+      const m = setPole(r, g.pole, g, `${g.name} and ${o.name} mingled here.`); setPole(r, o.pole, o, `${g.name} and ${o.name} mingled here.`);
       r.lastBy = g.id; r.lastAge = age;
       for (const p of [g, o]) p.needs.company = clamp(p.needs.company + 30, 0, 100);
       log(`${g.name} and ${o.name} mingle, and the country between them is ${g.pole} and ${o.pole} at once: a ${biomeOf(r)}.`, [g, o], 'major');
       if (!liveRegions().some(q => hasMark(q, 'making', 'human'))){ mark(r, 'making', 'human', g, `Where ${g.name} and ${o.name} mingled, the people were made.`); log('Where they mingled, something stood up on two legs and looked about. The people are made.', [g, o], 'major'); }
+      gesture(g, 'mingle', { region: r.id, with: o.id, otherFrom: o.at === undefined ? null : o.at, at: m.at });
       return true;
     },
   },
@@ -4097,10 +4191,11 @@ const GOD_ACTS = {
     targets: g => restGate().ok ? [settleHome(g) || liveRegions()[0]] : [],
     score: (g, r) => (100 - g.needs.rest) * 1.2 - 20 + rng() * 8,
     apply(g, r){
-      mark(r, 'rest', g.id, g, `${g.name} sleeps here, and is ${BODY[g.pole]}.`);
+      const m = mark(r, 'rest', g.id, g, `${g.name} sleeps here, and is ${BODY[g.pole]}.`);
       g.status = 'asleep'; g.asleep = true; g.needs.rest = 100; g.region = r.id; g.sleptAt = age; r.lastBy = g.id; r.lastAge = age;
       log(`${g.name} lies down and sleeps, and is ${BODY[g.pole]}.`, [g], 'major');
       if (LEAVES[g.pole]) log(LEAVES[g.pole], [g], 'major');
+      gesture(g, 'sleep', { region: r.id, body: BODY[g.pole], at: m.at });
       return true;
     },
   },
@@ -4117,10 +4212,13 @@ function godOptions(g){
 function decideGod(g){
   if (g.task){ const t = g.task;
     if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${t.type} unfinished.`, [g]); g.task = null; }
-    else { GOD_ACTS[t.type].continue(g, t); return; } }
+    else { beginAct(); GOD_ACTS[t.type].continue(g, t); return; } }
   const opts = godOptions(g); g.lastChoice = { opts: opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })), picked: null };
   for (let k = 0; k < opts.length; k++){ const o = opts[k];
-    if (GOD_ACTS[o.type].apply(g, o.region)){ g.lastChoice.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
+    beginAct(); deciding = { g, type: o.type };
+    const ok = GOD_ACTS[o.type].apply(g, o.region);
+    deciding = null;
+    if (ok){ g.lastChoice.picked = o.type; g.acted++; gainGodXp(g, o.type); noteBeside(g, o.region); return; }
     g.lastChoice.opts[k].failed = true; }
 }
 
@@ -4185,31 +4283,38 @@ function firstGod(){
 }
 /* A god whose pole is gone from the whole live field is unmade. Its death is a scar. */
 function unmake(g){
+  beginAct();
   const wasAsleep = g.status === 'asleep';
   g.status = 'dead'; g.alive = false; g.asleep = false;
   const r = settleHome(g) || liveRegions()[0];
   mark(r, 'scar', SCAR_OF[g.pole], g, `${g.name} died here, unmade.`);
   const gone = wasAsleep ? `${g.name} dies in its sleep, and where` : `${g.name} is no more, and where`;
   log(`Nothing on the field is ${g.pole} any more. ${gone} ${g.name} stood the ground is ${SCAR_OF[g.pole]}.`, [g], 'death');
+  /* The star fades out where it last stood, so the anchor it held is the anchor it keeps. */
+  gesture(g, 'unmade', { region: r ? r.id : null, at: g.at });
 }
 /* Past the age limit the eldest awake god does what has to be done, once an age, and every awake god
    wearies. At twice the limit the creation fails and everyone sleeps. */
 function backstop(){
   const gate = restGate(); const g = awakeGods()[0]; if (!g || gate.ok) return;
+  beginAct();
   creation.backstops++;
   log(`Wearied, ${g.name} does what has to be done. The world lacks ${gate.lack}.`, [g], 'major');
   const live = liveRegions();
   const starts = startCandidates();
   let pool = live.filter(r => !isStart(r));
   if (!pool.length) pool = starts.length > 1 ? starts.slice().sort((p, q) => p.area - q.area).slice(0, 1) : live;
-  if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar' && m.kind !== 'height' && m.kind !== 'depth'); setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
-  else if (gate.lack === 'water'){ const n = neighboursOf(gate.start)[0] || gate.start; setPole(n, 'wet', g, 'Made wet so the world could hold a life.'); }
-  else if (gate.lack === 'fuel'){ setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
-  else if (gate.lack === 'food'){ mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
-  else if (gate.lack === 'people'){ mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
-  else if (gate.lack === 'height'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
-  else if (gate.lack === 'depth'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
-  else if (KINDS.includes(gate.lack)){ const sp = Object.keys(SPECIES).find(s => SPECIES[s][gate.lack]); const r = pool.slice().sort((p, q) => q.area - p.area)[0]; mark(r, 'making', sp, g, `The ${SPECIES[sp].plural}, so the world could hold a life.`); }
+  /* Each branch names the country it marked and the mark it wrote, so the backstop draws like any other act. */
+  let on = null, m = null;
+  if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar' && m.kind !== 'height' && m.kind !== 'depth'); on = r; m = setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
+  else if (gate.lack === 'water'){ const n = neighboursOf(gate.start)[0] || gate.start; on = n; m = setPole(n, 'wet', g, 'Made wet so the world could hold a life.'); }
+  else if (gate.lack === 'fuel'){ on = gate.start; m = setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
+  else if (gate.lack === 'food'){ on = gate.start; m = mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
+  else if (gate.lack === 'people'){ on = gate.start; m = mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
+  else if (gate.lack === 'height'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; on = r; m = mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
+  else if (gate.lack === 'depth'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; on = r; m = mark(r, 'depth', 1, g, 'Dug so the world could hold a life.'); }
+  else if (KINDS.includes(gate.lack)){ const sp = Object.keys(SPECIES).find(s => SPECIES[s][gate.lack]); const r = pool.slice().sort((p, q) => q.area - p.area)[0]; on = r; m = mark(r, 'making', sp, g, `The ${SPECIES[sp].plural}, so the world could hold a life.`); }
+  gesture(g, 'backstop', { region: on ? on.id : null, lack: gate.lack, at: m ? m.at : null });
   for (const o of awakeGods()) o.needs.rest = Math.max(0, o.needs.rest - 20);
 }
 /* A world with many countries and few differences lacks differentiation. When the countries outnumber the
@@ -4227,6 +4332,8 @@ let settleNow = false;
 function ageStep(){
   withGodRng(() => {
     age++;
+    /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
+    creation.gestures = []; creation.gestureAge = age;
     if (age === 1) firstGod();
     /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
     if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
@@ -4246,7 +4353,8 @@ function ageStep(){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {} };
+  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1 };
+  deciding = null; saidFrom = 0; gestureFallbacks = {};
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){
@@ -4640,8 +4748,15 @@ let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', wor
 /* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
    lastEra is the era the last frame saw, so the frame can see the flip at settle. */
 const AGE_MS = 2000;
+/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
+   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
+/* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
+   field and the new one over it, so only the countries that changed appear to change. */
+let ocv2, octx2, fieldAge = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -4729,6 +4844,40 @@ function godRows(){
 function agesDue(acc, dt, pace){
   const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
+}
+
+/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+   They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
+
+/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
+   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+   caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
+function tweenTier(ms){
+  if (ms >= TWEEN.full) return 'full';
+  if (ms >= TWEEN.figure) return 'figure';
+  if (ms >= TWEEN.walk) return 'walk';
+  return 'none';
+}
+/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
+   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
+   the order is the chronicle's order, and the last one still finishes. */
+function gestureSlice(i, n, f){
+  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
+  return clamp((f - start) / (1 - start), 0, 1);
+}
+/* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
+   is nowhere to draw, and with no `from` the star is already where it belongs. */
+function pointAt(from, to, f){
+  if (to === null || to === undefined) return null;
+  const bx = to % W, b = { x: bx, y: (to - bx) / W };
+  if (from === null || from === undefined) return b;
+  const ax = from % W, a = { x: ax, y: (from - ax) / W }, t = clamp(f, 0, 1);
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+/* How much of a line is stroked. Nothing at 0, the whole line at 1. */
+function lineSoFar(line, f){
+  if (!line || !line.length) return [];
+  return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
 /* The mean of a list of #rrggbb colours, as rgb(). */
@@ -5189,42 +5338,225 @@ function drawWorldCache(){
 /* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
 /* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
-function drawBoundaries(g, alpha){
+function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
+    if (skip && skip.has(b.id)) continue;
     g.fillStyle = P[BOUNDARY_INK[b.pole] || 'field-line']; g.globalAlpha = BOUNDARY_INK[b.pole] ? 1 : alpha;
     for (const i of b.tiles){ const x = i % W, y = (i - x) / W; g.fillRect(x * WS, y * WS, WS, WS); }
   }
   g.globalAlpha = 1;
 }
-function drawFieldCache(){
+/* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+function drawFieldCache(skip = null){
   octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.clearRect(0, 0, ocv.width, ocv.height);
   for (const r of liveRegions()){
     octx.fillStyle = fieldColor(r, P);
     for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
     if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
   }
-  drawBoundaries(octx, 0.7);
+  drawBoundaries(octx, 0.7, skip);
 }
-function drawField(){
-  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
-  if (key !== fieldKey){ drawFieldCache(); fieldKey = key; }
-  wctx.setTransform(dpr, 0, 0, dpr, 0, 0); wctx.drawImage(ocv, 0, 0);
-  /* A god has no tile in the ages. It is drawn in the middle of the country it stands in. Gods that share a country stand side by side. */
-  const at = new Map();
-  for (const g of gods()){ if (g.status === 'dead') continue; const r = standsIn(g); if (!r) continue; if (!at.has(r.id)) at.set(r.id, []); at.get(r.id).push(g); }
-  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
-  for (const [id, list] of at){
-    const b = regionById(id).bbox, cx = (b.x0 + b.x1 + 1) / 2 * WS, cy = (b.y0 + b.y1 + 1) / 2 * WS;
-    list.forEach((g, k) => {
-      const x = cx + (k - (list.length - 1) / 2) * 46;
-      wctx.globalAlpha = g.status === 'awake' ? 1 : 0.55;
-      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
-      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, x, cy); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, x, cy);
-      wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
-      wctx.strokeText(g.name, x, cy + 14); wctx.fillStyle = P.select; wctx.fillText(g.name, x, cy + 14);
-    });
+
+/* ---- the ages in motion ----
+   An age is one step of the rules, so the state is already the new state when the tween begins. The view
+   holds the field as it was, fades the new one in over it, and draws each god's gesture across the same
+   fraction. The clock is `acc`, which main.js already keeps: the tween is a function of that fraction and
+   not of elapsed frames, so a tab that slept wakes and the drawing jumps with the state. */
+
+/* Where each god's star was left when the last age ended. An act often leaves a god on a neighbour of its
+   own country, and settleHome walks it home at the head of the next age. The record then begins somewhere
+   the star is not, so the star walks home first and walks out after. */
+let godLast = new Map(), godEnds = new Map();
+const tweenEase = f => f * f * (3 - 2 * f);
+const tileSpot = i => i === null || i === undefined ? null : { x: (i % W + 0.5) * WS, y: ((i - i % W) / W + 0.5) * WS };
+const spotOf = p => p ? { x: (p.x + 0.5) * WS, y: (p.y + 0.5) * WS } : null;
+function tweenRing(p, r, ink, alpha, width = 2){
+  if (!p) return;
+  wctx.globalAlpha = clamp(alpha, 0, 1); wctx.strokeStyle = ink; wctx.lineWidth = width;
+  wctx.beginPath(); wctx.arc(p.x, p.y, Math.max(1, r), 0, 7); wctx.stroke(); wctx.globalAlpha = 1;
+}
+/* A wash that spreads from the anchor over the country it acts on, by steps away from that tile. */
+function washTiles(rec, f, ink, alpha, hatch){
+  const r = rec.region === null || rec.region === undefined ? null : regionById(rec.region); if (!r || rec.to === null) return;
+  const ax = rec.to % W, ay = (rec.to - ax) / W;
+  let far = 1;
+  for (const i of r.tiles){ const x = i % W, d = Math.abs(x - ax) + Math.abs((i - x) / W - ay); if (d > far) far = d; }
+  const reach = far * f;
+  wctx.globalAlpha = alpha; wctx.fillStyle = ink;
+  for (const i of r.tiles){
+    const x = i % W, y = (i - x) / W;
+    if (hatch && (x + y) % 4 !== 0) continue;
+    if (Math.abs(x - ax) + Math.abs(y - ay) <= reach) wctx.fillRect(x * WS, y * WS, WS, WS);
   }
   wctx.globalAlpha = 1;
+}
+/* The three washes are one gesture kind and differ by the ink they use. */
+const WASH_INK = { freeze: 'field-cold', hide: 'field-dark', show: 'field-light' };
+/* Where a god's star stands while its gesture runs. The walk home takes the first part of the slice, and
+   only when the record begins somewhere the star was not left. */
+function walkPoint(rec, f){
+  const was = godLast.has(rec.god) ? godLast.get(rec.god) : rec.from;
+  if (was === null || was === undefined || rec.from === null || was === rec.from) return pointAt(rec.from, rec.to, f);
+  const home = 0.35;
+  return f < home ? pointAt(was, rec.from, f / home) : pointAt(rec.from, rec.to, (f - home) / (1 - home));
+}
+/* One gesture's own figure, at the fraction of its slice that has run. */
+function drawGesture(rec, f){
+  const q = tileSpot(rec.to), e = tweenEase(f);
+  if (rec.kind === 'split'){
+    /* Over the twenty-four seeds of tests/ages.js no cut leaves a gap of more than two tiles, so the sorted
+       line reads as one stroke and is drawn as one. */
+    wctx.fillStyle = P['field-line'];
+    for (const i of lineSoFar(rec.line, e)){ const x = i % W, y = (i - x) / W; wctx.fillRect(x * WS, y * WS, WS, WS); }
+    return;
+  }
+  if (rec.kind === 'flow'){
+    /* Two flows in five run between countries that do not lie in a straight line, so a line from anchor to
+       anchor would cross a country the water never entered. Each country lights in turn instead. */
+    const n = rec.path.length;
+    rec.path.forEach((i, k) => { const s = clamp(e * n - k, 0, 1); if (s > 0) tweenRing(tileSpot(i), 3 + 16 * s, P['field-wet'], 1 - s * 0.5, 2); });
+    return;
+  }
+  if (!q) return;
+  if (rec.kind === 'claim') tweenRing(q, 4 + 26 * e, P['field-' + rec.pole] || P.select, 1 - e, 2);
+  else if (rec.kind === 'make' || rec.kind === 'twist'){
+    const sp = SPECIES[rec.species];
+    wctx.save(); wctx.translate(q.x, q.y - 16 * (1 - e)); if (rec.kind === 'twist') wctx.rotate((1 - e) * 0.9);
+    wctx.globalAlpha = e; wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+    wctx.font = '700 16px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(sp.glyph, 0, 0);
+    wctx.fillStyle = rec.kind === 'twist' ? P['field-scar'] : P.sprite; wctx.fillText(sp.glyph, 0, 0);
+    wctx.restore(); wctx.globalAlpha = 1;
+  }
+  else if (rec.kind === 'raise') tweenRing(q, 3 + 24 * e, P['field-above'], 1 - e, 2);
+  else if (rec.kind === 'dig') tweenRing(q, 27 - 24 * e, P['field-below'], 1 - e, 2);
+  else if (rec.kind === 'pool') tweenRing(q, 3 + 18 * e, P['field-wet'], 1, 2);
+  else if (rec.kind === 'burn') washTiles(rec, e, P['field-scar'], 1, true);
+  else if (rec.kind === 'wash') washTiles(rec, e, P[WASH_INK[rec.value]] || P['field-line'], 0.5, false);
+  else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
+  else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
+}
+/* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
+   stay whole, and it is trimmed only when even two rows will not hold it. */
+function drawCaption(text, p){
+  if (!p) return;
+  const per = Math.max(24, Math.floor((W * WS - 24) / 7)), rows = [];
+  let rest = String(text);
+  while (rest.length && rows.length < 2){
+    if (rest.length <= per){ rows.push(rest); rest = ''; break; }
+    let cut = rest.lastIndexOf(' ', per); if (cut < per * 0.6) cut = per;
+    rows.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+  }
+  if (!rows.length) return;
+  if (rest) rows[rows.length - 1] = rows[rows.length - 1].slice(0, per - 1) + '…';
+  wctx.font = '500 11px "JetBrains Mono", ui-monospace, Menlo, monospace';
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  let w = 0; for (const t of rows) w = Math.max(w, wctx.measureText(t).width + 10);
+  const h = rows.length * 14 + 4;
+  const x = clamp(p.x, w / 2 + 2, W * WS - w / 2 - 2), y = clamp(p.y + 30, h / 2 + 2, H * WS - h / 2 - 2);
+  wctx.globalAlpha = 0.75; wctx.fillStyle = P.void; wctx.fillRect(x - w / 2, y - h / 2, w, h); wctx.globalAlpha = 1;
+  wctx.fillStyle = P.select;
+  rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
+}
+function drawField(){
+  const span = AGE_MS / pace, tier = tweenTier(span);
+  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
+  if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
+  if (key !== fieldKey){
+    /* The field last drawn becomes the field the new one fades in over. A new world, a thrown-back valley,
+       and a frame that ran two or more ages have nothing to fade from, so they snap. */
+    fieldJump = !fieldKey || creation.discards !== fieldDiscards || age !== fieldAge + 1;
+    if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
+    godLast = godEnds; godEnds = new Map();
+    fieldKey = key; fieldAge = age; fieldDiscards = creation.discards; fieldSkip = null;
+  }
+  /* A paused world and a world behind a dialog hold still, so the tween holds at its end and nothing sits
+     half drawn. The two fastest tiers, and a jump, are the same case. */
+  const still = paused || anyDialogOpen();
+  const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  const slices = recs.map((rec, i) => gestureSlice(i, recs.length, f));
+  const figures = f < 1 && (tier === 'full' || tier === 'figure');
+
+  /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
+  const skip = new Set();
+  if (figures) recs.forEach((rec, i) => {
+    if (rec.kind !== 'split' || slices[i] >= 1) return;
+    const b = boundaries.find(q => q.a === rec.near && q.b === rec.far); if (b) skip.add(b.id);
+  });
+  const skipKey = [...skip].sort().join(',');
+  if (skipKey !== fieldSkip){ drawFieldCache(skip); fieldSkip = skipKey; }
+
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (f < 1){ wctx.drawImage(ocv2, 0, 0); wctx.globalAlpha = tweenEase(f); wctx.drawImage(ocv, 0, 0); wctx.globalAlpha = 1; }
+  else wctx.drawImage(ocv, 0, 0);
+
+  /* The intent cue: what the god weighed before it acted, at the slow tier and in the first part of the
+     gesture's own slice. It replays a decision already taken; it does not ask the rules to look ahead. */
+  if (tier === 'full' && f < 1) recs.forEach((rec, i) => {
+    const s = slices[i]; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
+    const fade = (1 - s / TWEEN.cue) * 0.7;
+    for (const o of rec.weighed.opts){
+      const r = regionById(o.region); if (!r) continue;
+      wctx.globalAlpha = o.type === rec.weighed.picked ? fade : fade * 0.45;
+      wctx.strokeStyle = P.select; wctx.lineWidth = 2;
+      wctx.strokeRect(r.bbox.x0 * WS + 1, r.bbox.y0 * WS + 1, (r.bbox.x1 - r.bbox.x0 + 1) * WS - 2, (r.bbox.y1 - r.bbox.y0 + 1) * WS - 2);
+    }
+    wctx.globalAlpha = 1;
+    const g = beingById(rec.god), p = tileSpot(rec.from === null ? rec.to : rec.from);
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(rec.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+  });
+
+  /* The act's own figure, one per gesture, each in its own slice. */
+  if (figures) recs.forEach((rec, i) => { if (slices[i] > 0) drawGesture(rec, slices[i]); });
+
+  /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
+  const moving = new Map();
+  if (f < 1 && tier !== 'none') recs.forEach((rec, i) => {
+    const s = slices[i]; if (s <= 0) return;
+    const p = walkPoint(rec, s);
+    const beaten = rec.kind === 'battle' && rec.loser === rec.god;
+    if (p) moving.set(rec.god, { p, end: rec.to,
+      alpha: rec.kind === 'born' ? s : rec.kind === 'unmade' ? 1 - s : rec.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
+    /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
+       never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
+    if ((rec.kind === 'battle' || rec.kind === 'mingle') && rec.otherFrom !== null && rec.otherFrom !== undefined){
+      const back = s < 0.5 ? pointAt(rec.otherFrom, rec.to, s * 2) : pointAt(rec.to, rec.otherFrom, s * 2 - 1);
+      const lost = rec.kind === 'battle' && rec.loser === rec.other;
+      if (back) moving.set(rec.other, { p: back, end: rec.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+    }
+  });
+  const spots = [];
+  for (const g of gods()){
+    const m = moving.get(g.id);
+    if (!m && g.status === 'dead') continue;
+    const at = g.at === null || g.at === undefined ? null : { x: g.at % W, y: (g.at - g.at % W) / W };
+    let p = m ? m.p : at;
+    if (!p){ const r = standsIn(g); if (!r) continue; p = { x: (r.bbox.x0 + r.bbox.x1) / 2, y: (r.bbox.y0 + r.bbox.y1) / 2 }; }
+    godEnds.set(g.id, m ? m.end : g.at);
+    const s = spotOf(p);
+    spots.push({ g, x: s.x, y: s.y, alpha: m ? m.alpha : g.status === 'awake' ? 1 : 0.55 });
+  }
+  /* Two stars are nudged apart only when their pixels are within the glyph's own width. */
+  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k]; if (Math.abs(s.x - o.x) < 22 && Math.abs(s.y - o.y) < 16){ s.x = o.x + 22; s.y = o.y; } } });
+  wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+  for (const s of spots){
+    wctx.globalAlpha = clamp(s.alpha, 0, 1);
+    wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+    wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
+  }
+  wctx.globalAlpha = 1;
+  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
+  if (figures){
+    const said = recs.filter((rec, i) => rec.said !== null && rec.said !== undefined && legends[rec.said] && slices[i] > 0);
+    const pick = said.slice().reverse().find(rec => legends[rec.said].kind === 'major') || said[said.length - 1];
+    if (pick) drawCaption(legends[pick.said].text, tileSpot(pick.to));
+  }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){

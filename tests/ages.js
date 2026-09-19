@@ -10,20 +10,33 @@ const SOAK_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
 const MORE = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'moss-marsh-1', 'ash', 'reed', 'stone', 'pine', 'ford'];
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : [...SOAK_SEEDS, ...MORE];
 
+/* Every age's gesture count, and every gesture, as the creation runs. The list is replaced at the head
+   of each age, so it is read after each step or it is gone. */
 function creationOf(seed){
   const api = load(); api.startCreation(seed);
-  const t0 = Date.now(); api.runAges(); const ms = Date.now() - t0;
+  const t0 = Date.now();
+  const perAge = [], gestures = [];
+  const max = api.options.ageLimit * 2 + 2;
+  for (let n = 0; api.era === 'gods' && n < max; n++){ api.step(); perAge.push(api.creation.gestures.length); for (const rec of api.creation.gestures) gestures.push(rec); }
+  const ms = Date.now() - t0;
   const gs = api.gods();
   const contrasts = Object.keys(api.CONTRASTS).filter(c => gs.some(g => g.contrast === c));
   const species = new Set(); for (const r of api.liveRegions()) for (const m of api.marksOf(r, 'making')) species.add(m.value);
   const scars = api.liveRegions().filter(r => api.marksOf(r, 'scar').length).length;
-  return { api, ms, gs, contrasts, species: [...species].sort(), scars };
+  return { api, ms, gs, contrasts, species: [...species].sort(), scars, perAge, gestures };
 }
 
 const rows = [];
+/* The gesture record, counted across every seed. The design claims every act writes a usable mark, so
+   the fallback to the heart of a country should never fire; and it sets no cap on the gestures in one
+   age until there is a real number to set it against. These two tables are that number. */
+const fallbacks = {}, ages = {}, kinds = {};
 for (const seed of SEEDS){
   test(`seed ${seed}: the ages end`, t => {
-    const { api, ms, gs, contrasts, species, scars } = creationOf(seed);
+    const { api, ms, gs, contrasts, species, scars, perAge, gestures } = creationOf(seed);
+    for (const k in api.gestureFallbacks) fallbacks[k] = (fallbacks[k] || 0) + api.gestureFallbacks[k];
+    for (const n of perAge) ages[n] = (ages[n] || 0) + 1;
+    for (const rec of gestures) kinds[rec.kind] = (kinds[rec.kind] || 0) + 1;
     const c = api.creation;
     const line = `${seed.padEnd(14)} ages ${String(c.ages).padStart(3)}  gods ${gs.length}  asleep ${gs.filter(g => g.status === 'asleep').length}  dead ${gs.filter(g => g.status === 'dead').length}  regions ${api.liveRegions().length}  scars ${scars}  backstops ${c.backstops}  ${ms} ms  contrasts ${contrasts.join(',')}  made ${species.join(',')}`;
     rows.push(line); t.diagnostic(line);
@@ -48,3 +61,17 @@ for (const seed of SEEDS){
 }
 
 test('report', t => { for (const line of rows) t.diagnostic(line); });
+
+test('the gesture record over every seed', t => {
+  const acts = Object.keys(kinds).sort();
+  t.diagnostic(`gestures by kind: ${acts.map(k => `${k} ${kinds[k]}`).join(', ')}`);
+  const counts = Object.keys(ages).map(Number).sort((p, q) => p - q);
+  t.diagnostic(`gestures in one age: ${counts.map(n => `${n} -> ${ages[n]} ages`).join(', ')}`);
+  t.diagnostic(`the most in one age: ${counts[counts.length - 1]}`);
+  const fell = Object.keys(fallbacks).sort();
+  t.diagnostic(`anchor fallbacks: ${fell.length ? fell.map(k => `${k} ${fallbacks[k]}`).join(', ') : 'none'}`);
+  /* Every act in the table leaves a row, and every row is one of the kinds the design names. */
+  const KNOWN = ['split', 'claim', 'make', 'raise', 'dig', 'flow', 'pool', 'burn', 'wash', 'battle', 'twist', 'mingle', 'sleep', 'born', 'unmade', 'backstop'];
+  for (const k of acts) assert.ok(KNOWN.includes(k), `an unknown gesture kind: ${k}`);
+  assert.ok(!counts.includes(0), 'an age passed with no gesture at all');
+});
