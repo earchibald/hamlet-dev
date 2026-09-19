@@ -648,12 +648,47 @@ function drawMark(rec, f, alpha){
 Call it from `drawField` for `now` at `f` and alpha `1`, and for `before` at `1` and alpha `1 - f`. Add
 `'bg'` and `'map-halo'` to the palette read at `src/ui/map.js:6` if they are not already there.
 
-- [ ] **Step 5: Run the tests, build, commit**
+- [ ] **Step 5: Make the caption name the act, not the age**
+
+`drawCaption` in `src/ui/map.js` takes "the newest line of the age that is major, else the newest line
+there is". That was right when a beat was a whole age. Now the caption belongs to the act being played.
+
+Each gesture carries `said`, the index of the legend line that act wrote, so read the line from the record
+rather than guess it from the age:
+
+```js
+/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption; the age's
+   close takes the newest major line of the close, which is where the rest gate, the strain and a
+   backstop speak. */
+function captionFor(rec){
+  if (!rec) return majorOfClose();
+  return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
+}
+```
+
+Add a test beside the mark tests:
+
+```js
+test('the caption is the line the act wrote, and an act that wrote no line has none', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'captionFor']);
+  api.startWorld('gamma');
+  for (let k = 0; k < 4; k++) api.step(true);
+  const rec = api.creation.gestures[api.creation.gestures.length - 1];
+  const said = rec.said !== null && rec.said !== undefined;
+  assert.equal(api.captionFor(rec), said ? api.legends[rec.said].text : '');
+  assert.equal(api.captionFor({ said: null }), '', 'an act that wrote no line is silent, not wrong');
+});
+```
+
+`majorOfClose()` is the existing behaviour, kept for the age's close beat. If `drawCaption` holds that
+logic inline today, lift it into a named function rather than copying it.
+
+- [ ] **Step 6: Run the tests, build, commit**
 
 ```bash
 node --test tests/ui.js 2>&1 | grep -E '^ℹ (pass|fail)'
 node build.js
-git add -A && git commit -m "Every act draws its own mark and its own word
+git add -A && git commit -m "Every act draws its own mark, its own word, and its own line
 
 A split and a claim both recolour a country; a burn, a freeze, a hiding and a
 showing all wash it. Fifteen acts were being read through four devices. One
