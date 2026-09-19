@@ -509,21 +509,29 @@ const WORK_WORDS = {
   clay: 'clay', fish: 'fish', log: 'timber', stick: 'stick', rock: 'stone', berries: 'berry',
   fibre: 'reed', carcass: 'snare', venison: 'deer', moss: 'moss', water: 'water', cuttings: 'cutting',
 };
+/* The word the work left on a place. `at` is [x, y], or [x, y, z] for work below the surface. */
 function workWordAt(at){
-  const t = at && hasTile(at[0], at[1], 0) ? tileAt(at[0], at[1]) : null;
+  if (!at) return null;
+  const z = at[2] || 0;
+  const t = hasTile(at[0], at[1], z) ? tileAt(at[0], at[1], z) : null;
   return t && t.struct ? (WORK_WORDS[t.struct.type] || null) : null;
 }
-/* A sector is named by the first camp member to finish work in it. */
-function nameSectorForWork(a, word){
-  if (!word || !a.camp || !a.camp.site || !hasTile(a.x, a.y, 0)) return;
-  const s = sectorOfTile(world[idx(a.x, a.y)]);
+/* A sector is named by the first camp member to finish work in it. `at` is where the work was
+   done, which is not always where the worker stands: a job at the far edge of a sector is worked
+   from the tile next to it, which can lie in the sector next door. With no `at` the worker's own
+   place is the place. A sector covers a whole column, so only x and y are read. */
+function nameSectorForWork(a, word, at){
+  if (!word || !a.camp || !a.camp.site) return;
+  const x = at ? at[0] : a.x, y = at ? at[1] : a.y;
+  if (!hasTile(x, y, 0)) return;
+  const s = sectorOfTile(world[idx(x, y)]);
   if (!s || nameOf(s)) return;
   const prev = camp; camp = a.camp;
   const extra = [
     { text: cap(word) + (WORD_TAIL[word] || 'ground'), axis: 'work', base: 25, why: `for the ${word} work done here` },
     { text: `the ${cap(word)} ${WORD_PHRASE[word] || 'Ground'}`, axis: 'work', base: 25, why: `for the ${word} work done here` },
   ];
-  const rec = nameThing(s, 'sector', a, [a.x, a.y], extra);
+  const rec = nameThing(s, 'sector', a, [x, y], extra);
   if (rec) log(`${a.name} calls this ground ${rec.text}, ${rec.why}.`, campHumans(), 'info');
   camp = prev;
 }

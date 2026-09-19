@@ -128,6 +128,18 @@ test('people rows put trouble first, and the camp summary lists the stash as pai
   const c = api.campSummary(); assert.ok(Array.isArray(c.stash)); assert.ok(c.stash.every(p => p.length === 2 && p[1] > 0)); assert.ok(c.tools.includes('axe'));
 });
 
+test('a person who died on tick zero still holds their row for a day', () => {
+  const api = loadUI(['state', 'derive'], DERIVE); api.startWorld('r');
+  api.camp = api.camps[0];
+  const a = api.firstPerson(); a.camp = api.camps[0];
+  api.tick = 0; a.alive = false; a.diedAt = 0;
+  const row = api.peopleRows().find(r => r.a === a);
+  assert.ok(row, 'a death stamped zero dropped the row at once');
+  assert.equal(row.status, 'Dead');
+  api.tick = api.DAY;
+  assert.equal(api.peopleRows().some(r => r.a === a), false, 'the dead stay a day, no longer');
+});
+
 test('the view key changes when the world does, and holds still when nothing does', () => {
   const api = day21(); const k1 = api.viewKey();
   assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');

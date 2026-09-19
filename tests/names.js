@@ -488,13 +488,11 @@ test('the wolf, sprite, deer, and fish tags all appear once tasks, species, and 
   for (const e of potLines) assert.equal(e.tag, 'pot', e.text);
 });
 
-test('a founding party carries the found tag on the line that sends it out', () => {
-  const { api, a, c } = hearthCamp();
-  api.camp = c;
-  api.log(`${a.name} and somebody set out for the meadow to the west, carrying coals in a bundle of bark.`, [a], 'major', 'found');
-  assert.equal(api.chronicle[0].tag, 'found');
+test('every founding line in a real run carries the found tag', () => {
   const { events } = run70();
-  for (const e of events) if (e.text.includes('carrying coals in a bundle of bark')) assert.equal(e.tag, 'found', e.text);
+  const lines = events.filter(e => e.text.includes('carrying coals in a bundle of bark'));
+  assert.ok(lines.length > 0, 'no party set out in 70 days');
+  for (const e of lines) assert.equal(e.tag, 'found', e.text);
 });
 
 test('a person walking the land reads the marks and learns the old names', () => {
@@ -510,14 +508,20 @@ test('only a person learns an old name, and a world with every name learned cost
   const h = api.hills.find(x => x.nameKnown === false);
   assert.ok(h, 'no unlearned hill on seed r');
   const deer = api.beings.find(b => b.species === 'deer');
-  if (deer){ deer.x = h.x; deer.y = h.y; deer.z = 0; api.learnNamesHere(deer); assert.equal(h.nameKnown, false, 'a deer read the marks'); }
+  assert.ok(deer, 'no deer on seed r');
+  deer.x = h.x; deer.y = h.y; deer.z = 0;
+  api.learnNamesHere(deer);
+  assert.equal(h.nameKnown, false, 'a deer read the marks');
   const a = api.firstPerson(); a.x = h.x; a.y = h.y; a.z = 0;
   api.learnNamesHere(a);
   assert.equal(h.nameKnown, true);
   /* Once nothing is left to learn the pass gives up at once, and learns nothing more. */
   api.lore.unknown = 0;
   const g = api.hills.find(x => x.nameKnown === false);
-  if (g){ a.x = g.x; a.y = g.y; api.learnNamesHere(a); assert.equal(g.nameKnown, false, 'the early exit still read the marks'); }
+  assert.ok(g, 'seed r has only one named hill, so the early exit cannot be tested');
+  a.x = g.x; a.y = g.y;
+  api.learnNamesHere(a);
+  assert.equal(g.nameKnown, false, 'the early exit still read the marks');
 });
 
 test('every arrival line says the camp by name', () => {
@@ -527,24 +531,33 @@ test('every arrival line says the camp by name', () => {
   for (const e of arrivals) assert.ok(!e.text.includes('arrives at the camp '), e.text);
 });
 
-test('a founded camp carries its founder and its name from the moment the party leaves', () => {
+test('a founded camp carries its founder and its name from the moment the party leaves, and its line is tagged', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   const before = api.camps.length;
   const mate = api.makeBeing('human', a.x + 1, a.y, 0); mate.camp = c; mate.homeless = false; api.beings.push(mate);
-  if (!api.startFoundCamp(a)) return;
+  assert.ok(api.startFoundCamp(a), 'the party did not set out');
   assert.equal(api.camps.length, before + 1);
   const nc = api.camps[before];
   assert.equal(nc.founder, a.id);
   assert.equal(api.nameOf(nc), `${a.name}'s camp`);
+  const line = api.chronicle.find(e => e.text.includes('carrying coals in a bundle of bark'));
+  assert.ok(line, 'no line said the party set out');
+  assert.equal(line.tag, 'found');
 });
+
+/* Bare, walkable ground on the surface, well away from the camp. */
+function freeGround(api, c){
+  const t = api.world.find(q => q.z === 0 && api.passable(q.x, q.y, 0) && !q.feature && !q.struct && api.dist(q.x, q.y, c.site[0], c.site[1]) > 20);
+  assert.ok(t, 'no free ground away from the camp');
+  return t;
+}
 
 test('a finished job names the ground it stands on, through the real stop', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   c.stash.stick = 6;
-  const spot = api.world.find(t => t.z === 0 && api.passable(t.x, t.y, 0) && !t.feature && !t.struct && api.dist(t.x, t.y, c.site[0], c.site[1]) > 20);
-  assert.ok(spot, 'no free ground away from the camp');
+  const spot = freeGround(api, c);
   const s = api.sectorOfTile(spot);
   assert.equal(api.nameOf(s), null, 'the sector is named already');
   a.x = spot.x; a.y = spot.y; a.z = 0;
@@ -558,8 +571,9 @@ test('a finished job names the ground it stands on, through the real stop', () =
 test('a job with no work word names nothing', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
-  const spot = api.world.find(t => t.z === 0 && api.passable(t.x, t.y, 0) && !t.feature && !t.struct && api.dist(t.x, t.y, c.site[0], c.site[1]) > 20);
+  const spot = freeGround(api, c);
   const s = api.sectorOfTile(spot);
+  assert.equal(api.nameOf(s), null, 'the sector is named already');
   a.x = spot.x; a.y = spot.y; a.z = 0;
   /* checkSnare on bare ground: the effect finds no snare, so there is no work word here. */
   api.setTask(a, 'checkSnare', { at: [spot.x, spot.y] }, { label: 'Checking the snare', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
@@ -567,11 +581,57 @@ test('a job with no work word names nothing', () => {
   assert.equal(api.nameOf(s), null, 'a job with no work word named the ground');
 });
 
+test('the ground named is the work tile\'s, not the worker\'s, across a sector boundary', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  c.stash.stick = 6;
+  /* A pair of bare tiles side by side in two different, unnamed sectors, well away from the camp. */
+  let work = null, stand = null;
+  for (const t of api.world){
+    if (t.z !== 0 || !api.passable(t.x, t.y, 0) || t.feature || t.struct) continue;
+    if (api.dist(t.x, t.y, c.site[0], c.site[1]) <= 20) continue;
+    const q = api.hasTile(t.x - 1, t.y, 0) ? api.tileAt(t.x - 1, t.y) : null;
+    if (!q || !api.passable(q.x, q.y, 0) || q.feature || q.struct) continue;
+    if (api.sectorOfTile(t) === api.sectorOfTile(q)) continue;
+    work = t; stand = q; break;
+  }
+  assert.ok(work, 'no bare pair straddling a sector boundary');
+  const sw = api.sectorOfTile(work), ss = api.sectorOfTile(stand);
+  assert.equal(api.nameOf(sw), null, 'the work sector is named already');
+  assert.equal(api.nameOf(ss), null, 'the worker\'s sector is named already');
+  a.x = stand.x; a.y = stand.y; a.z = 0;
+  api.setTask(a, 'setSnare', { at: [work.x, work.y] }, { label: 'Setting a snare', path: [], progress: 9999, target: [work.x, work.y], within: 1 });
+  api.runTask(a);
+  assert.ok(api.nameOf(sw), 'the work tile\'s sector was not named');
+  assert.equal(api.nameOf(ss), null, 'the worker\'s own sector was named instead');
+});
+
+test('feeding a fire that already stands names nothing, and a finished hut names the ground', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const pitSector = api.sectorOfTile(api.tileAt(...c.pit));
+  assert.equal(api.nameOf(pitSector), null, 'the camp sector is named already');
+  c.stash.stick = 20; c.stash.log = 20; c.stash.hide = 4;
+  a.x = c.pit[0]; a.y = c.pit[1]; a.z = 0;
+  api.setTask(a, 'feedFire', { at: c.pit.slice() }, { label: 'Feeding the fire', path: [], progress: 9999, target: c.pit.slice(), within: 1 });
+  api.runTask(a);
+  assert.equal(api.nameOf(pitSector), null, 'feeding the fire named the ground');
+  /* The same stop, on a job that raises a structure where none stood: that one names the ground. */
+  const spot = freeGround(api, c);
+  const s = api.sectorOfTile(spot);
+  assert.equal(api.nameOf(s), null, 'the sector is named already');
+  a.x = spot.x; a.y = spot.y; a.z = 0;
+  api.setTask(a, 'buildHut', { at: [spot.x, spot.y] }, { label: 'Building a hut', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.runTask(a);
+  assert.equal(api.tileAt(spot.x, spot.y).struct.type, 'hut', 'the hut was not built');
+  assert.ok(api.nameOf(s), 'the finished hut did not name the ground');
+});
+
 test('a delivery to the stash names the ground it lands on, through the real stop', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   const s = api.sectorOfTile(api.tileAt(...c.stashTile));
-  if (api.nameOf(s)) return;
+  assert.equal(api.nameOf(s), null, 'the stash sector is named already');
   a.carrying = { kind: 'log', count: 2 };
   api.setTask(a, 'deliver', { at: c.stashTile.slice() }, { label: 'Carrying 2 logs to camp', path: [] });
   api.runTask(a);

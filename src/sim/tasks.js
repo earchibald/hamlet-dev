@@ -100,9 +100,15 @@ function workKind({ label, amount, skill, effect, type = 'work' }){
       const l = of(label, t.args), n = of(amount, t.args);
       t.progress += workSpeed(a, of(skill, t.args) || skillOfLabel(l)); t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
       if (t.progress < n) return 'continue';
-      /* The effect lands first, because a job that raises a structure is what gives the ground its
-         work word. A job whose place carries no word in WORK_WORDS names nothing. */
-      effect(a, t.args, t); nameSectorForWork(a, workWordAt(at)); return 'done';
+      /* Only a job that finished a structure names the ground. The test is the work tile itself,
+         read before the effect and again after: bare before and built after means this job raised
+         it. Feeding a fire, cooking at one, or checking a snare works at a structure that already
+         stood, so each names nothing. The word comes from the work tile, and so does the sector: a
+         job at the edge of a sector is worked from the tile beside it, which may lie next door. */
+      const wz = at[2] || 0, bare = !(hasTile(at[0], at[1], wz) && tileAt(at[0], at[1], wz).struct);
+      effect(a, t.args, t);
+      if (bare) nameSectorForWork(a, workWordAt(at), at);
+      return 'done';
     }] };
 }
 Object.assign(TASKS, {
