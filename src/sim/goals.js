@@ -8,7 +8,9 @@ function hideReserved(){
 /* Kinds for the goals' one-place jobs. Offers carry { kind, args }; the kind's begin walks to args.at
    and works there, and the effect is the old done closure, word for word, reading camp state again
    rather than capturing it. */
-TASKS.chooseSite = { type: 'work', begin(a){ return chooseSite(a); }, stops: [] };
+/* begin returns a boolean, so a record is never set (startTask hands the true straight back); stops is never
+   called, and holds one entry only so every kind in TASKS has a non-empty stops array. */
+TASKS.chooseSite = { type: 'work', begin(a){ return chooseSite(a); }, stops: [() => 'done'] };
 TASKS.buildFirepit = workKind({ label: 'Building the fire pit', amount: CLOCK.work.firepit, effect(a, args){
   if (camp.pit) return;
   const n = GOALS.find(g => g.id === 'firepit').need;

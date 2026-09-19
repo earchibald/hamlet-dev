@@ -3,8 +3,7 @@
 // order, and the order matters: core.js declares the constants and state the
 // others read at load time. clock.js comes next, because the tables of the
 // later files are written in its units. tasks.js declares TASKS before beings.js,
-// species.js, and fae.js add their kinds to it, and beings.js declares START before
-// species.js and fae.js add their actions to it. Function calls between files are
+// species.js, and fae.js add their kinds to it. Function calls between files are
 // free, because function declarations hoist across the joined script.
 //
 // build.js inlines source() into the page. Tests call load() to run the sim
@@ -21,7 +20,7 @@ function source(){
 /* The names the tests reach into. State is exposed with getters, because the
    sim reassigns `beings`, `items`, and `camp` as it runs. */
 const API = `return {
-  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, START, SPECIES, GROUND, ITEMS, LIFE,
+  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, addItem, removeItem, stashAdd,

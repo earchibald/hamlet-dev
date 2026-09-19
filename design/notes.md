@@ -347,7 +347,44 @@ Left for the retune (G4): `tests/lib/run.js` and `tests/door.js` each hard-code 
 
 The soak's six-seed fingerprint did not move through the whole plan. G1 is a pure refactor: every literal moved to `CLOCK` at its same value, in the same order of rolls.
 
-## 17. Next
+## 17. Tasks as data
+
+A task used to be a closure: an object built by a `startX` function, carrying an `arrive` function that closed over whatever it needed — a being, an item, a tile, a struct. A closure cannot be saved, cannot be read without running it, and cannot be handed to a second executor. Plan G2 made a task a plain record instead: `{ kind, type, args, stop, path, label, progress, started, key, ... }`, holding only numbers, strings, booleans, null, and arrays and plain objects of those.
+
+`kind` is the key into `TASKS`, in `src/sim/tasks.js`, and one kind means one behaviour. `type` is the category the rest of the rules already read off `a.task.type` (`'work'`, `'gather'`, `'flee'`, `'sit'`, `'guard'`, `'hunt'`, `'travel'`, and so on); it kept every value it had before the conversion, because `updateBeing`, `chooseTask`, and the interface compare it. `args` holds what the task is about: ids, an index, coordinates, item kinds, counts. `stop` is which of the kind's stops the task is at; today's `t.arrive = ...` reassignment became `t.stop = 1`, `t.stop = 2`, and so on.
+
+`TASKS[kind]` holds what a kind does:
+
+| Entry | Meaning |
+|---|---|
+| `type` | The record's default `type`. `begin` may return another. |
+| `begin(a, args)` | Everything a `startX` did before it built the task: the checks, the search for the target, the first path, a reservation, a chronicle line. Returns the record's other fields, `false` when the task cannot start, or `true` when it handed over to another kind. |
+| `stops` | An array of functions `(a, t)`, one for each place the task visits. The executor calls `stops[t.stop]` once the path there is walked, on every stride, until it returns `'done'` or `'fail'`; `'continue'` runs it again next stride. |
+| `release(a, t)` | What the task lets go of when it ends, well or not: a claim, a reservation, a brand. This is today's `cleanup`, folded together with the old `fail`, since both amount to letting go of what the task held. |
+| `work`, `effect` | Declared by `workKind` for a job done at one place: `work` is the world time from `CLOCK` and the skill that speeds it, `effect` is what changes when the work ends. Plan G5's day tier can run a job with declared `work` without walking it stride by stride. |
+
+A record holds no reference to a being, an item, a tile, a camp, a cave, or a grove. What a closure once held by reference, `args` holds by id, by index, or by coordinates, found again when the task needs it: a being by `beingById(id)`, an item by `items.find(i => i.id === id)`, a tile by `tileAt(x, y, z)`, a snare or a pit by `tileAt(x, y).struct`, a cave by `caves[i]`, a camp by `camps[i]`. A grove is read again off the being's own `a.grove`; no rule reassigns it. `caves` and `camps` are never spliced once the world is made (checked with `grep -n "caves\.\(splice\|pop\|shift\)\|caves = \|camps\.\(splice\|pop\|shift\)\|camps = " src/sim/*.js`), so an index still names the same cave or camp for the life of the task.
+
+The helpers: `startTask(a, kind, args)` deep-copies `args` (`JSON.parse(JSON.stringify(args))`, so a record never shares an array with an offer or a camp's own state), calls `TASKS[kind].begin`, and sets `a.task`. `setTask(a, kind, args, fields)` sets the record directly, for a task whose path is already in hand. `goTo(a, t, x, y, within, z)` is the walk-on check twenty tasks used to repeat inline: null when the being is already close enough, a new path and `'continue'` when it walks there, `'fail'` when there is no way. `taskStop(a)` runs the current stop once: `TASKS[a.task.kind].stops[a.task.stop](a, a.task)`. `chain(a, old, ok)` is unchanged. `workKind({ label, amount, skill, effect, ... })` builds a kind for a job done at one place, declaring `work` and `effect` and writing `stops` itself. `pathToStop` is what the spec called `legPath`.
+
+An offer is `{ label, score, task: { kind, args } }`. A site an offer draws from `rng()` — where a snare sits, which spot is open — is still chosen when the offer is built, in `offers()`, not inside `begin`; only the timing of what the offer carries changed, not the order or count of rolls.
+
+`tasks.js` loads before `beings.js` in `src/sim/index.js`'s `FILES`, because `beings.js`, `species.js`, `fae.js`, `goals.js`, and `recipes.js` all add kinds to `TASKS` as they load. `camps.js` loads before `tasks.js`, so the two kinds camps needs before it exists, `join` and `leadParty`, live in `tasks.js` and `goals.js` instead.
+
+Of the 77 kinds in `TASKS`, 26 declare `work` and are done at one place: `buildFirepit`, `buildHut`, `buildLeanTo`, `buildRack`, `butcherDeer`, `checkSnare`, `cookCatch`, `cookFish`, `craft`, `feedFire`, `haulPit`, `knapAxe`, `layFire`, `leaveBerries`, `lightWithMoss`, `makeSpear`, `raiseStorehouse`, `rearmSnare`, `setOfferingStone`, `setSnare`, `setWardPosts`, `sewWaterskin`, `smokeFish`, `smokeMeat`, `strikeSparks`, `testRocks`. The day tier can run any of these without walking a single stride. The other 51 are stride by stride, with no one place and no declared `work`: the base kinds (`drink`, `eat`, `rest`, `sit`, `shelter`, `sleep`, `wander`, `flee`, `walk`, `walkTo`, `socialize`), the gathering family (`deliver`, `gather`, `pickBerries`, `pickFibre`, `fish`, `digClay`, `takeCuttings`, `quarry`, `cutTree`, `fillWater`), the chases (`hunt`, `stalk`, `huntDeer`, `driveOff`, `fightSprite`, `raid`, `herd`, `scavenge`), the gnome and sprite loops (`home`, `carryHome`, `huddle`, `borrow`, `repay`, `shrooms`, `dance`, `forage`, `watch`, `collect`, `prank`), and the founding and cave kinds (`chooseSite`, `join`, `leadParty`, `clearDen`, `denParty`, `clearRock`, `searchCave`, `brand`, `followBrand`, `comeHome`, `fetchEmber`). Plan G5 must give each of these a day-tier answer of its own; the day tier cannot yet run a hunt or a haul in one step.
+
+A lookup that comes back empty now ends a task the way the old code ended it for a dead or a missing thing, in every case the conversion found:
+
+| Kind | What was found again, and what happens when it is gone |
+|---|---|
+| `hunt`, `stalk`, `huntDeer`, `driveOff`, `fightSprite` | The prey, the person, the deer, the wolf, or the sprite, by `beingById(id)`. A dead one fails the chase, as it did when the closure held a dead being directly. |
+| `socialize`, `scavenge`, `gather` | The other person or the item sought. Not found fails the task, as a vanished target did before. |
+| `huddle` | The gnome takes its own warmth gain regardless, then looks for the kin it huddles with; a kin not found is skipped, exactly as the old closure never checked whether the kin still lived. |
+| `checkSnare`, `haulPit`, `rearmSnare` | The snare or the pit, read again by its tile. A struct destroyed since (burned, or struck by lightning) means nothing happens where the old closure, holding the object directly, still acted on it — a carcass taken from a burned snare, a stick spent rearming one that had already gone. A snare or a pit rebuilt on the same tile while a person walks toward it is read in its place; a freshly built one holds no catch, so nothing follows either way. |
+
+The soak's six-seed fingerprint did not move through the whole plan. Every task of G2, from the first kind converted in task 1 to the executor's last mode removed in task 9, is a pure refactor: the golden record is the one written before G2 began.
+
+## 18. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.

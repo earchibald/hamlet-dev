@@ -19,7 +19,6 @@ TASKS.fightSprite = { type: 'guard',
     const q = bfs(a.x, a.y, a.z, (x, y, z) => z === sp.z && dist(x, y, sp.x, sp.y) <= 1, 400, a); if (!q) return 'fail'; t.path = q.slice(0, 3); return 'continue';
   }],
   release(a){ if (a.carrying && a.carrying.kind === 'spear') a.carrying = null; } };
-function startFightSprite(a, sp){ return startTask(a, 'fightSprite', { sprite: sp.id }); }
 
 /* Sprite actions. They live by night around a hollow pine. */
 Object.assign(TASKS, {

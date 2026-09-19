@@ -72,13 +72,11 @@ test('the base kinds of a person are in the table', () => {
 test('the animals and the gnomes are in the table', () => {
   const api = load(); api.startWorld('r');
   for (const k of ['hunt', 'raid', 'stalk', 'herd', 'scavenge', 'home', 'carryHome', 'shrooms', 'huddle', 'borrow', 'repay', 'walk', 'walkTo']) assert.ok(api.TASKS[k], k);
-  assert.equal(Object.keys(api.START).filter(k => ['hunt', 'raid', 'stalk', 'herd', 'scavenge', 'home', 'carryHome', 'shrooms', 'huddle', 'borrow', 'repay'].includes(k)).length, 0);
 });
 
-test('the sprites are in the table, and START is empty', () => {
+test('the sprites are in the table', () => {
   const api = load(); api.startWorld('r');
   for (const k of ['dance', 'forage', 'watch', 'collect', 'prank', 'fightSprite']) assert.ok(api.TASKS[k], k);
-  assert.deepEqual(Object.keys(api.START), []);
 });
 
 test('gathering and its kin are in the table, and a gathered stick reaches the stash as plain data', () => {
@@ -172,31 +170,42 @@ test('a record does not share an array with the offer or the camp', () => {
   assert.notEqual(a.task.args.at, at); assert.deepEqual(a.task.args.at, at);
 });
 
-/* ---------- the ratchet ---------- */
+/* ---------- one mode: no file holds a closure task ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
 const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
-/* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
-const PENDING = {
-  camps: 0, tasks: 4, beings: 3, species: 0, fae: 0, goals: 0, recipes: 0,
-};
-test('no file holds more closure tasks than the ratchet allows', () => {
-  const over = [];
-  for (const f of FILES){
-    const n = (fs.readFileSync(path.join(SIM, f + '.js'), 'utf8').match(OLD) || []).length, allowed = PENDING[f] || 0;
-    if (n > allowed) over.push(`${f}.js holds ${n}, and ${allowed} are allowed`);
-    if (PENDING[f] !== undefined && n < allowed) over.push(`${f}.js holds ${n}. Lower its PENDING count from ${allowed}.`);
-  }
-  assert.equal(over.length, 0, over.join('\n'));
+test('no file holds a closure task', () => {
+  const held = FILES.filter(f => new RegExp(OLD.source).test(fs.readFileSync(path.join(SIM, f + '.js'), 'utf8')));
+  assert.deepEqual(held, []);
 });
 
-/* Every task of kind in a short run is plain data. The close extends this to every task. */
-test('every record the table starts is plain data', () => {
-  const api = load(); api.startWorld('r');
-  const bad = new Set();
-  for (let k = 0; k < 6000; k++){
-    api.step();
-    for (const b of api.beings) if (b.alive && b.task && b.task.kind) for (const s of plain(b.task)) bad.add(`${b.task.kind}: ${s}`);
+test('every task in a run is a small plain record of a known kind', () => {
+  for (const seed of ['r', 'x']){
+    const api = load(); api.startWorld(seed);
+    const bad = new Set();
+    for (let k = 0; k < 12000; k++){
+      api.step();
+      for (const b of api.beings) if (b.alive && b.task){
+        const t = b.task;
+        if (!api.TASKS[t.kind]) bad.add(`no kind: ${t.kind} (${t.label})`);
+        for (const s of plain(t)) bad.add(`${t.kind}: ${s}`);
+        const { path: _p, ...rest } = t; if (JSON.stringify(rest).length > 600) bad.add(`${t.kind}: the record is ${JSON.stringify(rest).length} characters`);
+      }
+    }
+    assert.deepEqual([...bad], [], seed);
   }
-  assert.deepEqual([...bad], []);
+});
+
+test('a task survives a trip through JSON', () => {
+  const api = load(); api.startWorld('r');
+  for (let k = 0; k < 4000; k++) api.step();
+  for (const b of api.beings) if (b.alive && b.task) assert.deepEqual(JSON.parse(JSON.stringify(b.task)), b.task);
+});
+
+test('every kind has a type, a begin, and stops, and a job declares its work and effect', () => {
+  const api = load();
+  for (const [k, K] of Object.entries(api.TASKS)){
+    assert.equal(typeof K.type, 'string', k); assert.equal(typeof K.begin, 'function', k); assert.ok(Array.isArray(K.stops) && K.stops.length > 0, k);
+    if (K.work){ assert.equal(typeof K.effect, 'function', k); assert.ok('amount' in K.work && 'skill' in K.work, k); }
+  }
 });

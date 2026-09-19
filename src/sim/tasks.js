@@ -23,7 +23,7 @@ function startTask(a, kind, args = {}){
   return f === true ? true : setTask(a, kind, own, f);
 }
 /* Run the current stop once. */
-function taskStop(a){ const t = a.task; return t.arrive ? t.arrive(a, t) : TASKS[t.kind].stops[t.stop](a, t); }
+function taskStop(a){ const t = a.task; return TASKS[t.kind].stops[t.stop](a, t); }
 /* Walk on toward a stop. Null when the being is within reach. Otherwise the stride's result:
    'continue' with a new path, or 'fail' when there is no way. */
 function goTo(a, t, x, y, within, z = 0){
@@ -31,7 +31,7 @@ function goTo(a, t, x, y, within, z = 0){
   const q = pathToStop(a, x, y, within, z); if (!q) return 'fail';
   t.path = q; return 'continue';
 }
-function letGo(a, t){ if (t.cleanup) t.cleanup(t); else if (t.kind && TASKS[t.kind].release) TASKS[t.kind].release(a, t); }
+function letGo(a, t){ const K = TASKS[t.kind]; if (K.release) K.release(a, t); }
 function endTask(a){ const t = a.task; if (!t) return; letGo(a, t); a.task = null; }
 function failTask(a){ const t = a.task; if (!t) return; letGo(a, t); dropCarried(a); a.task = null; }
 /* A walk with nothing to do at its end. The caller sets the type, the label, and the path. */

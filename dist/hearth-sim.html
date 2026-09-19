@@ -1726,7 +1726,7 @@ function startTask(a, kind, args = {}){
   return f === true ? true : setTask(a, kind, own, f);
 }
 /* Run the current stop once. */
-function taskStop(a){ const t = a.task; return t.arrive ? t.arrive(a, t) : TASKS[t.kind].stops[t.stop](a, t); }
+function taskStop(a){ const t = a.task; return TASKS[t.kind].stops[t.stop](a, t); }
 /* Walk on toward a stop. Null when the being is within reach. Otherwise the stride's result:
    'continue' with a new path, or 'fail' when there is no way. */
 function goTo(a, t, x, y, within, z = 0){
@@ -1734,7 +1734,7 @@ function goTo(a, t, x, y, within, z = 0){
   const q = pathToStop(a, x, y, within, z); if (!q) return 'fail';
   t.path = q; return 'continue';
 }
-function letGo(a, t){ if (t.cleanup) t.cleanup(t); else if (t.kind && TASKS[t.kind].release) TASKS[t.kind].release(a, t); }
+function letGo(a, t){ const K = TASKS[t.kind]; if (K.release) K.release(a, t); }
 function endTask(a){ const t = a.task; if (!t) return; letGo(a, t); a.task = null; }
 function failTask(a){ const t = a.task; if (!t) return; letGo(a, t); dropCarried(a); a.task = null; }
 /* A walk with nothing to do at its end. The caller sets the type, the label, and the path. */
@@ -2342,10 +2342,7 @@ function chat(a, b){
   else if (op <= -40 && a.rel[b.id] !== 'rival'){ a.rel[b.id] = b.rel[a.id] = 'rival'; log(`${a.name} and ${b.name} can no longer stand each other.`, [a, b], 'bad'); }
 }
 
-/* Actions that are not kinds yet. species.js and fae.js add theirs until they are converted. */
-const START = {};
-
-/* The base kinds. Each begin is what START did before it built the task. */
+/* The base kinds. Each begin is what the old closure task did before it built the task. */
 Object.assign(TASKS, {
   drink: { type: 'drink',
     begin(a, args){
@@ -2650,7 +2647,7 @@ function updateBeing(a){
       const force = busy ? null : (n.water < 15 && !(a.cooldown.drink > tick)) ? 'drink'
         : (n.food < 15 && !(a.cooldown.eat > tick)) ? 'eat'
         : (a.task.type !== 'sit' && n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
-      if (force){ failTask(a); if (TASKS[force] ? startTask(a, force) : START[force](a)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
+      if (force){ failTask(a); if (startTask(a, force)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
     }
     if (a.task && tick - (a.task.started || tick) > CLOCK.limit.task) failTask(a);
   }
@@ -2984,7 +2981,6 @@ TASKS.fightSprite = { type: 'guard',
     const q = bfs(a.x, a.y, a.z, (x, y, z) => z === sp.z && dist(x, y, sp.x, sp.y) <= 1, 400, a); if (!q) return 'fail'; t.path = q.slice(0, 3); return 'continue';
   }],
   release(a){ if (a.carrying && a.carrying.kind === 'spear') a.carrying = null; } };
-function startFightSprite(a, sp){ return startTask(a, 'fightSprite', { sprite: sp.id }); }
 
 /* Sprite actions. They live by night around a hollow pine. */
 Object.assign(TASKS, {
@@ -3092,7 +3088,9 @@ function hideReserved(){
 /* Kinds for the goals' one-place jobs. Offers carry { kind, args }; the kind's begin walks to args.at
    and works there, and the effect is the old done closure, word for word, reading camp state again
    rather than capturing it. */
-TASKS.chooseSite = { type: 'work', begin(a){ return chooseSite(a); }, stops: [] };
+/* begin returns a boolean, so a record is never set (startTask hands the true straight back); stops is never
+   called, and holds one entry only so every kind in TASKS has a non-empty stops array. */
+TASKS.chooseSite = { type: 'work', begin(a){ return chooseSite(a); }, stops: [() => 'done'] };
 TASKS.buildFirepit = workKind({ label: 'Building the fire pit', amount: CLOCK.work.firepit, effect(a, args){
   if (camp.pit) return;
   const n = GOALS.find(g => g.id === 'firepit').need;

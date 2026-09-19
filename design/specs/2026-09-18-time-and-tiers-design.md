@@ -100,6 +100,8 @@ A goal offers `{ label, score, task: { kind, args } }`. A recipe nearly does thi
 
 The conversion is a refactor, kind by kind. The golden holds through all of it.
 
+**As built (G2).** `TASKS[kind]` holds `type`, `begin`, `stops`, `release`, and, for a job done at one place, `work` and `effect`. `begin` and `stops` are this section's `stops(a, args)`, split in two: `begin` runs the search and the first move, and each entry of `stops` is the behaviour at one stop, called again each stride once the walk there is done. `release` is this section's `fail`; it also runs when a task ends well, where the old code called `cleanup`, so one function now covers both. `check` is not a separate entry; each stop function tests what it needs and returns `'fail'` itself. A job done at one place, such as building the fire pit or knapping the axe, also declares `work` (the world time from `CLOCK` and the skill that speeds it) and `effect` (what changes when the work ends); the chases and the loops of gathering have no single place and no declared `work`, so they stay stride by stride, and plan G5 decides how the day tier answers them. The record keeps `type` beside `kind`: `kind` is the key into `TASKS`, and `type` is the category `a.task.type` that the rest of the rules already read.
+
 ## 3. Snapshots, save, and load
 
 A story is the seed, the options, and the log, so a replay is always a valid load. A replay is too slow after hours of tick-tier play. G builds true snapshots as well.

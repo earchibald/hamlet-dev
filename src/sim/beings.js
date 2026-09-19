@@ -87,10 +87,7 @@ function chat(a, b){
   else if (op <= -40 && a.rel[b.id] !== 'rival'){ a.rel[b.id] = b.rel[a.id] = 'rival'; log(`${a.name} and ${b.name} can no longer stand each other.`, [a, b], 'bad'); }
 }
 
-/* Actions that are not kinds yet. species.js and fae.js add theirs until they are converted. */
-const START = {};
-
-/* The base kinds. Each begin is what START did before it built the task. */
+/* The base kinds. Each begin is what the old closure task did before it built the task. */
 Object.assign(TASKS, {
   drink: { type: 'drink',
     begin(a, args){
@@ -395,7 +392,7 @@ function updateBeing(a){
       const force = busy ? null : (n.water < 15 && !(a.cooldown.drink > tick)) ? 'drink'
         : (n.food < 15 && !(a.cooldown.eat > tick)) ? 'eat'
         : (a.task.type !== 'sit' && n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
-      if (force){ failTask(a); if (TASKS[force] ? startTask(a, force) : START[force](a)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
+      if (force){ failTask(a); if (startTask(a, force)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
     }
     if (a.task && tick - (a.task.started || tick) > CLOCK.limit.task) failTask(a);
   }
