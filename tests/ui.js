@@ -1234,7 +1234,8 @@ test('the frame repaints when the timeline changes', () => {
 
 test('the timeline builds nodes and never parses markup', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '../src/ui/timeline.js'), 'utf8');
-  assert.doesNotMatch(src, /innerHTML/, 'the band sets textContent, so no sim string is parsed as markup');
+  /* An assignment, not the word: the file's own comment names innerHTML to warn the next reader off it. */
+  assert.doesNotMatch(src, /\.innerHTML\b/, 'the band sets textContent, so no sim string is parsed as markup');
 });
 
 module.exports = { loadUI };

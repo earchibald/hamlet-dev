@@ -1,6 +1,6 @@
 /* The timeline: the record of the creation, laid flat under the map. It draws the model and nothing
    else. It builds nodes and sets textContent, so no string out of the simulation is ever parsed as
-   markup. Do not set any element's markup property here. */
+   markup. Do not bring innerHTML in here. */
 function tlButton(id, text, key){
   const b = document.createElement('button');
   b.className = 'btn small'; b.id = id; b.textContent = text;
