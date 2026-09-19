@@ -600,7 +600,7 @@ The fault is not that the information was missing. It is that it was never held 
 
 - A creation is about **eighty decisions by up to eight actors**, and at pace 1 an age is two seconds, so the whole thing is over in **about forty seconds**. That is half a second a decision.
 - **The cast grows while you watch.** The pantheon goes from one god to six or eight, and nothing on the map ever said so. The staircase of blanks down the left of the unfolded band is the birth order, and it is information a watcher never had.
-- **Half of every creation is one act.** `split` is 26 of 78 on gamma, 19 of 73 on r, 39 of 85 on beta. On the map a split looks like a country dividing, every time. The most common thing that happens is the thing that looks most alike.
+- **A third of every creation is one act.** `split` is 26 of 78 on gamma, 19 of 73 on r, and 39 of 85 on beta: 33, 26, and 46 per cent. It is the commonest act on two of the three seeds, and on `r` it ties with `make` at 19 apiece. On the map a split looks like a country dividing, every time, so the act that happens most is the act that looks most alike.
 - **Each god has a habit**, and the habit is legible only across ages: on gamma, Morrow only ever moves water, Nyr only ever divides, Veyl spends most of its time finishing multi-age work.
 
 So the timeline is not a convenience. It is the only thing in the interface that holds a decision still long enough to be read, and the only place a god's habit is visible at all. Whether it is *enough* is a question for playing it, and the answer belongs here when it is known.
