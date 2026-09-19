@@ -198,10 +198,44 @@ Ruling 1 makes playability a condition of the merge, so it needs a threshold som
 | The top ladder rung held for a world day | a world day in 24 wall seconds, within a fifth |
 | The page answers a click while a run is in flight | under 200 ms, and the run can be stopped by the player |
 | The chronicle at the `major` filter, on reaching winter | under 200 lines, each one a sentence a newcomer can read |
-| A line in it that the retune made false | none |
+| A line in it that the retune made false | none of "The prose that states a duration", checked one by one |
 | A camp's first ten days | a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10, as task 11 tunes for |
 
-Two honest limits on this table. A wall-time number measured in a browser is a property of the machine, so it is a floor to be met on the machine that merges and not a benchmark to be compared across machines. And the last two rows are read by a person, not asserted by a test; the task reports what it saw and pastes the lines, so the reader can disagree.
+Two honest limits on this table. A wall-time number measured in a browser is a property of the machine, so it is a floor to be met on the machine that merges and not a benchmark to be compared across machines. And the last rows are read by a person, not asserted by a test; the task reports what it saw and pastes the lines, so the reader can disagree.
+
+**Record the load average beside every wall time, and re-run a miss once.** This repository already learned the other way round. PR 31 (issue 26, merged 9e7d859) removed the suite's one wall-clock assertion, 3000 ms in `tests/ages.js`, because it failed under parallel load and taught everyone to re-run a red gate. That habit makes every other gate worthless. So the licence here is narrow, and written down rather than invented at the gate:
+
+- Print the one-minute load average with each wall time. A miss cannot be read without it.
+- A row that misses is re-run **once**, on a machine at a load average of 2 or below, with no soak running. Report both numbers.
+- A row that misses twice under those conditions is a real failure. Report it as one and do not open the pull request.
+- Nothing else in this plan may be re-run because it was red. This licence covers these rows and no others, because a player's experience genuinely is a wall time and nothing else here is.
+
+### The prose that states a duration
+
+The lint in `tests/clock.js` reads rules, not strings. So a string that states a duration in words, governed by no constant, passes every gate and turns false the moment this plan moves the value. Issue 37 was this class: it put the length of the year on the page as the length of winter.
+
+A promise to check all of the game's prose is not checkable. This list is. It was swept on dev cb903eb with a deliberately noisy grep, because the noise is read once by a person at the gate and not by a test on every run:
+
+```
+grep -rnE "(day|days|night|week|season|winter|summer|spring|autumn|year|hour|minute)s?\b" src/sim/*.js src/ui/*.js \
+  | grep -iE "\b(a|an|one|two|three|four|five|six|seven|eight|nine|ten|half|every|each|[0-9]+)\b[^']{0,20}(day|night|week|season|winter|year|hour|minute)"
+```
+
+Re-run it at task 11 and add whatever is new. Do not trust this list to still be complete: it replaced an earlier sweep of mine that had missed two of these nine.
+
+| # | Line | What it says | The constant | Verdict, and what it must say after |
+|---|---|---|---|---|
+| 1 | `src/sim/goals.js:184` | "Keep the hearth three days without a break" | `CLOCK.limit.hearthProven` = `days(3)` | True today, unlinked. Read the constant. |
+| 2 | `src/sim/goals.js:319` | "Cooked meat spoils in two days" | `CLOCK.limit.cookedKeeps` = 1.8 days | True today, because 1.8 rounds to two. Read the constant. |
+| 3 | `src/sim/goals.js:326` | "Winter is `${SEASON_DAYS}` days long... That is one strip a day" | `SEASON_DAYS`, and an aim of 8 | **Breaks in task 1, not task 11.** Task 1 deletes `SEASON_DAYS`. The arithmetic behind "one strip a day" holds only by chance. dev 898db4e marks it with a comment naming this work; the comment goes when the fault does. |
+| 4 | `src/sim/goals.js:371` | a den "goes back to the beasts if the fire is out for a day" | `CLOCK.den.campDark` = `days(1)` | True today, unlinked. Read the constant. |
+| 5 | `src/sim/goals.js:376` | beasts "come back if the fire fails for a day" | `CLOCK.den.campDark` | As 4. |
+| 6 | `src/sim/species.js:271` | "With the fire out a day, the wolves are back in the den under the hill." | `CLOCK.den.campDark` | As 4, and it is a chronicle line rather than a goal row, so it outlives its moment. **The earlier sweep missed this one.** |
+| 7 | `src/ui/inspect.js:52` | a person's age as `${Math.floor(ageDays(a))} days` | `DAY` | Derived, so never false, but unreadable after the retune: a person of 70 reads as 25,550 days. Years. Task 8. |
+| 8 | `src/ui/inspect.js:84` | a bush or tree's age as `${...} days` | `DAY` | As 7, same fix, and **the earlier sweep missed this one too.** Task 8. |
+| 9 | `src/ui/keys.js:23` | "Step one hour" | `hours(1)` | True, and must stay true. Task 8 changes what the button does, not what it says. |
+
+Two lines the sweep raised and cleared, recorded so a later reader does not re-raise them. `src/sim/goals.js:188` prints `camp.streak / DAY`, and `src/ui/derive.js:126` and `:199` print `daysOfWood()`, which divides by `CLOCK.rate.pitBurn * DAY`. Both derive from the constants they describe and cannot go false.
 
 ### The soak
 
@@ -315,7 +349,8 @@ This task is ruling 1's substance. Read "The watch list" first.
 - [ ] Task 4's horizon must never jump over a stop. Add the case to `tests/skip.js`: a run to day 30 with a stop on day 12 ends on day 12, skipped and stepped alike.
 - [ ] The chronicle's filter: `ui.chronFilter` is `'all'` or `'major'` today. At 86,400 ticks a day that is not enough. Filter by tag and by person, on top of the `ui.chronSearch` that exists. A filter is view state and does not pass the door.
 - [ ] The interface: a place to set a stop, a place to see the stops that are set, and a Run button that says where it is running to. A run in progress shows what it is waiting for, and can be stopped by the player.
-- [ ] Measure "The player's gate" in full, in a browser on the built page, and put the table in the commit with the numbers you saw and the machine you saw them on. Paste the chronicle you read on reaching winter. If a row fails, say which and by how much; do not round it into a pass.
+- [ ] Measure "The player's gate" in full, in a browser on the built page. Put the table in the commit with the numbers you saw, the machine, and the one-minute load average beside each wall time. Paste the chronicle you read on reaching winter. Re-run a miss once under the conditions that section names, and report both numbers. If a row misses twice, say which and by how much; do not round it into a pass.
+- [ ] Walk "The prose that states a duration" for rows 7, 8 and 9, which are this task's interface strings. Re-run the sweep command there and report anything it finds that the list does not hold.
 - [ ] Gates: `tests/door.js`, `tests/ui.js`, `tests/skip.js`, `tests/snapshot.js`. Commit.
 
 ### Task 10: The rest of the tests in world units
@@ -333,14 +368,14 @@ This task is ruling 1's substance. Read "The watch list" first.
 **Files:** `src/sim/clock.js`, `tests/clock.js`, `design/notes.md`, `design/specs/2026-09-18-time-and-tiers-design.md`, `CLAUDE.md`, `design/settings.md`, and `design/reports/2026-09-g4-before-and-after.md` (new).
 
 - [ ] Remove the four markers. `tests/clock.js` fails if one is left in `src/`.
-- [ ] Re-read every player-facing string that states a time. The lint sees a bare literal in a rule. It does not see a correct constant used for the wrong quantity in prose, which is how issue 37 put the length of the year on the page as the length of winter. A sweep of dev 4bb1b36 found three in `src/sim/`, and nothing since has moved them. None is false today, which is what separates them from issue 37: that one was wrong on the page the day it was written, and these are right today and fragile tomorrow. Each states a duration in words that no constant governs, so each turns false the moment this plan moves the value. `src/sim/goals.js:319` says "Cooked meat spoils in two days" while `CLOCK.limit.cookedKeeps` is 1.8 days, which rounds to two. `src/sim/goals.js:326` derives "That is one strip a day" from `SEASON_DAYS` and an aim of eight that match only by chance; dev 898db4e marks it with a comment that names this task, and the comment goes when the fault does. `src/sim/goals.js:371` and `:376` say a den goes back to the beasts if the fire is out "for a day", which is exactly `CLOCK.den.campDark`, read by nothing. Make each string read its constant. The two interface strings are task 8's.
+- [ ] Walk "The prose that states a duration" line by line and close every row. Rows 3 to 6 are this task's; rows 7 to 9 were task 8's and are checked again here, because this task moves values that task 8 measured against. Re-run the sweep command in that section on the final build and add whatever is new: the list was swept on cb903eb and it replaced an earlier sweep that had missed two of its nine, so treat it as a floor and not as the whole truth.
 - [ ] Tune against the long run on three seeds until a camp's first ten days read as today's do: a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10. Change a value only in the table, and log each change with its reason.
 - [ ] **Decide how a tuned value is recorded before tuning starts, not after.** A changed constant is recorded nowhere today. The door log carries acts, and `startWorld(seed, options)` carries the world settings, but a turned knob carries neither. So a run with a tuned value cannot be replayed from its seed and its log, and the project's central guarantee does not reach it. patcher found this while surveying issue 48; it is the suite's problem and it is this task's problem too. A report of prose notes is not a record. **The rule for G4, in two lifetimes.** Try a value by handing a named set to `startWorld(seed, options)`. That is the inner loop, it is cheap, and it needs nothing new: the options record is already part of what a replay reads, so a trial run is reproducible from its seed and its options the moment it is made. Keep the option set beside the run that used it. Then **a value that survives its trials becomes a commit** to `src/sim/clock.js`, and every number in the bless report names the commit it came from, so any line of the report is reproducible from the repository alone. Nothing in G4 changes a constant while a world runs. Issue 48's developer suite works the same way, which patcher confirmed with the user, so this is a description of the tuner's workflow and not a constraint laid on top of it.
 - [ ] Write the report: for each seed, today's golden line beside the new three-day line; the long run's counts beside today's at the same world age of the camp; every value whose world-time meaning moved by more than a factor of two, with the reason (ruling 7: big movers are enough); seconds a world day at day 3 and day 50, skipped and stepped; the floors that were suspended, what task 4 measured, and what the user ruled about them.
 - [ ] The notes gain a section on the real clock and the skip, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
 - [ ] Watch the hermit rule. The branch in `src/sim/camps.js` that fires when one person is left holds on zero ticks of all six seeds for 70 days today, measured by dev-coordinator, and every seed does fall to one living person. The hearth condition is the only thing that prevents it. This retune changes when a pit goes out, so the rule can start to fire. Report it in the long run if it does. Issue 25 landed at 7c62d70 before this plan starts, by dev-coordinator's ruling, so read the rule under its new name and expect a second camp to be founded rather than the old false line to be printed.
 - [ ] Watch `theLoneFounder` for an unbounded retry, and read this before you chase a slow seed. Issue 25 left a known path that patcher flagged rather than buried: if no candidate ground can be reached from any edge of the world, the rule falls through without clearing `doomAt`, so it retries every tick. Each retry makes a fresh camp record, calls `setSite`, and runs a full `reachable()` flood fill for every candidate, while `nextId` climbs by one a tick forever. It cannot be reached on any soak seed today. It belongs to this plan because the retune changes when a pit goes out, which is what decides whether the outer rule fires at all. If it starts firing under G4 and a seed has a walled-off founding site, **this presents as a performance regression and not as a logic fault**, so anyone chasing a slow seed will read the tick loop and not a founding rule. dev-coordinator asked patcher to close it with a one-line fix before task 1, so it should be gone by the time you read this. Check that it is. If the fix slipped, this note is the diagnosis, and a slow seed with a climbing `nextId` is the symptom to look for.
-- [ ] Measure "The player's gate" again on the final build, because task 11 moves values that tasks 8 and 9 measured against.
+- [ ] Measure "The player's gate" again on the final build, because task 11 moves values that tasks 8 and 9 measured against. The same rule on load averages and on re-running a miss once.
 - [ ] Tell dev-coordinator before the pull request opens, not after. dev-coordinator will not merge G4 on a routine gate pass, and this is right: the merge changes what the published game is, and the moment of that change is the user's to pick, not a coordinator's and not mine. The standing rule covers landing work in dev; it does not cover changing the character of a live site.
 - [ ] Do not bless. Open the pull request with the report, and tell dev-coordinator that it waits for the user on two counts: the golden, and the timing of the release.
 
