@@ -55,6 +55,18 @@ test('the camp rules and the cellular systems read the table', () => {
   assert.equal(C.plant.samples, 60); assert.equal(C.plant.bushOld, 60000);
 });
 
+test('needs, cooldowns, and the base tasks read the table', () => {
+  const C = load().CLOCK;
+  assert.deepEqual(C.cold, { under: 0.012, winterNight: 0.06, winterDay: 0.025, summer: 0, night: 0.012, day: 0.003 });
+  assert.equal(C.rate.fireWarms, 0.5); assert.equal(C.rate.freezeHurts, 0.03); assert.equal(C.rate.starveHurts, 0.04);
+  assert.equal(C.rate.heals, 0.01); assert.equal(C.rate.fireHurts, 2.5); assert.equal(C.rate.oldAgeDeath, 0.0006);
+  assert.equal(C.rate.sitRests, 0.05); assert.equal(C.rate.sitWarms, 0.4);
+  assert.equal(C.cooldown.offerFailed, 60); assert.equal(C.cooldown.pathBlocked, 40); assert.equal(C.cooldown.taskFailed, 120); assert.equal(C.cooldown.needFailed, 120); assert.equal(C.cooldown.disturb, 1000);
+  assert.equal(C.limit.task, 1500); assert.equal(C.limit.hurtRemembered, 600);
+  assert.equal(C.task.sit, 90); assert.equal(C.task.sitChat, 25); assert.equal(C.task.standStill, 20);
+  assert.equal(C.thought.grief, 3000); assert.equal(C.thought.ateCooked, 700);
+});
+
 /* ---------- the lint: no bare time literal in a rule ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* Each rule finds a place where time is used. A match is bare when it still holds a number. */
@@ -74,18 +86,22 @@ const RULES = [
   { name: 'a decay',              re: /\b(food|water|rest|social|warmth|glow|play):\s*[\d.]+/g, files: ['species'] },
   { name: 'a small step',         re: /(-=|\+=)\s*\d*\.\d+/g },
   { name: 'a need gained',        re: /needs\.\w+\s*[+-]\s*0\.\d+/g },
-  { name: 'a roll',               re: /rng\(\)\s*[<>]=?\s*[^;)&|]+/g, rolls: true },
+  /* Stops at a `/` too: a chance already named from CLOCK can be divided by an unrelated formula
+     (the old-age roll divides by hardiness), and that denominator is not a bare time literal. */
+  { name: 'a roll',               re: /rng\(\)\s*[<>]=?\s*[^;)&|/]+/g, rolls: true },
 ];
 /* Rolls are linted only in the files that hold rules. World generation rolls once and is not time.
    In world.js the rules begin at growPlants. */
 const ROLL_FILES = ['camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'world'];
 /* A chance rolled once per event is not a rate. Each entry is the exact text of a match, with the reason. */
 const EVENT_CHANCES = [
+  'rng() < (t.struct.snare.chance',   // rolled once, when an animal steps on the trap
+  'rng() < 0.125',                    // rolled once, when an animal steps on the trap
 ];
 /* The ratchet. A file listed here may still hold this many bare literals. A file not listed holds none.
    Each task of the plan removes its files. The close removes the ratchet. */
 const PENDING = {
-  beings: 56, species: 72, fae: 39, tasks: 41, goals: 40, recipes: 11, settle: 1,
+  species: 72, fae: 39, tasks: 41, goals: 40, recipes: 11, settle: 1,
 };
 
 /* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
