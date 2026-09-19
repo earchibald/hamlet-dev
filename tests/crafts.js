@@ -19,7 +19,7 @@ function readyCamp(seed = 'r'){
 function doOffer(api, a, label){
   const o = api.offersFor(a).find(o => o.label === label);
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
-  assert.ok(o.start(a), `offer "${label}" would not start`);
+  assert.ok(api.startTask(a, o.task.kind, o.task.args), `offer "${label}" would not start`);
   a.task.started = api.tick; a.task.key = label;
   for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null, `"${label}" did not finish in 600 ticks`);
@@ -72,18 +72,19 @@ test('a basket lets a gatherer carry three more', () => {
   for (let k = 0; k < 12; k++) api.addItem('stick', c.stashTile[0] + 3 + (k % 4), c.stashTile[1] + 2 + Math.floor(k / 4));
   for (const t of api.world) if (t.struct === null && Math.abs(t.x - c.stashTile[0]) <= 8 && Math.abs(t.y - c.stashTile[1]) <= 8){ t.feature = null; if (t.ground === 'water') t.ground = 'grass'; }
   a.skills.gather = 0; c.stash.stick = 0;
-  api.startGather(a, 'stick'); for (let k = 0; k < 400 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0; k < 400 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(c.stash.stick, 3, 'three sticks a trip without a basket');
   c.tools.basket = 1; c.stash.stick = 0;
-  api.startGather(a, 'stick'); for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(c.stash.stick, 6, 'six a trip with a basket');
 });
 
-test('startBuild speeds work by the passed skill, not just the label', () => {
+test('a workKind job speeds work by the passed skill, not just the label', () => {
   const runs = craft => {
     const { api, a, c } = readyCamp();
+    api.TASKS.testCord = api.workKind({ label: 'twist cord', amount: 30, skill: 'craft', effect: () => {} });
     a.skills.craft = craft;
-    assert.ok(api.startBuild(a, c.stashTile, 30, 'twist cord', () => {}, 'craft'));
+    assert.ok(api.startTask(a, 'testCord', { at: c.stashTile }));
     let n = 0; for (; n < 200 && a.task; n++) api.runTask(a);
     return n;
   };
@@ -228,7 +229,7 @@ test('a dead pit with no ignition source sends a brave adult for firestones befo
   const tree = api.tileAt(c.site[0] + 4, c.site[1]); tree.ground = 'grass'; tree.feature = 'tree'; tree.struct = null;
   const t = api.tileAt(...c.pit); t.struct.lit = false;
   const byGoal = id => id === 'firewood' || id === 'firestones';
-  const topOf = id => api.offersFor(a).filter(o => o.goal.id === id).reduce((b, o) => !b || o.score > b.score ? o : b, null);
+  const topOf = id => api.offersFor(a).filter(o => o.goal === id).reduce((b, o) => !b || o.score > b.score ? o : b, null);
 
   assert.equal(api.goalState(goal(api, 'firestones')).text.includes('cold'), true, 'the card says the camp puts fire first');
   let stones = topOf('firestones'), wood = topOf('firewood');
