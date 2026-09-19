@@ -310,6 +310,8 @@ const NOT_SAVED = {
   agePos: 'lives only in the ages', pending: 'lives only in the ages',
   runUntil: 'lives only in the ages', stops: 'lives only in the ages',
   lastLoadFault: 'the reason the last load was refused, not world state',
+  chronicleSink: 'a test seam; null on the page, and a save must never install one',
+  chronicleWritten: 'a count for the test harness, not world state',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
 };

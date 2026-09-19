@@ -160,15 +160,15 @@ test('a world of another size loads into a sim of the default size', () => {
 
    The steps are counted on from the save, not from zero, because the script god reads the loop index. */
 function oracle(seed, N, M, opts = {}, before = null){
-  const a = load(); a.startWorld(seed, opts);
-  const ca = collect(a); ca.drain(); runOn(a, 0, N, ca);
+  const a = load(); const ca = collect(a); a.startWorld(seed, opts);
+  runOn(a, 0, N, ca);
   const at = before ? before(a, ca, N) : N;
   const midTask = a.beings.filter(b => b.alive && b.task && b.task.path && b.task.path.length).length;
   const working = a.beings.filter(b => b.alive && b.task && b.task.progress > 0).length;
   const denless = a.beings.filter(b => b.alive && b.oldDen && !b.den).length;
   const snap = through(a.takeSnapshot());
   const b = load(); assert.equal(b.loadSnapshot(snap), null);
-  const cb = collect(b); cb.skipPresent();
+  const cb = collect(b);
   const cut = ca.events.length;
   runOn(a, at, M, ca); runOn(b, at, M, cb);
   return { a, b, after: ca.events.slice(cut), loaded: cb.events, midTask, working, denless, snap };
