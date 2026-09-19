@@ -10,12 +10,13 @@ Design spec, 2026-09-18. It answers issue #11 of `earchibald/hamlet-dev`. It is 
 | The cause | An age is one discrete step, and the field cache is keyed on the age number. Nothing is drawn between two ages. A god has no place finer than a region. |
 | What changes in the sim | A god gains an anchor tile, `g.at`. Each act records a plain gesture in `creation.gestures`. No rule reads either. No act changes. |
 | What changes in the view | The field draws with a cross-fade between the last age and this one, a god walks from its old anchor to its new one, and each gesture draws its own figure across the same fraction. |
-| Files in `src/sim/` | `field.js` (`heartTile`), `gods.js` (`g.at`, the recorder, one call per act), and the reset of `creation` in `beginCreation`. |
+| Files in `src/sim/` | `field.js` (`heartTile` alone; `splitRegion` is not touched), `gods.js` (`g.at`, the recorder, one call per act), and the reset of `creation` in `beginCreation`. |
 | Files in `src/ui/` | `state.js` (the tween table, the second cache), `derive.js` (the pure tween functions), `map.js` (`drawField`, the gesture layer). `main.js` does not change. |
 | What does not change | `ageStep`, the act table's decisions, `standsIn`, `AGE_MS`, `pace`, `SPEEDS`, the door, the chronicle text. |
 | What does not move | The six-seed soak golden, `tests/ages.js`, and the `standsIn` rows in `tests/ui.js`. The fingerprint hashes text, kind, and age, so added fields cannot reach it. |
 | Where a duration lives | In the view. `AGE_MS` stays in `src/ui/state.js` and the tween tiers join it there. No duration and no rate enters `src/sim/`, so `tests/clock.js` has nothing new to lint. |
-| Determinism | An act records its own gesture. The recorder draws no random number. The view only reads. A watched creation still equals an unwatched one. |
+| Determinism | An act records its own gesture. The recorder draws no random number and reorders no state. The view only reads. A watched creation still equals an unwatched one. |
+| Reviewed | The `hamlet-mythos` session read this against `dev`. Its required change is in sections 0, 3, 8, and 9: `boundary.tiles` is state, so the recorder sorts a copy of it. |
 | Deferred | A wash that spreads from the anchor, a Legends row that lights its own country, animating settle, animating the day era, gestures kept as history. |
 
 ## 0. What is true today
@@ -28,8 +29,9 @@ Read this. Do not re-derive it.
 | The frame loop already holds the fraction between two ages in `acc`, from `agesDue(acc, dt, pace)`. | `src/ui/main.js`, `src/ui/derive.js` |
 | The field cache is keyed on `[seedText, age, creation.discards, liveRegions().length]`. | `drawField()`, `src/ui/map.js` |
 | A god draws at the centre of the bounding box of the region `standsIn(g)` returns. | `drawField()`, `src/ui/map.js` |
-| A mark carries an anchor tile in `at`. Every act writes at least one mark. | `mark()`, `src/sim/marks.js` |
+| A mark carries an anchor tile in `at`. `mark()` gives `at` as `null` when the target holds no tiles. | `mark()`, `src/sim/marks.js` |
 | `splitRegion()` returns `cut.boundary.tiles`: the real line of the cut. | `src/sim/field.js` |
+| **The order of `boundary.tiles` is state.** `paintRivers` places a ford by the index along the list, and then draws `rng()` for each ring tile in the list's order. Reorder the list and the fords move and the people's stream moves with them. | `paintRivers()`, `src/sim/world.js` |
 | A raise and a dig hold `left` and `done` in ages, not in ticks. | `spendAges()`, `src/sim/gods.js` |
 | `g.lastChoice` holds the options weighed, their scores, and the one picked. | `decideGod()`, `src/sim/gods.js` |
 | The soak fingerprint hashes a legend as `age|kind|text`. | `fingerprint()`, `tests/lib/run.js` |
@@ -45,6 +47,7 @@ A god has no tile, by design. The view still needs a point. Today that point is 
 |---|---|
 | A god comes into being | `heartTile(r)` of the region it holds. |
 | A god acts | The anchor tile of the mark the act wrote. A split takes the middle tile of the cut's own line. |
+| An act wrote no mark, or the mark's `at` is `null` | `heartTile` of the act's own region. `mark()` gives `null` for a target with no tiles, so the fallback is written and tested, not assumed. |
 | A god's region is split under it | The god keeps its tile while the tile lies in the live region `settleHome` gives. Otherwise `heartTile` of that region. |
 | A god sleeps | The anchor of its rest mark. |
 | A god is unmade | The anchor it last held. |
@@ -53,7 +56,9 @@ A god has no tile, by design. The view still needs a point. Today that point is 
 
 **Why this anchor is stable.** It is a property of the god, not of a region. A split changes a region's bounding box and its centroid, and neither is read. The anchor moves on two events only: the god acts somewhere, or a split cuts the god's own tile away from it. Both are real movement, and both are what this design wants to show.
 
-**A mark's anchor costs no draw.** `mark()` already picks a tile when the caller gives none, and that pick already consumes `rint`. The recorder reads the mark that the act wrote. It never calls `mark()` again and never picks a tile of its own.
+**A mark's anchor costs no draw.** `mark()` already picks a tile when the caller gives none, and that pick already consumes `rint` on the gods' stream, inside `withGodRng`. The recorder reads the mark that the act wrote. It never calls `mark()` again and never picks a tile of its own. The fallback is `heartTile`, which is a scan.
+
+**The fallback is measured, not assumed.** "Every act writes a usable mark" is a claim about thirteen acts and three events, and the anchor rule rests on it. Section 9 counts the gestures that take the fallback over the twenty-four seeds of `tests/ages.js`. A count of zero proves the claim. Any other count is the list of exceptions, and the list goes in the notes.
 
 **Two gods in one country.** Their anchors are usually different tiles. The view nudges two stars apart only when their pixels are within the glyph's own width. The present fixed offset of 46 pixels goes.
 
@@ -74,9 +79,11 @@ The head of every record:
 | `age` | The age it happened in. |
 | `from`, `to` | The god's anchor tile before the act and after it. Either may be `null`. |
 | `said` | The index in `legends` of the line the act wrote, or `null`. |
-| `weighed` | The three best options as `{ type, region, score }`, and `picked`, copied from `g.lastChoice` at the moment of the act. |
+| `weighed` | The three best options as `{ type, region, score }`, and `picked`, copied from `g.lastChoice` at the moment of the act. `null` when the act was not decided this age. |
 
 `weighed` is copied, not read live, because `decideGod` returns early for a god with a running task and leaves `lastChoice` standing from an earlier age. A cue that read the god would show a stale intent.
+
+**Only an `apply` copies `lastChoice`.** A `raise` or a `dig` that goes on through `continue` was decided in an earlier age. No decision of this age stands behind it. Its gesture carries `weighed: null`, and the view shows no intent cue for it. The work itself still draws, and the caption still names its line.
 
 **The recorder.** One function in `gods.js`, `gesture(g, kind, fields)`. Each act calls it once, at the end of a successful `apply` or `continue`. An act that returns `false` records nothing. `ageStep` empties the list at the head of the age, inside `withGodRng`.
 
@@ -86,7 +93,7 @@ The `drawn as` column is the view's contract. It is what section 4 tweens.
 
 | Act | `kind` | Fields beyond the head | Drawn as |
 |---|---|---|---|
-| `split` | `split` | `near`, `far` (region ids), `line` (the cut's tiles, ordered across the cut), `pole`, `other` | The god walks to the middle of the cut. The line strokes from one end to the other. The two colours fade in behind it. |
+| `split` | `split` | `near`, `far` (region ids), `line` (a sorted copy of the cut's tiles), `pole`, `other` | The god walks to the middle of the cut. The line strokes from one end to the other. The two colours fade in behind it. |
 | `claim` | `claim` | `region`, `pole` | The god walks to the country's anchor. The country's colour fades in. |
 | `make` | `make` | `region`, `species` | The species glyph rises at the anchor and settles. |
 | `raise` | `raise` | `region`, `step`, `of`, `value` | A ring swells outward at the anchor, one ring for this age's storey. `step` of `of` says how much of the work is done. |
@@ -103,10 +110,18 @@ The `drawn as` column is the view's contract. It is what section 4 tweens.
 | `sleep` | `sleep` | `region`, `body` | The star sinks to the anchor and dims to the sleeping alpha. |
 | A god comes into being | `born` | `region`, `pole` | The star fades in at the anchor. |
 | A god is unmade | `unmade` | `region` | The star fades out at its anchor. |
-| The backstop acts | `backstop` | `region`, `lack` | The world's own hand: the wash, with no god and no star. |
+| The backstop acts | `backstop` | `region`, `lack` | The wearied god walks and marks, as in any act. |
 | A strain makes a god | covered by `born` | | |
 
-The backstop and a strain have no acting god. `god` is `null`, and nothing walks.
+**Every gesture has an acting god.** `born` holds the new god's id, with `from: null`: the star fades in where it is made and nothing walks. `backstop` holds the id of the wearied god, which `backstop()` takes as `awakeGods()[0]`; that god acts, marks, and moves like any other. `unmade` holds the id of the god that is unmade. No gesture carries `god: null`.
+
+**The recorder sorts the split's line. `splitRegion` does not.**
+
+Caution: `boundary.tiles` is state, not a drawing order. `paintRivers` places a ford by the index along that list, and then draws `rng()` for each tile of the ring beside it, in the list's order. A reorder moves every ford and shifts the people's stream, which moves the six-seed golden and the settle tests. So `splitRegion` keeps the list exactly as it builds it, row-major, and `field.js` gains `heartTile` and nothing else.
+
+The recorder makes `line` as a **sorted copy**. It takes the spread of the tiles in x and in y, sorts along the wider one, and breaks a tie on the other coordinate and then on the tile index. That is a scan and a sort of a copy. It draws nothing, and the sim state it reads is unchanged.
+
+**A strain that presses a god records nothing.** When the pole already has a god, `strain` lowers that god's expression and writes no mark and no line. Nothing happened on the field, so nothing is drawn.
 
 ## 4. The tween
 
@@ -122,7 +137,9 @@ A cross-fade of two identical images gives the same image, so only the countries
 
 **The new boundary is held out of the cache.** `drawFieldCache` takes a set of boundary ids to skip. A split's own boundary is skipped while its gesture runs, and the gesture layer strokes it instead. At the end of the tween the cache holds it and the gesture layer is empty.
 
-**The stagger.** Several gods act in one age. The view gives gesture `i` of `n` a start offset of `i * S / n` of the tween, where `S` is at most a third. The gestures overlap and the last one still finishes by the end. This is a view choice for legibility. It claims no order in the rules, and the chronicle already lists the same acts in the same order.
+**The stagger.** Several gods act in one age. The view gives gesture `i` of `n` a start offset of `i * S / n` of the tween, where `S` is at most a third. The gestures overlap and the last one still finishes by the end.
+
+The order is the order `ageStep` ran them: eldest god first, which is the order of the list and the order of the chronicle. The rules call an age one instant, but they execute the acts in that order, and a god that acts later sees what the earlier one did. The stagger therefore shows a true order, and the drawer beside the map lists the same acts in the same order.
 
 **The pure parts are testable.** `derive.js` gains `tweenTier(ms)`, `gestureSlice(i, n, f)`, `pointAt(from, to, f)`, and `lineSoFar(line, f)`. They touch no DOM, and `tests/ui.js` runs them in Node. `map.js` holds the drawing alone.
 
@@ -182,8 +199,8 @@ The cue shows a decision that has already been taken. It is a replay, not a pred
 
 | File | Change |
 |---|---|
-| `src/sim/field.js` | `heartTile(r)`. |
-| `src/sim/gods.js` | `g.at` on a god, `gesture(g, kind, fields)`, one call per act, the anchor update in `settleHome`, the list emptied at the head of `ageStep`. |
+| `src/sim/field.js` | `heartTile(r)`, and nothing else. `splitRegion` and `boundary.tiles` are left exactly as they are. |
+| `src/sim/gods.js` | `g.at` on a god, `gesture(g, kind, fields)`, one call per act, the sorted copy of a split's line, the anchor update in `settleHome`, the list emptied at the head of `ageStep`. |
 | `src/sim/gods.js`, `beginCreation` | `creation` gains `gestures: []` and `gestureAge: -1`. |
 | `src/ui/state.js` | `TWEEN`, the second offscreen canvas. |
 | `src/ui/derive.js` | `tweenTier`, `gestureSlice`, `pointAt`, `lineSoFar`. |
@@ -200,6 +217,8 @@ The cue shows a decision that has already been taken. It is a replay, not a pred
 | One gesture an act | Over a whole creation, the count of gestures in an age equals the count of gods that acted in it. |
 | No draw is spent | Two runs of the same seed, one with the recorder and one without, give the same fingerprint. Proven once, in the plan, then dropped. |
 | The anchor is stable | Step a creation. For each age, a god's anchor changes only when it acted, or when its tile left its live region. |
+| The fallback is counted | Over the twenty-four seeds of `tests/ages.js`, count the gestures whose anchor came from `heartTile` because the act wrote no mark, or the mark's `at` was `null`. Zero proves that every act writes a usable mark. Any other count is the list of exceptions, and the report prints it by act. |
+| The boundary is untouched | After a creation, every `boundary.tiles` is in ascending tile order, as `splitRegion` built it. A split gesture's `line` holds the same tiles and a different order. |
 | The tier table | `tweenTier(AGE_MS / p)` for every `p` in `SPEEDS` gives the four tiers in order. |
 | The tween is pure | `pointAt` and `lineSoFar` at `f = 0` and `f = 1` give the ends. `gestureSlice` gives every gesture a slice inside `[0, 1]`. |
 | The golden | `npm run fast` and the six-seed soak, unblessed. |
@@ -213,6 +232,8 @@ The cue shows a decision that has already been taken. It is a replay, not a pred
 
 Each plan leaves `dev` working and playable. Plan 1 alone changes nothing the player sees, so it does not stand alone as a release; the two land together.
 
+**Coordination.** Tell the `feedback-pass` session before plan 2 touches `state.js`, `derive.js`, or `map.js`. It works in `src/ui/`, and on a naming plan in `src/sim/`. The `hamlet-mythos` session owns `gods.js`, `field.js`, and the ages view, and it reviewed this design. Nothing in plans G1 to G6 touches `gods.js`, `field.js`, or `drawField`, so branch `tiers` does not conflict.
+
 ## 11. Out of scope
 
 | Left out | Why |
@@ -225,30 +246,32 @@ Each plan leaves `dev` working and playable. Plan 1 alone changes nothing the pl
 | Sound, a replay scrubber, a god's portrait | None is needed to read the process. |
 | A god's act through the door | The door does not take a god act, and pace and hurry still do not pass it. |
 
-## 12. Open questions
+## 12. Settled in review
 
-Each has a recommendation. None is settled.
+The `hamlet-mythos` session reviewed this design against `dev`. It owns `gods.js`, `field.js`, and the ages view. Three questions closed.
+
+| Question | Settled |
+|---|---|
+| The split's line | `boundary.tiles` is state, not a drawing order, and it is left alone. The recorder sorts a copy. Section 3 holds the decision. |
+| The stagger | Keep it. The order is the order `ageStep` runs the gods, eldest first, which is the chronicle's order, so the stagger shows a true order of execution. Section 4 holds it. |
+| The count of gestures in an age | Set no cap now. `REGIONS_PER_GOD` bounds the gods by the size of the field. Count the gestures per age in `tests/ages.js` first, and design a cap only against a real number. |
+
+## 13. Open questions
+
+Each has a recommendation. None is settled. The reviewer had no objection to any recommendation here.
 
 **1. Cross-fade, or a wash that spreads from the anchor?**
 A cross-fade is cheap and exactly correct, but a country's colour arrives everywhere at once. A wash that spreads outward from the anchor reads more like a god's hand on the ground. It costs a distance order over the region's tiles for each act that paints one.
 *Recommendation:* build the cross-fade first. Measure a wash for `claim` and `burn` alone, on the largest region a default world makes, before it lands.
 
-**2. Does the stagger mislead?**
-Every awake god acts in the same instant by the rules. A stagger of up to a third of the tween suggests an order that the rules do not claim.
-*Recommendation:* keep the stagger, keep it small, and judge it by eye in the page check. Drop it if two gestures read as cause and effect.
-
-**3. Does the split's line stroke in a direction that reads?**
-The boundary's tiles come out of `splitRegion` in row-major order, and a restless god's cut winds. A child may lie in two pieces, which the field spec already accepts.
-*Recommendation:* order the line in the sim, across the cut, and stroke it in that order. If a two-piece child reads as a stutter, fall back to a fade for that one gesture.
-
-**4. Is the field allowed to read ahead of the picture?**
+**2. Is the field allowed to read ahead of the picture?**
 The state is the new state when the tween begins, so a hover card during a fade names a country that the eye has not seen change yet.
 *Recommendation:* accept it. Holding the card back an age would make the card disagree with the drawer beside it, which is worse. Revisit after a play test.
 
-**5. Does the flow path cross a country it never entered?**
+**3. Does the flow path cross a country it never entered?**
 `flow` marks a chain of neighbours. A line drawn anchor to anchor may cut a corner of a third country.
 *Recommendation:* accept it for now, and check it against the twenty-four seeds `tests/ages.js` runs. If it reads as a lie, draw the flow as a pulse on each country in turn instead of a line.
 
-**6. How many gestures can one age hold?**
-The gods multiply as the field grows. Ten stars, ten walks, and ten figures in two seconds may be as unreadable as the slideshow.
-*Recommendation:* set no cap in this design. Count the gestures per age in `tests/ages.js` across its seeds, and if the count runs high, cap the figures drawn and keep every walk.
+**4. Does a winding cut read as one stroke?**
+A restless god draws a winding line, and a child of a ragged parent may lie in two pieces, which the field spec already accepts. A sort along the cut's long axis gives a stroke order; it does not promise the stroke looks continuous.
+*Recommendation:* stroke it and look. If a two-piece child reads as a stutter, fade that one gesture in place of stroking it.
