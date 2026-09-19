@@ -695,7 +695,9 @@ function domStub(){
     classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
     setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
     appendChild(){}, insertBefore(){}, removeChild(){}, remove(){},
-    showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
+    /* `blurred` counts the blur calls, so a test can see the search box let the keyboard go. */
+    blurred: 0,
+    showModal(){}, close(){}, focus(){}, blur(){ el.blurred++; }, select(){}, scrollIntoView(){}, setPointerCapture(){},
     getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
   };
   el.querySelector = () => el; el.querySelectorAll = () => []; el.closest = () => el;
@@ -1128,6 +1130,141 @@ test('a sector name with markup in it is escaped once it becomes markup: the pal
   } finally {
     for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
   }
+});
+
+/* ---- task 11: the valley on the map, the lost people in help, and the chronicle search ---- */
+
+test('the help page lists the old names anybody has learned, with their meanings', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'learnedNames', 'chronicleMatches']); api.startWorld('r'); api.camp = api.camps[0];
+  assert.deepEqual(api.learnedNames(), [], 'nothing is learned at the start');
+  const h = api.hills.find(x => x.names && x.names.length);
+  assert.ok(h, 'seed r leaves an old name on a hill');
+  h.nameKnown = true;
+  const rows = api.learnedNames();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].text, api.nameOf(h));
+  assert.equal(rows[0].meaning, h.names[0].meaning);
+  assert.equal(rows[0].what, 'hill');
+});
+
+test('the chronicle search matches a line by its text, and an old line by the name it used', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'learnedNames', 'chronicleMatches', 'ui', 'drawerRows']); api.startWorld('r'); api.camp = api.camps[0];
+  const c = api.camps[0], was = c.name;
+  /* The founder's camp keeps a record of the name it started with. Without one there is no history to search. */
+  api.rename(c, api.nameRecord(was, { why: 'the first camp', by: null }));
+  api.log(`${was} lays a fire.`, [], 'info');
+  api.rename(c, api.nameRecord('Reedwater', { why: 'for the reeds', by: null }));
+  api.log('Reedwater keeps its fire.', [], 'info');
+  const lines = api.chronicle;
+  assert.equal(api.chronicleMatches(lines[0], 'reedwater'), true);
+  assert.equal(api.chronicleMatches(lines[1], 'reedwater'), true, 'the old line answers to the new name');
+  assert.equal(api.chronicleMatches(lines[1], was.toLowerCase()), true);
+  assert.equal(api.chronicleMatches(lines[0], 'zzzz'), false);
+  assert.equal(api.chronicleMatches(lines[0], ''), true);
+  api.ui.chronSearch = 'reedwater';
+  assert.equal(api.drawerRows('chronicle').length, 2);
+  api.ui.chronSearch = 'zzzz';
+  assert.equal(api.drawerRows('chronicle').length, 0);
+  api.ui.chronSearch = '';
+});
+
+/* An old name is a secret until somebody reads the marks. The search must not give it away either. */
+test('the chronicle search does not answer to an old name nobody has read', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'chronicleMatches', 'learnedNames', 'ui', 'drawerRows']); api.startWorld('r'); api.camp = api.camps[0];
+  const h = api.hills.find(x => x.names && x.names.length);
+  const old = h.names[0].text;
+  h.names.unshift(api.nameRecord('Crowtop', { why: 'for the birds', by: null }));
+  h.nameKnown = false;
+  api.log('Crowtop stands bare.', [], 'info');
+  const line = api.chronicle[0];
+  assert.equal(api.chronicleMatches(line, 'crowtop'), true, 'the name the people use still finds the line');
+  assert.equal(api.chronicleMatches(line, old.toLowerCase()), false, 'the unread old name finds nothing');
+  h.nameKnown = true;
+  assert.equal(api.chronicleMatches(line, old.toLowerCase()), true, 'once the marks are read, the old name finds it');
+});
+
+test('the slash key opens the chronicle search, from the map and from a drawer', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(keyHit(api, ev('/'), 'map'), { action: 'searchChronicle', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('/'), 'drawer:people'), { action: 'searchChronicle', arg: undefined });
+  assert.equal(typeof api.ACTIONS.searchChronicle, 'function');
+  assert.equal(typeof api.ACTIONS.closeSearch, 'function');
+});
+
+const UI_ALL = ['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions'];
+function withDom(run){
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'performance', 'innerWidth', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc; globalThis.localStorage = storage; globalThis.performance = { now: () => 0 };
+    globalThis.innerWidth = 1200;
+    globalThis.window = { innerWidth: 1200, innerHeight: 900, devicePixelRatio: 1, addEventListener(){}, matchMedia: () => ({ addEventListener(){} }) };
+    return run(el);
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
+}
+
+test('the search action opens the Chronicle drawer, and Escape clears the query before it leaves the box', () => {
+  withDom(el => {
+    const api = loadUI(UI_ALL, [...KEYS, 'ui']);
+    api.startWorld('r'); api.camp = api.camps[0];
+    api.ACTIONS.searchChronicle();
+    assert.ok(api.ui.open.includes('chronicle'), 'the drawer is open');
+    assert.equal(api.ui.focus, 'drawer:chronicle');
+    api.ui.chronSearch = 'reed';
+    el.blurred = 0;
+    api.ACTIONS.closeSearch();
+    assert.equal(api.ui.chronSearch, '', 'the first Escape clears the query');
+    assert.equal(el.blurred, 0, 'the caret stays in the box while there is text to clear');
+    api.ACTIONS.closeSearch();
+    assert.ok(el.blurred > 0, 'the second Escape gives the keyboard back to the drawer');
+    assert.equal(api.ui.focus, 'drawer:chronicle');
+  });
+});
+
+/* The help page prints sim text: the lore and the old names. Both are escaped where they become markup. */
+test('the help page tells of the lost people, lists the names that were read, and escapes them', () => {
+  withDom(el => {
+    const api = loadUI(UI_ALL, [...NAMES, 'learnedNames', 'openHelp', 'giveName', 'ui'], { __lore: '() => lore' });
+    api.startWorld('r'); api.camp = api.camps[0];
+    const lore = api.__lore();
+    const h = api.hills.find(x => x.names && x.names.length);
+    h.names[0] = api.nameRecord('<b>Stonemark</b>', { tongue: 'old', meaning: 'the <i>high</i> stone', by: 'lost' });
+    h.nameKnown = false;
+    api.openHelp();
+    assert.ok(el.innerHTML.includes(lore.people), 'the lost people are named');
+    assert.ok(el.innerHTML.includes(lore.sky.meaning), 'the sky word says what it means');
+    assert.ok(!el.innerHTML.includes('Stonemark'), 'a name nobody has read stays off the page');
+    h.nameKnown = true;
+    api.openHelp();
+    assert.ok(el.innerHTML.includes('&lt;b&gt;Stonemark&lt;/b&gt;'), 'the name is escaped where it becomes markup');
+    assert.ok(el.innerHTML.includes('&lt;i&gt;high&lt;/i&gt;'), 'the meaning is escaped too');
+    assert.ok(!el.innerHTML.includes('<b>Stonemark</b>'), 'the tag itself never lands unescaped');
+    assert.ok(!/mythos/i.test(el.innerHTML), 'the word mythos is never on screen');
+    /* The valley's line reads its name from the same place the map's title does, so the two never disagree. */
+    api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: null }));
+    api.openHelp();
+    assert.ok(el.innerHTML.includes('This valley: Sadrumo.'), el.innerHTML.slice(0, 200));
+    const panels = fs.readFileSync('src/ui/panels.js', 'utf8');
+    assert.ok(/nameOf\(valley\) \|\| 'World map'/.test(panels), 'the world map wears the valley’s name');
+  });
+});
+
+test('the view key reads the chronicle search in both eras, and the search stays out of storage', () => {
+  const api = loadUI(['state', 'derive'], ['ui', 'viewKey', 'inAges']);
+  api.startCreation('r', {}); api.camp = api.camps[0];
+  const agesWas = api.viewKey(); api.ui.chronSearch = 'reed';
+  assert.notEqual(api.viewKey(), agesWas, 'the ages branch reads it');
+  api.ui.chronSearch = '';
+  api.startWorld('r'); api.camp = api.camps[0];
+  const daysWas = api.viewKey(); api.ui.chronSearch = 'reed';
+  assert.notEqual(api.viewKey(), daysWas, 'the days branch reads it');
+  api.ui.chronSearch = '';
+  const state = fs.readFileSync('src/ui/state.js', 'utf8');
+  const saved = state.slice(state.indexOf('function persist'));
+  assert.ok(!/chronSearch: ui\.chronSearch/.test(saved), 'the search is not written to storage');
+  assert.ok(!/s\.chronSearch/.test(saved), 'the search is not read back from storage');
 });
 
 module.exports = { loadUI };

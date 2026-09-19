@@ -44,6 +44,9 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
+     a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
+  chronSearch: '',
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */

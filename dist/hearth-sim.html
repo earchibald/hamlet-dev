@@ -122,6 +122,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
+.filter input{flex:1;min-width:0;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:12px}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
 /* Floating windows. */
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
@@ -221,6 +222,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <table class="keys" id="helpKeys"></table>
   <h2>Muted</h2>
   <div id="helpMuted"></div>
+  <h2>The lost people</h2>
+  <div id="helpLore"></div>
   <h2>The map</h2>
   <div class="legend" id="legend">
     <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>
@@ -5666,6 +5669,9 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
+     a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
+  chronSearch: '',
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
@@ -6001,17 +6007,17 @@ function drawerRows(id){
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
-  if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  if (id === 'chronicle') return chronicle.filter(e => (ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death') && chronicleMatches(e, ui.chronSearch)).map(e => ({ kind: 'line', id: e.tick + e.text, e }));
   if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -6106,6 +6112,35 @@ function paletteMatch(query, rows){
   return hit.sort((a, b) => score(a) - score(b));
 }
 
+/* ---- the lost people, and the chronicle search ---- */
+/* Where an old name can sit, and the word the help page calls that thing. A burrow carries no old
+   name, so it never reaches this list. The valley, the camps, and the sectors are named by the
+   living, not by the lost, so they stay out too. */
+const LEARNED_KINDS = [['hill', () => hills], ['cave', () => caves], ['grove', () => groves], ['crossing', () => fords], ['river', () => [river]], ['lake', () => [stillWater]]];
+/* Every old name somebody has read, for the help page. A name nobody has found is not shown.
+   This reads the records and changes none of them. The text comes back raw; the page escapes it. */
+function learnedNames(){
+  const out = [];
+  for (const [what, list] of LEARNED_KINDS) for (const t of (list() || [])) if (t && t.nameKnown && t.names && t.names.length) out.push({ text: t.names[0].text, meaning: t.names[0].meaning, what });
+  return out;
+}
+/* The chronicle search. A query that matches a thing's name, now or before, matches every line
+   that used either, so an old line still answers to the new name. A thing whose name nobody has
+   read is skipped: the search must not give away what the marks have not told. */
+function chronicleMatches(e, q){
+  if (!q) return true;
+  const needle = String(q).trim().toLowerCase();
+  if (!needle) return true;
+  if (e.text.toLowerCase().includes(needle)) return true;
+  for (const t of nameThings()){
+    if (t.nameKnown === false) continue;
+    const list = (t.names || []).map(r => r.text);
+    if (!list.some(x => x.toLowerCase().includes(needle))) continue;
+    if (list.some(x => e.text.includes(x))) return true;
+  }
+  return false;
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -6177,6 +6212,9 @@ const KEYMAP = [
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
+     clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
+  { key: '/',          focus: 'any',    action: 'searchChronicle', label: 'Search the chronicle by name' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
@@ -6872,7 +6910,8 @@ function renderUI(force){
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  /* The world map wears the valley's name from the day a village gives it one. Until then it is the world map. */
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${nameOf(valley) || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = view !== 'loc';
@@ -6892,7 +6931,7 @@ const rowClass = (id, i) => focusedDrawer() === id && ui.row[id] === i ? 'sel' :
 const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
-  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button></div>`
+  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names  /"></div>`
     : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
   return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
@@ -6908,6 +6947,9 @@ function renderDrawers(){
     if (host.children[n] !== sec) host.insertBefore(sec, host.children[n] || null);
     sec.classList.toggle('focus', ui.focus === 'drawer:' + id);
     for (const b of sec.querySelectorAll('[data-filter]')) b.classList.toggle('on', ui.chronFilter === b.dataset.filter);
+    /* The box follows the state, but never while the player is typing in it: that would move the caret. */
+    const box = sec.querySelector('#chronSearch');
+    if (box && box.value !== ui.chronSearch && document.activeElement !== box) box.value = ui.chronSearch;
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
   });
   for (const id of docked){
@@ -6936,7 +6978,7 @@ function renderGoals(el){
 /* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
 const CHRON_ROWS = 300;
 function renderChronicle(el){
-  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + (focusedDrawer() === 'chronicle' ? ui.row.chronicle : -1);
+  const key = chronicle.length + ':' + (chronicle[0] ? chronicle[0].tick : 0) + ':' + ui.chronFilter + ':' + ui.chronSearch + ':' + (focusedDrawer() === 'chronicle' ? ui.row.chronicle : -1);
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
@@ -7001,6 +7043,17 @@ function openHelp(){
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
+  /* The lost people, and the old names somebody has read. Every string here comes from the sim, so it
+     is escaped once, here, where it becomes markup. The builders that made it keep their text raw. */
+  const learned = learnedNames();
+  $('helpLore').innerHTML = !lore ? '<p class="muted">No world yet.</p>' : `<ul>
+    <li>Before us: ${esc(lore.people)}.</li>
+    <li>What they built: ${esc(lore.built)}.</li>
+    <li>What took them: ${esc(lore.took)}.</li>
+    <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
+    <li>The small lights: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
+    <li>This valley: ${esc(nameOf(valley) || describe(valley, 'valley'))}.</li>
+  </ul><h3>Old names read</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   ui.focus = 'dialog:help'; $('help').showModal();
 }
 
@@ -7201,6 +7254,16 @@ const ACTIONS = {
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
+  /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
+     rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
+  searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  /* Esc in the box clears the query first, so one key both undoes the search and gives the keyboard back. */
+  closeSearch(){
+    const box = $('chronSearch');
+    if (ui.chronSearch){ ui.chronSearch = ''; if (box) box.value = ''; ui.row.chronicle = 0; renderUI(true); return; }
+    if (box) box.blur();
+    ui.focus = 'drawer:chronicle'; renderUI(true);
+  },
   palette(){ openPalette(); },
   paletteMove(d){ paletteMove(d); },
   paletteRun(){ paletteRun(); },
@@ -7258,6 +7321,8 @@ function initUI(){
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch'){ ui.chronSearch = e.target.value; ui.row.chronicle = 0; renderUI(true); } });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
@@ -7294,7 +7359,11 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    /* Typing in a box fires no key row. Esc is the one way out of the chronicle's search box, so it is let through. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput'){
+      if (e.key === 'Escape' && e.target.id === 'chronSearch'){ e.preventDefault(); ACTIONS.closeSearch(); }
+      return;
+    }
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;

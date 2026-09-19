@@ -44,6 +44,8 @@ function initUI(){
     if (make) newWorld($('seed').value.trim() || randomSeed());
   });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch'){ ui.chronSearch = e.target.value; ui.row.chronicle = 0; renderUI(true); } });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
@@ -80,7 +82,11 @@ function initUI(){
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput') return;
+    /* Typing in a box fires no key row. Esc is the one way out of the chronicle's search box, so it is let through. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput'){
+      if (e.key === 'Escape' && e.target.id === 'chronSearch'){ e.preventDefault(); ACTIONS.closeSearch(); }
+      return;
+    }
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;

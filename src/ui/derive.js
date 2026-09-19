@@ -299,17 +299,17 @@ function drawerRows(id){
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
-  if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  if (id === 'chronicle') return chronicle.filter(e => (ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death') && chronicleMatches(e, ui.chronSearch)).map(e => ({ kind: 'line', id: e.tick + e.text, e }));
   if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -402,4 +402,33 @@ function paletteMatch(query, rows){
   const hit = rows.filter(r => { const l = r.label.toLowerCase(); return words.every(w => l.includes(w)); });
   const score = r => (r.label.toLowerCase().startsWith(words[0]) ? 0 : 1) * 1000 + r.label.length;
   return hit.sort((a, b) => score(a) - score(b));
+}
+
+/* ---- the lost people, and the chronicle search ---- */
+/* Where an old name can sit, and the word the help page calls that thing. A burrow carries no old
+   name, so it never reaches this list. The valley, the camps, and the sectors are named by the
+   living, not by the lost, so they stay out too. */
+const LEARNED_KINDS = [['hill', () => hills], ['cave', () => caves], ['grove', () => groves], ['crossing', () => fords], ['river', () => [river]], ['lake', () => [stillWater]]];
+/* Every old name somebody has read, for the help page. A name nobody has found is not shown.
+   This reads the records and changes none of them. The text comes back raw; the page escapes it. */
+function learnedNames(){
+  const out = [];
+  for (const [what, list] of LEARNED_KINDS) for (const t of (list() || [])) if (t && t.nameKnown && t.names && t.names.length) out.push({ text: t.names[0].text, meaning: t.names[0].meaning, what });
+  return out;
+}
+/* The chronicle search. A query that matches a thing's name, now or before, matches every line
+   that used either, so an old line still answers to the new name. A thing whose name nobody has
+   read is skipped: the search must not give away what the marks have not told. */
+function chronicleMatches(e, q){
+  if (!q) return true;
+  const needle = String(q).trim().toLowerCase();
+  if (!needle) return true;
+  if (e.text.toLowerCase().includes(needle)) return true;
+  for (const t of nameThings()){
+    if (t.nameKnown === false) continue;
+    const list = (t.names || []).map(r => r.text);
+    if (!list.some(x => x.toLowerCase().includes(needle))) continue;
+    if (list.some(x => e.text.includes(x))) return true;
+  }
+  return false;
 }

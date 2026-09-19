@@ -171,6 +171,16 @@ const ACTIONS = {
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
+  /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
+     rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
+  searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  /* Esc in the box clears the query first, so one key both undoes the search and gives the keyboard back. */
+  closeSearch(){
+    const box = $('chronSearch');
+    if (ui.chronSearch){ ui.chronSearch = ''; if (box) box.value = ''; ui.row.chronicle = 0; renderUI(true); return; }
+    if (box) box.blur();
+    ui.focus = 'drawer:chronicle'; renderUI(true);
+  },
   palette(){ openPalette(); },
   paletteMove(d){ paletteMove(d); },
   paletteRun(){ paletteRun(); },

@@ -69,6 +69,9 @@ const KEYMAP = [
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
   { key: 'n',          ctrl: true, focus: 'any', action: 'newWorld',  label: 'New world' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
+     clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
+  { key: '/',          focus: 'any',    action: 'searchChronicle', label: 'Search the chronicle by name' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },

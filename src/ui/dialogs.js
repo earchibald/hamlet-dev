@@ -14,6 +14,17 @@ function openHelp(){
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
+  /* The lost people, and the old names somebody has read. Every string here comes from the sim, so it
+     is escaped once, here, where it becomes markup. The builders that made it keep their text raw. */
+  const learned = learnedNames();
+  $('helpLore').innerHTML = !lore ? '<p class="muted">No world yet.</p>' : `<ul>
+    <li>Before us: ${esc(lore.people)}.</li>
+    <li>What they built: ${esc(lore.built)}.</li>
+    <li>What took them: ${esc(lore.took)}.</li>
+    <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
+    <li>The small lights: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
+    <li>This valley: ${esc(nameOf(valley) || describe(valley, 'valley'))}.</li>
+  </ul><h3>Old names read</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   ui.focus = 'dialog:help'; $('help').showModal();
 }
 
