@@ -146,7 +146,7 @@ function updateCamps(){
     const pt = pitTile();
     if (pt && pt.struct.lit){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= PIT_BURN * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
       if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;

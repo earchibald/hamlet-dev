@@ -224,7 +224,7 @@ const GOALS = [
       const open = near.filter(c => !c.searched && !c.blocked), blocked = near.filter(c => c.blocked), done = near.filter(c => c.searched);
       if (!open.length && !blocked.length) return { s: 'done', text: `${done.length} cave${done.length > 1 ? 's' : ''} searched. Nothing left in the dark but the dark.` };
       const ready = camp.tools.spear && pitLit();
-      return { s: ready ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
+      return { s: ready ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${CLOCK.limit.ember} ticks. Fallen rock takes the axe.` };
     },
     offers(a){
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];

@@ -83,7 +83,7 @@ function markRows(x, y, z){
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
-  return fuel / (PIT_BURN * DAY);
+  return fuel / (CLOCK.rate.pitBurn * DAY);
 }
 function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };

@@ -116,7 +116,7 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },

@@ -265,10 +265,11 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
    The core is split into files under src/sim/. They are plain
    scripts that share one scope, joined in the order listed in
    src/sim/index.js. This file holds the constants, the data
-   tables, the seeded random numbers, the shared state, time,
-   and the chronicle. Every other file reads these.
+   tables, the seeded random numbers, the shared state and the
+   chronicle. The calendar and every duration are in clock.js.
+   Every other file reads these.
    ============================================================ */
-const LW = 28, LH = 20, DAY = 1000, TPS = 12;
+const LW = 28, LH = 20;
 /* World size in sectors and the level range are start options. startWorld sets them before anything is allocated. */
 let SW = 10, SH = 6, W = SW * LW, H = SH * LH;
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
@@ -347,7 +348,7 @@ const BIOMES = {
   river:   { name: 'Riverside' },
   ash:     { name: 'Burnt ground' },
 };
-const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140, PIT_BURN = 0.25, EMBER_LIFE = 420;
+const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
 
 /* Seeded random numbers. */
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -374,7 +375,6 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
    of the run. godRng is the gods' own stream. */
 let era = 'days', age = 0, pulseAge = null, godRng = null, legends = [], creation = null, field = null, boundaries = [];
 
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 /* The ladder in stages. The panel groups goals by these, in this order. */
 const STAGES = [
   { id: 'fire',       label: 'Fire' },
@@ -385,11 +385,6 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
-const hourOf = () => ((tick % DAY) / DAY) * 24;
-const dayOf = () => Math.floor(tick / DAY) + 1;
-const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
@@ -401,6 +396,45 @@ function log(text, who = [], kind = 'info'){
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
   for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
 }
+
+/* ---------- the clock: the calendar, the units, and every duration and rate ---------- */
+/* A tick is the smallest step of the world. DAY is the number of ticks in a world day. TPS is the
+   number of ticks the page runs in a real second at speed 1. */
+const DAY = 1000, TPS = 12;
+const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+
+/* World units into ticks. */
+const secs = n => n * DAY / 86400;
+const mins = n => n * DAY / 1440;
+const hours = n => n * DAY / 24;
+const days = n => n * DAY;
+const years = n => n * SEASON_DAYS * 4 * DAY;
+/* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike. */
+const perHour = p => p / hours(1);
+/* The chance that a roll made once a tick at `rate` comes up at least once in `n` ticks. */
+const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
+/* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
+   clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
+   stride. The retune replaces every one with a world unit. When none is left, the retune is done. */
+const ticks = n => n, strides = n => n, tickRate = p => p, strideRate = p => p;
+
+/* The calendar. */
+const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
+const isWinter = () => seasonOf() === 'winter';
+const hourOf = () => ((tick % DAY) / DAY) * 24;
+const dayOf = () => Math.floor(tick / DAY) + 1;
+const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
+
+/* Every duration and every rate that is not a row of a species, a life, or a recipe. Rules read
+   this table by name. No rule holds a bare tick count. */
+const CLOCK = {
+  rate: {
+    pitBurn: tickRate(0.25),   // fuel the lit pit burns
+  },
+  limit: {
+    ember: ticks(420),        // how long a carried ember lives
+  },
+};
 
 /* ---------- the field that divides ----------
    Before the world has tiles it has regions. One region holds everything at the start. A god's act
@@ -1460,7 +1494,7 @@ function updateCamps(){
     const pt = pitTile();
     if (pt && pt.struct.lit){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= PIT_BURN * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
       if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, 800); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
@@ -2260,7 +2294,7 @@ function startFetchEmber(a){
     arrive(a, t){
       if (!a.carrying){
         if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
-        a.carrying = { kind: 'ember', count: 1, dies: tick + EMBER_LIFE }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, 500);
+        a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, 500);
         log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
         const [px, py] = camp.pit; const q = legPath(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
       }
@@ -2540,7 +2574,7 @@ function startDriveOff(a, w){
 function withBrand(a, label, then){
   const [px, py] = camp.pit; const p = legPath(a, px, py, 1); if (!p) return false;
   a.task = { type: 'work', label: `Going to the fire for a brand`, path: p, fast: false,
-    arrive(a, t){ if (nearAt(a, px, py) > 1) return 'fail'; if (!pitLit()) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + EMBER_LIFE }; t.label = label; const r = chain(a, t, then(a)); if (r) return r; a.carrying = null; return 'fail'; },
+    arrive(a, t){ if (nearAt(a, px, py) > 1) return 'fail'; if (!pitLit()) return 'fail'; a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; t.label = label; const r = chain(a, t, then(a)); if (r) return r; a.carrying = null; return 'fail'; },
     cleanup(){ if (a.carrying && a.carrying.kind === 'ember') a.carrying = null; } };
   return true;
 }
@@ -2602,7 +2636,7 @@ function startClearDen(a, c){
     const m = c.mouth; const p = legPath(a, m.x, m.y, 0, m.z); if (!p) return false;
     failTask(mate);
     const mp = legPath(mate, m.x, m.y, 1, m.z); if (!mp) return false;
-    mate.carrying = { kind: 'ember', count: 1, dies: tick + EMBER_LIFE };
+    mate.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember };
     mate.task = { type: 'guard', label: 'Following with a brand', path: mp, arrive: () => 'continue', cleanup(){ if (mate.carrying && mate.carrying.kind === 'ember') mate.carrying = null; } };
     a.task = { type: 'guard', label: 'Going to the den with fire and the spear', path: p, fast: true,
       arrive(a, t){
@@ -2889,7 +2923,7 @@ const GOALS = [
       const open = near.filter(c => !c.searched && !c.blocked), blocked = near.filter(c => c.blocked), done = near.filter(c => c.searched);
       if (!open.length && !blocked.length) return { s: 'done', text: `${done.length} cave${done.length > 1 ? 's' : ''} searched. Nothing left in the dark but the dark.` };
       const ready = camp.tools.spear && pitLit();
-      return { s: ready ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${EMBER_LIFE} ticks. Fallen rock takes the axe.` };
+      return { s: ready ? 'active' : 'blocked', text: `${camp.tools.spear && !pitLit() ? 'The fire is out, and a brand needs a lit fire. ' : ''}${near.length} cave${near.length > 1 ? 's' : ''} near: ${open.length} unsearched, ${blocked.length} blocked by fallen rock. A brave person with a brand and the spear goes in; the brand lasts ${CLOCK.limit.ember} ticks. Fallen rock takes the axe.` };
     },
     offers(a){
       if (!camp.site || !camp.tools.spear || !pitLit() || a.traits.bravery < 0.5 || stage(a) === 'young' || a.hp < 60) return [];
@@ -3810,7 +3844,7 @@ function placeBodies(){
 function resetState(seed, opts){
   setOptions(opts); allocSearch();
   seedText = String(seed); rng = mulberry32(hashSeed(seedText));
-  tick = Math.round(DAY * 7 / 24); nextId = 1; fireCount = 0;
+  tick = Math.round(hours(7)); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: 1500 + rint(2000) };
   goalPriority = {};
@@ -4088,7 +4122,7 @@ function markRows(x, y, z){
 function daysOfWood(){
   const p = camp.pit && tileAt(...camp.pit).struct;
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
-  return fuel / (PIT_BURN * DAY);
+  return fuel / (CLOCK.rate.pitBurn * DAY);
 }
 function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };
@@ -5178,7 +5212,7 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(DAY / 24); k++) step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
