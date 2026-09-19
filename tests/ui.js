@@ -888,6 +888,21 @@ test('a chip opens the matrix that produced it, unsorted and unscored by the vie
   assert.equal(api.chipMatrix('9999:1'), null, 'a chip that names nothing opens nothing');
 });
 
+test('an opened chip says who weighed what, and what it took', () => {
+  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation', 'step']);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) api.step();
+  assert.equal(api.footChip(), null, 'nothing is open');
+  const rec = api.creation.choices.find(c => !c.continued && c.picked && c.opts.length > 1);
+  api.ui.timelineChip = `${rec.age}:${rec.god}`;
+  const f = api.footChip();
+  assert.match(f.head, new RegExp(`Age ${rec.age}`));
+  assert.match(f.head, new RegExp(rec.picked));
+  assert.equal(f.rows.length, Math.min(4, rec.opts.length), 'at most four rows');
+  assert.equal(f.rows[0].type, rec.opts[0].type, "in the record's own order");
+  assert.equal(typeof f.rows[0].score, 'number');
+});
+
 test('the zoom sets the span, and the default keeps the near ages large', () => {
   const api = loadUI(['state', 'derive'], TL_API);
   assert.deepEqual(api.timelineSpan(0, 20), { from: 9, to: 20 }, 'the default shows the last twelve');

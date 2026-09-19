@@ -347,6 +347,17 @@ function chipMatrix(key){
     byPlayer: !!rec.byPlayer, continued: !!rec.continued, opts: rec.opts || [] };
 }
 
+/* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop. */
+function footChip(){
+  const m = chipMatrix(ui.timelineChip);
+  if (!m) return null;
+  const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
+  const hand = m.byPlayer ? ', by your hand' : '';
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`,
+    rows: m.opts.slice(0, 4).map(o => ({ type: o.type, score: o.score, failed: !!o.failed })) };
+}
+
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
   if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');

@@ -107,11 +107,18 @@ const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: ren
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
+/* The chip's line for the foot: its head, then its rows as their act and their score, a failed
+   row saying the ground refused it. Every string here came from the simulation, so it passes through esc. */
+function chipFootLine(chip){
+  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : ''}</span>`).join('');
+  return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${cursorPhrase()}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
   ui.note = null;
+  const chip = footChip();
   const e = chronicle[0];
-  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }

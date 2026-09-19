@@ -5970,6 +5970,17 @@ function chipMatrix(key){
     byPlayer: !!rec.byPlayer, continued: !!rec.continued, opts: rec.opts || [] };
 }
 
+/* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop. */
+function footChip(){
+  const m = chipMatrix(ui.timelineChip);
+  if (!m) return null;
+  const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
+  const hand = m.byPlayer ? ', by your hand' : '';
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`,
+    rows: m.opts.slice(0, 4).map(o => ({ type: o.type, score: o.score, failed: !!o.failed })) };
+}
+
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
   if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
@@ -7081,12 +7092,19 @@ const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: ren
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
+/* The chip's line for the foot: its head, then its rows as their act and their score, a failed
+   row saying the ground refused it. Every string here came from the simulation, so it passes through esc. */
+function chipFootLine(chip){
+  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : ''}</span>`).join('');
+  return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${cursorPhrase()}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
   ui.note = null;
+  const chip = footChip();
   const e = chronicle[0];
-  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
