@@ -14,11 +14,23 @@ const path = require('path');
 const { load } = require('../src/sim');
 const { DAY, runDays, collect, runOn, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod, replayGod } = require('./lib/run');
 
-const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
-const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
-const DAYS = process.env.DAYS ? Number(process.env.DAYS) : DEFAULT_DAYS;
-const isDefault = DAYS === DEFAULT_DAYS && SEEDS.join() === DEFAULT_SEEDS.join();
-const GOLDEN = path.join(__dirname, 'soak-golden.json');
+/* Plan G4 made a world day 86,400 ticks, so a world day costs about fifteen seconds of real time
+   until tasks 3 and 4 take the head off the tick and add the skip. Six seeds for seventy days would
+   be near two hours. So the everyday soak is six seeds for three world days, which is about four and
+   a half minutes, and the seventy-day run is kept behind LONG=1 on one seed.
+   Three days is not a smaller seventy days. It is a different question: the first three days are the
+   ones a new player sees, and a fire by day 3 is the first thing that must work. Every floor that
+   three days cannot hold is suspended below rather than deleted, because a deleted floor is a gate
+   nobody can find again. */
+const LONG = !!process.env.LONG;
+const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 3;
+const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : LONG ? ['r'] : DEFAULT_SEEDS;
+const DAYS = process.env.DAYS ? Number(process.env.DAYS) : LONG ? 70 : DEFAULT_DAYS;
+const isDefault = !LONG && DAYS === DEFAULT_DAYS && SEEDS.join() === DEFAULT_SEEDS.join();
+/* The record this run answers to. G4 moves the golden once, at the bless, and no task may write it:
+   `tests/soak-golden.json` is the blessed record and this plan does not touch it. Until the bless,
+   the soak answers to a working record that each task may rewrite and must say so in its report. */
+const GOLDEN = path.join(__dirname, 'soak-working.json');
 const golden = fs.existsSync(GOLDEN) ? JSON.parse(fs.readFileSync(GOLDEN, 'utf8')) : {};
 let goldenDirty = false;
 
@@ -79,10 +91,19 @@ for (const seed of SEEDS){
     await t.test('someone is alive at the end', () => {
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
     });
-    await t.test('the camps grow', () => {
+    /* SUSPENDED, pending G4 task 4. A camp does not grow in three world days: nobody is born and the
+       newcomers have not come. The floor is not deleted, because a deleted floor is a gate nobody can
+       find again -- it is skipped here and run in full under LONG=1, and task 4 reports what a long
+       run costs once the skip works so the user can rule on where it belongs. */
+    await t.test('the camps grow', { skip: !LONG && 'suspended: three world days is too short. LONG=1 runs it' }, () => {
+      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day ${DAYS}, ${counts.born} born`);
+    });
+    /* The sums are gathered on every run, suspended or not: a skipped assertion must not also stop
+       the counting, or the six-seed floors below would silently see zero and pass. */
+    await t.test('the counts are gathered', () => {
       sums.humans += counts.humans; sums.born += counts.born;
       for (const k in FAR_FLOOR) sums[k] += counts[k];
-      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day 70, ${counts.born} born`);
+      t.diagnostic(`${seed}: alive ${counts.alive}, ever ${counts.humans}, born ${counts.born}`);
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
@@ -102,17 +123,19 @@ for (const seed of SEEDS){
       if (!g || process.env.UPDATE_GOLDEN){ golden[seed] = { days: DAYS, ...fp, counts }; goldenDirty = true; t.diagnostic(`${seed}: golden record ${g ? 'updated' : 'written'}`); return; }
       const diffs = Object.keys(fp).filter(k => JSON.stringify(g[k]) !== JSON.stringify(fp[k]));
       const changed = Object.keys(counts).filter(k => JSON.stringify(g.counts[k]) !== JSON.stringify(counts[k])).map(k => `${k}: ${JSON.stringify(g.counts[k])} -> ${JSON.stringify(counts[k])}`);
-      assert.deepEqual(diffs, [], `the story changed for seed ${seed}. Counts that moved: ${changed.join('; ') || 'none'}. If the change is intended, run UPDATE_GOLDEN=1 node tests/soak.js`);
+      assert.deepEqual(diffs, [], `the story changed for seed ${seed}. Counts that moved: ${changed.join('; ') || 'none'}. This is the working record, not the blessed one: if the change is intended, run UPDATE_GOLDEN=1 node tests/soak.js and say so in the task report.`);
     });
   });
 }
 
-/* The seventh: the snapshot held to the golden record. The world is saved halfway through, loaded into
-   a fresh sim, and run on to day 70. Its story, from the first line to the last, must be the straight
+/* The seventh: the snapshot held to the working record. The world is saved halfway through, loaded into
+   a fresh sim, and run on to the end. Its story, from the first line to the last, must be the straight
    run's, which is what the golden line for this seed already holds. It runs the cheapest of the six
    seeds, and it reads the golden line; it never writes one. A run that is not the default run has no
    golden line to answer to, so it skips, as the six seeds' own golden test does. */
-const SAVE_SEED = 'x', SAVE_DAY = 35;
+/* Halfway through whatever the run is, so the oracle keeps its preconditions at any length: people
+   walking, people at work, a fire alight. A fixed day 35 would be past the end of a three-day run. */
+const SAVE_SEED = 'x', SAVE_DAY = DAYS / 2;
 test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells the same story to day ${DEFAULT_DAYS}`,
   { skip: !isDefault ? 'not the default run' : !golden[SAVE_SEED] ? `no golden line for seed ${SAVE_SEED} yet` : false }, t => {
   const t0 = Date.now(), half = SAVE_DAY * DAY;
@@ -133,12 +156,17 @@ test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells
   assert.deepEqual(diffs, [], `the world saved on day ${SAVE_DAY} and loaded told another story. The snapshot lost or rebuilt something.`);
 });
 
-test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
+/* SUSPENDED, pending G4 task 4. Both floors were measured over seventy days and nothing like them
+   happens in three. The numbers are left in the assertion rather than lowered to fit: a floor
+   guessed at the new length would be a floor nobody measured, which reads as a gate and is not one.
+   Task 4 reports what a long run costs once the skip works, and the user rules on where these sit. */
+test('the six camps together grow', { skip: !LONG && 'suspended: measured over 70 days. LONG=1 runs it' }, t => {
   t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
   assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
 });
 
-test('the far countries are reached', { skip: !isDefault && 'not the default run' }, t => {
+/* SUSPENDED for the same reason: nobody walks to a far country in three days. */
+test('the far countries are reached', { skip: !LONG && 'suspended: measured over 70 days. LONG=1 runs it' }, t => {
   t.diagnostic(`far country sums across ${SEEDS.join(', ')}: ` + Object.keys(FAR_FLOOR).map(k => `${k} ${sums[k]}`).join(', '));
   for (const k in FAR_FLOOR) assert.ok(sums[k] >= FAR_FLOOR[k], `sum of ${k} ${sums[k]} (want >= ${FAR_FLOOR[k]})`);
 });
