@@ -49,8 +49,13 @@ player longer to watch eight things at once. The density is the fault, not only 
 One act is one beat. An age of four acts is four beats and then a fifth, its close. An age of one act
 is two beats. An age is as long as it has something to say.
 
-`BEAT_MS` is 1000 and replaces `AGE_MS` as the view's unit. A creation of about eighty acts and about
-twenty age closes is about a hundred beats, so about a hundred seconds at single speed.
+`BEAT_MS` is 1000 and replaces `AGE_MS` as the view's unit.
+
+The length of a creation is measured, not estimated. Over the twenty-four seeds of `tests/ages.js` a
+creation is **43 to 110 acts**, before its age closes are counted. So at single speed a creation runs
+from about a minute to about two, and across the whole ladder a player meets anything from about
+thirty seconds to about eight minutes. That is a wide instrument, and it is the right one: a short
+creation should not be padded and a long one should not be rushed.
 
 The tiers are unchanged and keep reading the length of the unit at run time, now `BEAT_MS / pace`. No
 branch names a pace, as before.
@@ -92,6 +97,12 @@ and an asleep god yields a beat in which nothing happened. A local `acted` in th
 a turn is open and `pending` is set. After the change it means a turn is open *or* one act is done.
 `pending` tells them apart, but only by implication, and `takeTurn` and `ageStep` both rely on the
 old meaning. The invariant goes in the comment above `ageDecide`, in that file's voice.
+
+**The player's own act is a beat like any other.** `takeTurn` resumes the age when the player applies
+an option. It takes the same flag, so the act the player chose plays as its own beat and the rest of
+the age advances act by act under the view. The player-turn path is not a corner in this slice: `Take
+a god` is how the user will test it, so an age that ran to its end the moment the player chose would
+break beat playback in exactly the mode E3 exists to deliver.
 
 **The age's close is one beat and is not subdivided.** `ageEnd` runs `unmake` over the pantheon
 first and `restGate()` second. Draw between the two and the field shows gods already gone against a
@@ -227,10 +238,12 @@ state and never passes the door, so a failure here means something has leaked in
   - **At least one seed runs with a god inhabited.** Act-by-act alone never sets `pending`, so a gate
     without it never interleaves the two reasons an age suspends. That interleaving, through one
     `agePos`, is where `prepared` and `opts` would break.
-  - **Assert the stop count, not only the fingerprint.** Equal fingerprints prove the stream did not
-    move. They do not prove the stops are where the view thinks they are. Count the suspensions and
-    compare against the awake gods advanced. A stop that skips a god, or fires twice on one, passes a
-    fingerprint check and breaks playback.
+  - **Assert where each stop lands, not only the fingerprint.** Equal fingerprints prove the stream
+    did not move. They do not prove the stops are where the view thinks they are. A stop that fires
+    on an asleep god passes every equality check there is — fingerprint, legends, tick — and hands
+    the view an empty beat. So the gate finds the next awake god *before* the call, while its status
+    is still the one the age will read, and requires the stop to land exactly one past it. Both
+    mutations — a return placed before `agePass`, and a stop on an asleep god — fail against this.
 - The ages gate is not the golden gate. If the soak's creation-to-settle path runs through this,
   prove it with a field-by-field diff against the commit this work branches from — not against a
   remembered number, because dev moves underneath. Expecting nothing is not measuring nothing.
