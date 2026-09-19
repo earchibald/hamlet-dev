@@ -7956,12 +7956,15 @@ function tipForCell(c, e){
 const GAUGE_LABEL = { hearth: 'Hearth', food: 'Food', water: 'Water', beds: 'Beds' };
 function gaugeHTML(id, g){
   if (!g) return '';
-  return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${g.text}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${g.text}</span></span>`;
+  return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${esc(g.text)}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${esc(g.text)}</span></span>`;
 }
+/* Text into markup. It covers the attribute case only because every attribute in src/ui/ is built
+   with double quotes, and no single-quoted attribute exists in the tree. The single quote is not
+   replaced here. Write an attribute with single quotes and this goes quiet and stops protecting it. */
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function chipHTML(a){
   const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${short}</span>`;
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${esc(short)}</span>`;
 }
 /* The clock runs on every gate tick, not on the view key, so the time never freezes. */
 function renderClock(){
@@ -7974,7 +7977,7 @@ function renderStrip(){
   /* The village title is not part of the name, so it is added here, not by the sim. */
   $('campName').textContent = inAges() ? 'The ages' : camp.name + (camp.village ? ', a village' : '');
   $('campName').title = inAges() ? '' : nameTitle(campNames().now);
-  $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${c.name}<kbd>F${i + 1}</kbd></button>`).join('') : '';
+  $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '';
   const g = gauges();
   $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
   $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
@@ -7984,7 +7987,7 @@ function renderStrip(){
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
      no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
      can run past that room where the bare biome word never did, so the title keeps the biome word, as
@@ -8102,17 +8105,17 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${r.r.status}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
   const c = $('count-goals'); if (c) c.textContent = '';
   if (inAges()){ el.innerHTML = '<div class="muted">No goals yet. The valley is not made.</div>'; return; }
   el.innerHTML = rows.map((r, i) => {
-    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); const line = foldLine(s, ui.unfold[s.id] || ui.showAll); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span>${line ? `<span class="fold" title="${esc(line)}">${line}</span>` : ''}</div>`; }
+    if (r.kind === 'stage'){ const s = r.s, fold = [s.done ? `${s.done} done` : '', s.idle ? `${s.idle} idle` : ''].filter(Boolean).join(' · '); const line = foldLine(s, ui.unfold[s.id] || ui.showAll); return `<div class="row stage ${rowClass('goals', i)}" data-stage="${s.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span>${s.label}</span><span>${fold}</span>${line ? `<span class="fold" title="${esc(line)}">${esc(line)}</span>` : ''}</div>`; }
     const { g, st, pr } = r.x, kind = g.standing && st.s === 'active' ? '<span class="tag">ongoing</span>' : '';
     const pri = g.locked ? '' : `<span class="pri">${[['0', 'Off'], ['1', 'On'], ['2', 'High']].map(([v, l]) => `<button class="pbtn ${pr === +v ? 'on' : ''}" data-goal="${g.id}" data-pri="${v}">${l}</button>`).join('')}</span>`;
-    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${st.text}</span></div>`;
+    return `<div class="row g-${st.s} ${rowClass('goals', i)}" data-goal-row="${g.id}" data-i="${i}"><span class="n">${rowNum('goals', i)}</span><span class="gt">${g.title}${kind}</span>${pri}<span class="gs">${esc(st.text)}</span></div>`;
   }).join('');
 }
 /* The newest 300 lines. The list rebuilds only when a line arrives, the filter moves, or the cursor moves. */
@@ -8123,7 +8126,7 @@ function renderChronicle(el){
   el.dataset.key = key;
   const rows = drawerRows('chronicle');
   const c = $('count-chronicle'); if (c) c.textContent = ` · ${rows.length}`;
-  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${r.e.kind} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${r.e.when}</span> ${r.e.text}</li>`).join('')}</ol>`;
+  el.innerHTML = `<ol id="chronicle">${rows.slice(0, CHRON_ROWS).map((r, i) => `<li class="k-${esc(r.e.kind)} ${rowClass('chronicle', i)}" data-i="${i}"><span class="when">${esc(r.e.when)}</span> ${esc(r.e.text)}</li>`).join('')}</ol>`;
 }
 function renderCamp(el){
   if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
@@ -8134,7 +8137,7 @@ function renderCamp(el){
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
     ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', c.tools.join(', ') || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
@@ -8149,8 +8152,8 @@ function renderLegends(el){
   const c = $('count-legends'); if (c) c.textContent = ` · ${rows.length}`;
   let when = null;
   el.innerHTML = rows.length ? `<ol id="legends">${rows.map((r, i) => {
-    const head = r.e.when !== when ? `<li class="age">${r.e.when}</li>` : ''; when = r.e.when;
-    return `${head}<li class="k-${r.e.kind} ${rowClass('legends', i)}" data-i="${i}">${r.e.text}</li>`;
+    const head = r.e.when !== when ? `<li class="age">${esc(r.e.when)}</li>` : ''; when = r.e.when;
+    return `${head}<li class="k-${esc(r.e.kind)} ${rowClass('legends', i)}" data-i="${i}">${esc(r.e.text)}</li>`;
   }).join('')}</ol>` : '<div class="muted">Nothing is told yet.</div>';
 }
 /* One table from a drawer id to its renderer. The docked drawers and the drawer windows both read it. */
@@ -8166,12 +8169,12 @@ function chipFootLine(chip){
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
 function renderFoot(){
-  const phrase = `<span class="muted">${cursorPhrase()}</span>`;
-  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
+  const phrase = `<span class="muted">${esc(cursorPhrase())}</span>`;
+  if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${esc(ui.note.text)}</span>`; return; }
   ui.note = null;
   const chip = footChip();
   const e = chronicle[0];
-  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`);
+  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
