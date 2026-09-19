@@ -71,10 +71,11 @@ test('the base kinds of a person are in the table', () => {
 
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
-const OLD = /\barrive\b|\bcleanup\b|\bstart: |\bSTART\b/g;
+/* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
+const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 1, tasks: 40, beings: 5, species: 17, fae: 8, goals: 54, recipes: 4, gods: 4,
+  camps: 1, tasks: 40, beings: 5, species: 17, fae: 8, goals: 54, recipes: 4,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];
