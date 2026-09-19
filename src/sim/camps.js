@@ -115,7 +115,7 @@ function startFoundCamp(leader){
   for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
   for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
-  return startJoin(leader);
+  return startTask(leader, 'join');
 }
 function shelterSite(){
   const [px, py] = camp.pit; let best = null;
@@ -125,18 +125,6 @@ function shelterSite(){
     const sc = -d + (t.ground === 'soil' ? 1 : 0) + rng(); if (!best || sc > best.sc) best = { x, y, sc };
   }
   return best ? [best.x, best.y] : null;
-}
-
-function startJoin(a){
-  const c = a.camp, dest = c.site || c.target; if (!dest) return false;
-  const [cx, cy] = dest, within = c.site ? 3 : 6; const p = legPath(a, cx, cy, within); if (!p) return false;
-  a.task = { type: 'travel', label: c.site ? 'Walking toward the smoke' : 'Walking to the new valley', path: p,
-    arrive(a, t){ if (nearAt(a, cx, cy) > within){ const q = legPath(a, cx, cy, within); if (!q) return 'fail'; t.path = q; return 'continue'; }
-      a.homeless = false;
-      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
-      else log(`${a.name} reaches the new valley.`, [a]);
-      return 'done'; } };
-  return true;
 }
 
 /* The camp's name as the chronicle says it. The first camp has no name of its own yet. */

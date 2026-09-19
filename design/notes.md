@@ -60,7 +60,7 @@ Traits, 0 to 1: bravery, sociability, diligence, temper, curiosity, patience, ha
 
 Skills: gather, build, cook, trap, craft, woodcut, hunt, wary. Animals use hunt and wary. Curiosity speeds learning. Two people sitting by the same fire pass skills when one is two levels ahead. Elders teach twice as fast.
 
-Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way. The search for water stopped after 3000 tiles, and a camp founded 59 steps from the nearest river let two people die of thirst beside a full stash; a failed near search now walks the whole world once and covers the first stretch, as legPath does.
+Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way. The search for water stopped after 3000 tiles, and a camp founded 59 steps from the nearest river let two people die of thirst beside a full stash; a failed near search now walks the whole world once and covers the first stretch, as pathToStop does.
 
 ## 6. Daily rhythms
 
@@ -347,13 +347,77 @@ The rows of `SPECIES`, `LIFE`, and `RECIPES` stay in their own tables. They are 
 
 `tests/clock.js` lints `src/sim/` for a bare time literal in a rule: a tick added to, a tick compared, a period, a thought's duration, a multiple of `DAY`, an age in days, a progress threshold, a wait, work in a build or a recipe, a stride, a decay, a small step added or subtracted, a need gained, a roll, a legacy marker outside `SPECIES`, `RECIPES`, or `gods.js`, or a world unit written inline. `EVENT_CHANCES` lists each chance that is rolled once per event, not on a repeating period, by the file and the exact text of the roll, with the reason: a snare's catch, a spear's hit, sparks that take, the rocks that prove to be firestones, and the rest. A spear's hit on a deer can roll more than once in one hunt, since a missed deer flees and the hunt goes on; it is still a chance for each throw, so it stays in `EVENT_CHANCES`.
 
+A thought's key and the name of its `CLOCK.thought` entry are two things. Where one key has two durations, the entries take two names (`axeMade`, `axeCut`), and the key string at both sites stays `'axe'`, because a new thought replaces an old one by its key.
+
 The lint cannot see everything. A literal passed through a named constant, a whole-number step such as `t.fire -= 2`, a division of `tick` by a literal, and a new data table with its own field names all pass it unread. A reviewer must catch those.
 
 Left for the retune (G4): `tests/lib/run.js` and `tests/door.js` each hard-code `DAY = 1000`; `src/ui/derive.js` holds pulse durations of 1500 ticks and `src/ui/map.js` refreshes its cache every 40 ticks, and the lint does not scan `src/ui/`; `tasks.js` near line 393 advances tree cutting by its own `1 + a.skills.woodcut * 0.3` and not by `workSpeed`, which plan G2 can fold in; `hours`, `mins`, and `secs` return fractions of a tick while `DAY` is 1000, so a caller must round; `CLOCK.thought.over` and `CLOCK.thought.wouldnothold` count ages of a god, not ticks.
 
 The soak's six-seed fingerprint did not move through the whole plan. G1 is a pure refactor: every literal moved to `CLOCK` at its same value, in the same order of rolls.
 
-## 17. Next
+## 17. Tasks as data
+
+A task used to be a closure: an object built by a `startX` function, carrying an `arrive` function that closed over whatever it needed — a being, an item, a tile, a struct. A closure cannot be saved, cannot be read without running it, and cannot be handed to a second executor. Plan G2 made a task a plain record instead: `{ kind, type, args, stop, path, label, progress, started, key, ... }`, holding only numbers, strings, booleans, null, and arrays and plain objects of those.
+
+`kind` is the key into `TASKS`, in `src/sim/tasks.js`, and one kind means one behaviour. `type` is the category the rest of the rules already read off `a.task.type` (`'work'`, `'gather'`, `'flee'`, `'sit'`, `'guard'`, `'hunt'`, `'travel'`, and so on); it kept every value it had before the conversion, because `updateBeing`, `chooseTask`, and the interface compare it. `args` holds what the task is about: ids, an index, coordinates, item kinds, counts. `stop` is which of the kind's stops the task is at; today's `t.arrive = ...` reassignment became `t.stop = 1`, `t.stop = 2`, and so on.
+
+`TASKS[kind]` holds what a kind does:
+
+| Entry | Meaning |
+|---|---|
+| `type` | The record's default `type`. `begin` may return another. |
+| `begin(a, args)` | Everything a `startX` did before it built the task: the checks, the search for the target, the first path, a reservation, a chronicle line. Returns the record's other fields, `false` when the task cannot start, or `true` when it handed over to another kind. |
+| `stops` | An array of functions `(a, t)`, one for each place the task visits. The executor calls `stops[t.stop]` once the path there is walked, on every stride, until it returns `'done'` or `'fail'`; `'continue'` runs it again next stride. |
+| `release(a, t)` | What the task lets go of when it ends, well or not: a claim, a reservation, a brand. This is today's `cleanup`, folded together with the old `fail`, since both amount to letting go of what the task held. |
+| `work`, `effect` | Declared by `workKind` for a job done at one place: `work` is the world time from `CLOCK` and the skill that speeds it, `effect` is what changes when the work ends. Plan G5's day tier can run a job with declared `work` without walking it stride by stride. |
+
+A record holds no reference to a being, an item, a tile, a camp, a cave, or a grove. What a closure once held by reference, `args` holds by id, by index, or by coordinates, found again when the task needs it: a being by `beingById(id)`, an item by `items.find(i => i.id === id)`, a tile by `tileAt(x, y, z)`, a snare or a pit by `tileAt(x, y).struct`, a cave by `caves[i]`, a camp by `camps[i]`. A grove is read again off the being's own `a.grove`; no rule reassigns it. A den works the same way: the gnome kinds (`home`, `carryHome`, `huddle`, `borrow`, `repay`) all read the gnome's own `a.den` fresh each time. `caves` and `camps` are never spliced once the world is made (checked with `grep -n "caves\.\(splice\|pop\|shift\)\|caves = \|camps\.\(splice\|pop\|shift\)\|camps = " src/sim/*.js`), so an index still names the same cave or camp for the life of the task.
+
+The helpers: `startTask(a, kind, args)` deep-copies `args` (`JSON.parse(JSON.stringify(args))`, so a record never shares an array with an offer or a camp's own state), calls `TASKS[kind].begin`, and sets `a.task`. `setTask(a, kind, args, fields)` sets the record directly, for a task whose path is already in hand. `goTo(a, t, x, y, within, z)` is the walk-on check twenty tasks used to repeat inline: null when the being is already close enough, a new path and `'continue'` when it walks there, `'fail'` when there is no way. `taskStop(a)` runs the current stop once: `TASKS[a.task.kind].stops[a.task.stop](a, a.task)`.
+
+`chain(a, old, ok)` is unchanged. `workKind({ label, amount, skill, effect, ... })` builds a kind for a job done at one place, declaring `work` and `effect` and writing `stops` itself. `pathToStop` is what the spec called `legPath`.
+
+An offer is `{ label, score, task: { kind, args } }`. A site an offer draws from `rng()` — where a snare sits, which spot is open — is still chosen when the offer is built, in `offers()`, not inside `begin`; only the timing of what the offer carries changed, not the order or count of rolls.
+
+A kind's `begin` is one of three sorts:
+
+| Sort | What `begin` does | Kinds |
+|---|---|---|
+| Ordinary | Returns the record's fields; the stops run stride by stride. | Most kinds. |
+| Dispatch only | Hands the being another task with `startTask` and returns `true`; the one stop never runs. Every kind still needs a `stops` entry, for the shape all kinds share. | `chooseSite`, `leadParty`, `denParty` |
+| Record only | Returns `false`. The kind is never reached through `begin`, only through `setTask`, which sets the record directly. | `walk`, `walkTo`, `followBrand`, `comeHome` |
+
+`tasks.js` loads before `beings.js` in `src/sim/index.js`'s `FILES`, because `beings.js`, `species.js`, `fae.js`, `goals.js`, and `recipes.js` all add kinds to `TASKS` as they load. `camps.js` loads before `tasks.js`, so the two kinds camps needs before it exists, `join` and `leadParty`, live in `tasks.js` and `goals.js` instead.
+
+Of the 77 kinds in `TASKS`, 26 declare `work` and are done at one place: `buildFirepit`, `buildHut`, `buildLeanTo`, `buildRack`, `butcherDeer`, `checkSnare`, `cookCatch`, `cookFish`, `craft`, `feedFire`, `haulPit`, `knapAxe`, `layFire`, `leaveBerries`, `lightWithMoss`, `makeSpear`, `raiseStorehouse`, `rearmSnare`, `setOfferingStone`, `setSnare`, `setWardPosts`, `sewWaterskin`, `smokeFish`, `smokeMeat`, `strikeSparks`, `testRocks`. The day tier can run any of these without walking a single stride. The other 51 are stride by stride, with no one place and no declared `work`: the base kinds (`drink`, `eat`, `rest`, `sit`, `shelter`, `sleep`, `wander`, `flee`, `walk`, `walkTo`, `socialize`), the gathering family (`deliver`, `gather`, `pickBerries`, `pickFibre`, `fish`, `digClay`, `takeCuttings`, `quarry`, `cutTree`, `fillWater`), the chases (`hunt`, `stalk`, `huntDeer`, `driveOff`, `fightSprite`, `raid`, `herd`, `scavenge`), the gnome and sprite loops (`home`, `carryHome`, `huddle`, `borrow`, `repay`, `shrooms`, `dance`, `forage`, `watch`, `collect`, `prank`), and the founding and cave kinds (`chooseSite`, `join`, `leadParty`, `clearDen`, `denParty`, `clearRock`, `searchCave`, `brand`, `followBrand`, `comeHome`, `fetchEmber`). Plan G5 must give each of these a day-tier answer of its own; the day tier cannot yet run a hunt or a haul in one step.
+
+A lookup that comes back empty now ends a task the way the old code ended it for a dead or a missing thing, in every case the conversion found:
+
+| Kind | What was found again, and what happens when it is gone |
+|---|---|
+| `hunt`, `stalk`, `huntDeer`, `driveOff`, `fightSprite` | The prey, the person, the deer, the wolf, or the sprite, by `beingById(id)`. A dead one fails the chase, as it did when the closure held a dead being directly. |
+| `socialize`, `scavenge`, `gather` | The other person or the item sought. Not found fails the task, as a vanished target did before. |
+| `huddle` | The gnome takes its own warmth gain regardless, then looks for the kin it huddles with; a kin not found is skipped, exactly as the old closure never checked whether the kin still lived. |
+| `checkSnare`, `haulPit`, `rearmSnare` | The snare or the pit, read again by its tile. A struct destroyed since (burned, or struck by lightning) means nothing happens where the old closure, holding the object directly, still acted on it — a carcass taken from a burned snare, a stick spent rearming one that had already gone. A snare or a pit rebuilt on the same tile while a person walks toward it is read in its place; a freshly built one holds no catch, so nothing follows either way. |
+
+The soak's six-seed fingerprint did not move through the whole plan. Every task of G2, from the first kind converted in task 1 to the executor's last mode removed in task 9, is a pure refactor: the golden record is the one written before G2 began.
+
+### What the later plans must answer
+
+The whole-branch review of G2 left these for the snapshots (G3) and the day tier (G5).
+
+| Plan | Point |
+|---|---|
+| G3 | The global `camp` is a hidden input of every stride. `updateBeing` sets it from `a.camp`. A loader that calls a stop or an effect outside `updateBeing` must set `camp` first. |
+| G3 | A record names a cave or a camp by its index. A snapshot must keep the order of `caves` and of `camps`. |
+| G3 | The reference table still owes the edges that are not tasks: `tile.struct.snare` and `camp.snares[i]`, `tile.struct.pit` and `camp.pitfalls[i]`, `tile.struct.camp`, `being.den`, `being.grove`, `cave.from`, `cave.cleared`, `cave.searched`, `grove.sector`, `grove.cave`, `sprite.target`, `being.shyOf`, `tile.garden`, and `den.holding.camp`. |
+| G3 | A JSON snapshot splits some shared arrays, and no rule minds. `workKind`'s `target` is the same array as `args.at`. A finished build sets `camp.shelter`, `camp.rack`, and their like to the task's own `args.at`. Every rule compares them by value. |
+| G5 | No `effect` reads its third argument or a field the stride loop sets. The day tier can pick the site and call `effect`. It must set `camp` first, as `updateBeing` does. |
+| G5 | `workKind`'s `begin` returns false when no path exists. The day tier wants a reach test and a distance, not a path. Split the two there. |
+| G5 | Five kinds write another being's task from inside a stop: `hunt`, `stalk`, `huntDeer`, `driveOff`, and `fightSprite`. The `defendDen` step in `updateBeing` does the same. `clearDen` hands the mate a whole task. A queue for each being must cope with an entry that another being's turn replaced. |
+| G5 | A chain starts the next task in the same step: `gather` to `deliver`, `cutTree` to `gather`, and `brand` to the kind in `args.next`. `brand` is the one record that carries another kind's whole offer. |
+
+## 18. Next
 
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.
@@ -361,3 +425,4 @@ The soak's six-seed fingerprint did not move through the whole plan. G1 is a pur
 - A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
 - G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data. Tasks as data is what a save format waits on.
 - Then the lingering gods. A sleeping god wakes, later gods are born of side effects or of belief, and the four inhabit modes come through the door.
+- `pickBerries`, `pickFibre`, `digClay`, and `takeCuttings` are one shape four times; a `harvestKind` builder like `workKind` would make them four rows. Not done in G2 because G2 moves no behaviour.

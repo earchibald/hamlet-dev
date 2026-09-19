@@ -78,8 +78,8 @@ test('a denned wolf whose den floor is unreachable still gets a rest task, not a
   const { api, b, den } = home;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to go home to */
   b.task = null; b.asleep = false;
-  const ok = api.START.home(b);
-  assert.ok(ok, 'START.home should fall back to resting rather than fail');
+  const ok = api.startTask(b, 'home');
+  assert.ok(ok, 'startTask home should fall back to resting rather than fail');
   assert.equal(b.task.type, 'rest', `expected a rest task, got ${b.task && b.task.type}`);
 });
 
@@ -165,7 +165,7 @@ test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', 
   sp.x = c.stashTile[0]; sp.y = c.stashTile[1]; sp.z = 0; sp.task = null;
   api.tick = 22 * 1000;
   let stolen = false;
-  for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.START.prank(sp); sp.task.arrive(sp, sp.task); stolen = c.stash.pot === 0; }
+  for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.startTask(sp, 'prank'); api.taskStop(sp); stolen = c.stash.pot === 0; }
   assert.ok(stolen, 'the pot was never taken in forty pranks');
   assert.ok(api.chronicle.some(e => e.text.includes('pot is gone')));
   /* The sprites leave nothing on a stone that already has something on it, so the tile is cleared first. */
@@ -173,7 +173,7 @@ test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', 
   for (const i of api.items.filter(i => i.x === c.stone[0] && i.y === c.stone[1] && i.z === 0)) api.removeItem(i);
   api.tileAt(...c.stone).struct = { type: 'stone', camp: c, offering: 0 };
   let cord = false;
-  for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.START.watch(sp); sp.task.progress = 119; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; sp.task.arrive(sp, sp.task); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
+  for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.startTask(sp, 'watch'); sp.task.progress = 119; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; api.taskStop(sp); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
   assert.ok(cord, 'no cord on the stone in forty nights');
   assert.ok(api.chronicle.some(e => e.text.includes('coil of cord lies')));
 });
@@ -188,7 +188,7 @@ test('a wolf raid takes fish as it takes meat', () => {
   if (!w){ w = api.makeBeing('wolf', c.stashTile[0], c.stashTile[1], null, 0); api.beings.push(w); }
   w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
   api.tick = 22 * 1000;
-  assert.ok(api.START.raid(w), 'the raid should start with fish in the stash');
-  w.task.arrive(w, w.task);
+  assert.ok(api.startTask(w, 'raid'), 'the raid should start with fish in the stash');
+  api.taskStop(w);
   assert.equal(c.stash.fish, 1);
 });

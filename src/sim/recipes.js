@@ -9,9 +9,9 @@
    default the title lowered. blurb: panel text. */
 /* Gatherers for loose things, kept as a table (not a `gatherOffer` set of function-reference fields on
    ITEMS rows) because ITEMS lives in core.js, which loads before these task starters exist. */
-const GATHERERS = { stick: a => startGather(a, 'stick'), rock: a => startGather(a, 'rock'), moss: a => startGather(a, 'moss'), log: a => startCutTree(a), fibre: a => startPickFibre(a), clay: a => startDigClay(a), cuttings: a => startTakeCuttings(a) };
+const GATHERERS = { stick: { kind: 'gather', args: { item: 'stick' } }, rock: { kind: 'gather', args: { item: 'rock' } }, moss: { kind: 'gather', args: { item: 'moss' } }, log: { kind: 'cutTree', args: {} }, fibre: { kind: 'pickFibre', args: {} }, clay: { kind: 'digClay', args: {} }, cuttings: { kind: 'takeCuttings', args: {} } };
 const RECIPES = [
-  { id: 'fibre', title: 'Gather fibre', stage: 'crafts', after: 'firepit', place: 'reeds', gather: a => startPickFibre(a), standing: { stash: 'fibre', n: 6 }, score: 26, offerLabel: 'gather fibre from the reeds',
+  { id: 'fibre', title: 'Gather fibre', stage: 'crafts', after: 'firepit', place: 'reeds', gather: { kind: 'pickFibre', args: {} }, standing: { stash: 'fibre', n: 6 }, score: 26, offerLabel: 'gather fibre from the reeds',
     blurb: 'Reed fibre twists into cord. Reeds grow in the marsh and along the water.' },
   { id: 'cord', title: 'Twist cord', stage: 'crafts', after: 'firepit', needs: { fibre: 4 }, place: 'stash', skill: 'craft', work: strides(30), makes: { item: 'cord', n: 2 }, standing: { stash: 'cord', n: 4 }, score: 36,
     verb: 'twists', blurb: 'Four bundles of fibre make two coils. Cord binds a rod, a basket, and clothes.' },
@@ -21,12 +21,12 @@ const RECIPES = [
     verb: 'weaves', done: 'A basket of cord and reed. Gatherers carry three more.', blurb: 'Three coils of cord. A gatherer with a basket carries three more.' },
   { id: 'rod', title: 'Make a fishing rod', stage: 'crafts', after: 'workshop', needs: { stick: 1, cord: 2 }, place: 'workshop', skill: 'craft', work: strides(40), makes: { tool: 'rod' }, score: 40,
     verb: 'binds', done: 'A stick, a line of cord, a bone hook. The river feeds the camp now.', blurb: 'A stick and two coils of cord. Opens fishing.' },
-  { id: 'fish', title: 'Fish the river', stage: 'food', after: 'rod', tools: ['rod'], place: 'water', gather: a => startFish(a), standing: { stash: 'fish', n: 4 }, active: () => camp.stash.fish < 4 && stashFood() + camp.stash.fish * 2 < foodTarget(), score: 36, offerLabel: 'fish the river',
+  { id: 'fish', title: 'Fish the river', stage: 'food', after: 'rod', tools: ['rod'], place: 'water', gather: { kind: 'fish', args: {} }, standing: { stash: 'fish', n: 4 }, active: () => camp.stash.fish < 4 && stashFood() + camp.stash.fish * 2 < foodTarget(), score: 36, offerLabel: 'fish the river',
     blurb: 'A fish cooks to two meals or smokes on the rack. People fish when food is short.' },
   { id: 'clothes', title: 'Sew hide clothes', stage: 'crafts', after: 'workshop', needs: { hide: 3, cord: 1 }, place: 'workshop', skill: 'craft', work: strides(70), makes: { wear: 'clothes' }, standing: { stash: 'hide', n: 0 }, active: () => campHumans().some(h => !h.clothes), score: 50,
     verb: 'sews', status: () => `${campHumans().filter(h => h.clothes).length} of ${campHumans().length} clothed.`,
     blurb: 'Three hides and a coil of cord. The coldest person wears them, and loses warmth slower.' },
-  { id: 'clay', title: 'Dig clay', stage: 'crafts', after: 'workshop', place: 'bank', gather: a => startDigClay(a), standing: { stash: 'clay', n: 6 }, score: 28, offerLabel: 'dig clay',
+  { id: 'clay', title: 'Dig clay', stage: 'crafts', after: 'workshop', place: 'bank', gather: { kind: 'digClay', args: {} }, standing: { stash: 'clay', n: 6 }, score: 28, offerLabel: 'dig clay',
     blurb: 'Clay from the riverbank. Four lumps build a kiln, three fire a pot.' },
   { id: 'kiln', title: 'Build the kiln', stage: 'crafts', after: 'workshop', needs: { rock: 8, clay: 4 }, place: 'site', skill: 'build', work: strides(120), makes: { struct: 'kiln' }, score: 42,
     verb: 'raises', done: 'A dome of rock and clay with a fire inside. Pots are fired here.', blurb: 'Eight rocks and four lumps of clay. Fires pots.' },
@@ -37,7 +37,7 @@ const RECIPES = [
   { id: 'pitfall', title: 'Dig a deer pit', stage: 'crafts', after: 'axe', needs: { log: 4, cord: 2 }, tools: ['axe'], place: 'pitfall', skill: 'trap', work: strides(90), makes: { pitfall: true }, standing: { stash: 'venison', n: 0 }, active: () => camp.pitfalls.length < 2, score: 34,
     verb: 'digs', status: () => `${camp.pitfalls.length} pits, ${camp.pitfalls.filter(p => p.catch).length} with a deer in.`,
     blurb: 'Four logs and two coils of cord over a hole on a deer path. One deer in eight that steps in is caught. Up to two pits.' },
-  { id: 'quarry', title: 'Quarry stone', stage: 'crafts', after: 'axe', tools: ['axe'], place: 'face', gather: a => startQuarry(a), standing: { stash: 'rock', n: 6 }, score: 36, offerLabel: 'quarry rocks',
+  { id: 'quarry', title: 'Quarry stone', stage: 'crafts', after: 'axe', tools: ['axe'], place: 'face', gather: { kind: 'quarry', args: {} }, standing: { stash: 'rock', n: 6 }, score: 36, offerLabel: 'quarry rocks',
     blurb: 'Rocks from a rock face within thirty tiles. Two a go. The loose-rock hunt is over.' },
 ];
 
@@ -120,28 +120,37 @@ function recipeGoal(r){
     },
     offers(a){
       if (this.state().s !== 'active') return [];
-      if (r.gather) return [{ label: r.offerLabel || r.title.toLowerCase(), score: r.score || 35, start: r.gather }];
+      if (r.gather) return [{ label: r.offerLabel || r.title.toLowerCase(), score: r.score || 35, task: { kind: r.gather.kind, args: { ...r.gather.args } } }];
       const out = [];
-      for (const [k, n] of Object.entries(r.needs || {})) if ((camp.stash[k] || 0) < n){ const g = gatherOffer(k); if (g) out.push({ label: `${ITEMS[k].gather || 'gather'} ${ITEMS[k].plural}`, score: (r.score || 40) - 5, start: g }); }
-      if (r.makes && r.makes.item && looseCount(r.makes.item)(sectors[secIdx(...Object.values(secOf(...camp.site)))]) > 0) out.push({ label: `gather ${ITEMS[r.makes.item].plural} left for us`, score: (r.score || 40) + 5, start: a => startGather(a, r.makes.item) });
+      for (const [k, n] of Object.entries(r.needs || {})) if ((camp.stash[k] || 0) < n){ const g = gatherOffer(k); if (g) out.push({ label: `${ITEMS[k].gather || 'gather'} ${ITEMS[k].plural}`, score: (r.score || 40) - 5, task: { kind: g.kind, args: { ...g.args } } }); }
+      if (r.makes && r.makes.item && looseCount(r.makes.item)(sectors[secIdx(...Object.values(secOf(...camp.site)))]) > 0) out.push({ label: `gather ${ITEMS[r.makes.item].plural} left for us`, score: (r.score || 40) + 5, task: { kind: 'gather', args: { item: r.makes.item } } });
       if (out.length) return out;
       if (!stashHas(r.needs) || (r.tools || []).some(t => !camp.tools[t])) return [];
       const at = placeFor(r); if (!at) return [];
-      const work = r.work / ((PLACES[r.place] && PLACES[r.place].speed) || 1);
-      return [{ label: r.title.toLowerCase(), score: r.score || 45, start: a => startBuild(a, at, work, r.title, a => {
-        if (recipeDone(r)) return;
-        const key = Object.keys(r.makes)[0];
-        if (key === 'struct' && tileAt(...at).struct) return;
-        if (!stashHas(r.needs)) return;
-        const result = MAKERS[key](r, a, at);
-        if (result === false) return;
-        takeNeeds(r.needs);
-        if (r.skill) gainXp(a, r.skill);
-        if (result !== 'logged')
-          log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${r.makes.n > 1 ? ITEMS[r.makes.item].plural : ITEMS[r.makes.item].name}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
-      }, r.skill) }];
+      const amount = r.work / ((PLACES[r.place] && PLACES[r.place].speed) || 1);
+      return [{ label: r.title.toLowerCase(), score: r.score || 45, task: { kind: 'craft', args: { recipe: r.id, at, amount } } }];
     } };
 }
+/* The one job kind for every recipe's build. label, amount, and skill are read from the recipe named
+   by args.recipe; args.amount is r.work / speed, worked out when the offer was built, as before. */
+TASKS.craft = workKind({
+  label: args => RECIPES.find(x => x.id === args.recipe).title,
+  amount: args => args.amount,
+  skill: args => RECIPES.find(x => x.id === args.recipe).skill,
+  effect(a, args){
+    const r = RECIPES.find(x => x.id === args.recipe), at = args.at;
+    if (recipeDone(r)) return;
+    const key = Object.keys(r.makes)[0];
+    if (key === 'struct' && tileAt(...at).struct) return;
+    if (!stashHas(r.needs)) return;
+    const result = MAKERS[key](r, a, at);
+    if (result === false) return;
+    takeNeeds(r.needs);
+    if (r.skill) gainXp(a, r.skill);
+    if (result !== 'logged')
+      log(`${a.name} ${r.verb || 'makes'} ${r.makes.item ? `${r.makes.n} ${r.makes.n > 1 ? ITEMS[r.makes.item].plural : ITEMS[r.makes.item].name}` : r.title.toLowerCase().replace(/^\w+ /, '')}.`, [a], r.makes.tool || r.makes.struct ? 'major' : 'info');
+  }
+});
 /* The recipe goals sit on the panel after the hand-written ladder and before the standing wolf guard.
    If the guard goal is ever renamed or removed, the recipes still show up, at the end of the panel. */
 {
