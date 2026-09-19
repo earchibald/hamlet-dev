@@ -48,7 +48,7 @@ test('the camp rules and the cellular systems read the table', () => {
   const C = load().CLOCK;
   assert.equal(C.every.spoil, 100); assert.equal(C.every.fae, 300); assert.equal(C.every.prune, 200); assert.equal(C.every.carcassRot, 50);
   assert.deepEqual(C.birth, { every: 400, chance: 0.35, gap: 16000 });
-  assert.deepEqual(C.arrival, { first: 700, firstSpread: 600, firstByHand: 700, secondHearth: 900, wait: 900, spread: 900, chance: 0.7, villageChance: 0.85, afterTheLast: 10000, afterTheDoomed: 10000 });
+  assert.deepEqual(C.arrival, { first: 700, firstSpread: 600, firstByHand: 700, secondHearth: 900, wait: 900, spread: 900, chance: 0.7, villageChance: 0.85, afterTheLast: 10000, afterTheDoomed: 10000, foundRetry: 500 });
   assert.deepEqual(C.storm, { first: 1500, firstSpread: 2000, length: 150, lengthSpread: 300, gap: 2000, summerGap: 4000, gapSpread: 3000 });
   assert.equal(C.food.cookedKeeps, 1800); assert.equal(C.food.berriesKeep, 3500);
   assert.equal(C.rate.lightningLit, 0.0006); assert.equal(C.rate.lightningOut, 0.0035); assert.equal(C.rate.strayLightning, 0.0008);

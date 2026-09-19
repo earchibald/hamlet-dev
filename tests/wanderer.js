@@ -290,49 +290,64 @@ test('the survivor dying mid-wait hands the valley to the empty-valley rule', ()
   assert.ok(alive(api) >= 1, 'the valley holds people again');
 });
 
-/* Wall the rim of the world in bare rock, so no edge of it can reach any ground inside. Then
-   `comeOverTheHills` finds no way in for any candidate site, and the rule runs out of sites. No soak
-   seed reaches that path, so the test builds the state rather than waiting for it. */
+/* Two ways for the rule to run out of options, and the run has to reach one of them on its own, since
+   no soak seed does. Wall the rim of the world in bare rock and no edge of it reaches any ground
+   inside, so `comeOverTheHills` finds no way in for any site the rule picks. Turn every sector rocky
+   and nothing in the valley grows, so there is no founding site to pick in the first place. */
 function wallTheRim(api){
   const wall = (x, y) => { const t = api.tileAt(x, y, 0); if (t){ t.ground = 'rock'; t.feature = null; t.struct = null; } };
   for (let x = 0; x < api.W; x++){ wall(x, 0); wall(x, api.H - 1); }
   for (let y = 0; y < api.H; y++){ wall(0, y); wall(api.W - 1, y); }
 }
+const barrenTheValley = api => { for (const s of api.sectors) s.biome = 'rocky'; };
 
 /* The rule tries, fails, and must then wait again rather than try again every tick. Trying costs a
    camp record and a flood fill for each candidate site, so an unbounded retry is both a leak and a
    stall. The corrected line restarts the wait. Clearing it instead looks more natural, and says the
-   line ends over again every ten days; that is what the first assertion here holds down. */
-test('no way in for a founder: the rule waits again rather than trying every tick', () => {
-  let walled = 0, ticks = 0, idTicks = 0, lastId = 0, cleared = 0, mostCamps = 0;
-  const { api, events, thinned } = downToOne('r', 3, 45, 'always', (api, i, thin) => {
-    if (!walled){ wallTheRim(api); walled = api.dayOf(); }
-    /* Count only after the first attempt has been made and failed, so the whole window lies inside
-       the retry. A window that reaches back before the first attempt dilutes the count and lets a
-       per-tick retry through. */
-    if (api.dayOf() <= thin + STALE + WAIT) return;
-    ticks++;
-    if (api.nextId !== lastId){ if (lastId) idTicks++; lastId = api.nextId; }
-    if (!api.doomAt) cleared++;
-    mostCamps = Math.max(mostCamps, api.camps.length);
+   line ends over again every ten days; that is what the first assertion here holds down. Both ways
+   out of options take the same line, so the rule has one answer to failure, and both are run here. */
+function runsOutOfOptions(name, block, waitKey){
+  test(`no way on for a founder (${name}): the rule waits again rather than trying every tick`, () => {
+    let blocked = 0, ticks = 0, idTicks = 0, lastId = 0, cleared = 0, mostCamps = 0, longestWait = 0;
+    const { api, events, thinned } = downToOne('r', 3, 45, 'always', (api, i, thin) => {
+      if (!blocked){ block(api); blocked = api.dayOf(); }
+      /* Count only after the first attempt has been made and failed, so the whole window lies inside
+         the retry. A window that reaches back before the first attempt dilutes the count and lets a
+         per-tick retry through. */
+      if (api.dayOf() <= thin + STALE + WAIT) return;
+      ticks++;
+      if (api.nextId !== lastId){ if (lastId) idTicks++; lastId = api.nextId; }
+      if (!api.doomAt) cleared++;
+      longestWait = Math.max(longestWait, api.doomAt - api.tick);
+      mostCamps = Math.max(mostCamps, api.camps.length);
+    });
+    assert.ok(blocked <= thinned, 'the world was blocked after the valley was thinned');
+    assert.equal(linesLike(events, NEW_LINE).length, 0, 'a founder got through, so the path under test never ran');
+    assert.ok(ticks > 15 * DAY, 'the window is too short to tell a per-tick retry from ordinary life');
+
+    /* One: the fix is right, not merely bounded. */
+    assert.equal(linesLike(events, ENDS).length, 1, 'the chronicle says the line ends more than once');
+    assert.equal(cleared, 0, 'the failure path cleared the wait, which says the line ends again every ten days');
+    assert.ok(api.doomAt > api.tick, 'the wait was left in the past, so the rule tries again every tick');
+    /* Which wait, not merely some wait. A stable failure takes the full stretch and a passing one takes
+       the short retry, so a test that only asked for a wait in the future would pass against either
+       constant in either place. The longest gap seen is the value the rule set, because the hook reads
+       it on the tick the rule set it. */
+    const { load } = require('../src/sim');
+    assert.equal(longestWait, load().CLOCK.arrival[waitKey], `the rule set a wait other than CLOCK.arrival.${waitKey}`);
+
+    /* Two and three: the unbounded retry. The walled rim reached it through a camp record a tick; the
+       old line popped that record on the way out, so `camps` stayed at one and the id climbed alone.
+       Measured over this window, that took an id on 55 ticks in every 100; winter holds the rule off,
+       which is why it is not every one. The same window with the wait restarted takes 7 in every 100,
+       all of it ordinary life in the valley. A fifth is the line, about three times clear of both.
+       A barren valley never reaches `makeCamp` at all, so it leaks no id and only the wait tells. */
+    assert.equal(mostCamps, 1, 'camp records piled up');
+    assert.ok(idTicks < ticks / 5, `a new id was taken on ${idTicks} of ${ticks} ticks, which is the rule trying again every tick`);
   });
-  assert.ok(walled <= thinned, 'the rim was walled after the valley was thinned');
-  assert.equal(linesLike(events, NEW_LINE).length, 0, 'a founder got in through a walled rim, so the path under test never ran');
-  assert.ok(ticks > 15 * DAY, 'the window is too short to tell a per-tick retry from ordinary life');
-
-  /* One: the fix is right, not merely bounded. */
-  assert.equal(linesLike(events, ENDS).length, 1, 'the chronicle says the line ends more than once');
-  assert.equal(cleared, 0, 'the failure path cleared the wait, which says the line ends again every ten days');
-  assert.ok(api.doomAt > api.tick, 'the wait was left in the past, so the rule tries again every tick');
-
-  /* Two and three: the unbounded retry. The old line popped its camp on the way out, so `camps` stayed
-     at one and the id climbed alone: a fresh camp record every tick the rule ran. Measured over this
-     window, that took an id on 55 in every 100 ticks; winter holds the rule off, which is why it is
-     not every tick. The same window with the wait restarted takes 7 in every 100, all of it ordinary
-     life in the valley. A fifth is the line, and it stands about three times clear of both. */
-  assert.equal(mostCamps, 1, 'camp records piled up');
-  assert.ok(idTicks < ticks / 5, `a new id was taken on ${idTicks} of ${ticks} ticks, which is the rule trying again every tick`);
-});
+}
+runsOutOfOptions('no way in', wallTheRim, 'afterTheLast');
+runsOutOfOptions('no ground to be had', barrenTheValley, 'foundRetry');
 
 test('the stale wait is a duration in the table, not a number in the rule', () => {
   const { load } = require('../src/sim');
