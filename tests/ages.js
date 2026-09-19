@@ -26,6 +26,19 @@ function creationOf(seed){
   return { api, ms, gs, contrasts, species: [...species].sort(), scars, perAge, gestures };
 }
 
+/* The gate for Become: a creation run entirely on autopilot is the creation startWorld runs alone.
+   Autopilot is the engine's own chooser, so this must hold on every seed, line for line. */
+function autopilotOf(seed){
+  const api = load(); api.startCreation(seed, {});
+  api.step();
+  const awake = api.awakeGods();
+  if (awake.length) api.inject({ source: 'player', act: 'become', id: awake[0].id });
+  api.inject({ source: 'player', act: 'run', until: api.options.ageLimit * 2 + 4 });
+  const max = api.options.ageLimit * 2 + 2;
+  for (let n = 0; api.era === 'gods' && n < max; n++) api.step();
+  return api;
+}
+
 const rows = [];
 /* The gesture record, counted across every seed. The design claims every act writes a usable mark, so
    the fallback to the heart of a country should never fire; and it sets no cap on the gestures in one
@@ -57,6 +70,15 @@ for (const seed of SEEDS){
     assert.ok(api.liveRegions().some(r => api.marksOf(r, 'depth').length), 'nothing dug');
     /* Every kind of life, not every species: a valley with foxes and no wolves is a gentler valley, not a broken one. */
     for (const kind of api.KINDS) assert.ok(species.some(sp => api.SPECIES[sp][kind]), `seed ${seed} never made a ${kind}`);
+  });
+
+  test(`seed ${seed}: an autopiloted creation is an unwatched one`, () => {
+    const a = load(); a.startWorld(seed);
+    const b = autopilotOf(seed);
+    assert.equal(b.era, 'days');
+    assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+    assert.equal(b.tick, a.tick);
+    assert.equal(b.firstPerson().name, a.firstPerson().name);
   });
 }
 

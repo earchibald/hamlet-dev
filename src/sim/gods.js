@@ -522,6 +522,11 @@ let pending = null;
 /* The age the autopilot runs to. Null when the player is choosing. Task 6 gives it its act. */
 let runUntil = null;
 
+/* The stops the player set. A stop on an age is what this slice builds; a stop on an event needs an
+   event kind on every chronicle line, which is G's watch list and is not written. The act is shaped
+   to take that kind the day it exists. */
+let stops = [];
+
 /* Fill the open turn. The once-per-god preparation (settleHome, godNeeds) runs in ageDecide, not
    here, so it happens exactly once however many times the turn is opened. The matrix is drawn once
    and kept on `agePos.opts`; re-opening the same god's turn, after the player left and came back,
@@ -579,6 +584,13 @@ function ageBegin(){
   /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
   if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
   agePos = { i: 0, list: gods(), prepared: false, opts: null };
+  /* A run ends at the age it named, or at the first stop that names this age. The line says why, so
+     the player is never stopped without a reason. */
+  if (runUntil !== null){
+    const stop = stops.find(s => s.what === 'age' && s.at === age);
+    if (stop){ runUntil = null; note(`Age ${age}. The stop you set is reached.`); }
+    else if (age >= runUntil){ runUntil = null; note(`Age ${age}. The run you set is over.`); }
+  }
 }
 
 /* The gods of this age, as they stood when it began, and where we are among them. The list is taken
@@ -629,6 +641,7 @@ function beginCreation(){
   godRng = mulberry32(hashSeed(seedText + ':gods'));
   creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [] };
   deciding = null; saidFrom = 0; gestureFallbacks = {};
+  agePos = null; pending = null; inhabited = null; runUntil = null; stops = [];
   withGodRng(() => initField());
 }
 function startCreation(seed, opts = {}){

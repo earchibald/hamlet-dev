@@ -278,3 +278,61 @@ test('the bars are data, and every barred act reads the trait its score reads', 
     assert.match(String(api.GOD_ACTS[type].score), new RegExp(`traits\\.${bar.trait}`), `${type}'s score reads ${bar.trait}`);
   }
 });
+
+test('a run takes the engine\'s own choice until the age it names', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending, 'the turn opens before the run');
+  assert.equal(api.inject({ source: 'player', act: 'run', until: api.age + 4 }), `Running to age ${api.age + 4}.`);
+  assert.equal(api.pending, null, 'a run closes the open turn');
+  let n = 0; while (api.era === 'gods' && api.runUntil !== null && n++ < 50) api.step();
+  assert.equal(api.runUntil, null, 'the run ended');
+  api.step();
+  assert.ok(api.pending || api.era === 'days', 'the turn comes back');
+});
+
+test('a stop on an age ends a run early, and says why', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  const at = api.age + 3;
+  assert.equal(api.inject({ source: 'player', act: 'watch', what: 'age', at }), `A stop is set at age ${at}.`);
+  assert.deepEqual(api.stops, [{ what: 'age', at }]);
+  api.inject({ source: 'player', act: 'run', until: api.age + 40 });
+  let n = 0; while (api.era === 'gods' && api.runUntil !== null && n++ < 50) api.step();
+  assert.equal(api.age, at, 'the run stopped at the stop, not at the run\'s own end');
+  /* The stop's own note is not always the newest line: the age it lands on can still raise a god by
+     strain in the same step, which logs after it. The chronicle must hold the note somewhere. */
+  assert.ok(api.chronicle.some(e => /the stop you set is reached/i.test(e.text)), 'the chronicle says why the run stopped');
+});
+
+test('the same watch twice clears the stop', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  api.inject({ source: 'player', act: 'watch', what: 'age', at: 9 });
+  assert.equal(api.inject({ source: 'player', act: 'watch', what: 'age', at: 9 }), 'The stop at age 9 is cleared.');
+  assert.deepEqual(api.stops, []);
+});
+
+test('a watch on anything but an age says what is not built', () => {
+  const api = load(); api.startCreation('gamma', {});
+  assert.equal(api.inject({ source: 'player', act: 'watch', what: 'birth', who: 3 }),
+    'Only a stop on an age is built. A stop on an event waits for the watch list.');
+});
+
+test('a creation run entirely on autopilot is the creation the engine runs alone', () => {
+  const a = load(), b = load();
+  a.startWorld('delta');
+  b.startCreation('delta', {});
+  b.step();
+  b.inject({ source: 'player', act: 'become', id: b.awakeGods()[0].id });
+  b.inject({ source: 'player', act: 'run', until: 100000 });
+  let n = 0; while (b.era === 'gods' && n++ < 2000) b.step();
+  assert.equal(b.era, 'days');
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  assert.equal(b.tick, a.tick);
+});

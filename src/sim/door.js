@@ -70,6 +70,25 @@ const DOOR_ACTS = {
     if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
     return takeTurn(e.opt);
   },
+  /* Run: the god chooses for itself until the age named, or until a stop is reached. Autopilot is the
+     engine's own chooser and nothing else, so a creation run on autopilot is an unwatched creation. */
+  run(e){
+    if (era !== 'gods') return 'There are no ages to run.';
+    if (inhabited === null) return 'You are nobody. There is nothing to hand over.';
+    if (!Number.isInteger(e.until) || e.until <= age) return 'A run goes to an age still ahead.';
+    runUntil = e.until; releaseTurn();
+    note(`${beingById(inhabited).name} goes on alone a while.`);
+    return `Running to age ${e.until}.`;
+  },
+  /* Watch: set or clear a stop. The same stop twice clears it. */
+  watch(e){
+    if (e.what !== 'age') return 'Only a stop on an age is built. A stop on an event waits for the watch list.';
+    if (!Number.isInteger(e.at)) return 'A stop on an age names a whole age.';
+    const k = stops.findIndex(s => s.what === 'age' && s.at === e.at);
+    if (k >= 0){ stops.splice(k, 1); return `The stop at age ${e.at} is cleared.`; }
+    stops.push({ what: 'age', at: e.at });
+    return `A stop is set at age ${e.at}.`;
+  },
 };
 function inject(event){
   const act = DOOR_ACTS[event.act];
