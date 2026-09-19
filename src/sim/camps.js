@@ -123,6 +123,9 @@ function startFoundCamp(leader){
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
   const mate = mates[0]; if (!mate) return false;
   const old = camp, nc = makeCamp(`${leader.name}'s camp`);
+  /* The new camp has a founder and a name record from the moment the party leaves, so its first
+     chronicle line reads under a real name and `notableCandidates` knows who made it. */
+  nameFoundersCamp(nc, leader);
   nc.target = secCenter(target); nc.coals = tick + CLOCK.party.coalsLast;
   const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + CLOCK.party.foodKeeps); } };
   take('smoked', 3); take('berries', 3); take('stick', 4);

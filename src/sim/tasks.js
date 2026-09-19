@@ -329,7 +329,7 @@ TASKS.join = { type: 'travel',
     const at = t.args.at, r = goTo(a, t, at[0], at[1], t.args.within); if (r) return r;
     const c = a.camp;
     a.homeless = false;
-    if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
+    if (c.site){ log(`${a.name} arrives at ${c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
     else log(`${a.name} reaches the new valley.`, [a]);
     return 'done';
   }] };
