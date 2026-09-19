@@ -495,7 +495,7 @@ function nameVillage(c){
 function nameTick(){
   if (tick % DAY !== CLOCK.names.nameHour) return;
   const prev = camp;
-  for (const c of camps){ camp = c; nameCampAtHearth(c); nameVillage(c); nameEvents(c); }
+  for (const c of camps){ camp = c; nameCampAtHearth(c); nameVillage(c); nameEvents(c); epithetPass(c); }
   if (camps[0] && camps[0].village && !nameOf(valley)){ camp = camps[0]; nameValley(camps[0]); }
   camp = prev;
 }
@@ -551,6 +551,85 @@ function nameValley(c){
   const by = namerFor(c.site); if (!by) return;
   const rec = nameThing(valley, 'valley', by, c.site, loreCandidates(40));
   if (rec) log(`${by.name} gives the whole valley a name: ${rec.text}, ${rec.why}.`, campHumans(), 'major');
+}
+
+/* ---------- epithets ----------
+   An epithet is what others call you, so it is scored from the opinions others
+   hold and from shared history. The camp is the namer, not a person, so no trait
+   weight applies. An epithet is not a place, so it never joins the name index:
+   two camps may both have a firekeeper. */
+const DEED_EPITHETS = { fire: 'firekeeper', wolf: 'wolfdriver', found: 'founder', sprite: 'spritefriend', deer: 'deer-slayer', fish: 'fisher', pot: 'potter' };
+const FATE_EPITHETS = { frost: 'the frozen', fire: 'the burnt', death: 'the lost', old: 'who died warm by the fire' };
+
+function epithetCandidates(a){
+  const out = [], folk = humans().filter(h => h.camp === a.camp && h !== a);
+  let up = 0, down = 0, rivals = 0;
+  for (const h of folk){
+    const op = h.opinions[a.id] || 0;
+    if (op > 0) up += op; else down -= op;
+    if (h.rel[a.id] === 'rival') rivals++;
+  }
+  if (up >= 40 && up > down) out.push({ text: 'the talker', score: 40 + Math.round(up / 10), why: 'people like talking to them' });
+  if (down >= 40 && down > up) out.push({ text: 'the sour', score: 40 + Math.round(down / 10), why: 'arguments follow them' });
+  if ((a.taught || 0) >= 5) out.push({ text: 'the teacher', score: 40 + a.taught, why: `taught ${a.taught} times by the fire` });
+  if (rivals >= 3) out.push({ text: 'the one everyone argues with', score: 40 + rivals * 5, why: `${rivals} rivals in one camp` });
+  /* Deeds, from the tags on the person's own history. */
+  const tags = {};
+  for (const e of a.history) if (e.tag) tags[e.tag] = (tags[e.tag] || 0) + 1;
+  for (const k in DEED_EPITHETS) if (tags[k]) out.push({ text: DEED_EPITHETS[k], score: 30 + 5 * (tags[k] - 1), why: `for what they did, ${tags[k]} time${tags[k] > 1 ? 's' : ''}` });
+  /* Life events and birth, from the lineage record. */
+  const L = a.lineage || {};
+  const kids = beings.filter(b => b.parents && b.parents.includes(a.id)).length;
+  if (L.roof) out.push({ text: 'born under a roof', score: 20, why: 'born in a camp that had a roof' });
+  if (kids >= 2) out.push({ text: 'twice a parent', score: 20 + kids, why: `${kids} children` });
+  if (L.edge) out.push({ text: `walked in from the ${L.edge}`, score: 20, why: `came in from the ${L.edge}` });
+  if (L.village) out.push({ text: 'born in a village', score: 20, why: 'born in a village' });
+  if (L.foundersChild) out.push({ text: 'child of founders', score: 20, why: 'both parents founded a camp' });
+  if (L.firstBorn) out.push({ text: 'first born here', score: 20, why: 'the first child born in this camp' });
+  return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));
+}
+/* Once a day at the fire. `CLOCK.names.epithetAfter` days in a camp for the first. Half again as
+   much for a change. */
+function epithetPass(c){
+  for (const a of campHumans()){
+    if (tick - (a.campSince === undefined ? a.born : a.campSince) < CLOCK.names.epithetAfter) continue;
+    const cands = epithetCandidates(a), top = cands[0];
+    if (!top) continue;
+    const keep = cands.slice(0, 6).map(x => ({ text: x.text, score: x.score }));
+    if (!a.epithet){
+      a.epithets = [nameRecord(top.text, { why: top.why, by: null, scores: keep })];
+      a.epithet = top.text;
+      log(`The camp has started to call ${a.name} ${top.text}.`, campHumans(), 'info');
+      continue;
+    }
+    if (top.text === a.epithet) continue;
+    const held = cands.find(x => x.text === a.epithet);
+    if (top.score < (held ? held.score : 0) * 1.5) continue;
+    const old = a.epithet;
+    a.epithets.unshift(nameRecord(top.text, { why: top.why, by: null, scores: keep }));
+    a.epithet = top.text;
+    log(`Nobody calls ${a.name} ${old} any more. Now it is ${a.name} ${top.text}.`, campHumans(), 'major');
+  }
+}
+/* Fate gives the last epithet. It is always applied, on top of whatever was held. Guarded to
+   humans: gods already carry their own `epithet`, given at creation, and never a fate's. */
+function giveFate(a, tag){
+  if (a.species !== 'human') return;
+  const text = FATE_EPITHETS[tag] || FATE_EPITHETS.death;
+  if (!a.epithets) a.epithets = [];
+  a.epithets.unshift(nameRecord(text, { why: 'how they died', by: null }));
+  a.epithet = text;
+}
+const fullName = a => a && a.epithet ? `${a.name} ${a.epithet}` : (a ? a.name : '');
+
+/* Everyone gets a lineage record at birth or arrival: parents, the camp, the day, and how they
+   came. `campSince` starts the clock `epithetPass` reads. Fields are ids and plain values, never a
+   reference to a being or a camp, so a snapshot can list every one. */
+function lineageFor(a, o = {}){
+  a.campSince = tick;
+  a.lineage = { parents: a.parents ? a.parents.slice() : null, camp: a.camp ? a.camp.id : null, day: dayOf(),
+    roof: !!o.roof, village: !!o.village, edge: o.edge || null, foundersChild: !!o.foundersChild, firstBorn: !!o.firstBorn };
+  return a.lineage;
 }
 
 /* ---------- describing a thing with no name yet ---------- */

@@ -654,3 +654,68 @@ test('the first drink at a pool names it, through the real stop', () => {
   assert.ok(api.nameOf(p), 'the pool was not named by the drink');
   assert.ok(api.chronicle.some(e => e.text.includes(`calls the pool ${api.nameOf(p)}`)), api.chronicle[0].text);
 });
+
+/* ---------- epithets, lineage, and fate ---------- */
+
+test('ten days in a camp earns an epithet, and the chronicle says so', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  a.campSince = api.tick - 11 * api.DAY;
+  a.history.unshift({ tick: api.tick, when: '', text: 'set the ember in the pit', kind: 'major', tag: 'fire', camp: c.id });
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'firekeeper');
+  assert.equal(api.fullName(a), `${a.name} firekeeper`);
+  assert.ok(a.epithets[0].why, 'an epithet has a reason');
+  assert.ok(a.epithets[0].scores.length >= 1, 'the candidate list is kept');
+  assert.ok(api.chronicle.some(e => e.text === `The camp has started to call ${a.name} firekeeper.`), api.chronicle[0].text);
+});
+
+test('a candidate below the bar does not replace the epithet, and one above it does', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  a.campSince = api.tick - 11 * api.DAY;
+  for (let k = 0; k < 4; k++) a.history.unshift({ tick: api.tick, when: '', text: 'a wolf driven off', kind: 'good', tag: 'wolf', camp: c.id });
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'wolfdriver');
+  const held = api.epithetCandidates(a).find(x => x.text === 'wolfdriver').score;
+  /* One deed of another kind scores 30, which is under 1.5 times the held score. */
+  a.history.unshift({ tick: api.tick, when: '', text: 'a fish', kind: 'good', tag: 'fish', camp: c.id });
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'wolfdriver', `30 should not beat ${held} times 1.5`);
+  for (let k = 0; k < 12; k++) a.history.unshift({ tick: api.tick, when: '', text: 'a fish', kind: 'good', tag: 'fish', camp: c.id });
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'fisher');
+  assert.deepEqual(a.epithets.map(r => r.text), ['fisher', 'wolfdriver']);
+  assert.ok(api.chronicle.some(e => e.text === `Nobody calls ${a.name} wolfdriver any more. Now it is ${a.name} fisher.`), api.chronicle[0].text);
+});
+
+test('fate gives the last epithet, and it replaces the one held', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  a.campSince = api.tick - 11 * api.DAY;
+  a.history.unshift({ tick: api.tick, when: '', text: 'the ember', kind: 'major', tag: 'fire', camp: c.id });
+  api.epithetPass(c);
+  assert.equal(a.epithet, 'firekeeper');
+  api.die(a, 'froze in the cold', 'frost');
+  assert.equal(a.epithet, 'the frozen');
+  assert.equal(a.epithets.length, 2);
+  assert.equal(a.diedAt, api.tick);
+});
+
+test('everyone gets a lineage record, and the birth source reads it', () => {
+  const api = world();
+  const first = api.firstPerson();
+  assert.ok(first.lineage, 'the first person has no lineage');
+  assert.equal(first.lineage.day, api.dayOf());
+  const later = runDays('r', 40).api;
+  const born = later.beings.filter(b => b.species === 'human' && b.parents);
+  assert.ok(born.length >= 1, 'nobody was born in forty days');
+  for (const b of born){ assert.ok(b.lineage, `${b.name} has no lineage`); assert.equal(b.lineage.roof, true); assert.deepEqual(b.lineage.parents, b.parents); }
+});
+
+test('by day 40 every person with ten days in a camp has an epithet', () => {
+  const { api } = runDays('r', 40);
+  const old = api.beings.filter(b => b.species === 'human' && b.alive && api.tick - (b.campSince === undefined ? b.born : b.campSince) >= 10 * api.DAY);
+  assert.ok(old.length >= 1, 'nobody has been in a camp ten days');
+  for (const b of old) assert.ok(b.epithet, `${b.name} has no epithet`);
+});

@@ -52,6 +52,7 @@ function settle(){
      repainted and no name line can fall into the legends. */
   if (!lore) nameTheLand();
   const a = firstPerson();
+  lineageFor(a, {});
   log(`${a.name} walks alone into the ${sectorOfTile(tileAt(a.x, a.y)).name.toLowerCase()} with nothing but two hands.`, [a], 'major');
 }
 /* The one line a final settle writes. A failed creation has no ages left; a creation at the cap has ages left but

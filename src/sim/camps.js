@@ -130,7 +130,7 @@ function startFoundCamp(leader){
   const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + CLOCK.party.foodKeeps); } };
   take('smoked', 3); take('berries', 3); take('stick', 4);
   old.sentParty = `${leader.name} and ${mate.name}`;
-  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
+  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.campSince = tick; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
   for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major', 'found');
   return startTask(leader, 'join');
@@ -157,6 +157,7 @@ function comeOverTheHills(){
   if (!ok.length) return null;
   const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
   const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
+  lineageFor(b, { edge: x === 0 ? 'west' : x === W - 1 ? 'east' : y === 0 ? 'north' : 'south' });
   return b;
 }
 
@@ -251,6 +252,9 @@ function updateCamps(){
         c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
         for (const t in c.traits) c.traits[t] = clamp(Math.round(((pair.p.traits[t] + pair.q.traits[t]) / 2 + (rng() - 0.5) * 0.3) * 100) / 100, 0, 1);
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
+        lineageFor(c, { roof: true, village: !!camp.village,
+          foundersChild: camps.some(k => k.founder === pair.p.id) && camps.some(k => k.founder === pair.q.id),
+          firstBorn: !beings.some(b => b !== c && b.species === 'human' && b.parents && b.lineage && b.lineage.camp === camp.id) });
         for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
         for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');

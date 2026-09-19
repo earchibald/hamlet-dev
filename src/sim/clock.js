@@ -58,6 +58,7 @@ const CLOCK = {
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
     eventMemory: days(16),             // an event line older than this is no longer a candidate
+    epithetAfter: days(10),            // how long in a camp before the first epithet can be earned
   },
   /* Warmth a person loses each tick, by where and when. */
   cold: { under: tickRate(0.012), winterNight: tickRate(0.06), winterDay: tickRate(0.025), summer: tickRate(0), night: tickRate(0.012), day: tickRate(0.003) },
