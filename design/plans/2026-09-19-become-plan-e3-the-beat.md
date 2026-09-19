@@ -21,8 +21,10 @@ no build step but `node build.js`. Canvas 2D for the map. `node --test` for the 
 - **The view never asks whether an act came from the player or from a god.** `takeTurn` applies the
   option, moves past the god, and returns without resuming; a step is the only thing that advances an
   age. So after a `choose` lands, the age stands one god past the player's and the view draws that as
-  one beat like any other. If you find yourself writing a branch on `byPlayer` anywhere in the
-  playback path, stop: the shape is wrong, not the engine.
+  one beat like any other. **A branch on `byPlayer` anywhere in the playback path is a fault in the
+  engine, not in the view.** If you find yourself needing one, stop and report it: the engine is not
+  giving the view what it should, and the fix belongs in `src/sim/gods.js` with the session that owns
+  it. Do not route around it in `src/ui/`. A reviewer can check this by grepping the playback path.
 - **Nothing in this plan changes `src/sim/`.** If a task seems to need it, stop and ask; `src/sim/gods.js`
   and `src/sim/door.js` belong to the hamlet-mythos session.
 - **`src/ui/derive.js` and `src/ui/keys.js` have no DOM.** Every pure part goes there so `tests/ui.js`
