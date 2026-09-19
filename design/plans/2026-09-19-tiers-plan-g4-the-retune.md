@@ -191,7 +191,7 @@ This is what lets a player reach winter. A ladder cannot: at an hour a wall seco
 
 ### The instrument
 
-**This is a present defect, it lands before task 1, and it is not G4's to carry.** It is written here because G4 makes it worse and because every gate in this plan reads through it.
+**This is a present defect, it lands before task 1, and it is not G4's to carry.** It is written here because G4 makes it worse and because every gate in this plan reads through it. It is fixed on branch `chronicle-sink` in PR 50, which is dev's and not this plan's; task 1 merges dev to pick it up.
 
 `log()` at `src/sim/core.js:165` trims: `chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();`. The live chronicle holds the last 300 lines. The collector in `tests/lib/run.js` takes lines by scraping that window, and its own comment at line 29 states the condition it depends on: "a run that wants them all must take each line as it appears."
 
@@ -214,7 +214,7 @@ For task 4 the same fault threatens the skip's gate in both directions. The step
 
 The proof is `startWorld('sweep23')`, which drops 665 lines today with no new engine behaviour. That is better than a constructed jump: it exercises the real path, and it goes on working as a regression test after the skip exists.
 
-Affected: every test that builds a collector — `tests/soak.js`, `tests/names.js`, `tests/door.js`, `tests/gnomes.js`, `tests/settle.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/ui.js`, `tests/trace-deaths.js`. **`tests/ages.js` is not affected**, which I confirmed rather than assumed: it calls `load()` directly, builds no collector, and takes no fingerprint.
+Affected: every test that builds a collector — `tests/soak.js`, `tests/names.js`, `tests/door.js`, `tests/gnomes.js`, `tests/settle.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/ui.js`, `tests/trace-deaths.js`. **`tests/ages.js` is not affected**, which I confirmed rather than assumed: it calls `load()` directly, builds no collector, and takes no fingerprint. Grepping `fingerprint` in the tests does return `tests/ages.js`, which looks like it contradicts that. It does not: the only match is the word inside a comment at line 70, and there is no call. dev-coordinator hit the same false positive, so it is recorded here rather than left for the next person to re-derive.
 
 ### The player's gate
 
