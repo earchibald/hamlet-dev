@@ -49,7 +49,23 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .btn.on kbd{opacity:.85}
 .btn .pin{margin-left:4px;opacity:.85}
-.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%}
+#timeline{display:none;background:var(--panel);border-top:1px solid var(--line);padding:3px 10px 5px;font-size:12px;overflow:hidden}
+#timeline.on{display:block}
+#timeline:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#timeline.focus{border-top-color:var(--accent);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+#timeline .tlhead{display:flex;align-items:center;gap:8px;color:var(--muted);font:500 11px "JetBrains Mono",monospace}
+#timeline .tlhead .sp{margin-left:auto;display:flex;gap:4px}
+#timeline .lane{display:flex;align-items:center;gap:4px;margin-top:2px;white-space:nowrap;overflow:hidden}
+#timeline .who{flex:none;width:96px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
+#timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
+#timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* The unfolded lanes carry one cell per age, so every cell takes the same width and a column
+   lines up. The folded row is one stream in age order and keeps its own natural width. */
+#timeline .lane.fixed .cell{flex:none;width:84px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#timeline .cell.blank{cursor:default;border-color:transparent}
+#timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
 .strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -84,6 +100,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
 #foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
+#foot .chiprow.taken{color:var(--accent);font-weight:700}
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
@@ -210,6 +227,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div id="drawers"></div>
     <div id="windows"></div>
   </main>
+  <div id="timeline" tabindex="0" aria-label="The timeline of the ages"></div>
 </div>
 <div id="tip" class="tip ins" role="tooltip" hidden></div>
 <dialog id="start">
@@ -224,6 +242,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="help">
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
+  <p class="muted">[ and ] show more or fewer ages while the timeline is focused. Elsewhere they change level.</p>
   <h2>Muted</h2>
   <div id="helpMuted"></div>
   <h2>The lost people</h2>
@@ -6508,6 +6527,9 @@ const ui = {
   sticky: false,       /* true keeps a one-shot tool selected after it is used */
   recent: [],          /* labels of the last commands run through the palette, newest first, at most five */
   overlay: false,      /* the countries drawn over the world map in the days */
+  timelineFold: true,  /* the timeline is one row; false is a row for each god */
+  timelineZoom: 0,     /* 0 keeps the near ages large; each step out doubles the span */
+  timelineChip: null,  /* the chip the player opened, `age:god`, or null. Not a preference: it names one act of one creation. */
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
@@ -6522,7 +6544,7 @@ let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -6531,6 +6553,8 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
+    if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
@@ -6847,9 +6871,105 @@ function drawerRows(id){
   return [];
 }
 
+/* ---------- the timeline ----------
+   The record of the creation, laid flat under the map. It reads `creation.choices`, which the sim
+   keeps: one entry for each god that decided in each age, with that god's whole scored option list,
+   what it picked, and what failed to apply. The view neither sorts nor scores. Nothing here reaches
+   into a rule, and nothing here changes one. */
+
+/* How many ages the band covers. Zoom 0 is the default and keeps the near ages large; each step out
+   doubles the span. The span never begins before age one, and never ends before the live age. */
+const TL_SPAN = 12, TL_ZOOM_MAX = 9;
+function timelineSpan(zoom, now){
+  const want = TL_SPAN * Math.pow(2, Math.max(0, Math.min(TL_ZOOM_MAX, zoom)));
+  return { from: Math.max(1, now - want + 1), to: Math.max(1, now) };
+}
+
+/* One cell's words. A carried act says so. A free choice names what it took, or says the ground
+   refused every option it had. */
+function tlCellText(rec, withWho){
+  const g = beingById(rec.god);
+  const who = withWho && g ? `${g.name}: ` : '';
+  if (rec.continued) return `${who}carries on`;
+  if (!rec.picked) return `${who}finds nothing it can do`;
+  return `${who}${rec.picked}`;
+}
+
+/* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
+   cell, blank so timeline.js can draw it and give it the filled cell's own width. */
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+
+function timelineModel(){
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  if (!inAges() || !creation || !creation.choices) return empty;
+  const now = age;
+  const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
+  if (ui.timelineFold !== false){
+    return { shown: true, folded: true, from, to, now, marks: [],
+      rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
+  }
+  /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
+     where the row has something to show and blank where it does not. That is the whole point of the
+     unfolded view, so a player can read down a column and see what several gods did at once. */
+  const rows = [];
+  for (const g of gods()){
+    const mine = inSpan.filter(c => c.god === g.id);
+    if (!mine.length && g.status !== 'awake') continue;
+    const byAge = new Map(mine.map(r => [r.age, r]));
+    const cells = [];
+    for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
+    rows.push({ id: g.id, label: g.name, cells });
+  }
+  /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
+     `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
+     about now, so it sits under the now-line, in the last cell of the span; every earlier age is blank. */
+  const gate = creation.gate;
+  const gateCells = [];
+  for (let a = from; a <= to; a++){
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+  }
+  rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
+  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+}
+
+/* One chip, opened. The matrix is the record's own, in the record's own order. */
+function chipMatrix(key){
+  if (!key || !creation || !creation.choices) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  const rec = creation.choices.find(c => c.age === a && c.god === id);
+  if (!rec) return null;
+  const g = beingById(rec.god);
+  return { age: rec.age, god: rec.god, name: g ? g.name : 'someone gone', picked: rec.picked || null,
+    byPlayer: !!rec.byPlayer, continued: !!rec.continued, opts: rec.opts || [] };
+}
+
+/* What the foot says about an opened chip. The head names the god, the age, and what it did. The rows
+   are the matrix as the record holds it, at most four, so the foot stays shallow on a laptop.
+   decideGod walks its options in order and marks every one it cannot land as failed, so for a record
+   the engine wrote, the taken row is the first option that is not failed: that is the order the
+   engine tried them in. A player, by contrast, takes an option by name at any index, and only that
+   row's `failed` flag is ever set; an earlier untried row would then wrongly read as the one taken.
+   So for a `byPlayer` record no row is marked taken here — the head already says the hand was the
+   player's. A continued record, or one where every option failed, has no taken row either. Where a
+   taken row exists it always shows, even when several failed options would push it past the four-row
+   cap: then the first three rows show, and the taken row takes the fourth place in place of whichever
+   row it would have displaced. */
+function footChip(){
+  const m = chipMatrix(ui.timelineChip);
+  if (!m) return null;
+  const did = m.continued ? 'carries on' : m.picked ? `takes ${m.picked}` : 'finds nothing it can do';
+  const hand = m.byPlayer ? ', by your hand' : '';
+  const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
+  const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
+  const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
+  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+}
+
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
@@ -6911,7 +7031,10 @@ function winClose(id){ ui.windows = ui.windows.filter(w => w.id !== id); if (ui.
 /* Where Tab goes: the map, each docked drawer in order, then each window in order. */
 function focusRing(){
   const out = ui.windows.filter(w => w.kind === 'drawer').map(w => w.target);
-  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`)];
+  /* The timeline is out of the ring once a world is settled: `creation` is still set, but the ages are over
+     and the band has nothing live to show. Before any world is made the band is not shown either, so Tab
+     must not stop on it. */
+  return ['map', ...ui.open.filter(id => !out.includes(id)).map(id => `drawer:${id}`), ...ui.windows.map(w => `window:${w.id}`), ...(inAges() ? ['timeline'] : [])];
 }
 
 /* The command palette's rows. Static rows come from the key map, one per label. Dynamic rows are built on open.
@@ -7024,6 +7147,11 @@ const KEYMAP = [
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
+  { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
+  /* The same two keys as the levels. A focused row beats an `any` row, so they zoom the timeline's
+     own time axis while the timeline holds focus, and change level everywhere else. */
+  { key: '[',          focus: 'timeline', action: 'zoomTimelineOut', label: 'Timeline: more ages', button: 'tlOut' },
+  { key: ']',          focus: 'timeline', action: 'zoomTimelineIn',  label: 'Timeline: fewer ages', button: 'tlIn' },
   { key: 'ArrowLeft',  focus: 'map', action: 'cursor', arg: [-1, 0, 1], label: 'Cursor west' },
   { key: 'ArrowRight', focus: 'map', action: 'cursor', arg: [1, 0, 1],  label: 'Cursor east' },
   { key: 'ArrowUp',    focus: 'map', action: 'cursor', arg: [0, -1, 1], label: 'Cursor north' },
@@ -7605,6 +7733,68 @@ function drawLoc(){
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
+/* The timeline: the record of the creation, laid flat under the map. It draws the model and nothing
+   else. It builds nodes and sets textContent, so no string out of the simulation is ever parsed as
+   markup. Do not bring innerHTML in here. */
+function tlButton(id, text, key){
+  const b = document.createElement('button');
+  b.className = 'btn small'; b.id = id; b.textContent = text;
+  const k = document.createElement('kbd'); k.textContent = key; b.appendChild(k);
+  return b;
+}
+function tlCell(c){
+  if (!c.chip){
+    const s = document.createElement('span');
+    s.className = 'cell' + (c.blank ? ' blank' : '');
+    s.textContent = c.text;
+    if (c.text) s.title = c.text;
+    return s;
+  }
+  const b = document.createElement('button');
+  b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
+  b.dataset.chip = c.chip; b.textContent = c.text; b.title = c.text;
+  return b;
+}
+function drawTimeline(){
+  const el = $('timeline'); if (!el) return;
+  const m = timelineModel();
+  el.classList.toggle('on', m.shown);
+  /* `ui.focus` is not DOM focus, so the band must show its own. `[` and `]` change meaning with it. */
+  el.classList.toggle('focus', m.shown && ui.focus === 'timeline');
+  el.replaceChildren();
+  if (!m.shown) return;
+  const head = document.createElement('div'); head.className = 'tlhead';
+  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
+  const sp = document.createElement('span'); sp.className = 'sp';
+  sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
+            tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
+  head.append(span, sp); el.appendChild(head);
+  for (const r of m.rows){
+    const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
+    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
+    lane.appendChild(who);
+    for (const c of r.cells) lane.appendChild(tlCell(c));
+    const now = document.createElement('span'); now.className = 'now';
+    lane.appendChild(now);
+    el.appendChild(lane);
+  }
+}
+
+/* One handler for the whole band. A click on a cell opens or closes it. A click anywhere in the band
+   gives the timeline focus, so `[` and `]` zoom instead of changing level. */
+const TL_BUTTONS = { foldTl: 'foldTimeline', tlOut: 'zoomTimelineOut', tlIn: 'zoomTimelineIn' };
+function initTimeline(){
+  const el = $('timeline'); if (!el) return;
+  el.addEventListener('click', e => {
+    ACTIONS.focusTimeline();
+    const cell = e.target.closest('[data-chip]');
+    const btn = e.target.closest('button');
+    if (cell) ACTIONS.openChip(cell.dataset.chip);
+    else if (btn && TL_BUTTONS[btn.id]) ACTIONS[TL_BUTTONS[btn.id]]();
+    renderUI(true);
+  });
+}
+
 /* Inspection: the hover card and the window card for a being or a tile. */
 
 /* ---- inspection ---- */
@@ -7843,6 +8033,7 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
+  drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
@@ -7953,12 +8144,20 @@ const DRAWER_RENDER = { people: renderPeople, goals: renderGoals, chronicle: ren
 /* A note wins the foot for four seconds. Then the newest chronicle line comes back.
    The cursor phrase always shows first, in its own span; the note or chronicle line follows. */
 const NOTE_MS = 4000;
+/* The chip's line for the foot: its head, then its rows as their act and their score, a failed
+   row saying the ground refused it, and the taken row marked so the player can tell which option
+   the head's verb refers to. Every string here came from the simulation, so it passes through esc. */
+function chipFootLine(chip){
+  const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('<span class="muted">·</span>');
+  return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${cursorPhrase()}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${ui.note.text}</span>`; return; }
   ui.note = null;
+  const chip = footChip();
   const e = chronicle[0];
-  const line = ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`;
+  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${e.when}</span><span class="k-${e.kind}">${e.text}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
@@ -8086,7 +8285,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
@@ -8144,6 +8343,8 @@ function onLoad(){
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* The opened chip named one act of one creation that no longer exists. */
+  ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   cursor = { x: clamp(cursor.x, 0, W - 1), y: clamp(cursor.y, 0, H - 1), z: clamp(cursor.z, ZMIN, ZMAX) };
   cur = { sx: clamp(cur.sx, 0, SW - 1), sy: clamp(cur.sy, 0, SH - 1) };
@@ -8222,6 +8423,11 @@ function onSettle(){
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
+  /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
+     could close it again, and the foot would print that act in place of the newest chronicle line. */
+  ui.timelineChip = null;
+  /* The band leaves the focus ring at settle. A focus left on it sends `[` and `]` to a hidden band. */
+  if (ui.focus === 'timeline') ui.focus = 'map';
   const a = firstPerson();
   if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
   say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
@@ -8311,6 +8517,15 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
+     is on its own time axis and never touches the map's levels. */
+  foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },
+  zoomTimelineOut(){ ui.timelineZoom = Math.min(TL_ZOOM_MAX, (ui.timelineZoom | 0) + 1); persist(); renderUI(true); },
+  zoomTimelineIn(){ ui.timelineZoom = Math.max(0, (ui.timelineZoom | 0) - 1); persist(); renderUI(true); },
+  /* A click anywhere in the band gives it the focus, so `[` and `]` zoom instead of changing level. */
+  focusTimeline(){ ui.focus = 'timeline'; },
+  /* One act of one creation, opened into the foot. The same chip twice closes it. */
+  openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
@@ -8441,6 +8656,7 @@ function initUI(){
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
   wireWindows();
+  initTimeline();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
