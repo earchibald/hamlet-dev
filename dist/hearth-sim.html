@@ -506,6 +506,14 @@ const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
    read a value that still means what it always meant rather than one that became 86 times shorter
    the day the day got longer.
 
+   The two duration markers round, and that is not tidiness. A tick is one world second and a
+   duration counted in ticks must be a whole number of them, because rules compare durations with
+   `%`. `strides(6)` is 1036.8 exactly, and `++progress % 1036.8` is never zero for a whole
+   `progress`, so a rule written that way stops firing altogether and does not fail: the berry is
+   never picked and the picker picks for ever. That is what happened here, and nothing went red.
+   Every duration this table holds is therefore a whole number of ticks, and `tests/clock.js`
+   asserts it, so the next non-integer duration is caught by a test and not by a stuck villager.
+
    The rates convert the other way, by division, for the same reason. A chance of 0.0006 a tick used
    to come up about once in 1,700 ticks, which was under two world days; left alone it would come up
    about once every half hour. Lightning would strike a camp eighty-six times as often and nothing
@@ -516,7 +524,7 @@ const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
    not convert one because it happens to equal a round world unit: the arithmetic is free and the
    reading is not, and a value that arrives at its task already looking settled is not asked the
    question the task owes it. A marker may be removed, never added. */
-const ticks = n => n * 86.4, strides = n => n * 172.8, tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+const ticks = n => Math.round(n * 86.4), strides = n => Math.round(n * 172.8), tickRate = p => p / 86.4, strideRate = p => p / 172.8;
 
 /* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
    because the seasons are not all the same length.

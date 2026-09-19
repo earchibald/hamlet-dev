@@ -78,11 +78,15 @@ test('night runs from 20:00 to 06:00', () => {
    test they would hold whatever `ticks` did. */
 test('every marker converts the old clock, and none is an identity', () => {
   const api = load();
-  /* A tick of the old 1000-tick day is 86.4 world seconds. A stride was two of those ticks. */
-  assert.equal(api.ticks(1), 86.4);
+  /* A tick of the old 1000-tick day is 86.4 world seconds and a stride was two of those, but both
+     round: a duration is a whole number of world seconds. The rounding shows only on values that do
+     not land on one, which is why the whole-number test above exists rather than this one. */
+  assert.equal(api.ticks(1), 86);
+  assert.equal(api.ticks(5), 432);
   assert.equal(api.ticks(1000), api.days(1));
   assert.equal(api.ticks(500), api.hours(12));
-  assert.equal(api.strides(1), 172.8);
+  assert.equal(api.strides(1), 173);
+  assert.equal(api.strides(6), 1037);
   assert.equal(api.strides(500), api.days(1));
   /* The rates divide, because a rate a tick spread over 86.4 times as many ticks must be that much
      smaller to mean the same thing. Left as identities they would fire 86 times as often and no
@@ -90,6 +94,28 @@ test('every marker converts the old clock, and none is an identity', () => {
   assert.equal(api.tickRate(86.4), 1);
   assert.equal(api.strideRate(172.8), 1);
   assert.ok(Math.abs(api.tickRate(0.0006) * api.days(1) - 0.6) < 1e-9, 'a chance a tick no longer means what it meant a day');
+});
+
+/* A duration is a whole number of world seconds, because rules compare durations with `%` and a
+   fractional period never divides a whole tick count. `strides(6)` was 1036.8 and
+   `++progress % 1036.8` is never zero, so berry picking stopped finishing and the picker picked for
+   the whole day. Nothing went red: the rule did not fail, it stopped happening. This is the test
+   that catches the next one. A rate is exempt, since it is a fraction by its nature and is never
+   counted in ticks. */
+test('every duration in the table is a whole number of ticks', () => {
+  const C = load().CLOCK;
+  const RATE_KEYS = new Set(['rate', 'cold', 'fire', 'chance', 'villageChance', 'copyChance', 'birthChance', 'mossChance', 'berryGrow', 'bushDies', 'berryWither', 'bushSeeds', 'shroomGrow', 'pineFalls', 'stickDrops', 'ashHeals', 'saplingSprouts', 'samples', 'burn', 'stormQuench', 'spread', 'stormSpread', 'over', 'slower']);
+  const bad = [];
+  const walk = (o, path) => {
+    for (const k in o){
+      if (RATE_KEYS.has(k)) continue;
+      const v = o[k];
+      if (v && typeof v === 'object') walk(v, path + k + '.');
+      else if (typeof v === 'number' && !Number.isInteger(v) && Math.abs(v) >= 1) bad.push(`${path}${k} = ${v}`);
+    }
+  };
+  walk(C, 'CLOCK.');
+  assert.deepEqual(bad, [], 'a duration that is not a whole number of ticks never divides a tick count, so a rule that compares it with % silently stops firing');
 });
 
 test('perHour spreads an hourly rate over the ticks of an hour', () => {
