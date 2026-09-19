@@ -953,14 +953,41 @@ one; that `H` asks; that `Take a god` opens paused. E2's lesson stands — the l
 test and was found by measuring the page. **A background Safari tab runs no frames**, so `onSettle()` is
 not called and the era boundary looks broken when it is not; call the frame by hand when crossing it.
 
-- [ ] **Step 3: Write section 19's new subsection**
+- [ ] **Step 3: Prove a door log replays the same at two paces**
+
+This is the gate that matters, because the golden cannot see it. The golden fixes the random number
+stream, so a suspension point, a stop position and who-acted-when move no number in it — and a paced
+view is made almost entirely of that class of behaviour. A green soak carries close to no information
+about what this branch changed.
+
+Run one seed to settle twice, once at `PACES[0]` and once at `PACES[3]`, and compare the door log and
+the fingerprint. They must be identical. A difference means pacing reached the door, which the spec
+forbids. Record both fingerprints in the PR body; that one line is worth more than any count of passing
+view tests.
+
+Then grep the BUILT page, not `src/sim/index.js`, for any test-only accessor this branch added:
+
+```bash
+node build.js && grep -c 'beatStill\|__pace' dist/hearth-sim.html
+```
+
+`source()` is what `build.js` inlines and the API string is test-only, but only the artifact proves it.
+
+- [ ] **Step 4: State where the branch's numbers live**
+
+G4, the retune, is coming and it moves what a tick means. `BEAT_MS` and `PACES` are real-time values
+that sit close to it. Say in the PR body, in one line, whether any E3 value is expressed in engine ticks
+rather than in milliseconds — including when the answer is none. A stated "there is none" and silence
+look the same in a diff, and only one of them is true.
+
+- [ ] **Step 5: Write section 19's new subsection**
 
 Add "The beat (E3)" under section 19 of `design/notes.md`, in the file's voice: what a beat is, why Step
 cut before, the four conditions `gods.js` set and why, the ladder and why nothing is above double, the
 mark language, and the measured length of a creation (43 to 110 acts). Record the `tellIfGone` timing
 change, and the headless-frames caveat from the memory note.
 
-- [ ] **Step 4: Commit and open the PR**
+- [ ] **Step 6: Commit and open the PR**
 
 ```bash
 git add -A && git commit -m "Notes: what the beat is, and what it cost"
