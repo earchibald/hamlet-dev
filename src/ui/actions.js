@@ -264,7 +264,8 @@ const ACTIONS = {
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
+  hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },

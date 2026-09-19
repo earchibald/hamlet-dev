@@ -63,6 +63,8 @@ function initUI(){
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
+  $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
   document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });

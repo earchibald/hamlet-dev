@@ -237,6 +237,12 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
 </dialog>
+<dialog id="hurry">
+  <h2>Hurry to the valley?</h2>
+  <p>The rest of the creation happens at once. You will see the valley it made, and none of the making.</p>
+  <p class="muted" id="hurryLeft"></p>
+  <p><button class="btn" type="button" id="hurryGo">Hurry<kbd>Enter</kbd></button> <button class="btn" type="button" id="hurryStay">Stay and watch<kbd>Esc</kbd></button></p>
+</dialog>
 <!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
 <input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">
@@ -7196,7 +7202,7 @@ const KEYMAP = [
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
   { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
-  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -8251,6 +8257,15 @@ function muteChoice(k){
   if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
+/* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it
+   is open, as they hold behind any dialog. */
+function openHurry(){
+  closeDialogs();
+  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  ui.focus = 'dialog:hurry';
+  $('hurry').showModal();
+  $('hurryGo').focus();
+}
 function openHelp(){
   closeDialogs();
   const seen = new Set();
@@ -8560,7 +8575,8 @@ const ACTIONS = {
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
+  hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
@@ -8715,6 +8731,8 @@ function initUI(){
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
+  $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
   document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });

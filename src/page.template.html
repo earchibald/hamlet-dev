@@ -237,6 +237,12 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
 </dialog>
+<dialog id="hurry">
+  <h2>Hurry to the valley?</h2>
+  <p>The rest of the creation happens at once. You will see the valley it made, and none of the making.</p>
+  <p class="muted" id="hurryLeft"></p>
+  <p><button class="btn" type="button" id="hurryGo">Hurry<kbd>Enter</kbd></button> <button class="btn" type="button" id="hurryStay">Stay and watch<kbd>Esc</kbd></button></p>
+</dialog>
 <!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
 <input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">

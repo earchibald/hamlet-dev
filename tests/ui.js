@@ -819,6 +819,15 @@ test('H hurries the ages from any focus', () => {
   assert.equal(typeof api.ACTIONS.hurry, 'function');
 });
 
+test('the hurry asks before it skips, and declining leaves the creation where it stood', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...DERIVE, 'KEYMAP']);
+  const row = api.KEYMAP.find(r => r.action === 'hurry');
+  assert.ok(row, 'H is still the hurry');
+  assert.equal(row.label, 'Hurry to the valley', 'the label says where it goes, not what it skips');
+  const go = api.KEYMAP.find(r => r.action === 'hurryGo');
+  assert.equal(go, undefined, 'the doing of it is not on a key: it is the dialog button');
+});
+
 test('a creation watched age by age is the creation that startWorld runs', () => {
   const a = sim.load(), b = sim.load();
   a.startWorld('gamma');
@@ -957,8 +966,9 @@ test('every action holds in the ages: the view stays on the world, nothing follo
     const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 4, drawer: 'legends', campN: 1,
       cursor: [1, 0, 1], nav: [1, 0], stage: 'fire', goalPri: { id: 'firepit', pri: 1 }, gotoSector: { sx: 0, sy: 0 },
       jumpChip: 1, muteMenu: 1, muteChoice: 1, rowPick: 1, palettePick: 1, paletteMove: 1, unmute: 'x' };
-    /* `hurry` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it. */
-    const SKIP = new Set(['hurry']);
+    /* `hurryGo` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it.
+       `hurry` itself only opens the dialog now, and stays in the loop like any other action. */
+    const SKIP = new Set(['hurryGo']);
     let ran = 0;
     for (const name of Object.keys(api.ACTIONS)){
       if (SKIP.has(name)) continue;

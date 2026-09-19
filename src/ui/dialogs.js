@@ -24,6 +24,15 @@ function muteChoice(k){
   if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
+/* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it
+   is open, as they hold behind any dialog. */
+function openHurry(){
+  closeDialogs();
+  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  ui.focus = 'dialog:hurry';
+  $('hurry').showModal();
+  $('hurryGo').focus();
+}
 function openHelp(){
   closeDialogs();
   const seen = new Set();
