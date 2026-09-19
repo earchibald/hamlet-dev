@@ -4257,12 +4257,22 @@ const DOOR_ACTS = {
     camp = prev;
     return 'Camp site set. The fire pit will go here.';
   },
+  /* Become: the player is the mob. The other three inhabit modes are named in the spec and refused
+     until each is built. Task 3 gives this act its turn lock; here it only names who you are. */
+  become(e){
+    const g = beingById(e.id);
+    if (!g || !g.alive || g.species !== 'god') return 'Only a god can be taken, and only while it lives.';
+    return `You are ${g.name}, ${g.epithet}.`;
+  },
 };
 function inject(event){
   const act = DOOR_ACTS[event.act];
   if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
   if (event.tick !== undefined && event.tick !== tick) return 'Not now.';
-  doorLog.push({ ...event, tick });
+  /* In the gods era an age is the step and the tick stands still, so the age is the stamp that
+     tells one act from another. In the days era nothing changes: the tick is the stamp. */
+  if (era === 'gods' && event.age !== undefined && event.age !== age) return 'Not now.';
+  doorLog.push(era === 'gods' ? { ...event, tick, age } : { ...event, tick });
   return act(event);
 }
 function resetDoor(){ doorLog = []; replayHead = { seed: seedText, options }; }
