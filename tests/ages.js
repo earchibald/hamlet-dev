@@ -26,17 +26,44 @@ function creationOf(seed){
   return { api, ms, gs, contrasts, species: [...species].sort(), scars, perAge, gestures };
 }
 
-/* The gate for Become: a creation run entirely on autopilot is the creation startWorld runs alone.
-   Autopilot is the engine's own chooser, so this must hold on every seed, line for line. */
-function autopilotOf(seed){
-  const api = load(); api.startCreation(seed, {});
+/* The gate for Become: a creation the player drove, turn by turn, is the creation startWorld runs
+   alone. The player takes the top row of the matrix every time a turn opens, which is what the
+   engine's own chooser takes, so every age suspends at the player's god and resumes through the
+   door. Force Actions is on, because a bar is a lens on the matrix and not a rule: with it off a
+   barred top row could not be taken, and the player could not follow the engine.
+   Returns the api and how many turns the player took, so a run that opened none fails. */
+function steeredOf(seed){
+  const api = load(); api.startCreation(seed, { force: true });
   api.step();
-  const awake = api.awakeGods();
-  if (awake.length) api.inject({ source: 'player', act: 'become', id: awake[0].id });
-  api.inject({ source: 'player', act: 'run', until: api.options.ageLimit * 2 + 4 });
-  const max = api.options.ageLimit * 2 + 2;
-  for (let n = 0; api.era === 'gods' && n < max; n++) api.step();
-  return api;
+  const first = api.awakeGods()[0];
+  assert.equal(api.inject({ source: 'player', act: 'become', id: first.id }),
+    `You are ${first.name}, ${first.epithet}.`, 'the first god that wakes is taken');
+  let turns = 0;
+  const max = (api.options.ageLimit * 2 + 2) * 20;
+  for (let n = 0; api.era === 'gods' && n < max; n++){
+    if (api.pending){
+      /* The top row that has not already been refused by the ground. The autonomous god falls down
+         its own matrix the same way, in the same order. */
+      const row = api.pending.opts.find(o => !o.failed);
+      if (row){
+        turns++;
+        const msg = api.inject({ source: 'player', act: 'choose', id: api.pending.god, opt: { type: row.type, region: row.region } });
+        assert.match(msg, /^You \w+\. .+ acts\.$|^The ground refuses it\./, `seed ${seed}: ${msg}`);
+        continue;
+      }
+      /* Nothing on the table can land. Hand the god back and let it fall through the same failures. */
+      api.inject({ source: 'player', act: 'become', id: null });
+      api.step();
+      continue;
+    }
+    const me = api.inhabited && api.beingById(api.inhabited.id);
+    if ((!me || me.status !== 'awake') && api.awakeGods().length){
+      const g = api.awakeGods()[0];
+      assert.equal(api.inject({ source: 'player', act: 'become', id: g.id }), `You are ${g.name}, ${g.epithet}.`);
+    }
+    api.step();
+  }
+  return { api, turns };
 }
 
 const rows = [];
@@ -72,9 +99,10 @@ for (const seed of SEEDS){
     for (const kind of api.KINDS) assert.ok(species.some(sp => api.SPECIES[sp][kind]), `seed ${seed} never made a ${kind}`);
   });
 
-  test(`seed ${seed}: an autopiloted creation is an unwatched one`, () => {
+  test(`seed ${seed}: a creation the player drove is an unwatched one`, () => {
     const a = load(); a.startWorld(seed);
-    const b = autopilotOf(seed);
+    const { api: b, turns } = steeredOf(seed);
+    assert.ok(turns > 0, 'no turn ever opened: the age never suspended');
     assert.equal(b.era, 'days');
     assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
     assert.equal(b.tick, a.tick);
