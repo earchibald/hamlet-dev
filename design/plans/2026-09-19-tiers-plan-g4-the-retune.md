@@ -216,6 +216,28 @@ The proof is `startWorld('sweep23')`, which drops 665 lines today with no new en
 
 Affected: every test that builds a collector — `tests/soak.js`, `tests/names.js`, `tests/door.js`, `tests/gnomes.js`, `tests/settle.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/ui.js`, `tests/trace-deaths.js`. **`tests/ages.js` is not affected**, which I confirmed rather than assumed: it calls `load()` directly, builds no collector, and takes no fingerprint. Grepping `fingerprint` in the tests does return `tests/ages.js`, which looks like it contradicts that. It does not: the only match is the word inside a comment at line 70, and there is no call. dev-coordinator hit the same false positive, so it is recorded here rather than left for the next person to re-derive.
 
+### The check a change cannot run on itself
+
+Three faults met while writing this plan turned out to be one fault. Each was a test that lived inside the condition it was meant to verify, so it agreed with the thing it was supposed to catch.
+
+| The test | The condition it lived inside | What it could not see |
+|---|---|---|
+| The golden record | the random number stream | anything that moves no number: a suspension point, a stop position, who acted when, the skip's horizon |
+| A skip compared against a stored record | the numbers that were drawn | a broken skip that draws the same numbers and agrees with the file |
+| The chronicle sink's own tests | a sink that is set | that it stays null where it must, which only a run of the built page could show |
+
+None of the three was caught by care. Each was caught by somebody outside the change asking what ran in the state the change's own tests never entered.
+
+**So every task answers this before it opens its pull request**, in one or two sentences in the commit, and names what it ran:
+
+- What state does this change have that its tests never enter? A flag off, a seam absent, a branch not taken, a rate not used.
+- What runs in that state, and who checked it? If the answer is only the built page, say so and run the page.
+- Is any comparison here made against a record rather than against the thing being preserved? If so, say why the record cannot agree with the fault.
+
+A task with no such state says so in a sentence. The wrong answer is silence, because silence and "there is none" look the same in a diff and only one of them is true.
+
+This check is structurally one an author is worst placed to run, so a task reporting it honestly is worth more than a task passing it. Answering "I did not check that" is a result.
+
 ### The player's gate
 
 Ruling 1 makes playability a condition of the merge, so it needs a threshold somebody else can check. These are measured in a browser on the built `dist/hearth-sim.html`, on seed `r` and on one other named seed, from a new world.
