@@ -155,6 +155,34 @@ test('a person who died on tick zero still holds their row for a day', () => {
   assert.equal(api.peopleRows().some(r => r.a === a), false, 'the dead stay a day, no longer');
 });
 
+test('state lines: a mauled person is told the wolves keep off, and only a living person is told', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'stateLines']); api.startWorld('r');
+  api.camp = api.camps[0];
+  const a = api.firstPerson(); a.camp = api.camps[0]; a.alive = true; a.inDark = false;
+  api.tick = 1000;
+  const wolfLine = 'The wolves keep their distance for now.';
+
+  a.cooldown.stalked = api.tick + 500;
+  assert.deepEqual(api.stateLines(a), [wolfLine], 'a wait still running says the wolves keep off');
+  a.cooldown.stalked = api.tick;
+  assert.deepEqual(api.stateLines(a), [], 'the wait ends on the tick it names');
+  a.cooldown.stalked = api.tick - 500;
+  assert.deepEqual(api.stateLines(a), [], 'a wait long past says nothing');
+
+  a.cooldown.stalked = api.tick + 500; a.inDark = true;
+  assert.deepEqual(api.stateLines(a), ['In the dark without a brand.', wolfLine], 'the dark line comes first');
+  a.inDark = false;
+
+  a.alive = false;
+  assert.deepEqual(api.stateLines(a), [], 'the dead carry no state line');
+  a.alive = true;
+
+  const cool = { stalked: api.tick + 500 };
+  assert.deepEqual(api.stateLines({ species: 'wolf', alive: true, cooldown: cool }), [], 'a beast carries none');
+  assert.deepEqual(api.stateLines({ species: 'god', alive: true, cooldown: cool }), [], 'a god carries none');
+  assert.deepEqual(api.stateLines(null), [], 'nobody carries none');
+});
+
 test('the view key changes when the world does, and holds still when nothing does', () => {
   const api = day21(); const k1 = api.viewKey();
   assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');
