@@ -134,8 +134,8 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;
-/* The valley down to one person. doomAt is 0 unless the line is doomed. It holds the tick a lone
-   wanderer may arrive on once the chronicle has said the line cannot go on. */
+/* The valley down to one person who keeps a cold hearth. doomAt is 0 unless that holds. It holds the
+   tick a founder may walk in on, far from them, once the chronicle has said the line ends with them. */
 let doomAt = 0;
 /* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
    regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
@@ -157,10 +157,23 @@ function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
+/* A test seam, and the only way to see every line. `chronicle` keeps its last 300 and drops the
+   rest, so anything that reads the chronicle after the fact can miss what was written between two
+   looks. `chronicleSink`, when a harness sets it, takes each line as it is written instead.
+   `chronicleWritten` counts every line ever written in this scope, and never resets, so a harness
+   can prove it missed nothing and can tell that it started watching late.
+
+   Nothing in the game sets the sink. It is null on the page, no rule reads it, it draws no random
+   number, and it is in `NOT_SAVED`, so a loaded save cannot install one. A harness may observe more
+   than the player. It must not make the world it observes a different world. */
+let chronicleSink = null, chronicleWritten = 0;
+
 /* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
    for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
 function log(text, who = [], kind = 'info', tag = null){
   const e = { tick, when: stamp(), text, kind, tag, camp: camp ? camp.id : null };
+  chronicleWritten++;
+  if (chronicleSink) chronicleSink.push(e);
   if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
   /* The history keeps the last forty lines only. A deed must outlast that, so a tagged line also

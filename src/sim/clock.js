@@ -146,7 +146,19 @@ const CLOCK = {
     wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
     chance: 0.7, villageChance: 0.85,
     afterTheLast: days(10),                       // with no person alive in the valley, the wait before a lone wanderer crosses the hills
-    afterTheDoomed: days(10),                     // with one person alive, how long the hearth must be cold before the line counts as doomed
+    afterTheDoomed: days(10),                     // with one person alive, how long their hearth must be cold before the line counts as ended
+    /* After a founding fails for want of ground, before the valley is looked over again. The same case
+       as CLOCK.den.digRetry, and today the same value: a try that found nothing waits a little rather
+       than asking the world again every tick.
+       Do not rewrite `digRetry` as hours(12) to match this. `ticks()` marks a duration whose meaning
+       in real time nobody has decided yet. It is a to-do item, and the retune is finished when none is
+       left. The retune's own task settles the den group, having read each value, and the question it
+       owes this one is whether half a world day is the right wait for a driven-out wolf. That the two
+       agree in value today is arithmetic, not a reason to make them agree in spelling: a value that
+       arrives at that task already looking settled does not get asked the question.
+       Only the task that owns a group converts that group's markers. A new value is never written with
+       one, so hours(12) beside a marked neighbour is the state the table is meant to be in. */
+    foundRetry: hours(12),
   },
   party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },   // foodKeeps: what the stash keeps is under `food`
   storm: {

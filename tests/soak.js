@@ -116,13 +116,16 @@ const SAVE_SEED = 'x', SAVE_DAY = 35;
 test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells the same story to day ${DEFAULT_DAYS}`,
   { skip: !isDefault ? 'not the default run' : !golden[SAVE_SEED] ? `no golden line for seed ${SAVE_SEED} yet` : false }, t => {
   const t0 = Date.now(), half = SAVE_DAY * DAY;
-  const a = load(); a.startWorld(SAVE_SEED);
-  const ca = collect(a); ca.drain(); runOn(a, 0, half, ca);
+  const a = load(); const ca = collect(a); a.startWorld(SAVE_SEED);
+  runOn(a, 0, half, ca);
   const snap = JSON.parse(JSON.stringify(a.takeSnapshot()));
   const b = load();
   assert.equal(b.loadSnapshot(snap), null, 'the save was refused');
-  const cb = collect(b); cb.skipPresent();
+  /* The collector goes on after the load, so it takes the loaded world's own new lines and not the
+     window the snapshot restored. */
+  const cb = collect(b);
   runOn(b, half, DEFAULT_DAYS * DAY - half, cb);
+  ca.check(`${SAVE_SEED} before the save`); cb.check(`${SAVE_SEED} after the load`);
   const events = ca.events.concat(cb.events), fp = fingerprint(b, events);
   t.diagnostic(`${SAVE_SEED}: ${Date.now() - t0} ms, saved on day ${SAVE_DAY}, ${events.length} chronicle lines`);
   const g = golden[SAVE_SEED];

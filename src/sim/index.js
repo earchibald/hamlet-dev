@@ -20,8 +20,13 @@ function source(){
 }
 
 /* The names the tests reach into. State is exposed with getters, because the
-   sim reassigns `beings`, `items`, and `camp` as it runs. */
+   sim reassigns `beings`, `items`, and `camp` as it runs.
+
+   This whole object is a template literal. So nothing inside it may hold a backtick or a `${`:
+   either ends the string, and the parse error is then reported somewhere else entirely, often in
+   another file's line. Write comments inside it in plain words, with no code quoting. */
 const API = `return {
+  /* A template literal: no backticks and no dollar-brace below this line. */
   mulberry32, streamState, setStreamState,
   SNAPSHOT_VERSION, REFS, REF_KINDS, TILE_DEFAULTS, SAVED_STATE, NOT_SAVED, savedValues, takeSnapshot, unnamedRefs, loadSnapshot, checkOptions,
   get lastLoadFault(){ return lastLoadFault; }, get inhabitedTold(){ return inhabitedTold; },
@@ -30,7 +35,7 @@ const API = `return {
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, stashAdd,
   TASKS, startTask, setTask, taskStop, goTo, workKind,
-  runTask, updateBeing, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, sectorCount, looseCount,
+  runTask, updateBeing, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,
   pathToStop, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
   seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
@@ -58,9 +63,15 @@ const API = `return {
   campName, campNameOf, campHumans, humans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
+  /* The chronicle test seam. This object is built inside a template literal, so no backticks here.
+     watchChronicle(a) points the sink at an array and answers how many lines were already written,
+     so a harness that started late can say so rather than report a short run as a whole one. */
+  get chronicleWritten(){ return chronicleWritten; },
+  watchChronicle(a){ chronicleSink = a; return chronicleWritten; },
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
+  get nextId(){ return nextId; }, get doomAt(){ return doomAt; },
   get groves(){ return groves; }, get corpses(){ return corpses; }, get seedText(){ return seedText; },
   get goalPriority(){ return goalPriority; },
   get doorLog(){ return doorLog; }, get replay(){ return { ...replayHead, log: doorLog }; },
