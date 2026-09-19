@@ -78,8 +78,8 @@ test('a denned wolf whose den floor is unreachable still gets a rest task, not a
   const { api, b, den } = home;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to go home to */
   b.task = null; b.asleep = false;
-  const ok = api.START.home(b);
-  assert.ok(ok, 'START.home should fall back to resting rather than fail');
+  const ok = api.startTask(b, 'home');
+  assert.ok(ok, 'startTask home should fall back to resting rather than fail');
   assert.equal(b.task.type, 'rest', `expected a rest task, got ${b.task && b.task.type}`);
 });
 
@@ -188,7 +188,7 @@ test('a wolf raid takes fish as it takes meat', () => {
   if (!w){ w = api.makeBeing('wolf', c.stashTile[0], c.stashTile[1], null, 0); api.beings.push(w); }
   w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
   api.tick = 22 * 1000;
-  assert.ok(api.START.raid(w), 'the raid should start with fish in the stash');
-  w.task.arrive(w, w.task);
+  assert.ok(api.startTask(w, 'raid'), 'the raid should start with fish in the stash');
+  api.taskStop(w);
   assert.equal(c.stash.fish, 1);
 });

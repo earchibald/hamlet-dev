@@ -33,6 +33,11 @@ function goTo(a, t, x, y, within, z = 0){
 function letGo(a, t){ if (t.cleanup) t.cleanup(t); else if (t.kind && TASKS[t.kind].release) TASKS[t.kind].release(a, t); }
 function endTask(a){ const t = a.task; if (!t) return; letGo(a, t); a.task = null; }
 function failTask(a){ const t = a.task; if (!t) return; letGo(a, t); dropCarried(a); a.task = null; }
+/* A walk with nothing to do at its end. The caller sets the type, the label, and the path. */
+TASKS.walk = { type: 'travel', begin: () => false, stops: [() => 'done'] };
+/* A walk to a place, taken up again if the being is pushed off it. args: at [x, y, z], within. */
+TASKS.walkTo = { type: 'travel', begin: () => false,
+  stops: [(a, t) => goTo(a, t, t.args.at[0], t.args.at[1], t.args.within, t.args.at[2] || 0) || 'done'] };
 function runTask(a){
   const t = a.task; a.status = t.label;
   if (t.wait > 0){ t.wait--; return; }
