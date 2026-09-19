@@ -49,7 +49,18 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .btn.on kbd{opacity:.85}
 .btn .pin{margin-left:4px;opacity:.85}
-.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%}
+#timeline{display:none;background:var(--panel);border-top:1px solid var(--line);padding:3px 10px 5px;font-size:12px;overflow:hidden}
+#timeline.on{display:block}
+#timeline:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#timeline .tlhead{display:flex;align-items:center;gap:8px;color:var(--muted);font:500 11px "JetBrains Mono",monospace}
+#timeline .tlhead .sp{margin-left:auto;display:flex;gap:4px}
+#timeline .lane{display:flex;align-items:center;gap:4px;margin-top:2px;white-space:nowrap;overflow:hidden}
+#timeline .who{flex:none;width:96px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
+#timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
+#timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
 .strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -209,6 +220,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div id="drawers"></div>
     <div id="windows"></div>
   </main>
+  <div id="timeline" tabindex="0" aria-label="The timeline of the ages"></div>
 </div>
 <div id="tip" class="tip ins" role="tooltip" hidden></div>
 <dialog id="start">
@@ -5941,7 +5953,7 @@ function chipMatrix(key){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
@@ -6661,6 +6673,60 @@ function drawLoc(){
 }
 function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
+/* The timeline: the record of the creation, laid flat under the map. It draws the model and nothing
+   else. It builds nodes and sets textContent, so no string out of the simulation is ever parsed as
+   markup. Do not set any element's markup property here. */
+function tlButton(id, text, key){
+  const b = document.createElement('button');
+  b.className = 'btn small'; b.id = id; b.textContent = text;
+  const k = document.createElement('kbd'); k.textContent = key; b.appendChild(k);
+  return b;
+}
+function tlCell(c){
+  if (!c.chip){ const s = document.createElement('span'); s.className = 'cell'; s.textContent = c.text; return s; }
+  const b = document.createElement('button');
+  b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
+  b.dataset.chip = c.chip; b.textContent = c.text;
+  return b;
+}
+function drawTimeline(){
+  const el = $('timeline'); if (!el) return;
+  const m = timelineModel();
+  el.classList.toggle('on', m.shown);
+  el.replaceChildren();
+  if (!m.shown) return;
+  const head = document.createElement('div'); head.className = 'tlhead';
+  const span = document.createElement('span'); span.textContent = `Age ${m.from} to ${m.now}`;
+  const sp = document.createElement('span'); sp.className = 'sp';
+  sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
+            tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
+  head.append(span, sp); el.appendChild(head);
+  for (const r of m.rows){
+    const lane = document.createElement('div'); lane.className = 'lane';
+    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
+    lane.appendChild(who);
+    for (const c of r.cells) lane.appendChild(tlCell(c));
+    const now = document.createElement('span'); now.className = 'now';
+    lane.appendChild(now);
+    el.appendChild(lane);
+  }
+}
+
+/* One handler for the whole band. A click on a cell opens or closes it. A click anywhere in the band
+   gives the timeline focus, so `[` and `]` zoom instead of changing level. */
+const TL_BUTTONS = { foldTl: 'foldTimeline', tlOut: 'zoomTimelineOut', tlIn: 'zoomTimelineIn' };
+function initTimeline(){
+  const el = $('timeline'); if (!el) return;
+  el.addEventListener('click', e => {
+    ui.focus = 'timeline';
+    const cell = e.target.closest('[data-chip]');
+    const btn = e.target.closest('button');
+    if (cell) ACTIONS.openChip(cell.dataset.chip);
+    else if (btn && TL_BUTTONS[btn.id]) ACTIONS[TL_BUTTONS[btn.id]]();
+    renderUI(true);
+  });
+}
+
 /* Inspection: the hover card and the window card for a being or a tile. */
 
 /* ---- inspection ---- */
@@ -6891,6 +6957,7 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
+  drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
@@ -7452,6 +7519,7 @@ function initUI(){
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
   wireWindows();
+  initTimeline();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });

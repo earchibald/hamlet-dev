@@ -8,6 +8,7 @@ function renderUI(force){
   renderClock(); renderFoot();
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
+  drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `World map \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${s.name}, sector ${s.sx},${s.sy}` : `${s.name}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();

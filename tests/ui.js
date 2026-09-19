@@ -734,7 +734,7 @@ function domStub(){
     style: {}, dataset: {}, children: [], scrollTop: 0, offsetWidth: 220, offsetHeight: 140, className: '',
     classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
     setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
-    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){},
+    appendChild(){}, insertBefore(){}, removeChild(){}, remove(){}, replaceChildren(){}, append(){},
     showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
     getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
   };
@@ -1218,6 +1218,23 @@ test('the page says what it asked for, tells the player when a save fails, and s
   /* A slot without a real tick is no slot, in both places that read one. */
   assert.match(dialogs, /typeof lastSave\.tick === 'number' && Number\.isFinite\(lastSave\.tick\)/);
   assert.match(actions, /typeof lastSave\.tick !== 'number' \|\| !Number\.isFinite\(lastSave\.tick\)/);
+});
+
+test('the frame repaints when the timeline changes', () => {
+  const api = loadUI(['state', 'derive'], ['viewKey', 'ui', 'startCreation', 'step']);
+  api.startCreation('gamma', {});
+  for (let n = 0; n < 6; n++) api.step();
+  const a = api.viewKey();
+  api.ui.timelineFold = !api.ui.timelineFold;
+  assert.notEqual(api.viewKey(), a, 'the fold is in the key');
+  const b = api.viewKey();
+  api.ui.timelineChip = '3:2';
+  assert.notEqual(api.viewKey(), b, 'the opened chip is in the key');
+});
+
+test('the timeline builds nodes and never parses markup', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '../src/ui/timeline.js'), 'utf8');
+  assert.doesNotMatch(src, /innerHTML/, 'the band sets textContent, so no sim string is parsed as markup');
 });
 
 module.exports = { loadUI };
