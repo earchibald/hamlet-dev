@@ -99,7 +99,7 @@ So: do not drop the floors and do not promise to keep them. Task 4 measures seco
 
 ## Global Constraints
 
-- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at the commit this plan branches off. Issue 25 lands before task 1 starts. Never check out, stash, or commit in `~/Code/hamlet`.
+- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at cb903eb. Two things land in dev before task 1 starts, and task 1 merges dev rather than waiting on them idly: issue 25's `theLoneFounder` fix, and the collector fix of "The instrument". Neither is G4's work. If either is still open when task 1 is ready, say so and do not work around it. Never check out, stash, or commit in `~/Code/hamlet`.
 - G4 merges into dev through dev-coordinator, which is the only session that merges. A merge into dev publishes the built page to GitHub Pages within about three minutes, so the merge is a release to the public site. There is no staging step and nobody looks at it in between. Ruling 1 means dev must be playable at that merge, and so must the published page one minute later.
 - **G4 lands as one merge.** Build it on the branch, in as many commits as it takes, and merge once. A retune that reaches dev in pieces publishes every piece, and an intermediate state of this plan is exactly the state that can hold neither the golden nor the playability. This reverses the usual preference for landing early: for inert work early is cheap, and for this work every intermediate landing is a public release of a half-retuned world.
 - **The playability gate is a gate, not a report.** "The player's gate" below says what playable means in numbers a person can check on the built page. Task 9 measures it and task 11 repeats it. A task that cannot meet it says so and does not open the pull request.
@@ -175,15 +175,7 @@ Task 3 gives every being the tick of its next act. Task 2 gives every system the
 
 **What proves it.** A seed run by `runTo` and the same seed run tick by tick give the same fingerprint, the same chronicle, and the same layout. That test is the task.
 
-**The instrument has to see everything on both sides, and today it does not.** `log()` at `src/sim/core.js:165` trims: `chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();`. The live chronicle holds the last 300 lines and no more. The soak loses nothing today only because `drain()` in `tests/lib/run.js` runs once per `api.step()`, and in the days era a step is one tick, and no tick logs 300 lines. The harness's own comment at `tests/lib/run.js:29` states that assumption out loud.
-
-The skip breaks it. One step then covers a span, `drain()` runs once for the whole span, and a span dense enough to write more than 300 lines loses its oldest off the end before the collector sees them. `drain()` walks newest-first until it meets a line it has seen; if that line was popped, it silently takes the newest 300 and calls it the span.
-
-That threatens this task's gate in both directions. A stepped run drains every tick and keeps everything, a skipped run drains once a jump and can drop lines, so the two fingerprints differ for a reason that is the harness and not the skip — and the task spends its time hunting a horizon fault that is not there. Worse, a real defect that suppressed some lines could be masked by a trim that dropped the same region, and the gate would pass a broken skip. That is the stored-record problem one level down: a comparison is only sound if the instrument sees everything on both sides.
-
-**Do not raise the 300.** It is a display limit for the player's drawer and it belongs where it is. Make the harness independent of step granularity instead, so that one jump over a thousand ticks and a thousand single steps give the same list by construction. The straightforward shape is a sink in `log()` that the harness sets and that is null otherwise: no rule reads it, it draws no random number, and it goes in `NOT_SAVED` with its reason. Take a different shape if a better one appears, but meet the two conditions — observed as written, not scraped after the fact, and not dependent on how often the harness drains.
-
-**Then assert the instrument.** Count lines written against lines collected and require them equal at the end of every run. This may never fire: no real span may be dense enough to reach 300. Then it costs one assertion, which is the right price for never debugging a mismatch the harness invented.
+**This gate needs the collector fixed first.** See "The instrument", which is a precondition of this plan and not a part of this task. A gate built on the present collector measures the harness.
 
 The comparison is against the stepped run and never against a stored record. A stored record remembers the numbers, and a broken skip that draws the same numbers agrees with it. The golden fixes the random number stream, so anything that moves no number is invisible to it, and the skip's horizon is exactly that kind of thing: a missed beat or a season turned over without a rule reading it can leave the stream untouched and the world wrong. Compare against the thing being preserved, not against a file that only remembers what was drawn. Every way a skip can be wrong — a beat missed, a need that crosses zero inside a jump, a season turned over without a rule reading it — shows as a difference there.
 
@@ -196,6 +188,33 @@ The comparison is against the stepped run and never against a stored record. A s
 Task 9 gives the days era `run({ what: 'day' | 'season' | 'year', at })` and stops on events as well as on times: a death, a birth, a hearth gone out, a person cut off, a newcomer, a goal reached. Each is a tag `log` already takes. A stop fires once, is spent, and writes its line. That is the ages' rule and it does not change.
 
 This is what lets a player reach winter. A ladder cannot: at an hour a wall second, a season is still 36 wall minutes. A run to winter over a skipping engine is seconds, and it stops with a sentence that says where the world got to.
+
+### The instrument
+
+**This is a present defect, it lands before task 1, and it is not G4's to carry.** It is written here because G4 makes it worse and because every gate in this plan reads through it.
+
+`log()` at `src/sim/core.js:165` trims: `chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();`. The live chronicle holds the last 300 lines. The collector in `tests/lib/run.js` takes lines by scraping that window, and its own comment at line 29 states the condition it depends on: "a run that wants them all must take each line as it appears."
+
+Two callers do not honour it.
+
+| Where | What is lost |
+|---|---|
+| `runDays` calls `api.startWorld(seed, opts)` and only then builds the collector, so the whole creation is logged before the collector exists | On seed `sweep23`, 300 lines held against 965 in `legends`: two thirds of the creation gone from the `chronicle` field, and `chronicleLines` wrong by the same amount. Measured by dev-coordinator over 40 creations; the next four worst are 224, 203, 190, 167. The six soak seeds sit at 73 to 121, so nothing is wrong today. |
+| G4's skip makes one step cover a span, so `drain()` runs once for the span | A span that writes more than 300 lines loses its oldest. `drain()` walks newest-first until it meets a seen line; if that line was popped it does not see a gap, it takes the newest 300 and calls it the span. |
+
+Both are the same fault: a gap between when a line is written and when the harness looks. One fix closes both.
+
+The creation case is the more dangerous of the two, because nothing is red. The six soak seeds are short enough that the record is honest, so the fingerprint silently covers less than it claims only for whoever next picks a long-creation seed. **So until this is fixed, do not add a soak seed**: a seed with a long creation gives a truncated chronicle fingerprint and a weaker gate that reports itself as a pass.
+
+For task 4 the same fault threatens the skip's gate in both directions. The stepped side keeps everything and the skipped side can drop lines, so the fingerprints differ for a reason that is the harness and not the skip, and the task hunts a horizon fault that is not there. Worse, a real defect that suppressed lines could be masked by a trim that dropped the same region, and the gate passes a broken skip. That is the stored-record problem one level down: a comparison is sound only if the instrument sees everything on both sides.
+
+**Do not raise the 300.** It is a display limit for the player's drawer, and a display limit that moves to satisfy a test stops being one. Close the gap instead, so that lines are observed as they are written rather than scraped afterwards. Then the creation, a single step, and a jump over a thousand ticks all give the same list by construction. The straightforward shape is a sink in `log()` that the harness sets and that is null otherwise: no rule reads it, it draws no random number, and it goes in `NOT_SAVED` with its reason.
+
+**Assert the instrument too.** Count lines written against lines collected and require them equal at the end of every run, so this cannot come back silently.
+
+The proof is `startWorld('sweep23')`, which drops 665 lines today with no new engine behaviour. That is better than a constructed jump: it exercises the real path, and it goes on working as a regression test after the skip exists.
+
+Affected: every test that builds a collector — `tests/soak.js`, `tests/names.js`, `tests/door.js`, `tests/gnomes.js`, `tests/settle.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/ui.js`, `tests/trace-deaths.js`. **`tests/ages.js` is not affected**, which I confirmed rather than assumed: it calls `load()` directly, builds no collector, and takes no fingerprint.
 
 ### The player's gate
 
@@ -299,7 +318,7 @@ The floors that the three-day run cannot hold are **not** removed until task 4 h
 
 This task answers ruling 2. It is also the task whose numbers decide the floors, so its report goes to the user and the plan waits for a word before task 5 removes anything.
 
-- [ ] **Fix the instrument before writing the gate.** Make the collector independent of step granularity and add the written-against-collected assertion, as "The skip" says. Prove it first: log more than 300 lines inside one jump in a test and show that the old collector drops them and the new one does not. A gate built on the present collector measures the harness.
+- [ ] Check that the collector fix has landed, as "The instrument" says. Do not build this gate on the old collector: it would measure the harness. If the fix has not landed, stop and say so rather than working around it.
 - [ ] Write the failing test in `tests/skip.js`, and write it so that it fails against a `runTo` that merely loops `step()`. Six seeds, three world days, skipped and stepped: the same fingerprint, the same chronicle line for line, and the same `tests/names.js` layout. Then the same over 70 days on seed `r`.
 - [ ] Write the adversarial cases as their own tests, each of which must fail if the horizon ignores it: a need that crosses zero inside a jump; a season that turns inside a jump; a pit that goes out inside a jump; a thought whose `until` falls inside a jump; a stop set inside a jump (task 9 reads this one again).
 - [ ] Build `nextEvent()` and `runTo(t)` as "The skip" says. `nextEvent()` reads the next-act ticks of task 3 and the next-beat ticks of task 2. Nothing in it reads a wall clock.
