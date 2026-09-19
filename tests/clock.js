@@ -293,8 +293,8 @@ test('every event chance names a roll the lint would flag, in the file it names'
     const src = fs.readFileSync(path.join(SIM, f + '.js'), 'utf8');
     const r = RULES.find(r => r.rolls);
     const text = f === 'world' ? src.slice(src.indexOf('function growPlants')) : src;
-    for (const m of text.matchAll(r.re)) if (hasNumber(m[0])) found.add(f + ' ' + m[0].trim());
+    for (const m of text.matchAll(r.re)) if (hasNumber(m[0])) found.add(f + '\0' + m[0].trim());
   }
-  const dead = EVENT_CHANCES.filter(e => !found.has(e.file + ' ' + e.text));
+  const dead = EVENT_CHANCES.filter(e => !found.has(e.file + '\0' + e.text));
   assert.deepEqual(dead, []);
 });
