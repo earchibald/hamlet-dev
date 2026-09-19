@@ -9,7 +9,8 @@ function setTool(id, sticky = false){
 }
 function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
 function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
-function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
+/* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
+function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){

@@ -1911,4 +1911,15 @@ test('a stepped beat plays: the world is paused, and the beat still has a fracti
   assert.equal(api.beatStill(true), true, 'a dialog holds everything, a stepped beat included');
 });
 
+test('un-pausing takes over a beat the player stepped: the running clock owns it from there', () => {
+  /* paused is a plain let, reached the same way as the beatStill test above. */
+  const api = loadUI(['state', 'derive', 'actions'], [...DERIVE, 'beatStill', 'setPaused', 'get paused(){ return paused; }, set paused(v){ paused = v; }']);
+  withPage(() => {
+    api.paused = true; api.ui.playing = true;
+    assert.equal(api.beatStill(false), false, 'the stepped beat plays while the world sits paused');
+    api.setPaused(false);
+    assert.equal(api.ui.playing, false, 'un-pausing ends the stepped beat; the running clock takes the rest of it');
+  });
+});
+
 module.exports = { loadUI };
