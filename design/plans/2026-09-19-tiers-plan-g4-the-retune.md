@@ -22,7 +22,7 @@
 | 8 | The rest of the test suite in world units | `npm run fast` |
 | 9 | The tuning pass, the markers gone, the record, and the before and after report for the user | the long run's report; the user blesses |
 
-The spec is `design/specs/2026-09-18-time-and-tiers-design.md`, sections 0, 1, 10, and the G4 row of section 12. The survey is `.superpowers/sdd/g4-survey.md` (gitignored, in the worktree). It holds the measurements this plan rests on, with file and line. Every task reads it.
+The spec is `design/specs/2026-09-18-time-and-tiers-design.md`, sections 0, 1, 10, and the G4 row of section 12. The survey is `design/reports/2026-09-19-g4-survey.md`. It holds the measurements this plan rests on, with file and line. Every task reads it.
 
 ## What the survey found
 
