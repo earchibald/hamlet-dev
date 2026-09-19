@@ -37,6 +37,7 @@ const CLOCK = {
     freezeHurts: tickRate(0.03), starveHurts: tickRate(0.04), heals: tickRate(0.01), fireHurts: tickRate(2.5),
     oldAgeDeath: tickRate(0.0006),     // past the usual span, divided by hardiness
     sitRests: strideRate(0.05), sitWarms: strideRate(0.4),
+    danceGlows: strideRate(0.6), danceRests: strideRate(0.3), dancePlays: strideRate(0.5), visitPlays: strideRate(0.4),
   },
   limit: {
     ember: ticks(420),        // how long a carried ember lives
@@ -53,6 +54,7 @@ const CLOCK = {
     nibble: strides(15), talk: strides(10), shelterWait: strides(60),
     sit: strides(90), sitChat: strides(25), sitTeach: strides(30), sitTeachAt: strides(15),
     standStill: strides(20), doze: strides(60),
+    eatCarcass: strides(25), eatShrooms: strides(8), denRest: strides(60), kinChat: strides(20),
   },
   /* How often a rule looks. A rule runs when tick % every is 0, or is the `At` entry beside it. */
   every: {
@@ -67,12 +69,38 @@ const CLOCK = {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
     disturb: ticks(1000),             // between two counts of one person in a gnome burrow
+    raid: ticks(1200), stalk: ticks(2000), wolfLine: ticks(300),
   },
   food: {
     cookedKeeps: ticks(1800), berriesKeep: ticks(3500),
     carcassKeeps: ticks(900), venisonKeeps: ticks(1500), fishKeeps: ticks(600),
   },
   birth: { every: ticks(400), chance: 0.35, gap: days(16) },
+  /* Wildlife comes in on a period. `at` is the tick of the period on which the rule runs. */
+  spawn: {
+    rabbitLitter: { every: ticks(250), chance: 0.8 },
+    rabbitStray: { every: ticks(300) },
+    fawn: { every: ticks(2000), at: ticks(1000) },
+    wolf: { every: ticks(10000), at: ticks(2500) },
+    fox: { every: ticks(6000) },
+  },
+  den: {
+    birthEvery: ticks(500), birthGap: days(20),
+    digAfter: days(3), digRetry: ticks(500),   // a driven-out owner digs a new den
+    biteGap: ticks(150),                       // one bite for the whole den
+    campDark: days(1),                         // a hearth out this long lets the owners come back
+  },
+  gnome: { every: ticks(500), copyChance: 0.3, repayGap: days(6), leaveAfter: days(3) },
+  grove: { every: ticks(500), birthGap: days(6), oldPine: days(40), birthChance: 0.5 },
+  sprite: {
+    dance: strides(240), danceSeen: strides(40), mossEvery: strides(200), mossChance: 0.35,
+    visit: strides(160), visitGift: strides(120),
+    prankGap: ticks(300), returnAfter: ticks(800), returnSpread: ticks(600),
+  },
+  chase: {
+    wolf: strides(140), wolfPerSkill: strides(30), stalk: strides(160),
+    spearSprite: strides(90),
+  },
   arrival: {
     first: ticks(700), firstSpread: ticks(600),   // after lightning lights the first hearth
     firstByHand: ticks(700),                      // after a person lights it
@@ -115,5 +143,11 @@ const CLOCK = {
     cold: ticks(50), wet: ticks(300), dry: ticks(300), gnome: ticks(900), burrow: ticks(800),
     intruderGnome: ticks(2000), starving: ticks(50), burned: ticks(800), warm: ticks(200),
     slept: ticks(600), dark: ticks(400), emberlost: ticks(500), sawfire: ticks(400), sawwolf: ticks(600),
+    chased: ticks(800), escaped: ticks(900), fed: ticks(600), wolf: ticks(1200), mauled: ticks(2000),
+    borrowed: ticks(1500), repaid: ticks(1500), gnomegift: ticks(1200), denbite: ticks(1500), defend: ticks(600),
+    struck: ticks(2000), bitten: ticks(900), dodged: ticks(1500), killedfae: ticks(2000),
+    spriteGrove: ticks(900), spriteCamp: ticks(700), giftTaken: ticks(1500),
+    faefire: ticks(1000), pinched: ticks(900), stolen: ticks(800), prank: ticks(1500),
+    mosslight: ticks(400), intruderSprite: ticks(1500), inhollow: ticks(600),
   },
 };

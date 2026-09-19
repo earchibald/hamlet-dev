@@ -67,6 +67,20 @@ test('needs, cooldowns, and the base tasks read the table', () => {
   assert.equal(C.thought.grief, 3000); assert.equal(C.thought.ateCooked, 700);
 });
 
+test('the animals, the sprites, and the gnomes read the table', () => {
+  const api = load(), C = api.CLOCK;
+  assert.deepEqual(C.spawn.rabbitLitter, { every: 250, chance: 0.8 });
+  assert.equal(C.spawn.rabbitStray.every, 300);
+  assert.deepEqual(C.spawn.fawn, { every: 2000, at: 1000 });
+  assert.deepEqual(C.spawn.wolf, { every: 10000, at: 2500 });
+  assert.equal(C.spawn.fox.every, 6000);
+  assert.deepEqual(C.den, { birthEvery: 500, birthGap: 20000, digAfter: 3000, digRetry: 500, biteGap: 150, campDark: 1000 });
+  assert.equal(C.gnome.every, 500); assert.equal(C.gnome.copyChance, 0.3); assert.equal(C.gnome.repayGap, 6000); assert.equal(C.gnome.leaveAfter, 3000);
+  assert.equal(C.chase.wolf, 140); assert.equal(C.chase.wolfPerSkill, 30); assert.equal(C.chase.stalk, 160);
+  assert.equal(C.sprite.dance, 240); assert.equal(C.sprite.prankGap, 300);
+  assert.equal(api.SPECIES.human.decay.food, 0.035); assert.equal(api.SPECIES.sprite.stride, 1);
+});
+
 /* ---------- the lint: no bare time literal in a rule ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* Each rule finds a place where time is used. A match is bare when it still holds a number. */
@@ -97,11 +111,16 @@ const ROLL_FILES = ['camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'reci
 const EVENT_CHANCES = [
   'rng() < (t.struct.snare.chance',   // rolled once, when an animal steps on the trap
   'rng() < 0.125',                    // rolled once, when an animal steps on the trap
+  'rng() > 0.45 + a.skills.hunt * 0.1',   // the deer that breaks free of a wolf
+  'rng() < 0.6',                          // the carcass roll (whether a venison carcass is finished), and the prank's victim roll
+  'rng() < 0.45 + a.skills.hunt * 0.1',   // the spear's hit on a sprite
+  'rng() < 0.5',                          // one gift roll of a sprite's visit, and two of the prank's rolls
+  "rng() < 0.5 ? 'cord' : 'moss'",        // the other gift roll of a sprite's visit, picking cord over moss
 ];
 /* The ratchet. A file listed here may still hold this many bare literals. A file not listed holds none.
    Each task of the plan removes its files. The close removes the ratchet. */
 const PENDING = {
-  species: 72, fae: 39, tasks: 41, goals: 40, recipes: 11, settle: 1,
+  tasks: 41, goals: 40, recipes: 11, settle: 1,
 };
 
 /* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
