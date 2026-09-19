@@ -11,17 +11,8 @@ function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-/* The newest major line, for a beat with no act of its own on stage: the rest gate, the strain, and a
-   birth outside any single act's telling all speak this way. */
-function majorOfClose(){
-  for (let i = legends.length - 1; i >= 0; i--) if (legends[i].kind === 'major') return legends[i].text;
-  return '';
-}
-/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption; the age's
-   close takes the newest major line of the close, which is where the rest gate, the strain and a
-   backstop speak. */
+/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
-  if (!rec) return majorOfClose();
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
 }
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
