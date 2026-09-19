@@ -117,8 +117,10 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   step(){ setPaused(true); step(); renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
-  slower(){ const v = inAges() ? pace : speed, s = v === 64 ? 16 : v === 16 ? 4 : 1; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  faster(){ const v = inAges() ? pace : speed, s = v === 1 ? 4 : v === 4 ? 16 : 64; if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
+  faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
+  /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
+  speedStep(i){ ACTIONS.speed(SPEEDS[clamp(i, 0, SPEEDS.length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },

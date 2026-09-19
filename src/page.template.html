@@ -103,6 +103,8 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .row.trouble .st{color:var(--bad)}
 .stage{margin:8px 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:2px}
 .gs{color:var(--muted);font-size:12px;grid-column:2/4}
+/* A folded stage's idle goals: two lines at most, the rest behind the title. */
+.row.stage .fold{grid-column:2/4;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tag{font-size:10px;border:1px solid var(--line);border-radius:10px;padding:0 5px;color:var(--muted);margin-left:5px;vertical-align:middle}
 .pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
 .pbtn{font-size:11px;padding:1px 6px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
@@ -182,7 +184,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
-      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>-</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>- =</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>- =</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>=</kbd></button></span>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>Shift+4</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
