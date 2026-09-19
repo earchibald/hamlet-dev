@@ -175,6 +175,16 @@ It buys nothing. Task 1 makes `ticks(n)` the converter `secs(n * 86.4)`, so `tic
 
 It costs a reading. `digRetry` belongs to the den group, which task 6 rules on. Written `hours(12)` it arrives at task 6 already looking decided, and the question task 6 owes it — is half a world day right for a driven-out wolf to wait before trying for a hill again? — is the question a settled-looking value does not get asked. Note that `digAfter: days(3)` sits on the same line already in real units. The mixed line is the marker working, not a mess.
 
+**Arithmetic is not a reading, and the table is built to hide the difference.** patcher counted `src/sim/clock.js`: of its 150 `ticks()` entries, 30 land on a whole number of days and 36 on a whole number of hours. So **about 44 percent of the marked table converts to a round, human duration by arithmetic alone.** `guardEmber: ticks(500)` is `hours(12)`. `swarm: ticks(4000)` is `days(4)`. `blight: ticks(5000)` is `days(5)`.
+
+That is a risk and not a convenience. A task told to convert its group will find that most of its values convert mechanically into something round and plausible, and a round plausible answer feels finished. `ticks(4000)` becomes `days(4)` without anybody asking whether four days is the right time for a swarm to last. A wrong conversion is visible in the diff; a mechanically correct one is indistinguishable from a considered one. The values most at risk are the tidiest: `hours(13.7)` gets argued about and therefore gets read, and `days(4)` sails through.
+
+**So each task's report says what each value means in world time and why that is right — not what it converts to.** The conversion is the easy half and the helpers already did it.
+
+**The gate.** A task names every value it converted **without changing**, because that is where an unread value hides. A group where everything converted and nothing moved is either well tuned or never read, and only the task can say which. Saying "I converted these nine and changed none, and here is why each is right" is the report. A silent group is not.
+
+The worked example above is the case in point. `hours(12)` for `digRetry` is not wrong — it is exactly right, and task 1 reaches the same number on its own. The objection was that task 6 owes the value a question: is half a world day right for a driven-out wolf to wait before trying for a hill again? The arithmetic could never answer that, and it would have looked as though it had.
+
 **The rule.** Only the task that owns a group converts that group's markers, and it converts them having read the value. No other task, and no fix passing through, converts a marked value for consistency with a neighbour. A new value is never written with a marker, so a new neighbour in real units beside a marked one is the normal and correct state. If a passing fix finds the inconsistency jarring, it says so in a comment and leaves the value alone: an inconsistency on the record is cheaper than a decision nobody remembers making.
 
 ### The conversion rule for each category (survey, part 3)
