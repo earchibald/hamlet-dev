@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status: a draft that waits for the user.** Section "Rulings the user must make" lists seven decisions. No task starts before the user has ruled on them. Every ruling has a default, and the tasks below are written for the defaults.
+**Status: ready to start.** The user has ruled on questions 1, 2, and 7. Questions 3 to 6 are read as their defaults, and the tasks are written for them. See "The rulings". One question is deliberately left open: whether the soak keeps its floors. Task 4 measures it and takes a number to the user. No task removes a floor before that.
 
-**Goal:** Move the engine to real units. A tick is one world second, a day is 86,400 ticks, a year is 365 days, a person lives about 70 years, and a walking person moves one tile a tick. The golden is blessed once, at the end, by the user.
+**Goal:** Move the engine to real units, and keep the game playable at real units. A tick is one world second, a day is 86,400 ticks, a year is 365 days, a person lives about 70 years, and a walking person moves one tile a tick. The golden is blessed once, at the end, by the user.
 
-**Architecture:** The four legacy markers of plan G1 (`ticks`, `strides`, `tickRate`, `strideRate`) first become converters, so the whole table keeps today's world-time meaning at the new tick. The engine's beats then move off the tick: cellular systems run once a world minute, camp rules roll at hourly rates, and a being's state is computed from elapsed time. Each group of the table is then rewritten in real units and its marker removed. The plan is done when no marker is left.
+**Architecture:** The four legacy markers of plan G1 (`ticks`, `strides`, `tickRate`, `strideRate`) first become converters, so the whole table keeps today's world-time meaning at the new tick. The engine's beats then move off the tick: cellular systems run once a world minute, camp rules roll at hourly rates, and a being's state is computed from elapsed time. Once every being and every system carries the tick of its next act, the engine can jump to that tick instead of stepping through the ticks between, so world time costs what happens in it rather than what it spans. Each group of the table is then rewritten in real units and its marker removed. The plan is done when no marker is left and dev is playable.
 
 **Tech stack:** Plain JS scripts in one shared scope, `node --test`, no dependencies.
 
@@ -15,14 +15,16 @@
 | 1 | The calendar at real units, the markers as converters, walking at a tile a tick, the soak reshaped | determinism, invariants, the oracle |
 | 2 | The beats: cellular systems once a world minute, camp rules at hourly rates, periods in world time | the same, and plant and fire counts a world day within a table of tolerances |
 | 3 | A being's head off the tick: state from elapsed time, a cheap proximity pass each tick | the same, and a world day in under 5 s |
-| 4 | Work, sleep, and needs in world time | the same, and the crafts tests in world units |
-| 5 | Lives, ages, births, and plants | the same |
-| 6 | Chases, embers, brands, and the hazards | the same, and no odd death in the long run |
-| 7 | The interface: the speed ladder, the Hour button, the calendar display, the autosave's beat | `tests/ui.js` |
-| 8 | The rest of the test suite in world units | `npm run fast` |
-| 9 | The tuning pass, the markers gone, the record, and the before and after report for the user | the long run's report; the user blesses |
+| 4 | The skip: the engine jumps to the next tick at which anything happens | a skipped run and a stepped run give the same fingerprint, chronicle, and layout; the floors measured and reported |
+| 5 | Work, sleep, and needs in world time | the same, and the crafts tests in world units |
+| 6 | Lives, ages, births, and plants | the same |
+| 7 | Chases, embers, brands, and the hazards | the same, and no odd death in the long run |
+| 8 | The interface's clock: the speed ladder, the Hour button, the calendar display, the autosave's beat | `tests/ui.js` |
+| 9 | Playability: the watch list in the days era, and the chronicle's filters | `tests/door.js`, `tests/ui.js`, and a person reaches winter in under a minute |
+| 10 | The rest of the test suite in world units | `npm run fast` |
+| 11 | The tuning pass, the markers gone, the record, and the before and after report for the user | the long run's report; the user blesses |
 
-The spec is `design/specs/2026-09-18-time-and-tiers-design.md`, sections 0, 1, 10, and the G4 row of section 12. The survey is `design/reports/2026-09-19-g4-survey.md`. It holds the measurements this plan rests on, with file and line. Every task reads it.
+The spec is `design/specs/2026-09-18-time-and-tiers-design.md`, sections 0, 1, 10, and the G4 row of section 12. The survey is `design/reports/2026-09-19-g4-survey.md`. It holds the measurements this plan rests on, with file and line. Every task reads it. The survey was written before the user ruled, so its last row is now wrong; see "What the survey found".
 
 ## What the survey found
 
@@ -35,35 +37,85 @@ The spec is `design/specs/2026-09-18-time-and-tiers-design.md`, sections 0, 1, 1
 | `growPlants` | 92 percent of the random stream | No middle commit can hold the golden. Bless once, at the end. |
 | `CLOCK` | 284 entries: 136 plain durations, 53 stride counts or distances, 31 chances a tick, 17 periods, 12 ages, 6 amounts a stride, 1 calendar length, 11 flagged as unclear | Each category converts by its own rule. |
 | Six seeds for three world days today | 9 people, 0 births, 0 huts, 0 far-country events | A three-day soak cannot hold today's floors. |
-| At the top speed of the new ladder | a season takes about 4 wall hours, a year about 15 | Before plan G5, the tick tier shows a camp's first days and no more. |
+| ~~At the top speed of the new ladder, a season takes about 4 wall hours~~ | superseded | The user rejected this as a thing to live with. A ladder cannot reach a year; task 4 and task 9 are the answer instead. |
 
-## Rulings the user must make
+Two numbers in that table are Node numbers, not browser numbers. The 26 to 52 seconds a world day is measured by `tests/lib/run.js` stepping `load()` in a bare loop. Nothing in `src/sim/` throttles. `TPS` is declared at `src/sim/clock.js:4` but no rule reads it; `speed` and the frame budget live only in `src/ui/`. So headless parity at unlimited speed is already true today, and the wall is tick count alone.
 
-| # | Question | Default in this plan | Why it is the user's |
+The 26 to 52 seconds has a second measurement behind it, taken a different way. While surveying for issue 48, patcher measured a headless world day on seed `r` at about 240 ms on today's clock, which is 0.24 ms a tick, which predicts about 21 seconds at 86,400 ticks. That number comes from today's per-tick cost multiplied out, not from running the retune, so it is independent of the survey and it agrees with it. This plan's central timing claim rests on two measurements and not on one.
+
+`load()` gives a fresh scope on every call, which patcher verified. So two worlds with two different `CLOCK` tables run side by side in one process, and a before-and-after comparison needs no second process. Tasks 4 and 11 both want this.
+
+## The rulings
+
+### Ruled by the user
+
+| # | Question | The ruling |
+|---|---|---|
+| 1 | When does G4 reach dev? | Build it, and fix the playability inside G4. |
+| 2 | May the soak drop its floors, because 800 world days a seed is too slow? | The premise is rejected. Make the simulation fast. Variable tick speed is an engine requirement. |
+| 7 | How much of the retuned table does the pull request show? | Big movers are enough. |
+
+The user's words, because the gloss is not the ruling.
+
+> **On 1.** "let's build G4. G4 also needs to include considerations of UI/UX changes and improvements, and continuing improvement on things like breakpoints and filters, to make things playable. Higher speeds also become absolutely necessary."
+
+> **On 2.** "again - more speed - not just speed from a UI perspective, which changes the way backend things are processed - but SPEED OF TICK should be variable. 'real' gametime is sped up, for user-skipping-time or for testing and debugging. PARTICULARLY for agents running the simulation (there is no need to run it in a browser! They should be the same!! This is a simulation!) speed should be effectively unlimited."
+
+> **On 7.** "Big movers are fine."
+
+**What ruling 1 changes.** The draft held G4 out of dev until G5 was ready, because at real units a player cannot reach summer, winter, a grown child, or a death of old age. The user did not take that trade. G4 merges into dev like any plan, and fixes the playability itself. A merge into dev publishes to GitHub Pages, so G4's merge is a release. dev must be playable on the day it merges, not eventually.
+
+Playability is not a task at the end. It is three things, and they are spread through the plan:
+
+| The player's problem | Where it is solved |
+|---|---|
+| Waiting is too slow | Tasks 3 and 4. World time costs what happens in it. |
+| Watching is too slow | Task 8. The ladder's top rung is what task 4 makes possible. |
+| Naming where to stop | Task 9. The watch list, which `door.js` already names twice and does not build. |
+| Reading what happened | Task 9. The chronicle drowns the player at 86,400 ticks a day. Filter it. |
+
+**What ruling 2 changes.** Variable tick speed is a property of the engine, not a setting of the view. The demand is not that the page draws faster. It is that a world second costs nothing when nothing happens in it, whether a player or an agent asks for it. Task 4 is that work, and it is why the floors question is not answered yet.
+
+### Read as defaults, not blessed in writing
+
+The user answered the three questions patcher flagged as theirs, after patcher advised taking the defaults on 3 to 6. patcher reads the silence as assent and has told the user so, which gives the user room to correct it. The tasks below are written for these defaults. If the user corrects one, its task changes and nothing before it does.
+
+| # | Question | Default, in force | Why it is the user's |
 |---|---|---|---|
-| 1 | **When does G4 reach dev?** At real units and before the day tier (G5), a player cannot reach summer, winter, a grown child, or a death of old age. 24 rules read `isWinter()`. The spec says every plan leaves dev playable. | Build G4 on branch `tiers-g4` and hold it out of dev until G5 is ready. Merge the two one after the other. dev keeps today's clock until then. | It changes what the released game is for some weeks, or it delays every merge of G. |
-| 2 | **The floors.** Today's floors (people, births, the goal ladder, the far countries) need about 70 of today's days, which is more than two of today's years. At real units that span is about 800 world days a seed. The spec moves these floors to G5's day soak. | The tick soak keeps only what three days can show: a site, a pit, a lit hearth, someone alive, nobody cut off, no odd death, determinism, and the snapshot oracle. A long run (`LONG=1`, one seed, 70 world days, about 21 to 42 s) reports counts but asserts no floor. The old floors return in G5 in the day soak. | The spec says a floor is not lowered without the user's word. This removes floors for the length of one plan. |
 | 3 | **The chases.** A chase is a count of strides today. Kept as a count, a wolf chase becomes a sprint of 2.3 world minutes. Kept as world time, it becomes a pursuit of 6.7 hours over a map a person crosses in 5 minutes. | A chase is a distance. Write each as tiles run: the hunter gives up after it has run `CLOCK.chase.*` tiles. The numbers start at today's stride counts, which are today's tiles. | It decides how dangerous a wolf is and how a hunt feels. |
 | 4 | **Plant lives.** The spec scales animal lives to real years and says nothing of plants. A bush dies at 60 of today's days, which is about two of today's years. | Plants scale as animals do: by the year. A bush lives about 2 years, a pine about 100 years, and `grove.oldPine` is 40 years. Berry growth stays seasonal. | It sets how a valley changes over a lifetime, and the sprites' births hang on old pines. |
 | 5 | **Birth intervals.** `birth.gap` is 16 of today's days. Scaled by the life it would be 13 years. | Real intervals: 2 years between a mother's children, a den's litter once a year in spring, a grove's sprite once in 5 years. | It sets how fast a camp grows, which H builds on. |
 | 6 | **The proximity beat.** Fire on a tile, a wolf within 5 tiles, and a den's bite cannot be computed from elapsed time. A check once a world minute can miss a wolf that walks 60 tiles in that minute. | A cheap pass every tick checks only proximity and fire, for beings that are awake or on a burning tile's level. Everything else about a being is computed when it next acts. | It trades cost against the chance that a threat goes unseen. The default keeps today's rule exactly. |
-| 7 | **The values themselves.** The spec gives a few: an axe 1 hour, a lean-to 4 hours, sleep 8 hours, adult at 16, old at 55. The other 250 are guesses until tuned. | Task 9 tunes against the long run and a calibration table, and the pull request shows every value that moved by more than a factor of two from its world-time meaning today. | The user may want to read that table before the bless. |
+
+Ruling 6 and task 4 meet, and task 4 says how. A pass that must run every tick is a pass that forbids a jump. The resolution is in "The skip" below, and it does not weaken ruling 6.
+
+### Left open on purpose: the floors
+
+The draft asked the user to drop the soak's floors, because 800 world days a seed is too slow to run. The user's answer attacks the slowness. That does not by itself save the floors, and the plan must not pretend it does. Even unthrottled and headless, 800 world days at 30 seconds a day is hours.
+
+Tasks 2, 3, and 4 are what buy the speed, because they take systems off the per-tick beat and then let the engine skip the ticks with nothing in them. Their measured result decides the floors.
+
+So: do not drop the floors and do not promise to keep them. Task 4 measures seconds a world day and seconds for a 70-day and an 800-day run, and puts those numbers in front of the user. Nothing is removed before the user has read them. If the skip brings a world day down far enough, the question dissolves and nothing was lost.
 
 ## Global Constraints
 
-- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev after `naming` has landed. Never check out, stash, or commit in `~/Code/hamlet`.
-- G4 moves the golden once. No task runs `UPDATE_GOLDEN=1`. Task 9 prepares the report; the user blesses. Until then `tests/soak.js` compares against a working record, `tests/soak-working.json`, which each task may rewrite and must say so in its report with the reason.
+- Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at the commit this plan branches off. Issue 25 lands before task 1 starts. Never check out, stash, or commit in `~/Code/hamlet`.
+- G4 merges into dev through dev-coordinator, which is the only session that merges. A merge into dev publishes the built page to GitHub Pages, so the merge is a release. Ruling 1 means dev must be playable at that merge.
+- G4 moves the golden once. No task runs `UPDATE_GOLDEN=1`. Task 11 prepares the report; the user blesses. Until then `tests/soak.js` compares against a working record, `tests/soak-working.json`, which each task may rewrite and must say so in its report with the reason.
 - Between the first task and the bless, three gates stand in for the golden: a seed run twice gives the same fingerprint; the snapshot oracle (`tests/snapshot.js`) holds; and no death in the soak or the long run has a cause other than old age.
+- From task 4 on, a fourth gate joins them: a run that skips and a run that steps give the same fingerprint, the same chronicle, and the same layout. A skip that changes the story is a bug in the skip, never a new golden.
+- Speed is an engine property. No rule in `src/sim/` reads a wall clock, a frame, or a rate of play. The page's speed and the agent's absence of one must reach the same world from the same seed.
+- No task adds a way to change a constant at run time. `CLOCK` is set before a world runs, and a tuned value is a commit. A knob that changed a constant without passing the door would make a run unreplayable from its seed and its log, which is the one guarantee every other gate in this plan stands on. Task 11 says what this means for the tuning pass.
 - A duration or a rate goes in `CLOCK`, or in a `SPECIES`, `LIFE`, or `RECIPES` row, in the unit helpers. `tests/clock.js` fails on a bare one. A legacy marker may only be removed, never added.
 - A new top-level `let` or `var` in `src/sim/` goes in `SAVED_STATE` or `NOT_SAVED`. A field that points at a record goes in `REFS`. A field added to a saved record is read as optional with a default, and `SNAPSHOT_VERSION` stays 1, unless the meaning of a saved field changes. The meaning of `tick` changes in this plan, so **the version rises to 2 in task 1**, and a version 1 save is refused with its sentence.
-- The naming plan lands before G4 and blesses the chronicle fields of the golden. Merge dev before G4's first task, so that G4's diff shows only G4's moves. `tests/names.js` holds a layout record, `tests/names-layout.json` (the tick-0 layout, and the day-70 `beings` and `items` under `SLOW=1`). G4 moves those on purpose. Task 9 measures the layout file again with `UPDATE_LAYOUT=1` in the same commit as the bless, and says so. Read the comment at the top of `tests/names.js` first. Naming adds a third random stream, `nrng`; `catchUp` and every new beat must draw from `rng` only.
-- The names landed in dev at 68b7061 and blessed `chronicle` and `chronicleLines`. Take G4's before fingerprints from the dev commit this plan branches off, not from a remembered number. Nothing since 68b7061 has moved the golden, and dev is at 4bb1b36, but issue 25 lands before task 1 starts. The survey counted chronicle lines before the names, so its line counts are low by 49 to 99 a seed. `CLOCK.names` holds `nameHour`, `eventMemory`, and `epithetAfter`; task 5 rules on them with the ages. The naming pass runs at hour 20 each night, and `log` takes a tag that rules read. A person's `deeds` counts acts by tag; plan G6 reads it before it designs the annals.
+- The naming plan landed before G4 and blessed the chronicle fields of the golden. Merge dev before G4's first task, so that G4's diff shows only G4's moves. `tests/names.js` holds a layout record, `tests/names-layout.json` (the tick-0 layout, and the day-70 `beings` and `items` under `SLOW=1`). G4 moves those on purpose. Task 11 measures the layout file again with `UPDATE_LAYOUT=1` in the same commit as the bless, and says so. Read the comment at the top of `tests/names.js` first. Naming adds a third random stream, `nrng`; `catchUp` and every new beat must draw from `rng` only.
+- The names landed in dev at 68b7061 and blessed `chronicle` and `chronicleLines`. Take G4's before fingerprints from the dev commit this plan branches off, not from a remembered number. The survey counted chronicle lines before the names, so its line counts are low by 49 to 99 a seed. `CLOCK.names` holds `nameHour`, `eventMemory`, and `epithetAfter`; task 6 rules on them with the ages. The naming pass runs at hour 20 each night, and `log` takes a tag that rules read. A person's `deeds` counts acts by tag; plan G6 reads it before it designs the annals.
 - `updateWorld()`'s order of calls does not change. A system that moves to a slower beat keeps its place in the list and returns at once off its beat.
-- The engine step stays pure. Every outside act enters by `inject()`.
+- The engine step stays pure. Every outside act enters by `inject()`. Where to run to is an act and passes the door. How fast to draw it is view state and never passes the door. Plan E3 settled that line; G4 keeps it.
 - Files in `src/sim/` and `src/ui/` are plain scripts in one scope. No `import`, no `export`. Do not change the body of `load()` in `src/sim/index.js`. If a security hook blocks a legitimate edit, stop and report it.
 - Run `node build.js` after every change to `src/` and commit the built page.
 - Game text is plain English, one idea per sentence. Documents follow the house style: one idea per sentence, 25 words at most, active voice, one word for one meaning, paragraphs of six sentences or fewer, a summary table at the top.
-- The budgets: a tick-tier world day in under 5 s in Node on seed `r` at day 3 and at day 50 of the long run; `npm run fast` in about its present time; the soak in about two minutes.
+- The budgets: a tick-tier world day in under 5 s in Node on seed `r` at day 3 and at day 50 of the long run, before the skip; after task 4, a world day in which little happens costs far less, and task 4 reports the figure rather than assuming one. `npm run fast` in about its present time; the soak in about two minutes.
 - Commit messages are a plain sentence. End each with:
   `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and
   `Claude-Session: https://claude.ai/code/session_011WREt1LNngD7W6xW2uYrYn`
@@ -91,11 +143,11 @@ A period (`every`, with a phase `at`) is rewritten in world time by hand in task
 | Category | Count | Rule |
 |---|---|---|
 | (a) a plain duration | 136 | `ticks(n)` holds it in world time at once. Its task rewrites it in `mins`, `hours`, or `days`, rounded to a value a person would say. |
-| (b) a stride count or a distance | 53 | Work becomes world time (task 4). Walking distances become tiles (task 6). A chase follows ruling 3. |
+| (b) a stride count or a distance | 53 | Work becomes world time (task 5). Walking distances become tiles (task 7). A chase follows ruling 3. |
 | (c) a chance a tick | 31 | A rate for each world hour, rolled with `rollFor` at the rule's beat. |
 | (d) an amount a stride | 6 | An amount for each world hour of the act. |
 | (e) a period and its phase | 17 | World time, by hand (task 2). |
-| (f) an age or a life stage | 12 | Years (task 5). Births follow ruling 5, plants ruling 4. |
+| (f) an age or a life stage | 12 | Years (task 6). Births follow ruling 5, plants ruling 4. |
 | (g) the calendar | 1 | Task 1. |
 | unclear | 11 | Each is named in its task with its ruling: `limit.ember` and `limit.guardEmber` with the chases; `limit.task` with work; `cooldown.stalked` is derived again from the healing rate; `limit.resourceCache` becomes 10 world minutes; `plant.samples` is fixed by the minute beat. |
 
@@ -111,12 +163,34 @@ A thought holds `until`, a tick, and no longer counts down. A record that change
 
 A being's next act has a known tick when it walks (every tick), works or sleeps (the tick its work or its rest ends, from the rate), or waits. The executor keeps that tick on the being and skips the being until then. The proximity pass of ruling 6 can wake it sooner.
 
+### The skip
+
+Task 3 gives every being the tick of its next act. Task 2 gives every system the tick of its next beat. Between them the engine can name the next tick at which anything at all happens. Task 4 makes it jump there instead of stepping through the ticks between, so a world second costs what happens in it and not what it spans.
+
+**The horizon.** `nextEvent()` returns the earliest of: the next being's next-act tick, the next system beat, and the next calendar break a rule reads (dawn, dusk, a season's turn). `runTo(t)` advances to `min(nextEvent(), t)` in one move, resolves what is owed there, and repeats.
+
+**What forbids a jump.** Ruling 6 puts a proximity pass on every tick, and a pass on every tick is a pass that cannot be skipped. It is only a real constraint when it has work. So a burning tile, or an awake predator within its own reach of a sleeping or working person, pins the horizon to the next tick. Nothing else does. When something dangerous stands near people the engine steps one tick at a time, which is right: that is the part of the world worth watching. When nothing does, the pass has nothing to find and the engine jumps. Ruling 6 is not weakened; it is given a precondition that is cheap to test and that names exactly today's rule.
+
+**What proves it.** A seed run by `runTo` and the same seed run tick by tick give the same fingerprint, the same chronicle, and the same layout. That test is the task. Every way a skip can be wrong — a beat missed, a need that crosses zero inside a jump, a season turned over without a rule reading it — shows as a difference there.
+
+**What the skip is not.** It is not pacing and it does not pass the door. A jump is the engine deciding that it has nothing to do, and it gives the same story either way, which is what the fingerprint test proves. What passes the door is where to run to, and that is the watch list's business.
+
+### The watch list
+
+`src/sim/door.js` returns the same sentence twice today, at line 87 and line 98: "Only a run to an age is built. A run to an event waits for the watch list." The ages era has `run` and `watch`, `runUntil` and `stops`, a stop that clears itself when it fires, and a line that says why the run ended. G4 does not invent this. It builds the days-era half that the code already names.
+
+Task 9 gives the days era `run({ what: 'day' | 'season' | 'year', at })` and stops on events as well as on times: a death, a birth, a hearth gone out, a person cut off, a newcomer, a goal reached. Each is a tag `log` already takes. A stop fires once, is spent, and writes its line. That is the ages' rule and it does not change.
+
+This is what lets a player reach winter. A ladder cannot: at an hour a wall second, a season is still 36 wall minutes. A run to winter over a skipping engine is seconds, and it stops with a sentence that says where the world got to.
+
 ### The soak
 
 | Run | What | Asserts |
 |---|---|---|
 | `node tests/soak.js` | six seeds, three world days | a site, a pit, a lit hearth, someone alive, nobody cut off, no odd death, the same fingerprint twice, the working record (the golden after the bless), and the seventh test (save at day 1.5, load, run to day 3) |
 | `LONG=1 node tests/soak.js` | seed `r`, 70 world days | no odd death; prints people, births, goals reached, far-country counts, and seconds a world day |
+
+The floors that the three-day run cannot hold are **not** removed until task 4 has measured the cost and the user has read it. See "Left open on purpose".
 
 `scriptGod` lights a pit when the step count passes `c.coals`. `c.coals` is a tick, so the comparison holds at any scale; task 1 checks it.
 
@@ -129,7 +203,7 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] Write the failing tests in `tests/clock.js`: `DAY` is 86400; `hours(1)` is 3600; `seasonOf` gives spring on day 1 and day 91, summer on day 92, winter on day 274 and day 365, spring again on day 366; `isNight` holds at 23:00 and not at 12:00; `ticks(1000)` is `days(1)`; every chance-a-tick entry of the survey's list is now an hourly rate below 1.
 - [ ] Change the calendar and the markers as "The design" says. Replace each of the 31 chances with its hourly rate and roll it with `rollFor(rate, 1)` where the rule still runs each tick; task 2 moves the beat.
 - [ ] Walking: a being on a path moves one tile a tick, two at a run (`fast`). The stride gate stays for acts that are not steps, reading the converted stride. Remove `darkStep`; a person in the dark walks at half speed by moving on even ticks only. Rewrite the two tests in `tests/terrain.js` that count steps.
-- [ ] Reshape the soak as "The soak" says. Write `tests/soak-working.json` from the first green run and say so in the report.
+- [ ] Reshape the soak as "The soak" says. Keep every floor that three days can still hold, and mark the rest as suspended pending task 4, not deleted. Write `tests/soak-working.json` from the first green run and say so in the report.
 - [ ] Gates: `node --test tests/clock.js tests/snapshot.js`, the soak, and a note of seconds a world day. This task is expected to be far over the 5 s budget. Report the number.
 - [ ] Commit.
 
@@ -140,6 +214,7 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] Write a failing test: over one world day on seed `r`, `growPlants`, `spreadFire`, `updateWeather`, `strayLightning`, `rotCarcasses`, and `groveTick` each run 1,440 times, and the count of tiles `growPlants` looks at is within 2 percent of 60,000.
 - [ ] Add `CLOCK.every.cellular = mins(1)`. Each cellular system returns at once off that beat. `plant.samples` becomes looks a run (about 42). Every chance inside those systems is rolled with `rollFor(rate, CLOCK.every.cellular)`.
 - [ ] `updateCamps`: the pit burns by elapsed time; spoilage, births, arrivals, storms, and lightning roll hourly rates at their own beats. Rewrite the 17 periods of category (e) in world time, each with its phase. The survey's part 8, row 8, lists the 16 `tick % N` sites.
+- [ ] Each system keeps the tick of its next beat where task 4 can read it. A system whose beat cannot be named ahead of time is reported, not hidden: task 4 needs the list.
 - [ ] Calibration test: one world day at this commit against one of today's days on the base commit, six seeds, from a saved table in `tests/calibrate-beats.json`: berries grown, bushes seeded, tiles burnt after one forced lightning strike, fuel burnt by a lit pit. Each within 15 percent.
 - [ ] Gates as task 1. Commit.
 
@@ -152,16 +227,31 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] Budget test: a world day on seed `r` at day 3 in under 5 s. Report seconds for day 3 and, from the long run, day 50.
 - [ ] Gates as task 1, plus `tests/snapshot.js` green with the new fields. Commit.
 
-### Task 4: Work, sleep, and needs in world time
+### Task 4: The skip
+
+**Files:** `src/sim/main.js`, `src/sim/beings.js`, `src/sim/clock.js`, `src/sim/index.js`, `tests/skip.js` (new), `tests/soak.js`, `tests/lib/run.js`.
+
+This task answers ruling 2. It is also the task whose numbers decide the floors, so its report goes to the user and the plan waits for a word before task 5 removes anything.
+
+- [ ] Write the failing test in `tests/skip.js` first, and write it so that it fails against a `runTo` that merely loops `step()`. Six seeds, three world days, skipped and stepped: the same fingerprint, the same chronicle line for line, and the same `tests/names.js` layout. Then the same over 70 days on seed `r`.
+- [ ] Write the adversarial cases as their own tests, each of which must fail if the horizon ignores it: a need that crosses zero inside a jump; a season that turns inside a jump; a pit that goes out inside a jump; a thought whose `until` falls inside a jump; a stop set inside a jump (task 9 reads this one again).
+- [ ] Build `nextEvent()` and `runTo(t)` as "The skip" says. `nextEvent()` reads the next-act ticks of task 3 and the next-beat ticks of task 2. Nothing in it reads a wall clock.
+- [ ] The hazard precondition: a burning tile, or an awake predator within reach of a sleeping or working person, pins the horizon to the next tick. Write the test that a wolf closing on a sleeper is never skipped over, and that its absence is.
+- [ ] `runTo` is what the soak, the long run, and `tests/lib/run.js` use. A stepped run stays available and the skip test is what keeps the two honest.
+- [ ] **Measure and report, do not decide.** Use two `load()` scopes in one process for the before and after, so the two runs meet the same machine on the same day. Seconds a world day at day 3, day 50, and day 400. Seconds for a 70-day run and for an 800-day run, on one seed and on six. The wall time of `npm run fast` and of the soak. Put the table in the pull request, name the floors that the numbers would let the soak keep, and say plainly which ones still cost more than the budget.
+- [ ] Do not remove a floor. Tell dev-coordinator that the floors question is with the user, and carry on with task 5.
+- [ ] Gates as task 1, plus `tests/skip.js`. Commit.
+
+### Task 5: Work, sleep, and needs in world time
 
 **Files:** `src/sim/clock.js` (`CLOCK.work`, `CLOCK.task`, `CLOCK.rate` needs), `src/sim/tasks.js` (`workKind`), `src/sim/recipes.js`, `src/sim/species.js` (decay rows), `tests/crafts.js`, `tests/tasks.js`.
 
 - [ ] `workKind`'s `amount` is world time for a person of no skill. `workSpeed` divides it. Progress is elapsed time, so a worker is skipped until the end tick. The spec's values: knap an axe 1 hour, a lean-to 4 hours, a night's sleep 8 hours. The rest of `CLOCK.work` and every recipe keep their world-time meaning of today, rounded to a quarter hour, and the report lists them.
 - [ ] Needs decay for each world hour. A person eats three times a day, drinks five, sleeps once. Write those as the test: over three days a fed, watered person's acts fall within one of those counts.
 - [ ] `limit.task` becomes 3 days. Report how many tasks the watchdog drops in the long run, before and after.
-- [ ] Gates. Commit.
+- [ ] Gates, including `tests/skip.js`. Commit.
 
-### Task 5: Lives, ages, births, and plants
+### Task 6: Lives, ages, births, and plants
 
 **Files:** `src/sim/beings.js` (`LIFE`), `src/sim/clock.js` (`birth`, `den`, `grove`, `plant`), `src/sim/camps.js`, `src/sim/species.js`, `src/sim/world.js`, `tests/dwellers.js`, `tests/gnomes.js`.
 
@@ -170,61 +260,86 @@ A being's next act has a known tick when it walks (every tick), works or sleeps 
 - [ ] Every test that ages a being sets `born` directly and does not run the years.
 - [ ] Gates. Commit.
 
-### Task 6: Chases, embers, brands, and the hazards
+### Task 7: Chases, embers, brands, and the hazards
 
 **Files:** `src/sim/clock.js` (`chase`, `limit.ember`, `limit.guardEmber`, `party.coalsLast`, `cooldown`), `src/sim/species.js`, `src/sim/tasks.js`, `tests/closing.js`, `tests/dwellers.js`.
 
 - [ ] Chases count tiles run, by ruling 3. An ember lasts 20 world minutes, which is 1,200 tiles and no limit on this map; the long run must show a person bringing fire home. A brand outlasts its chase by a quarter, as today.
-- [ ] `cooldown.stalked`: derive it again. A maul takes 20 to 34 hit points; the healing rate is per world hour after task 4; the cooldown is the time to heal the worst maul at middling hardiness, and the test says so in numbers.
+- [ ] `cooldown.stalked`: derive it again. A maul takes 20 to 34 hit points; the healing rate is per world hour after task 5; the cooldown is the time to heal the worst maul at middling hardiness, and the test says so in numbers.
+- [ ] A chase is a hazard, so it pins task 4's horizon. Check that a chase over a skipping engine and the same chase stepped give the same outcome, and add the case to `tests/skip.js`.
 - [ ] The long run shows no death by mauling on seed `r`, and on `birch-crag-41` for 40 days with no fire lit by the player. Report maulings a day against today's.
 - [ ] Gates. Commit.
 
-### Task 7: The interface
+### Task 8: The interface's clock
 
 **Files:** `src/ui/state.js` (`SPEEDS`), `src/ui/main.js` (`acc`, the cap on steps a frame), `src/ui/strip.js` and `src/ui/derive.js` (the date), `src/ui/keys.js`, `src/page.template.html`, `tests/ui.js`. The interface belongs to the feedback-pass session; tell it before this task starts.
 
-- [ ] The ladder: 1, 6, 60 (the default), 600, then Days and Seasons shown and disabled with a tooltip that says the day tier is not built. The interface owns ticks a second: a speed of `n` is `n` ticks a wall second.
-- [ ] At 600 the page runs 10 ticks a frame. The cap on steps a frame becomes a cap on milliseconds a frame (8 ms), and the page says "The world cannot keep up at this speed." once when the cap bites for a whole second.
-- [ ] The Hour button steps 3,600 ticks over several frames under the same cap.
-- [ ] The date reads "Day 12 of spring, year 1, 14:05". The autosave still writes once a world day, which at 600 is every 2.4 wall minutes.
+- [ ] The ladder: 1, 10, 60 (the default), 600, 3600. The interface owns ticks a second: a speed of `n` is `n` ticks a wall second. At 3600 a world day takes 24 wall seconds. The disabled Days and Seasons rungs of the draft are gone; a ladder cannot reach a year, and task 9 is how the player gets there instead.
+- [ ] Above 60 the page advances with `runTo`, not with a loop of `step`, so a quiet stretch costs a frame rather than 600. The cap on steps a frame becomes a cap on milliseconds a frame (8 ms), and the page says "The world cannot keep up at this speed." once when the cap bites for a whole second.
+- [ ] The Hour button calls `runTo(tick + 3600)` under the same cap.
+- [ ] The date reads "Day 12 of spring, year 1, 14:05". The autosave still writes once a world day, which at 3600 is every 24 wall seconds; move it to a wall-time beat if that is too often, and say which you chose.
 - [ ] An age is printed in years, not days. `src/ui/panels.js:98` prints `${c.age} days` and `src/ui/inspect.js:52` prints `${Math.floor(ageDays(a))} days`. At real units a person of 70 reads as 25,550 days.
-- [ ] `tests/ui.js`: the ladder, the default, the disabled steps, the date string, the age in years, the keys. Gates. Commit.
+- [ ] `tests/ui.js`: the ladder, the default, the date string, the age in years, the keys. Gates. Commit.
 
-### Task 8: The rest of the tests in world units
+### Task 9: Playability, the watch list and the filters
+
+**Files:** `src/sim/door.js`, `src/sim/main.js`, `src/sim/core.js` (`log` tags), `src/sim/snapshot.js`, `src/ui/state.js`, `src/ui/panels.js`, `src/ui/derive.js`, `src/ui/main.js`, `src/ui/keys.js`, `tests/door.js`, `tests/ui.js`. Tell the feedback-pass session before this task starts; the chronicle panel is theirs.
+
+This task is ruling 1's substance. Read "The watch list" first.
+
+- [ ] Write the failing tests in `tests/door.js`: a run to a day ahead lands on that day; a run to a day behind is refused with its sentence; a stop on a death fires once, is spent, and writes its line; the same stop set twice clears it; a run and a stop both appear in the door's log, because both are acts.
+- [ ] Build `run` and `watch` for the days era, in the shape the ages use. Delete both "waits for the watch list" sentences at `src/sim/door.js:87` and `:98`; a marker comment or a deferring sentence is removed by the task that does the work.
+- [ ] A stop is a mark ahead of now: `{ what, at }`. Times are `day`, `season`, `year`. Events are the tags `log` already carries: a death, a birth, a hearth gone out, a person cut off, a newcomer, a goal reached. List the tags the task supports and say which it does not.
+- [ ] `runUntil` and `stops` are already in `NOT_SAVED` with the reason "lives only in the ages". That reason is now false. Give them a true one or save them, and say which you chose.
+- [ ] A run stops on the first stop reached, clears it, and writes the line that says why. A run interrupted by a stop leaves the world where the stop fired, not where the run was aimed.
+- [ ] Task 4's horizon must never jump over a stop. Add the case to `tests/skip.js`: a run to day 30 with a stop on day 12 ends on day 12, skipped and stepped alike.
+- [ ] The chronicle's filter: `ui.chronFilter` is `'all'` or `'major'` today. At 86,400 ticks a day that is not enough. Filter by tag and by person, on top of the `ui.chronSearch` that exists. A filter is view state and does not pass the door.
+- [ ] The interface: a place to set a stop, a place to see the stops that are set, and a Run button that says where it is running to. A run in progress shows what it is waiting for, and can be stopped by the player.
+- [ ] The gate the user asked for: from a new world, a person reaches winter in under a wall minute, and the chronicle they read on arrival is legible. Say how long it took and paste the lines.
+- [ ] Gates: `tests/door.js`, `tests/ui.js`, `tests/skip.js`, `tests/snapshot.js`. Commit.
+
+### Task 10: The rest of the tests in world units
 
 **Files:** `tests/crafts.js`, `tests/closing.js`, `tests/gnomes.js`, `tests/dwellers.js`, `tests/wanderer.js`, `tests/snapshot.js`, `tests/door.js`, `tests/tasks.js`, `tests/terrain.js`, `tests/settle.js`.
 
 - [ ] Every step count in a test becomes a call of a unit helper (`api.hours(6)`), and every run length is set by what the test must see, not by a number of today's ticks. The survey's part 5 lists the assertions by file. No assertion is dropped. One that cannot hold at real units within a test's time is reported, not parked.
+- [ ] A test that ran long because it waited may now use `runTo`. A test that measures a rule's own behaviour must still step, and must say so.
 - [ ] The snapshot oracle's save points move to world times with the same preconditions (someone walking, someone at work, a fire, a den dug after the load).
 - [ ] `npm run fast` green, and its seconds reported against today's.
 - [ ] Commit.
 
-### Task 9: The tuning pass, the markers gone, and the report
+### Task 11: The tuning pass, the markers gone, and the report
 
 **Files:** `src/sim/clock.js`, `tests/clock.js`, `design/notes.md`, `design/specs/2026-09-18-time-and-tiers-design.md`, `CLAUDE.md`, `design/settings.md`, and `design/reports/2026-09-g4-before-and-after.md` (new).
 
 - [ ] Remove the four markers. `tests/clock.js` fails if one is left in `src/`.
-- [ ] Re-read every player-facing string that states a time. The lint sees a bare literal in a rule. It does not see a correct constant used for the wrong quantity in prose, which is how issue 37 put the length of the year on the page as the length of winter. A sweep of dev 4bb1b36 found three in `src/sim/`. None is false today, which is what separates them from issue 37: that one was wrong on the page the day it was written, and these are right today and fragile tomorrow. Each states a duration in words that no constant governs, so each turns false the moment this plan moves the value. `src/sim/goals.js:319` says "Cooked meat spoils in two days" while `CLOCK.limit.cookedKeeps` is 1.8 days, which rounds to two. `src/sim/goals.js:326` derives "That is one strip a day" from `SEASON_DAYS` and an aim of eight that match only by chance; dev 898db4e marks it with a comment that names this task, and the comment goes when the fault does. `src/sim/goals.js:371` and `:376` say a den goes back to the beasts if the fire is out "for a day", which is exactly `CLOCK.den.campDark`, read by nothing. Make each string read its constant. The two interface strings are task 7's.
+- [ ] Re-read every player-facing string that states a time. The lint sees a bare literal in a rule. It does not see a correct constant used for the wrong quantity in prose, which is how issue 37 put the length of the year on the page as the length of winter. A sweep of dev 4bb1b36 found three in `src/sim/`. None is false today, which is what separates them from issue 37: that one was wrong on the page the day it was written, and these are right today and fragile tomorrow. Each states a duration in words that no constant governs, so each turns false the moment this plan moves the value. `src/sim/goals.js:319` says "Cooked meat spoils in two days" while `CLOCK.limit.cookedKeeps` is 1.8 days, which rounds to two. `src/sim/goals.js:326` derives "That is one strip a day" from `SEASON_DAYS` and an aim of eight that match only by chance; dev 898db4e marks it with a comment that names this task, and the comment goes when the fault does. `src/sim/goals.js:371` and `:376` say a den goes back to the beasts if the fire is out "for a day", which is exactly `CLOCK.den.campDark`, read by nothing. Make each string read its constant. The two interface strings are task 8's.
 - [ ] Tune against the long run on three seeds until a camp's first ten days read as today's do: a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10. Change a value only in the table, and log each change with its reason.
-- [ ] Write the report: for each seed, today's golden line beside the new three-day line; the long run's counts beside today's at the same world age of the camp; every value whose world-time meaning moved by more than a factor of two, with the reason; seconds a world day at day 3 and day 50; the floors that were removed and where G5 puts them back.
-- [ ] The notes gain a section on the real clock, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
+- [ ] **Decide how a tuned value is recorded before tuning starts, not after.** A changed constant is recorded nowhere today. The door log carries acts, and `startWorld(seed, options)` carries the world settings, but a turned knob carries neither. So a run with a tuned value cannot be replayed from its seed and its log, and the project's central guarantee does not reach it. patcher found this while surveying issue 48; it is the suite's problem and it is this task's problem too. A report of prose notes is not a record. **The rule for G4: a tuned value is a commit.** Tuning edits `src/sim/clock.js` and re-runs, and every number in the report names the commit it came from, so any line of it can be reproduced from the repository alone. Do not build a runtime knob inside G4. A knob that sets a constant without passing the door would break replay for every run after it, which is a larger thing than this plan is allowed to spend. Issue 48 may build one, and it will have to answer how the door carries it.
+- [ ] Write the report: for each seed, today's golden line beside the new three-day line; the long run's counts beside today's at the same world age of the camp; every value whose world-time meaning moved by more than a factor of two, with the reason (ruling 7: big movers are enough); seconds a world day at day 3 and day 50, skipped and stepped; the floors that were suspended, what task 4 measured, and what the user ruled about them.
+- [ ] The notes gain a section on the real clock and the skip, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
 - [ ] Watch the hermit rule. The branch in `src/sim/camps.js` that fires when one person is left holds on zero ticks of all six seeds for 70 days today, measured by dev-coordinator, and every seed does fall to one living person. The hearth condition is the only thing that prevents it. This retune changes when a pit goes out, so the rule can start to fire. Report it in the long run if it does. Issue 25 lands before this plan starts, by dev-coordinator's ruling, so read the rule under its new name and expect a second camp to be founded rather than the old false line to be printed.
 - [ ] Do not bless. Open the pull request with the report, and tell dev-coordinator that it waits for the user.
 
-**An option, not a task.** Nothing catches prose that states a duration. `tests/clock.js` reads rules, not strings, so issue 37 and the six strings above all passed it. A lint that flags a number word beside "day", "days", "winter" or "year" in a player-facing string would have caught all seven. It would also be noisy. Offer it to the user with the report; do not build it inside G4.
+**An option, not a task.** Nothing catches prose that states a duration. `tests/clock.js` reads rules, not strings, so issue 37 and the strings above all passed it. A lint that flags a number word beside "day", "days", "winter" or "year" in a player-facing string would have caught all of them. It would also be noisy. Offer it to the user with the report; do not build it inside G4.
+
+**Related, and not a G4 deliverable.** The user has asked for a local developer suite site: tabs for tweaking, review, knobs, name pools and text synthesis, and access to the simulation's internals. patcher is filing the issue. It overlaps task 11's knob tuning. Read it when it lands; do not absorb it.
 
 ## Self-review
 
-| Spec line | Task |
+| Spec line or ruling | Task |
 |---|---|
 | A tick is a world second, a day 86,400, a year 365 with seasons 91, 91, 91, 92 | 1 |
 | Walking a tile a tick, a run two | 1 |
 | Cellular systems once a world minute | 2 |
 | Camp rules as rates an hour, rolled at the step | 2 |
-| Needs an hour; work in world time; an axe 1 hour, a lean-to 4, sleep 8 | 4 |
-| Lives in years | 5 |
-| The speed ladder | 7 |
+| Needs an hour; work in world time; an axe 1 hour, a lean-to 4, sleep 8 | 5 |
+| Lives in years | 6 |
 | The reshaped tick soak; a world day under 5 s | 1, 3 |
-| Blessed once; the floors hold or the user has ruled | 9, and rulings 1 and 2 |
+| Blessed once | 11 |
+| Ruling 1: G4 reaches dev playable | 8, 9 |
+| Ruling 2: tick speed is variable and effectively unlimited | 4 |
+| Ruling 2: the floors are measured before they are moved | 4, then the user |
+| Ruling 7: the report shows the big movers | 11 |
 
 Not in G4: the day tier, the day soak and its floors, calibration between tiers, the rates table, and zoom. They are G5 and G6.
