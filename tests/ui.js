@@ -1381,10 +1381,17 @@ test('the act card withholds the weighed row for a record the player made', () =
   const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'actCard']);
   api.startWorld('gamma');
   api.step(true);
-  const rec = { ...api.creation.gestures[0], byPlayer: true, weighed: null };
+  /* The record carries a real weighed block. With `weighed: null` the row is absent either way, and the
+     test would pass with the byPlayer guard deleted — it would agree with the fault it exists to catch. */
+  const weighed = { opts: [{ type: 'split', region: 0, score: 4 }], picked: 'split' };
+  const rec = { ...api.creation.gestures[0], byPlayer: true, weighed };
   const card = api.actCard(rec);
   assert.equal(card.rows.some(r => r.label === 'weighed'), false,
     'the taken row cannot be derived for a player record until a later slice stores it');
+  /* The control. The same record the engine made shows the row, so the line above is the guard talking. */
+  const mine = api.actCard({ ...rec, byPlayer: false });
+  assert.equal(mine.rows.some(r => r.label === 'weighed'), true,
+    'an act the engine decided still shows what it weighed');
 });
 
 /* A canvas that draws nothing and keeps the list of what it was asked to draw. */
