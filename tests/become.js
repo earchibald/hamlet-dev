@@ -419,3 +419,34 @@ test('a creation run entirely on autopilot is the creation the engine runs alone
   assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
   assert.equal(b.tick, a.tick);
 });
+
+test('the ages take their own state with them when the valley is settled', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.inject({ source: 'player', act: 'watch', what: 'age', at: 900 });
+  api.inject({ source: 'player', act: 'run', what: 'age', at: 900 });
+  assert.equal(api.runUntil, 900);
+  assert.equal(api.stops.length, 1);
+  let n = 0; while (api.era === 'gods' && n++ < 2000) api.step();
+  assert.equal(api.era, 'days', 'the valley settled');
+  assert.equal(api.agePos, null, 'no position in an age survives');
+  assert.equal(api.pending, null, 'no turn is open');
+  assert.equal(api.runUntil, null, 'a run that outlived the ages is cleared');
+  assert.deepEqual(api.stops, [], 'a stop that can never fire is cleared');
+  assert.ok(api.inhabited && api.inhabited.id === g.id, 'who the player is outlives the ages');
+});
+
+test('a discarded valley does not cost the player the run they set', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  api.inject({ source: 'player', act: 'become', id: api.awakeGods()[0].id });
+  api.inject({ source: 'player', act: 'run', what: 'age', at: 900 });
+  /* Settle every age. Each one discards, because a valley cannot be painted this early, and the
+     ages are handed back. The run must survive every one of them. */
+  for (let n = 0; n < 12 && api.era === 'gods'; n++){
+    api.step();
+    assert.ok(api.era === 'days' || api.runUntil === 900, `the run was lost at age ${api.age}`);
+  }
+});
