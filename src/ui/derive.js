@@ -409,6 +409,9 @@ function paletteMatch(query, rows){
    name, so it never reaches this list. The valley, the camps, and the sectors are named by the
    living, not by the lost, so they stay out too. */
 const LEARNED_KINDS = [['hill', () => hills], ['cave', () => caves], ['grove', () => groves], ['crossing', () => fords], ['river', () => [river]], ['lake', () => [stillWater]]];
+/* The valley's name, or null while it has none that anybody has read. The map's title, the help
+   page, and the chronicle search ask this one question, so the three never disagree. */
+const valleyName = () => valley && valley.nameKnown !== false ? nameOf(valley) : null;
 /* Every old name somebody has read, for the help page. A name nobody has found is not shown.
    This reads the records and changes none of them. The text comes back raw; the page escapes it. */
 function learnedNames(){

@@ -45,7 +45,7 @@ function initUI(){
   });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
-  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch'){ ui.chronSearch = e.target.value; ui.row.chronicle = 0; renderUI(true); } });
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });

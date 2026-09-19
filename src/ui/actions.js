@@ -174,11 +174,19 @@ const ACTIONS = {
   /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
      rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
   searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  /* The one writer of the query. The box's input handler calls it, and so does Esc. A shorter list would
+     leave a stale row index pointing past the end, so the row goes back to the top with every change. */
+  setChronSearch(v){
+    const q = v == null ? '' : String(v);
+    if (ui.chronSearch === q) return;
+    ui.chronSearch = q; ui.row.chronicle = 0;
+    const box = $('chronSearch'); if (box && box.value !== q) box.value = q;
+    renderUI(true);
+  },
   /* Esc in the box clears the query first, so one key both undoes the search and gives the keyboard back. */
   closeSearch(){
-    const box = $('chronSearch');
-    if (ui.chronSearch){ ui.chronSearch = ''; if (box) box.value = ''; ui.row.chronicle = 0; renderUI(true); return; }
-    if (box) box.blur();
+    if (ui.chronSearch){ ACTIONS.setChronSearch(''); return; }
+    const box = $('chronSearch'); if (box) box.blur();
     ui.focus = 'drawer:chronicle'; renderUI(true);
   },
   palette(){ openPalette(); },

@@ -6117,6 +6117,9 @@ function paletteMatch(query, rows){
    name, so it never reaches this list. The valley, the camps, and the sectors are named by the
    living, not by the lost, so they stay out too. */
 const LEARNED_KINDS = [['hill', () => hills], ['cave', () => caves], ['grove', () => groves], ['crossing', () => fords], ['river', () => [river]], ['lake', () => [stillWater]]];
+/* The valley's name, or null while it has none that anybody has read. The map's title, the help
+   page, and the chronicle search ask this one question, so the three never disagree. */
+const valleyName = () => valley && valley.nameKnown !== false ? nameOf(valley) : null;
 /* Every old name somebody has read, for the help page. A name nobody has found is not shown.
    This reads the records and changes none of them. The text comes back raw; the page escapes it. */
 function learnedNames(){
@@ -6910,8 +6913,9 @@ function renderUI(force){
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
-  /* The world map wears the valley's name from the day a village gives it one. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${nameOf(valley) || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  /* The world map wears the valley's name from the day a village gives it one, and only once somebody
+     has read it. Until then it is the world map. */
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = view !== 'loc';
@@ -6931,7 +6935,7 @@ const rowClass = (id, i) => focusedDrawer() === id && ui.row[id] === i ? 'sel' :
 const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
-  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names  /"></div>`
+  const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names /"></div>`
     : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
   return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
@@ -7052,8 +7056,8 @@ function openHelp(){
     <li>What took them: ${esc(lore.took)}.</li>
     <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
     <li>The small lights: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
-    <li>This valley: ${esc(nameOf(valley) || describe(valley, 'valley'))}.</li>
-  </ul><h3>Old names read</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
+    <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
+  </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   ui.focus = 'dialog:help'; $('help').showModal();
 }
 
@@ -7257,11 +7261,19 @@ const ACTIONS = {
   /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
      rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
   searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  /* The one writer of the query. The box's input handler calls it, and so does Esc. A shorter list would
+     leave a stale row index pointing past the end, so the row goes back to the top with every change. */
+  setChronSearch(v){
+    const q = v == null ? '' : String(v);
+    if (ui.chronSearch === q) return;
+    ui.chronSearch = q; ui.row.chronicle = 0;
+    const box = $('chronSearch'); if (box && box.value !== q) box.value = q;
+    renderUI(true);
+  },
   /* Esc in the box clears the query first, so one key both undoes the search and gives the keyboard back. */
   closeSearch(){
-    const box = $('chronSearch');
-    if (ui.chronSearch){ ui.chronSearch = ''; if (box) box.value = ''; ui.row.chronicle = 0; renderUI(true); return; }
-    if (box) box.blur();
+    if (ui.chronSearch){ ACTIONS.setChronSearch(''); return; }
+    const box = $('chronSearch'); if (box) box.blur();
     ui.focus = 'drawer:chronicle'; renderUI(true);
   },
   palette(){ openPalette(); },
@@ -7322,7 +7334,7 @@ function initUI(){
   });
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
-  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch'){ ui.chronSearch = e.target.value; ui.row.chronicle = 0; renderUI(true); } });
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });

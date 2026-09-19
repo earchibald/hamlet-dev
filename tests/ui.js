@@ -1212,7 +1212,12 @@ test('the search action opens the Chronicle drawer, and Escape clears the query 
     api.ACTIONS.searchChronicle();
     assert.ok(api.ui.open.includes('chronicle'), 'the drawer is open');
     assert.equal(api.ui.focus, 'drawer:chronicle');
-    api.ui.chronSearch = 'reed';
+    /* Every write to the query goes through an action. The box's input handler calls this one too. */
+    api.ui.row.chronicle = 7;
+    api.ACTIONS.setChronSearch('reed');
+    assert.equal(api.ui.chronSearch, 'reed');
+    assert.equal(api.ui.row.chronicle, 0, 'a shorter list starts at the top again');
+    assert.equal(el.value, 'reed', 'the box follows the state');
     el.blurred = 0;
     api.ACTIONS.closeSearch();
     assert.equal(api.ui.chronSearch, '', 'the first Escape clears the query');
@@ -1220,6 +1225,11 @@ test('the search action opens the Chronicle drawer, and Escape clears the query 
     api.ACTIONS.closeSearch();
     assert.ok(el.blurred > 0, 'the second Escape gives the keyboard back to the drawer');
     assert.equal(api.ui.focus, 'drawer:chronicle');
+    /* The one writer: no file outside actions.js assigns the query or the chronicle row for it. */
+    for (const f of ['main', 'panels', 'dialogs', 'derive', 'keys']){
+      const src = fs.readFileSync(`src/ui/${f}.js`, 'utf8');
+      assert.ok(!/ui\.chronSearch\s*=/.test(src), `${f}.js writes ui.chronSearch`);
+    }
   });
 });
 
@@ -1242,13 +1252,30 @@ test('the help page tells of the lost people, lists the names that were read, an
     assert.ok(el.innerHTML.includes('&lt;i&gt;high&lt;/i&gt;'), 'the meaning is escaped too');
     assert.ok(!el.innerHTML.includes('<b>Stonemark</b>'), 'the tag itself never lands unescaped');
     assert.ok(!/mythos/i.test(el.innerHTML), 'the word mythos is never on screen');
-    /* The valley's line reads its name from the same place the map's title does, so the two never disagree. */
+    /* The valley's line asks the same question the map's title does, so the two never disagree. */
     api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: null }));
     api.openHelp();
+    assert.ok(!el.innerHTML.includes('Sadrumo.'), 'a valley name nobody has read is not printed either');
+    api.valley.nameKnown = true;
+    api.openHelp();
     assert.ok(el.innerHTML.includes('This valley: Sadrumo.'), el.innerHTML.slice(0, 200));
-    const panels = fs.readFileSync('src/ui/panels.js', 'utf8');
-    assert.ok(/nameOf\(valley\) \|\| 'World map'/.test(panels), 'the world map wears the valley’s name');
+    assert.ok(el.innerHTML.includes('Old names learned'), 'the list keeps the plan’s heading');
   });
+});
+
+/* Three states, one rule: no name, a name nobody has read, and a name the valley wears. */
+test('the map wears the valley’s name only once somebody has read it', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'valleyName', 'giveName']); api.startWorld('r');
+  assert.equal(api.valleyName(), null, 'no name yet: the map says World map');
+  api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: 'lost' }));
+  assert.equal(api.valley.nameKnown, false, 'an old record starts unread');
+  assert.equal(api.valleyName(), null, 'an unread name is not on the map');
+  assert.equal(api.describe(api.valley, 'valley').includes('Sadrumo'), false, 'and not in the help page either');
+  api.valley.nameKnown = true;
+  assert.equal(api.valleyName(), 'Sadrumo');
+  assert.equal(api.describe(api.valley, 'valley'), 'Sadrumo', 'the map and the help page agree');
+  const panels = fs.readFileSync('src/ui/panels.js', 'utf8');
+  assert.ok(/valleyName\(\) \|\| 'World map'/.test(panels), 'the map title asks the one rule');
 });
 
 test('the view key reads the chronicle search in both eras, and the search stays out of storage', () => {
