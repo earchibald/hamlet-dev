@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'clock', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
+const FILES = ['core', 'clock', 'names', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -28,11 +28,20 @@ const API = `return {
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, addItem, removeItem, stashAdd,
+  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, stashAdd,
   TASKS, startTask, setTask, taskStop, goTo, workKind,
-  runTask, updateBeing, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, sectorCount, looseCount,
+  runTask, updateBeing, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, sectorCount, looseCount,
   pathToStop, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
+  seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, OLD_FORBID,
+  nameTheLand, learnName, learnNamesHere, LORE_BUILT, LORE_TOOK, SKY_MEANINGS, SPRITE_MEANINGS, OLD_CAVE_KINDS,
+  loreCandidates, valleyFallbacks, nameThing, rename, candidatesFor, scoreCandidates, namerFor, landWords, axisMult, nameFoundersCamp, nameCampAtHearth, nameVillage, nameTick,
+  WORD_TAIL, WORD_PHRASE, joinedWord, phraseWord, landRows, landCandidates, workRows,
+  EVENT_NAMES, eventCandidates, nameEvents, eventName, isEventLine,
+  WORK_WORDS, workWordAt, nameSectorForWork, namePondHere, nameValley, describe, compass, thingSpot, placePhrase, DESCRIBE_KIND,
+  DEED_EPITHETS, FATE_EPITHETS, epithetCandidates, epithetPass, giveFate, fullName, lineageFor,
+  rebuildNames, get nrng(){ return nrng; }, get tongue(){ return tongue; }, get nameIndex(){ return nameIndex; }, get usedMeanings(){ return usedMeanings; },
+  get lore(){ return lore; }, get valley(){ return valley; }, get river(){ return river; }, get stillWater(){ return stillWater; }, get ponds(){ return ponds; }, get fords(){ return fords; },
   initField, splitRegion, regionById, liveRegions, regionAt, canSplit, neighboursOf, SECTOR_AREA, liveBoundaries, heartTile,
   CONTRASTS, POLES, mark, marksOf, hasMark, setPole, poleOf, hasPole, BIOME_OF, biomeOf, GROWS, poleShare,
   startCreation, runAges, ageStep, ageBegin, ageDecide, ageEnd, endAges, settleIfDue, get agePos(){ return agePos; }, get pending(){ return pending; }, get inhabited(){ return inhabited; }, takeTurn, releaseTurn,
@@ -46,7 +55,7 @@ const API = `return {
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
   get options(){ return options; },
-  campHumans, humans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
+  campName, campNameOf, campHumans, humans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
   get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },

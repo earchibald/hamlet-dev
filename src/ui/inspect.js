@@ -13,7 +13,7 @@ function inspectGod(g){
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
   else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
-  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in the ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
+  else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
   /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
@@ -47,15 +47,16 @@ function inspectBeing(a, full = false){
     extra = `<h3>Nature and learning</h3><div class="chips"><span class="chip">${traitWord('bravery', a.traits.bravery)}</span>${a.species === 'deer' ? `<span class="chip">${traitWord('sociability', a.traits.sociability)}</span>` : ''}<span class="chip">${habit}</span>${learned.map(l => `<span class="chip">${l}</span>`).join('')}${drowsy(a) ? '<span class="chip">resting hours</span>' : ''}${a.grove ? `<span class="chip">grove in ${a.grove.sector.name.toLowerCase()} ${a.grove.sector.sx},${a.grove.sector.sy}, anger ${a.grove.anger}</span>` : ''}${a.den ? `<span class="chip">${a.den.hill ? `den under the hill at ${a.den.hill.x},${a.den.hill.y}` : `burrow at ${a.den.exit.x},${a.den.exit.y}`}</span>` : ''}</div>`;
   }
   const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
-  return `<div class="head"><strong style="color:${beingColor(a)}">${a.name}</strong><span>${moodWord(a, m)} (${m})</span></div>
-    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${sectors[secIdx(s.sx, s.sy)].name.toLowerCase()} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
+  const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
+  return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
+    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
     ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
 }
 function inspectTile(x, y, z = 0){
-  const s = secOf(x, y), where = `${sectors[secIdx(s.sx, s.sy)].name}, ${x - s.sx * LW},${y - s.sy * LH}`;
+  const s = secOf(x, y), where = `${esc(sectorLabel(sectors[secIdx(s.sx, s.sy)]))}, ${x - s.sx * LW},${y - s.sy * LH}`;
   if (!hasTile(x, y, z)) return `<table class="kv"><tr><td>Where</td><td>${where}</td></tr><tr><td>Level</td><td>${levelName(z)}. ${z > 0 ? 'Open air. The ground is below.' : 'Solid earth. Nothing is dug here.'}</td></tr></table>`;
   const t = tileAt(x, y, z), rows = [['Where', where], ['Level', levelName(z)], ['Ground', GROUND[t.ground].name + (GROUND[t.ground].walk || t.ground === 'water' ? '' : '. Nothing walks through it.')]];
   const c = z === 0 ? camps.find(c => c.site && ((c.site[0] === x && c.site[1] === y) || (c.stashTile[0] === x && c.stashTile[1] === y) || (c.pit && c.pit[0] === x && c.pit[1] === y) || (c.rack && c.rack[0] === x && c.rack[1] === y) || (c.shelter && c.shelter[0] === x && c.shelter[1] === y) || (c.workshop && c.workshop[0] === x && c.workshop[1] === y) || (c.kiln && c.kiln[0] === x && c.kiln[1] === y))) : null;
@@ -113,7 +114,9 @@ function renderTip(){
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
   const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
-    : tipTarget.sector ? '<div class="muted">' + sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)]) + '</div>'
+    /* sectorSummary is one plain sentence, not markup of its own, so it is escaped whole here,
+       at the one place it becomes the tip's innerHTML. Nothing inside it escapes itself first. */
+    : tipTarget.sector ? '<div class="muted">' + esc(sectorSummary(sectors[secIdx(tipTarget.sector.sx, tipTarget.sector.sy)])) + '</div>'
     : inspectTile(tipTarget.tile[0], tipTarget.tile[1], tipTarget.tile[2]);
   tip.innerHTML = body;
   const nh = tip.querySelector('.hist'); if (nh) nh.scrollTop = scroll;

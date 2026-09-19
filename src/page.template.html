@@ -139,6 +139,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
+.filter input{flex:1;min-width:0;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:12px}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
 /* Floating windows. */
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
@@ -244,6 +245,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <p class="muted">[ and ] show more or fewer ages while the timeline is focused. Elsewhere they change level.</p>
   <h2>Muted</h2>
   <div id="helpMuted"></div>
+  <h2>The lost people</h2>
+  <div id="helpLore"></div>
   <h2>The map</h2>
   <div class="legend" id="legend">
     <span><b>@</b>person</span><span><b>r</b>rabbit</span><span><b>d</b>deer</span><span><b>f</b>fox</span><span><b>w</b>wolf</span><span><b>¤</b>sprite</span><span><b>g</b>gnome</span><span><b>♠</b>hollow pine</span><span><b>⊙</b>offering stone</span><span><b>ǂ</b>ward post</span><span><b>z</b>asleep</span><span><b>♣</b>tree</span><span><b>*</b>berry bush</span><span><b>ɸ</b>mushrooms</span><span><b>#</b>boulder</span><span><b>~</b>water</span><span><b>▒</b>rock</span><span><b>·</b>stone floor</span><span><b>◢</b>slope</span><span><b>◠</b>cave mouth</span>

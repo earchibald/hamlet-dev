@@ -143,6 +143,18 @@ test('people rows put trouble first, and the camp summary lists the stash as pai
   const c = api.campSummary(); assert.ok(Array.isArray(c.stash)); assert.ok(c.stash.every(p => p.length === 2 && p[1] > 0)); assert.ok(c.tools.includes('axe'));
 });
 
+test('a person who died on tick zero still holds their row for a day', () => {
+  const api = loadUI(['state', 'derive'], DERIVE); api.startWorld('r');
+  api.camp = api.camps[0];
+  const a = api.firstPerson(); a.camp = api.camps[0];
+  api.tick = 0; a.alive = false; a.diedAt = 0;
+  const row = api.peopleRows().find(r => r.a === a);
+  assert.ok(row, 'a death stamped zero dropped the row at once');
+  assert.equal(row.status, 'Dead');
+  api.tick = api.DAY;
+  assert.equal(api.peopleRows().some(r => r.a === a), false, 'the dead stay a day, no longer');
+});
+
 test('the view key changes when the world does, and holds still when nothing does', () => {
   const api = day21(); const k1 = api.viewKey();
   assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');
@@ -808,7 +820,9 @@ function domStub(){
     classList: { toggle(){}, add(){}, remove(){}, contains(){ return false; } },
     setAttribute(){}, removeAttribute(){}, addEventListener(){}, removeEventListener(){},
     appendChild(){}, insertBefore(){}, removeChild(){}, remove(){}, replaceChildren(){}, append(){},
-    showModal(){}, close(){}, focus(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
+    /* `blurred` counts the blur calls, so a test can see the search box let the keyboard go. */
+    blurred: 0,
+    showModal(){}, close(){}, focus(){}, blur(){ el.blurred++; }, select(){}, scrollIntoView(){}, setPointerCapture(){},
     getBoundingClientRect(){ return { left: 0, top: 0, width: 260, height: 260 }; },
   };
   el.querySelector = () => el; el.querySelectorAll = () => []; el.closest = () => el;
@@ -1342,6 +1356,312 @@ test('a god stands on a tile of a live country, so its star is drawn on the grou
       assert.ok(api.liveRegions().some(q => q.tiles.includes(g.at)), `${g.name} stands on no live country in age ${api.age}`);
     }
   }
+});
+
+/* Task 10: the interface shows the names. */
+const NAMES = ['nameTitle', 'campNames', 'sectorLabel', 'fullName', 'describe', 'nameOf', 'formerNames', 'nameRecord', 'rename'];
+
+test('a hover line on a name says the tongue, the meaning, the day, the reason, who named it, and the scores', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r'); api.camp = api.camps[0];
+  const a = api.beings[0];
+  const plain = api.nameRecord('Reedwater', { why: 'for the reeds along the water', by: a.id, scores: [{ text: 'Reedwater', axis: 'land', score: 33 }, { text: 'Pinehill', axis: 'land', score: 21 }] });
+  const line = api.nameTitle(plain);
+  assert.match(line, /^Reedwater\./);
+  assert.match(line, /since day 1/);
+  assert.match(line, /for the reeds along the water/);
+  assert.match(line, new RegExp(`named by ${a.name}`));
+  assert.match(line, /scores: Reedwater 33, Pinehill 21/);
+  /* Seed r has no painted river, so the great water is the lake it found instead. */
+  const old = (api.river || api.stillWater).names[0];
+  assert.match(api.nameTitle(old), new RegExp(`${old.text}, ${old.meaning}, in the old tongue`));
+  assert.match(api.nameTitle(old), /named by the lost people/);
+  assert.equal(api.nameTitle(null), '');
+});
+
+test('the camp view model gives the name now and the names before it', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r'); api.camp = api.camps[0];
+  const c = api.camps[0];
+  /* A fresh camp holds no name record yet: nameFoundersCamp and nameCampAtHearth are the only
+     writers, and neither has run. So the first rename gives it its first record, with nothing
+     before it; the second rename is the one that leaves a former name behind. */
+  api.rename(c, api.nameRecord('Old Camp', { why: 'a first name', by: null }));
+  api.rename(c, api.nameRecord('Reedwater', { why: 'for the reeds', by: null }));
+  const n = api.campNames();
+  assert.equal(n.now.text, 'Reedwater');
+  assert.equal(n.past.length, 1);
+  assert.equal(n.past[0].text, 'Old Camp');
+});
+
+test('a person with an epithet is shown by their full name, and a god keeps its own', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r');
+  const a = api.firstPerson();
+  assert.equal(api.fullName(a), a.name);
+  a.epithet = 'firekeeper';
+  assert.equal(api.fullName(a), `${a.name} firekeeper`);
+  /* Gods carry their own epithet from creation. fullName joins a god's name to it the same way,
+     but no row asks it to: the god card and the People drawer's god rows read a.name and
+     a.epithet directly, unchanged. This says what fullName does with one, not only that it has one. */
+  const g = api.beings.find(b => b.species === 'god');
+  assert.ok(g && g.epithet, 'a god carries its own epithet');
+  assert.equal(api.fullName(g), `${g.name} ${g.epithet}`);
+});
+
+/* Review fix 1: the People drawer's row label is a field of the row itself, chosen once in
+   drawerRows, not `esc(fullName(a))` for every row regardless of species. A god's row must read
+   exactly as it did at d08a432, before task 10: the name alone, nothing joined on by fullName. */
+test('the People drawer gives a person their full name, and leaves a god’s row exactly as it read before names', () => {
+  const api = loadUI(['state', 'derive', 'keys'], [...NAMES, 'drawerRows']);
+  api.startCreation('alpha', {}); api.camp = api.camps[0];
+  for (let i = 0; i < 6; i++) api.step();
+  assert.equal(api.era, 'gods');
+  const godRows = api.drawerRows('people');
+  assert.ok(godRows.length);
+  for (const r of godRows) assert.equal(r.label, r.r.a.name, 'a god’s row carries no epithet from fullName');
+
+  const api2 = loadUI(['state', 'derive'], [...NAMES, 'drawerRows']); api2.startWorld('r');
+  const p = api2.firstPerson(); p.epithet = 'firekeeper';
+  const row = api2.drawerRows('people').find(x => x.id === p.id);
+  assert.equal(row.label, `${p.name} firekeeper`, 'a person’s row carries their full name');
+});
+
+/* A god's inspector head is a different function, inspectGod, never touched by task 10; this locks
+   that in against the same regression the People drawer had. */
+test('a god’s inspector head reads as it did before names: its name, its own epithet, nothing more', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...NAMES, 'inspectGod']);
+  api.startCreation('alpha', {}); api.camp = api.camps[0];
+  for (let i = 0; i < 6; i++) api.step();
+  const g = api.gods()[0];
+  const html = api.inspectGod(g);
+  assert.match(html, new RegExp(`<div class="head"><strong style="color:[^"]*">${g.name}</strong><span>${g.epithet}</span></div>`));
+});
+
+test('a sector shows its own name beside the biome word once it has one, and just the biome word before that', () => {
+  const api = loadUI(['state', 'derive'], NAMES); api.startWorld('r');
+  const s = api.sectors[0];
+  assert.equal(api.sectorLabel(s), s.name, 'no name yet: the biome word alone');
+  s.names = [api.nameRecord('Timberground', { why: 'for the work done here', by: null })];
+  assert.match(api.sectorLabel(s), new RegExp(`^Timberground, an? ${s.name.toLowerCase()}$`));
+});
+
+/* Review fix 3: a sector inside a sentence that supplies its own words around it ("in ... at 3,4.")
+   reads its own name with no article, and keeps the old "the <biome>" phrase when it has none. */
+test('sectorProse names the sector mid-sentence when it can, and keeps the plain biome phrase when it cannot', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'sectorProse']); api.startWorld('r');
+  const s = api.sectors[0];
+  assert.equal(api.sectorProse(s), `the ${s.name.toLowerCase()}`, 'unnamed: the plain biome phrase, as it always read');
+  s.names = [api.nameRecord('Timberground', { why: 'test', by: null })];
+  assert.equal(api.sectorProse(s), 'Timberground', 'named: the sector’s own name, with no article of its own');
+});
+
+test('inspectTile’s Where row uses the sector’s own name once it has one', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'actions'], [...NAMES, 'inspectTile', 'LW', 'LH']);
+  api.startWorld('r');
+  const s = api.sectors[0];
+  s.names = [api.nameRecord('Timberground', { why: 'test', by: null })];
+  const html = api.inspectTile(s.sx * api.LW, s.sy * api.LH, 0);
+  assert.match(html, /Timberground, a /);
+});
+
+/* Review fix 2: sectorLabel carries sim text (a naming record), and it is escaped once, at the
+   place it turns into markup: the palette row and the sector tooltip. The builders themselves
+   (paletteRows, sectorSummary) stay raw, so nothing here is escaped twice. */
+test('a sector name with markup in it is escaped once it becomes markup: the palette row and the sector tooltip', () => {
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc; globalThis.localStorage = storage; globalThis.window = { innerWidth: 1200, innerHeight: 900 };
+    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs'],
+      [...NAMES, 'paletteRows', 'openPalette', 'renderPalette', 'renderTip'],
+      { setTip: '(t, a) => { tipTarget = t; tipAnchor = a; }' });
+    api.startWorld('r'); api.camp = api.camps[0];
+    const s = api.sectors[0];
+    s.names = [api.nameRecord('<b>Timberground</b>', { why: 'a test name', by: null })];
+
+    /* openPalette is what a real keypress runs: it fills the dialog's own row list from
+       paletteRows() before the first render, which a bare renderPalette() call cannot do. */
+    api.openPalette();
+    const row = api.paletteRows().find(r => r.label.includes('Timberground'));
+    assert.ok(row, 'the sector has a palette row');
+    assert.ok(row.label.includes('<b>Timberground</b>'), 'the builder keeps the raw text, unescaped');
+    el.value = 'Timberground';
+    api.renderPalette();
+    const paletteHTML = el.innerHTML;
+    assert.ok(paletteHTML.includes('&lt;b&gt;Timberground&lt;/b&gt;'), 'the palette escapes the sector name at render');
+    assert.ok(!paletteHTML.includes('<b>Timberground</b>'), 'the tag itself never lands unescaped in the palette');
+
+    api.setTip({ sector: { sx: s.sx, sy: s.sy } }, { x: 0, y: 0, left: false });
+    el.innerHTML = '';
+    api.renderTip();
+    const tipHTML = el.innerHTML;
+    assert.ok(tipHTML.includes('&lt;b&gt;Timberground&lt;/b&gt;'), 'the tooltip escapes the sector name at render');
+    assert.ok(!tipHTML.includes('<b>Timberground</b>'), 'the tag itself never lands unescaped in the tooltip');
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
+});
+
+/* ---- task 11: the valley on the map, the lost people in help, and the chronicle search ---- */
+
+test('the help page lists the old names anybody has learned, with their meanings', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'learnedNames', 'chronicleMatches']); api.startWorld('r'); api.camp = api.camps[0];
+  assert.deepEqual(api.learnedNames(), [], 'nothing is learned at the start');
+  const h = api.hills.find(x => x.names && x.names.length);
+  assert.ok(h, 'seed r leaves an old name on a hill');
+  h.nameKnown = true;
+  const rows = api.learnedNames();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].text, api.nameOf(h));
+  assert.equal(rows[0].meaning, h.names[0].meaning);
+  assert.equal(rows[0].what, 'hill');
+});
+
+test('the chronicle search matches a line by its text, and an old line by the name it used', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'learnedNames', 'chronicleMatches', 'ui', 'drawerRows']); api.startWorld('r'); api.camp = api.camps[0];
+  const c = api.camps[0], was = c.name;
+  /* The founder's camp keeps a record of the name it started with. Without one there is no history to search. */
+  api.rename(c, api.nameRecord(was, { why: 'the first camp', by: null }));
+  api.log(`${was} lays a fire.`, [], 'info');
+  api.rename(c, api.nameRecord('Reedwater', { why: 'for the reeds', by: null }));
+  api.log('Reedwater keeps its fire.', [], 'info');
+  const lines = api.chronicle;
+  assert.equal(api.chronicleMatches(lines[0], 'reedwater'), true);
+  assert.equal(api.chronicleMatches(lines[1], 'reedwater'), true, 'the old line answers to the new name');
+  assert.equal(api.chronicleMatches(lines[1], was.toLowerCase()), true);
+  assert.equal(api.chronicleMatches(lines[0], 'zzzz'), false);
+  assert.equal(api.chronicleMatches(lines[0], ''), true);
+  api.ui.chronSearch = 'reedwater';
+  assert.equal(api.drawerRows('chronicle').length, 2);
+  api.ui.chronSearch = 'zzzz';
+  assert.equal(api.drawerRows('chronicle').length, 0);
+  api.ui.chronSearch = '';
+});
+
+/* An old name is a secret until somebody reads the marks. The search must not give it away either. */
+test('the chronicle search does not answer to an old name nobody has read', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'chronicleMatches', 'learnedNames', 'ui', 'drawerRows']); api.startWorld('r'); api.camp = api.camps[0];
+  const h = api.hills.find(x => x.names && x.names.length);
+  const old = h.names[0].text;
+  h.names.unshift(api.nameRecord('Crowtop', { why: 'for the birds', by: null }));
+  h.nameKnown = false;
+  api.log('Crowtop stands bare.', [], 'info');
+  const line = api.chronicle[0];
+  assert.equal(api.chronicleMatches(line, 'crowtop'), true, 'the name the people use still finds the line');
+  assert.equal(api.chronicleMatches(line, old.toLowerCase()), false, 'the unread old name finds nothing');
+  h.nameKnown = true;
+  assert.equal(api.chronicleMatches(line, old.toLowerCase()), true, 'once the marks are read, the old name finds it');
+});
+
+test('the slash key opens the chronicle search, from the map and from a drawer', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(keyHit(api, ev('/'), 'map'), { action: 'searchChronicle', arg: undefined });
+  assert.deepEqual(keyHit(api, ev('/'), 'drawer:people'), { action: 'searchChronicle', arg: undefined });
+  assert.equal(typeof api.ACTIONS.searchChronicle, 'function');
+  assert.equal(typeof api.ACTIONS.closeSearch, 'function');
+});
+
+const UI_ALL = ['state', 'derive', 'keys', 'map', 'timeline', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions'];
+function withDom(run){
+  const { el, doc, storage } = domStub();
+  const had = Object.fromEntries(['document', 'localStorage', 'performance', 'innerWidth', 'window'].map(k => [k, globalThis[k]]));
+  try {
+    globalThis.document = doc; globalThis.localStorage = storage; globalThis.performance = { now: () => 0 };
+    globalThis.innerWidth = 1200;
+    globalThis.window = { innerWidth: 1200, innerHeight: 900, devicePixelRatio: 1, addEventListener(){}, matchMedia: () => ({ addEventListener(){} }) };
+    return run(el);
+  } finally {
+    for (const [k, v] of Object.entries(had)) if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+  }
+}
+
+test('the search action opens the Chronicle drawer, and Escape clears the query before it leaves the box', () => {
+  withDom(el => {
+    const api = loadUI(UI_ALL, [...KEYS, 'ui']);
+    api.startWorld('r'); api.camp = api.camps[0];
+    api.ACTIONS.searchChronicle();
+    assert.ok(api.ui.open.includes('chronicle'), 'the drawer is open');
+    assert.equal(api.ui.focus, 'drawer:chronicle');
+    /* Every write to the query goes through an action. The box's input handler calls this one too. */
+    api.ui.row.chronicle = 7;
+    api.ACTIONS.setChronSearch('reed');
+    assert.equal(api.ui.chronSearch, 'reed');
+    assert.equal(api.ui.row.chronicle, 0, 'a shorter list starts at the top again');
+    assert.equal(el.value, 'reed', 'the box follows the state');
+    el.blurred = 0;
+    api.ACTIONS.closeSearch();
+    assert.equal(api.ui.chronSearch, '', 'the first Escape clears the query');
+    assert.equal(el.blurred, 0, 'the caret stays in the box while there is text to clear');
+    api.ACTIONS.closeSearch();
+    assert.ok(el.blurred > 0, 'the second Escape gives the keyboard back to the drawer');
+    assert.equal(api.ui.focus, 'drawer:chronicle');
+    /* The one writer: no file outside actions.js assigns the query or the chronicle row for it. */
+    for (const f of ['main', 'panels', 'dialogs', 'derive', 'keys']){
+      const src = fs.readFileSync(`src/ui/${f}.js`, 'utf8');
+      assert.ok(!/ui\.chronSearch\s*=/.test(src), `${f}.js writes ui.chronSearch`);
+    }
+  });
+});
+
+/* The help page prints sim text: the lore and the old names. Both are escaped where they become markup. */
+test('the help page tells of the lost people, lists the names that were read, and escapes them', () => {
+  withDom(el => {
+    const api = loadUI(UI_ALL, [...NAMES, 'learnedNames', 'openHelp', 'giveName', 'ui'], { __lore: '() => lore' });
+    api.startWorld('r'); api.camp = api.camps[0];
+    const lore = api.__lore();
+    const h = api.hills.find(x => x.names && x.names.length);
+    h.names[0] = api.nameRecord('<b>Stonemark</b>', { tongue: 'old', meaning: 'the <i>high</i> stone', by: 'lost' });
+    h.nameKnown = false;
+    api.openHelp();
+    assert.ok(el.innerHTML.includes(lore.people), 'the lost people are named');
+    assert.ok(el.innerHTML.includes(lore.sky.meaning), 'the sky word says what it means');
+    assert.ok(!el.innerHTML.includes('Stonemark'), 'a name nobody has read stays off the page');
+    h.nameKnown = true;
+    api.openHelp();
+    assert.ok(el.innerHTML.includes('&lt;b&gt;Stonemark&lt;/b&gt;'), 'the name is escaped where it becomes markup');
+    assert.ok(el.innerHTML.includes('&lt;i&gt;high&lt;/i&gt;'), 'the meaning is escaped too');
+    assert.ok(!el.innerHTML.includes('<b>Stonemark</b>'), 'the tag itself never lands unescaped');
+    assert.ok(!/mythos/i.test(el.innerHTML), 'the word mythos is never on screen');
+    /* The valley's line asks the same question the map's title does, so the two never disagree. */
+    api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: null }));
+    api.openHelp();
+    assert.ok(!el.innerHTML.includes('Sadrumo.'), 'a valley name nobody has read is not printed either');
+    api.valley.nameKnown = true;
+    api.openHelp();
+    assert.ok(el.innerHTML.includes('This valley: Sadrumo.'), el.innerHTML.slice(0, 200));
+    assert.ok(el.innerHTML.includes('Old names learned'), 'the list keeps the plan’s heading');
+  });
+});
+
+/* Three states, one rule: no name, a name nobody has read, and a name the valley wears. */
+test('the map wears the valley’s name only once somebody has read it', () => {
+  const api = loadUI(['state', 'derive'], [...NAMES, 'valleyName', 'giveName']); api.startWorld('r');
+  assert.equal(api.valleyName(), null, 'no name yet: the map says World map');
+  api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: 'lost' }));
+  assert.equal(api.valley.nameKnown, false, 'an old record starts unread');
+  assert.equal(api.valleyName(), null, 'an unread name is not on the map');
+  assert.equal(api.describe(api.valley, 'valley').includes('Sadrumo'), false, 'and not in the help page either');
+  api.valley.nameKnown = true;
+  assert.equal(api.valleyName(), 'Sadrumo');
+  assert.equal(api.describe(api.valley, 'valley'), 'Sadrumo', 'the map and the help page agree');
+  const panels = fs.readFileSync('src/ui/panels.js', 'utf8');
+  assert.ok(/valleyName\(\) \|\| 'World map'/.test(panels), 'the map title asks the one rule');
+});
+
+test('the view key reads the chronicle search in both eras, and the search stays out of storage', () => {
+  const api = loadUI(['state', 'derive'], ['ui', 'viewKey', 'inAges']);
+  api.startCreation('r', {}); api.camp = api.camps[0];
+  const agesWas = api.viewKey(); api.ui.chronSearch = 'reed';
+  assert.notEqual(api.viewKey(), agesWas, 'the ages branch reads it');
+  api.ui.chronSearch = '';
+  api.startWorld('r'); api.camp = api.camps[0];
+  const daysWas = api.viewKey(); api.ui.chronSearch = 'reed';
+  assert.notEqual(api.viewKey(), daysWas, 'the days branch reads it');
+  api.ui.chronSearch = '';
+  const state = fs.readFileSync('src/ui/state.js', 'utf8');
+  const at = state.indexOf('function persist');
+  assert.ok(at >= 0, 'state.js has no function persist: the two checks below would pass on one character');
+  const saved = state.slice(at);
+  assert.ok(!/chronSearch: ui\.chronSearch/.test(saved), 'the search is not written to storage');
+  assert.ok(!/s\.chronSearch/.test(saved), 'the search is not read back from storage');
 });
 
 /* ---------- saves: the file name, the keys, and the view after a load ---------- */

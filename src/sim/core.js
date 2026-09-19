@@ -104,7 +104,7 @@ const PIT_MAX = 400, STICK_FUEL = 50, LOG_FUEL = 140;
 /* Every field a fresh tile has besides x, y, z, and ground, with the value it starts at. makeTile spreads
    this table, and a snapshot leaves out a field that still equals its default. The two read one table, so
    they cannot drift. The key order is the order makeTile gave these fields. */
-const TILE_DEFAULTS = { feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null };
+const TILE_DEFAULTS = { feature: null, berries: 0, fire: 0, struct: null, slope: false, hill: null, cave: null, mouth: null, water: null, pond: null, ford: null };
 
 /* Seeded random numbers. A stream's whole state is one 32-bit number, and a snapshot reads it and sets it. */
 function mulberry32(a){
@@ -157,9 +157,16 @@ function stamp(){
   if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
-function log(text, who = [], kind = 'info'){
-  const e = { tick, when: stamp(), text, kind };
+/* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
+   for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
+function log(text, who = [], kind = 'info', tag = null){
+  const e = { tick, when: stamp(), text, kind, tag, camp: camp ? camp.id : null };
   if (era === 'gods'){ e.age = age; legends.push(e); }
   chronicle.unshift(e); if (chronicle.length > 300) chronicle.pop();
-  for (const a of who){ a.history.unshift(e); if (a.history.length > 40) a.history.pop(); }
+  /* The history keeps the last forty lines only. A deed must outlast that, so a tagged line also
+     adds one to the person's own count. Nothing but an epithet reads it. */
+  for (const a of who){
+    a.history.unshift(e); if (a.history.length > 40) a.history.pop();
+    if (tag && a.deeds) a.deeds[tag] = (a.deeds[tag] || 0) + 1;
+  }
 }

@@ -79,6 +79,9 @@ const KEYMAP = [
   /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
   { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
+  /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
+     clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
+  { key: '/',          focus: 'any',    action: 'searchChronicle', label: 'Search the chronicle by name' },
   { key: 'ArrowDown',  focus: 'dialog:palette', action: 'paletteMove', arg: 1,  label: 'Next command' },
   { key: 'ArrowUp',    focus: 'dialog:palette', action: 'paletteMove', arg: -1, label: 'Previous command' },
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },

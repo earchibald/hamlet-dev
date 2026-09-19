@@ -3,7 +3,11 @@
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
   if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.name} <span class="k">${a.species === 'god' ? a.status : moodWord(a, mood(a))}</span>` : 'Gone'; }
-  const [x, y] = w.target.tile, s = secOf(x, y); return `${sectors[secIdx(s.sx, s.sy)].name} ${x - s.sx * LW},${y - s.sy * LH}`;
+  /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
+     no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
+     can run past that room where the bare biome word never did, so the title keeps the biome word, as
+     it always did; the sector's own name is one hover away, in the card the window's body shows. */
+  const [x, y] = w.target.tile, s = secOf(x, y); return `${esc(sectors[secIdx(s.sx, s.sy)].name)} ${x - s.sx * LW},${y - s.sy * LH}`;
 }
 function renderWindows(){
   const box = $('windows'), seen = new Set();

@@ -4,6 +4,12 @@ function makeCamp(name){
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
     tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+  /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
+     gets its first name record once someone is there to give it one: at the site (`setSite`),
+     or, failing that, at the hearth (`nameCampAtHearth`). A placeholder such as "The first camp"
+     is not a name; do not give it one here, or its name history would start with a name nobody
+     gave it. */
+  c.names = []; c.namedAt = 0; c.founder = null; c.villageNamed = 0;
   camps.push(c); return c;
 }
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
@@ -54,6 +60,9 @@ function chooseSite(a){
     if (!best || sc > best.sc) best = { x, y, sc, why };
   }
   if (!best) return false;
+  /* The actor wins the name: whoever chose the spot named it, not whoever `setSite`
+     might otherwise pick as the most sociable person standing there. */
+  nameFoundersCamp(camp, a);
   setSite(best.x, best.y);
   camp.siteReason = best.why.join(', ');
   log(`${a.name} picks a spot for the camp: ${best.why.join(', ')}.`, [a], 'major');
@@ -63,6 +72,12 @@ function setSite(x, y){
   camp.site = [x, y];
   const st = nearFind(x, y, t => passable(t.x, t.y) && !t.feature, RING) || tileAt(x, y);
   camp.stashTile = [st.x, st.y];
+  /* A fallback only: when nobody has named this camp yet (the door's site act, or any
+     other path that sets a site without an actor of its own), give it a founder from
+     whoever is there to name it, so a camp raised through `inject()` is never left
+     carrying "The first camp". A caller that already named the camp (`chooseSite`) is
+     never overridden here. */
+  if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
 /* A wildfire within reach of the camp, for fetching an ember. */
 function nearbyBlaze(){
@@ -108,13 +123,16 @@ function startFoundCamp(leader){
   const mates = campHumans().filter(h => h !== leader && !h.homeless).sort((p, q) => (leader.opinions[q.id] || 0) - (leader.opinions[p.id] || 0));
   const mate = mates[0]; if (!mate) return false;
   const old = camp, nc = makeCamp(`${leader.name}'s camp`);
+  /* The new camp has a founder and a name record from the moment the party leaves, so its first
+     chronicle line reads under a real name and `notableCandidates` knows who made it. */
+  nameFoundersCamp(nc, leader);
   nc.target = secCenter(target); nc.coals = tick + CLOCK.party.coalsLast;
   const take = (k, n) => { const m = Math.min(n, old.stash[k]); if (m > 0){ old.stash[k] -= m; if (old.rot[k]) old.rot[k].splice(0, m); nc.stash[k] += m; if (nc.rot[k]) for (let i = 0; i < m; i++) nc.rot[k].push(tick + CLOCK.party.foodKeeps); } };
   take('smoked', 3); take('berries', 3); take('stick', 4);
   old.sentParty = `${leader.name} and ${mate.name}`;
-  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
+  for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.campSince = tick; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
   for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
-  log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
+  log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major', 'found');
   return startTask(leader, 'join');
 }
 function shelterSite(){
@@ -127,8 +145,11 @@ function shelterSite(){
   return best ? [best.x, best.y] : null;
 }
 
-/* The camp's name as the chronicle says it. The first camp has no name of its own yet. */
-const campName = () => camp.name === 'The first camp' ? 'the camp' : camp.name;
+/* The camp's name as the chronicle says it. A camp with no name record has no name of its own
+   yet, and is just "the camp". The test is the record, never the placeholder text: a rule reads
+   data, not a name. */
+const campNameOf = c => c && nameOf(c) ? c.name : 'the camp';
+const campName = () => campNameOf(camp);
 
 /* A stranger walks in from a reachable edge of the world and makes for `camp`. Returns the person,
    or null when no edge of the world can reach the camp's site. */
@@ -139,6 +160,7 @@ function comeOverTheHills(){
   if (!ok.length) return null;
   const i = ok[rint(ok.length)] - ZOFF * W * H, x = i % W, y = (i - x) / W;
   const b = makeBeing('human', x, y, takeName(), rint(360)); b.homeless = true; b.camp = camp; beings.push(b);
+  lineageFor(b, { edge: x === 0 ? 'west' : x === W - 1 ? 'east' : y === 0 ? 'north' : 'south' });
   return b;
 }
 
@@ -217,7 +239,10 @@ function updateCamps(){
     }
     if (tick % CLOCK.every.spoil === 0) spoilFood();
     if (tick % CLOCK.every.fae === 0) faeTick();
-    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; camp.name = camp.name === 'The first camp' ? 'The first village' : camp.name.replace(' camp', ' village'); log(`With a storehouse, huts, and eight people, ${camp.name} is a village now.`, campHumans(), 'major'); for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
+    /* The promotion sets the flag and the thought, on this tick, as it always has: the layout
+       guard needs a being's mood to move at the same moment it does today. The naming and the
+       chronicle line belong to nameVillage, which runs in the nightly pass, at its own fire. */
+    if (!camp.village && camp.storehouse && camp.huts.length >= 2 && campHumans().length >= 8){ camp.village = true; for (const h of campHumans()) addThought(h, 'village', 'We live in a village', 6, CLOCK.thought.village); }
     /* Births. Two people who like each other, a roof, a warm season, and the food goal met.
        A camp takes another mouth only while it is stocked. Beds alone let a village grow past what
        the land feeds, and winter, when nothing can be gathered, then killed it together. */
@@ -230,9 +255,12 @@ function updateCamps(){
         c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
         for (const t in c.traits) c.traits[t] = clamp(Math.round(((pair.p.traits[t] + pair.q.traits[t]) / 2 + (rng() - 0.5) * 0.3) * 100) / 100, 0, 1);
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
+        lineageFor(c, { roof: true, village: !!camp.village,
+          foundersChild: camps.some(k => k.founder === pair.p.id) && camps.some(k => k.founder === pair.q.id),
+          firstBorn: !beings.some(b => b !== c && b.species === 'human' && b.parents && b.lineage && b.lineage.camp === camp.id) });
         for (const par of [pair.p, pair.q]){ par.rel[c.id] = 'child'; c.rel[par.id] = 'parent'; par.opinions[c.id] = 60; c.opinions[par.id] = 60; addThought(par, 'birth', `${c.name} was born`, 15, CLOCK.thought.birthParent); }
         for (const h of campHumans()) if (h !== pair.p && h !== pair.q) addThought(h, 'birth', `A child, ${c.name}, was born in the camp`, 6, CLOCK.thought.birthCamp);
-        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name === 'The first camp' ? 'the camp' : camp.name}.`, [c, pair.p, pair.q], 'major');
+        log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
     tryLightning();
@@ -245,4 +273,5 @@ function updateCamps(){
       }
     }
   }
+  nameTick();
 }

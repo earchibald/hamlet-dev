@@ -58,6 +58,8 @@ function initUI(){
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
+  document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });
   $('paletteList').addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) paletteRun(Number(li.dataset.i)); });
   $('paletteBtn').addEventListener('click', ACTIONS.palette); $('chordBtn').addEventListener('click', ACTIONS.chord);
   $('chordButtons').addEventListener('click', e => { const b = e.target.closest('[data-stage]'); if (b) ACTIONS.stage(b.dataset.stage); });
@@ -96,8 +98,12 @@ function initUI(){
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
   document.addEventListener('keydown', e => {
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
-       that is how Alt+C continues the last world while the cursor sits in the seed box. */
-    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput' && !(e.ctrlKey || e.altKey || e.metaKey)) return;
+       that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
+       plain key let through, and only as the way out of the chronicle's search box. */
+    if (e.target.tagName === 'INPUT' && e.target.id !== 'paletteInput' && !(e.ctrlKey || e.altKey || e.metaKey)){
+      if (e.key === 'Escape' && e.target.id === 'chronSearch'){ e.preventDefault(); ACTIONS.closeSearch(); }
+      return;
+    }
     if (anyDialogOpen()){
       if (e.key === 'Escape'){ e.preventDefault(); closeDialogs(); return; }
       if (ui.focus === 'dialog:palette' && !(e.key.startsWith('Arrow') || e.key === 'Enter' || e.altKey)) return;

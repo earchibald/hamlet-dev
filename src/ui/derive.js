@@ -233,15 +233,44 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead leave the list at once until a death stamp exists. */
+/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+   `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
+   field, never for its truth. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt && tick - b.diedAt < DAY))).map(a => {
+  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
   return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
 }
+
+/* One plain-English line for a hover on a name. Every field of the record, in order. */
+function nameTitle(rec){
+  if (!rec) return '';
+  const who = rec.by === null ? 'named by the camp' : rec.by === 'lost' ? 'named by the lost people' : `named by ${(beingById(rec.by) || { name: 'somebody' }).name}`;
+  return [
+    rec.tongue === 'old' ? `${rec.text}, ${rec.meaning}, in the old tongue` : rec.text,
+    `since day ${Math.floor(rec.since / DAY) + 1}`,
+    rec.why,
+    who,
+    rec.scores && rec.scores.length ? `scores: ${rec.scores.map(s => `${s.text} ${s.score}`).join(', ')}` : '',
+  ].filter(Boolean).join('. ') + '.';
+}
+/* The current camp's name now, and the names it had before. */
+function campNames(){ return { now: camp.names && camp.names.length ? camp.names[0] : null, past: formerNames(camp) }; }
+/* A sector's label. Once it has a name of its own, the biome word stays beside it, so the ground
+   a name was given for is still there. With no name yet it is just the biome word, as before. */
+function sectorLabel(s){
+  const n = nameOf(s);
+  if (!n) return s.name;
+  const w = s.name.toLowerCase();
+  return `${n}, ${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
+}
+/* A sector inside a sentence that already has its own words around it ("in ... at 3,4."). A named
+   sector is a proper noun and needs no article of its own; an unnamed one is still just its biome
+   word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
+function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
 function campSummary(){
   return {
@@ -261,14 +290,20 @@ function seasonLine(){
 
 /* The rows a drawer's keys act on, in the order the drawer shows them. */
 function drawerRows(id){
-  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r }));
+  /* A person's row shows their full name, epithet and all; a god's row is untouched by that, since
+     a god already carries its own epithet from creation and its row read that way before names. */
+  if (id === 'people') return (inAges() ? godRows() : peopleRows()).map(r => ({ kind: 'person', id: r.a.id, r, label: r.a.species === 'human' ? fullName(r.a) : r.a.name }));
   if (id === 'goals'){
     if (inAges()) return [];
     const out = [];
     for (const s of stages(ui.showAll)){ out.push({ kind: 'stage', id: s.id, s }); for (const x of s.goals) if (!x.hidden || ui.unfold[s.id]) out.push({ kind: 'goal', id: x.g.id, x }); }
     return out;
   }
-  if (id === 'chronicle') return chronicle.filter(e => ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death').map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  /* The search's thing list is built once for the whole pass, not once for each of 300 lines. */
+  if (id === 'chronicle'){
+    const set = ui.chronSearch ? nameMatchSet() : null;
+    return chronicle.filter(e => (ui.chronFilter === 'all' || e.kind === 'major' || e.kind === 'death') && chronicleMatches(e, ui.chronSearch, set)).map(e => ({ kind: 'line', id: e.tick + e.text, e }));
+  }
   if (id === 'legends') return legends.map((e, i) => ({ kind: 'legend', id: i, e }));
   return [];
 }
@@ -371,10 +406,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -453,7 +488,7 @@ function paletteRows(){
   if (!inAges()) for (const a of campHumans()){ out.push({ label: `Inspect ${a.name}`, key: '', action: 'inspect', arg: a.id, group: 9 }); out.push({ label: `Follow ${a.name}`, key: '', action: 'follow', arg: a.id, group: 9 }); }
   if (!inAges()) for (const g of GOALS) if (!g.locked) for (const [v, l] of [[0, 'Off'], [1, 'On'], [2, 'High']]) out.push({ label: `${g.title}: ${l}`, key: '', action: 'goalPri', arg: { id: g.id, pri: v }, group: 9 });
   if (!inAges()) camps.forEach((c, i) => out.push({ label: `Go to ${c.name}`, key: `F${i + 1}`, action: 'campN', arg: i + 1, group: 9 }));
-  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${s.name} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
+  if (!inAges()) for (const s of sectors) out.push({ label: `Go to ${sectorLabel(s)} ${s.sx},${s.sy}`, key: '', action: 'gotoSector', arg: { sx: s.sx, sy: s.sy }, group: 9 });
   for (const m of ui.mutes) out.push({ label: `Unmute: ${muteLabel(m)}`, key: '', action: 'unmute', arg: m, group: 9 });
   if (!inAges()) for (const s of STAGES) if (stagesShown().includes(s.id)) out.push({ label: `Goals: ${s.label}`, key: `G ${STAGE_LETTER[s.id].toUpperCase()}`, action: 'stage', arg: s.id, group: 9 });
   for (const g of gods()) out.push({ label: `Inspect ${g.name} ${g.epithet}`, key: '', action: 'inspect', arg: g.id, group: 9 });
@@ -472,6 +507,47 @@ function paletteMatch(query, rows){
   return hit.sort((a, b) => score(a) - score(b));
 }
 
+/* ---- the lost people, and the chronicle search ---- */
+/* Where an old name can sit, and the word the help page calls that thing. A burrow carries no old
+   name, so it never reaches this list. The valley, the camps, and the sectors are named by the
+   living, not by the lost, so they stay out too. */
+const LEARNED_KINDS = [['hill', () => hills], ['cave', () => caves], ['grove', () => groves], ['crossing', () => fords], ['river', () => [river]], ['lake', () => [stillWater]]];
+/* The valley's name, or null while it has none that anybody has read. The map's title, the help
+   page, and the chronicle search ask this one question, so the three never disagree. */
+const valleyName = () => valley && valley.nameKnown !== false ? nameOf(valley) : null;
+/* Every old name somebody has read, for the help page. A name nobody has found is not shown.
+   This reads the records and changes none of them. The text comes back raw; the page escapes it. */
+function learnedNames(){
+  const out = [];
+  for (const [what, list] of LEARNED_KINDS) for (const t of (list() || [])) if (t && t.nameKnown && t.names && t.names.length) out.push({ text: t.names[0].text, meaning: t.names[0].meaning, what });
+  return out;
+}
+/* The chronicle search. A query that matches a thing's name, now or before, matches every line
+   that used either, so an old line still answers to the new name. A thing whose name nobody has
+   read is skipped: the search must not give away what the marks have not told.
+   A pass over the whole chronicle builds the list of things once, with `nameMatchSet`, and hands
+   it in. Built per line it cost a spread of every named thing for each of three hundred rows, on
+   every keystroke. With no set given the function builds its own, so one call still answers. */
+function nameMatchSet(){
+  const out = [];
+  for (const t of nameThings()){
+    if (t.nameKnown === false) continue;
+    const texts = (t.names || []).map(r => r.text);
+    if (texts.length) out.push(texts);
+  }
+  return out;
+}
+function chronicleMatches(e, q, set){
+  if (!q) return true;
+  const needle = String(q).trim().toLowerCase();
+  if (!needle) return true;
+  if (e.text.toLowerCase().includes(needle)) return true;
+  for (const list of (set || nameMatchSet())){
+    if (!list.some(x => x.toLowerCase().includes(needle))) continue;
+    if (list.some(x => e.text.includes(x))) return true;
+  }
+  return false;
+}
 /* The name of a save file. The seed goes to lower case, and each run of anything else becomes one
    dash. A seed of nothing but punctuation leaves no name, so it is called the world. */
 function saveName(seed, t){

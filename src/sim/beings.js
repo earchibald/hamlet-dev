@@ -13,6 +13,10 @@ function makeBeing(species, x, y, name, hue){
     skills: { gather: 0, build: 0, cook: 0, trap: 0, craft: 0, woodcut: 0, hunt: 0, wary: 0 }, xp: {},
     thoughts: [], opinions: {}, rel: {}, task: null, carrying: null, status: 'Arriving', asleep: false,
     cooldown: {}, history: [], lastChoice: null, lastHurt: null, homeless: false, pokedUntil: 0, camp: null,
+    /* How many tagged lines this person stands in, by tag. `log` counts them. The history holds
+       only the last forty lines, so a deed read back out of it is gone within a day or two; this
+       count is what an epithet reads. Plain numbers, and nothing but an epithet reads it. */
+    deeds: {},
   };
   if (species === 'human') b.needs.warmth = 80 + rint(20);
   if (species === 'human') b.clothes = false;
@@ -53,11 +57,14 @@ function dropCarried(a){
   if (c.kind === 'moss'){ for (let k = 0; k < c.count; k++) addItem('moss', a.x, a.y, a.z); return; }
   for (let k = 0; k < c.count; k++) addItem(c.kind, a.x, a.y, a.z);
 }
-function die(a, cause){
-  failTask(a); a.alive = false; a.asleep = false; a.status = 'Dead';
+/* `tag` is what kind of death it was, for the event table. `diedAt` is the tick, for the chronicle
+   and for anything that asks how long ago somebody died. Both are data. Nothing reads the cause text. */
+function die(a, cause, tag = 'death'){
+  failTask(a); a.alive = false; a.asleep = false; a.status = 'Dead'; a.diedAt = tick;
+  giveFate(a, tag);
   if (a.species === 'human'){
     corpses.push({ x: a.x, y: a.y, z: a.z, name: a.name });
-    log(`${a.name} ${cause}.`, [a], 'death');
+    log(`${a.name} ${cause}.`, [a], 'death', tag);
     for (const o of humans()){
       if (o.camp !== a.camp) continue;
       const op = o.opinions[a.id] || 0;
@@ -117,7 +124,7 @@ Object.assign(TASKS, {
         const q = walkFar(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
-      a.needs.water = 100; if (a.species === 'human') addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); return 'done';
+      a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
     }] },
   eat: { type: 'eat',
     begin(a, args){
@@ -190,7 +197,7 @@ Object.assign(TASKS, {
       if (a.needs.warmth !== undefined) a.needs.warmth = Math.min(100, a.needs.warmth + CLOCK.rate.sitWarms);
       if (t.progress % CLOCK.task.sitTeach === CLOCK.task.sitTeachAt){
         const teacher = humans().find(o => o !== a && near(o, a) <= 2 && o.task && o.task.type === 'sit' && Object.keys(o.skills).some(k => o.skills[k] > (a.skills[k] || 0) + 1));
-        if (teacher){ const sk = Object.keys(teacher.skills).filter(k => teacher.skills[k] > (a.skills[k] || 0) + 1).sort((p, q) => teacher.skills[q] - teacher.skills[p])[0]; a.xp[sk] = (a.xp[sk] || 0) + (stage(teacher) === 'old' ? 1.2 : 0.6) * (0.5 + a.traits.curiosity); addThought(a, 'taught', `Learned about ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name}`, 3, CLOCK.thought.taught); if (a.xp[sk] >= (a.skills[sk] + 1) * 3){ a.xp[sk] = 0; a.skills[sk]++; log(`${a.name} learned ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name} by the fire.`, [a, teacher], 'good'); } }
+        if (teacher){ const sk = Object.keys(teacher.skills).filter(k => teacher.skills[k] > (a.skills[k] || 0) + 1).sort((p, q) => teacher.skills[q] - teacher.skills[p])[0]; teacher.taught = (teacher.taught || 0) + 1; a.xp[sk] = (a.xp[sk] || 0) + (stage(teacher) === 'old' ? 1.2 : 0.6) * (0.5 + a.traits.curiosity); addThought(a, 'taught', `Learned about ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name}`, 3, CLOCK.thought.taught); if (a.xp[sk] >= (a.skills[sk] + 1) * 3){ a.xp[sk] = 0; a.skills[sk]++; log(`${a.name} learned ${sk === 'trap' ? 'trapping' : sk + 'ing'} from ${teacher.name} by the fire.`, [a, teacher], 'good'); } }
       }
       return ++t.progress < CLOCK.task.sit && pitLit() ? 'continue' : 'done';
     }] },
@@ -348,6 +355,9 @@ function updateBeing(a){
        a per-tick cost with no chance of a hit. */
     if (camp && !camp.gnomes.known && !a.asleep && !(hourOf() >= 6 && hourOf() < 19)){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, CLOCK.thought.gnome); } }
     { const here = hereTile; if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; here.cave.disturbedBy = camp; a.cooldown.disturb = tick + CLOCK.cooldown.disturb; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, CLOCK.thought.burrow); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, CLOCK.thought.intruderGnome); } }
+    /* A person awake on the ground reads the marks the lost people cut. It gives no thought and
+       changes no need, so nobody's day moves because of it. */
+    if (!a.asleep) learnNamesHere(a);
   }
   if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);
@@ -358,11 +368,16 @@ function updateBeing(a){
   /* The life clock. Past the usual span, each day is a gift. */
   if (ageDays(a) > LIFE[a.species].life && rng() < CLOCK.rate.oldAgeDeath / (0.5 + a.traits.hardiness)){
     const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
-    die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age'); return;
+    /* Two tags for the one cause, so the fate epithet says what the line says. */
+    die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age', warm ? 'old' : 'oldCold'); return;
   }
   const here = tileAt(a.x, a.y, a.z);
   if (here.fire > 0){ a.hp -= CLOCK.rate.fireHurts; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, CLOCK.thought.burned); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); startTask(a, 'flee'); } }
-  if (a.hp <= 0){ die(a, here.fire > 0 ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : n.warmth !== undefined && n.warmth < 20 ? 'froze in the cold' : (a.lastHurt || 'died')); return; }
+  if (a.hp <= 0){
+    const burned = here.fire > 0, frozen = n.warmth !== undefined && n.warmth < 20;
+    die(a, burned ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : frozen ? 'froze in the cold' : (a.lastHurt || 'died'),
+      burned ? 'fire' : frozen ? 'frost' : 'death'); return;
+  }
   if (a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, CLOCK.thought.warm);
   if (a.asleep){
     if (n.rest >= 100 || (!night && n.rest >= 60)){ a.asleep = false; if (a.species === 'human'){ const roof = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1), warm = camp && pitLit() && nearAt(a, ...camp.pit) <= 4; addThought(a, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, CLOCK.thought.slept); } }

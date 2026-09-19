@@ -289,7 +289,7 @@ function sectorSummary(s){
   if (people.length) parts.push(people.map(p => p.name).join(', '));
   for (const c of camps) if (c.site && secOf(...c.site).sx === s.sx && secOf(...c.site).sy === s.sy) parts.unshift(c.pit ? `${c.name} and its hearth` : `the site of ${c.name}, not yet built`);
   if (s.country != null && regionById(s.country)) parts.push(countryLine(regionById(s.country)));
-  return `${s.name}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
+  return `${sectorLabel(s)}, sector ${s.sx},${s.sy}: ${parts.filter(Boolean).join('; ')}.`;
 }
 
 /* ---- nearby view: the sector and its eight neighbours, from the world cache at 9 px per tile ---- */

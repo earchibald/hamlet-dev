@@ -31,7 +31,7 @@ Object.assign(TASKS, {
       const g = a.grove;
       const w = goTo(a, t, g.x, g.y, 2); if (w) return w;
       a.needs.glow = Math.min(100, a.needs.glow + CLOCK.rate.danceGlows); a.needs.rest = Math.min(100, a.needs.rest + CLOCK.rate.danceRests);
-      if (!drowsy(a) && t.progress % CLOCK.sprite.danceSeen === 0) for (const h of humans()) if (h.camp && near(h, a) <= 7){ camp = h.camp; if (!camp.fae.known){ camp.fae.known = true; log(`${h.name} stumbles on a ring of lights dancing around a hollow pine in the ${g.sector.name.toLowerCase()}. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw sprites dancing in the grove' : 'Saw lights in the grove that were not fireflies', h.traits.curiosity > 0.5 ? 5 : -4, CLOCK.thought.spriteGrove); }
+      if (!drowsy(a) && t.progress % CLOCK.sprite.danceSeen === 0) for (const h of humans()) if (h.camp && near(h, a) <= 7){ camp = h.camp; if (!camp.fae.known){ camp.fae.known = true; log(`${h.name} stumbles on a ring of lights dancing around a hollow pine in the ${g.sector.name.toLowerCase()}. The camp knows about the sprites now.`, campHumans(), 'major', 'sprite'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw sprites dancing in the grove' : 'Saw lights in the grove that were not fireflies', h.traits.curiosity > 0.5 ? 5 : -4, CLOCK.thought.spriteGrove); }
       if (beings.some(o => o !== a && o.alive && o.species === 'sprite' && near(o, a) <= 3)) a.needs.play = Math.min(100, a.needs.play + CLOCK.rate.dancePlays);
       if (++t.progress % CLOCK.sprite.mossEvery === 0 && rng() < CLOCK.sprite.mossChance && !items.some(i => i.kind === 'moss' && dist(i.x, i.y, g.x, g.y) <= 2)){ const q = nearFind(g.x, g.y, q => passable(q.x, q.y) && !itemAt(q.x, q.y), RING); if (q) addItem('moss', q.x, q.y); }
       return t.progress < CLOCK.sprite.dance ? 'continue' : 'done';
@@ -53,7 +53,7 @@ Object.assign(TASKS, {
       const c = camps[t.args.camp], r = t.args.within;
       const w = goTo(a, t, c.pit[0], c.pit[1], r); if (w) return w;
       t.label = 'Watching the fire from the dark'; a.needs.play = Math.min(100, a.needs.play + CLOCK.rate.visitPlays);
-      if (t.progress === 0){ camp = c; for (const h of campHumans()) if (near(h, a) <= 7 && !h.asleep){ if (!c.fae.known){ c.fae.known = true; log(`${h.name} sees a light dancing at the edge of the firelight. It is not a firefly. The camp knows about the sprites now.`, campHumans(), 'major'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw a sprite dancing in the dark' : 'Something watched us from the dark', h.traits.curiosity > 0.5 ? 4 : -4, CLOCK.thought.spriteCamp); } }
+      if (t.progress === 0){ camp = c; for (const h of campHumans()) if (near(h, a) <= 7 && !h.asleep){ if (!c.fae.known){ c.fae.known = true; log(`${h.name} sees a light dancing at the edge of the firelight. It is not a firefly. The camp knows about the sprites now.`, campHumans(), 'major', 'sprite'); } addThought(h, 'sprite', h.traits.curiosity > 0.5 ? 'Saw a sprite dancing in the dark' : 'Something watched us from the dark', h.traits.curiosity > 0.5 ? 4 : -4, CLOCK.thought.spriteCamp); } }
       if (++t.progress === CLOCK.sprite.visitGift && c.stone && c.fae.favor >= 20 && rng() < 0.5){ const st = tileAt(...c.stone).struct; if (!itemAt(c.stone[0], c.stone[1]) && st.offering === 0){ const gift = c.fae.favor >= 40 && rng() < 0.5 ? 'cord' : 'moss'; addItem(gift, c.stone[0], c.stone[1]); camp = c; log(gift === 'cord' ? 'A coil of cord lies on the offering stone in the morning, knotted by small hands.' : 'A tuft of glowing moss lies on the offering stone in the morning.', campHumans(), 'good'); } }
       return t.progress < CLOCK.sprite.visit && isNight() ? 'continue' : 'done';
     }] },
@@ -83,7 +83,7 @@ Object.assign(TASKS, {
       const c = camps[t.args.camp];
       const w = goTo(a, t, c.stashTile[0], c.stashTile[1], 1); if (w) return w;
       camp = c; c.fae.lastPrank = tick; a.needs.play = 100;
-      if (!c.fae.known){ c.fae.known = true; log('Something small and angry has been in the camp in the night. The camp knows about the sprites now, and not in a good way.', campHumans(), 'major'); }
+      if (!c.fae.known){ c.fae.known = true; log('Something small and angry has been in the camp in the night. The camp knows about the sprites now, and not in a good way.', campHumans(), 'major', 'sprite'); }
       const grudged = campHumans().filter(h => (c.fae.grudges[h.id] || 0) > 20), victim = grudged[rint(grudged.length)] || campHumans().filter(h => h.asleep)[0];
       const pit = pitTile(); const severe = c.fae.favor < -60 || (a.grove && a.grove.swarmUntil > tick);
       if (severe && pit && pit.struct.lit && rng() < 0.5){ pit.struct.lit = false; pit.struct.fuel = Math.min(pit.struct.fuel, 30); c.streak = 0; log('The fire dies to nothing in a moment, as if pinched out. Laughter in the dark.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'faefire', 'Sprites put the fire out', -10, CLOCK.thought.faefire); }
