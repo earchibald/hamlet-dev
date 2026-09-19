@@ -71,13 +71,44 @@ linear series of moves, not a snapshot. So the simulation stops between the move
 same stop on a different trigger: advance one god, then return. `agePos` already carries the position,
 the snapshot of the age's gods, `prepared`, and the drawn matrix, so a resume needs nothing new.
 
-The shape of the change belongs to the session that owns `src/sim/gods.js`. This spec records only
-what is required of it:
+The session that owns `src/sim/gods.js` has read the change and set its shape. It holds four
+conditions, and they are requirements, not preferences.
 
-- Advance exactly one god of the age, then return, without ending the age.
-- Leave `agePos` fit to resume, as it already is for an abandoned turn.
-- Do not run once-per-god work twice. `agePos.prepared` and `agePos.opts` already hold this.
-- End the age as its own step, so the close can be drawn as its own beat.
+**A flag on `ageDecide`, not a second entry point.** A second entry point is a second copy of the
+`while (agePos.i < list.length)` loop and of the `prepared`/`opts` invariant. The file already avoids
+that on purpose: both paths that advance the age call `agePass()`, and there is one copy of the
+invariant. `ageStep` passes the flag through.
+
+**The return goes after `agePass()`, and inside the awake branch.** Return before the position
+advances and the resume re-enters the same god with `prepared` already true, so `decideGod` runs
+twice on one god against a matrix drawn once. That moves the stream. Return outside the awake branch
+and an asleep god yields a beat in which nothing happened. A local `acted` in the awake branch, and
+`if (oneAct && acted) return false;` after `agePass()`.
+
+**`ageDecide`'s `false` becomes ambiguous, and the file must say so.** Today `false` means one thing:
+a turn is open and `pending` is set. After the change it means a turn is open *or* one act is done.
+`pending` tells them apart, but only by implication, and `takeTurn` and `ageStep` both rely on the
+old meaning. The invariant goes in the comment above `ageDecide`, in that file's voice.
+
+**The age's close is one beat and is not subdivided.** `ageEnd` runs `unmake` over the pantheon
+first and `restGate()` second. Draw between the two and the field shows gods already gone against a
+gate that still counts them, and `strain` and `outgrown` then read that gate. The three sites that
+set `settleNow` or `creation.failed` are worse to observe mid-way, because the view would draw a
+world that is already discarded.
+
+### One line moves, and it is meant to
+
+`ageDecide` opens with `tellIfGone()`. Today it runs once an age. Act by act it runs after every act,
+so the line that tells the player their god is gone — "acts no more. Take another god, or watch." —
+arrives one act after the god goes rather than at the next age boundary.
+
+This is deliberate and it is the better behaviour. It is safe: `inhabitedTold` makes it idempotent,
+it draws no random number, and `inhabited` is null in every headless run, so the golden's `chronicle`
+and `chronicleLines` cannot move. It is recorded here because `note()` writes the chronicle, so this
+is a real change to when a player-facing line appears.
+
+The general rule it stands for: `ageDecide` stops being a once-an-age entry point. Anything inside it
+that assumed otherwise must be re-read. `tellIfGone` is the only one today.
 
 Nothing else in `src/sim/` is in scope. `AGE_MS` lives in `src/ui/state.js`, so every pacing decision
 in this spec is view state and none of it passes the door.
@@ -147,7 +178,17 @@ state and never passes the door, so a failure here means something has leaked in
 
 - `tests/ages.js` gains the gate: all twenty-four seeds run act by act and match the fingerprint of
   the same seed run whole. This extends the gate E1 built, which already suspends and resumes every
-  age.
+  age. Two sharpenings, both required:
+  - **At least one seed runs with a god inhabited.** Act-by-act alone never sets `pending`, so a gate
+    without it never interleaves the two reasons an age suspends. That interleaving, through one
+    `agePos`, is where `prepared` and `opts` would break.
+  - **Assert the stop count, not only the fingerprint.** Equal fingerprints prove the stream did not
+    move. They do not prove the stops are where the view thinks they are. Count the suspensions and
+    compare against the awake gods advanced. A stop that skips a god, or fires twice on one, passes a
+    fingerprint check and breaks playback.
+- The ages gate is not the golden gate. If the soak's creation-to-settle path runs through this,
+  prove it with a field-by-field diff against the commit this work branches from — not against a
+  remembered number, because dev moves underneath. Expecting nothing is not measuring nothing.
 - `tests/ui.js` covers the new pure parts in `derive.js`: the beat count of an age, the beat at a
   fraction, the tier of a beat at each pace, and the close counted as a beat.
 - `tests/ui.js` covers the split `still` rule: a paused world holds, a stepped world plays.
