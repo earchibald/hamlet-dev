@@ -205,6 +205,10 @@ function nameTheLand(){
     sky: { text: oldWord(), meaning: npick(SKY_MEANINGS) },
     sprites: { text: oldWord(), meaning: npick(SPRITE_MEANINGS) },
   };
+  /* Every source whose own word a candidate may not use bare. The people are left out:
+     naming a thing after the people themselves is the one case where the repeat is the
+     point. A lore source added later joins this same list and needs no other change. */
+  lore.sources = [lore.sky, lore.sprites];
   findWaters();
   oldNamesOnTheLand();
 }
@@ -421,10 +425,10 @@ function loreCandidates(base){
     { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
   ];
 }
-/* The valley's last resort. A lore text another thing already holds scores zero, and three texts
-   are all the lore has, so hills, sectors, and camps can take every one and leave the valley with
-   nothing. These compounds are built from the same lore words, in a shape nothing else offers, so
-   they are always free. They score under the plain texts, so they only win once those are gone. */
+/* The valley's route to the sky's word and the sprites' word. Both are sources, so
+   `scoreCandidates` never lets their plain text score above zero; only a distinct form may
+   carry them, and these compounds are that form. The people's own name has no such fallback,
+   because it needs none: naming after the people stays bare. */
 const VALLEY_FALLBACK_BASE = 20;
 function valleyFallbacks(){
   if (!lore) return [];
@@ -487,15 +491,20 @@ const eventName = entry => nameOf(entry);
 function candidatesFor(kind, by, place){
   return [...landCandidates(place), ...eventCandidates(camp, kind), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
-/* Score, drop duplicates, and sort. A text another thing already owns scores zero. */
+/* Score, drop duplicates, and sort. A text another thing already owns scores zero, and so
+   does a source's own bare word (`lore.sources`): it may only be offered in a distinct
+   form, such as the compounds in `valleyFallbacks`. The people are not a source here, so
+   their own name still scores in bare form. */
 function scoreCandidates(cands, by, thing){
   const seen = new Set(), out = [];
+  const owned = lore && lore.sources ? new Set(lore.sources.map(s => s.text.toLowerCase())) : null;
   for (const c of cands){
     const key = c.text.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const owner = nameIndex.get(key);
-    c.score = owner && owner !== thing ? 0 : Math.round((c.base + (c.recency || 0)) * axisMult(c.axis, by) * 10) / 10;
+    const bareOwned = owned && owned.has(key);
+    c.score = (owner && owner !== thing) || bareOwned ? 0 : Math.round((c.base + (c.recency || 0)) * axisMult(c.axis, by) * 10) / 10;
     out.push(c);
   }
   return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));

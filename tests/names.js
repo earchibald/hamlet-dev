@@ -664,6 +664,28 @@ test('the valley line never says the name twice', () => {
 /* The three texts loreCandidates offers, in the same shapes the namer builds them. */
 function loreTexts(api){ return [api.titleCase(api.lore.people.replace(/^the /, '')), api.lore.sky.text, api.lore.sprites.text]; }
 
+/* Minor: the ruling is general, not two special cases. Any candidate text already owned by a
+   named source (the sky, the sprites) scores zero bare; the people are the one exception, since
+   naming after them is the point. Without the fix, the sky's and sprites' bare texts score like
+   any other lore candidate, and this fails. */
+test('a source\'s own word never scores above zero bare, but the people\'s own name still can', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  const cands = [
+    { text: api.lore.sky.text, axis: 'lore', base: 40 },
+    { text: api.lore.sprites.text, axis: 'lore', base: 40 },
+    { text: api.titleCase(api.lore.people.replace(/^the /, '')), axis: 'lore', base: 40 },
+    { text: `Vale of ${api.lore.sky.text}`, axis: 'lore', base: 20 },
+  ];
+  const scored = api.scoreCandidates(cands, null, api.valley);
+  const byText = t => scored.find(x => x.text === t);
+  assert.equal(byText(api.lore.sky.text).score, 0, 'the sky\'s bare word must score zero');
+  assert.equal(byText(api.lore.sprites.text).score, 0, 'the sprites\' bare word must score zero');
+  assert.ok(byText(`Vale of ${api.lore.sky.text}`).score > 0, 'the compound form must still score');
+  const peopleText = api.titleCase(api.lore.people.replace(/^the /, ''));
+  assert.ok(byText(peopleText).score > 0, 'the people\'s own name must still score bare');
+});
+
 test('the valley is named even when every lore text is already taken, and the name is its own', () => {
   const { api, c } = hearthCamp();
   api.camp = c;
@@ -700,12 +722,14 @@ test('the first camp that is a village names the valley, even when it is not the
 test('a name a person gives aloud is known at once, and describe says it', () => {
   const { api, c } = hearthCamp();
   api.camp = c;
-  /* With the plain lore text taken, one of the two old-tongue texts wins. */
+  /* The sky's word and the sprites' word never score above zero bare, so with the plain
+     people's text taken too, only a distinct compound is left to win. */
   api.giveName({ names: [] }, api.nameRecord(loreTexts(api)[0], {}));
   api.nameValley(c);
   const r = api.valley.names[0];
   assert.ok(r, 'the valley has no name');
-  assert.equal(r.tongue, 'old', 'an old-tongue lore text should have won');
+  assert.notEqual(r.text, api.lore.sky.text, 'the sky\'s word must not be offered bare');
+  assert.notEqual(r.text, api.lore.sprites.text, 'the sprites\' word must not be offered bare');
   assert.notEqual(r.by, 'lost', 'a person gave this name');
   assert.equal(api.valley.nameKnown, true, 'the people know the name they just chose');
   assert.equal(api.describe(api.valley, 'valley'), r.text);
