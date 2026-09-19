@@ -408,6 +408,46 @@ test('the event table names a tagged major line at the fire, and the name reads 
   assert.equal(api.chronicle.length, n, 'an event is named once');
 });
 
+/* Important 6: a night took a place name once the fourteen event texts were spent, so seed r
+   named 89 nights, 75 of them after places, and each took a text the land could have had. */
+test('a night is named from the event table alone, and a night with no text left goes unnamed', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
+  const first = api.chronicle[0];
+  api.nameEvents(c);
+  assert.ok(first.names && first.names.length, 'the first wolf night was not named');
+  const texts = [api.EVENT_NAMES.wolf.phrase, api.cap(api.EVENT_NAMES.wolf.word) + api.WORD_TAIL[api.EVENT_NAMES.wolf.word]];
+  assert.ok(texts.includes(first.names[0].text), `${first.names[0].text} is not an event text`);
+  /* The wolf tag offers two texts, the phrase and the joined word. A third wolf night has
+     nothing left to take, and the camp has already named its wolf night, so it goes unnamed. */
+  api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
+  api.nameEvents(c);
+  api.log('A wolf comes out of the dark a third time.', [a], 'bad', 'wolf');
+  const third = api.chronicle[0];
+  api.nameEvents(c);
+  assert.equal(third.names, undefined, `the third night took ${third.names && third.names[0].text}`);
+  assert.equal(api.chronicle[0], third, 'a line was logged for a night that took no name');
+  /* And the pass gives up on it: a line older than a day is never looked at again. */
+  api.tick += 2 * api.DAY;
+  api.nameEvents(c);
+  assert.equal(third.names, undefined, 'the pass came back to a night it had already passed over');
+});
+
+test('a night is never named after a place', () => {
+  const { api, events } = run70();
+  const named = events.filter(e => e.names && e.names.length);
+  assert.ok(named.length > 0, 'no night was named in 70 days');
+  const texts = new Set();
+  for (const k in api.EVENT_NAMES){
+    const t = api.EVENT_NAMES[k];
+    texts.add(t.phrase);
+    if (api.WORD_TAIL[t.word]) texts.add(api.cap(t.word) + api.WORD_TAIL[t.word]);
+  }
+  for (const e of named) assert.ok(texts.has(e.names[0].text), `a night was called ${e.names[0].text}`);
+  assert.ok(named.length <= texts.size, `${named.length} nights from ${texts.size} texts`);
+});
+
 test('a line with no tag, a line of another camp, and a quiet line are not events', () => {
   const { api, c } = hearthCamp();
   api.camp = c;
@@ -751,6 +791,28 @@ test('the first drink at a pool names it, through the real stop', () => {
   assert.equal(a.needs.water, 100, 'the drink did not land');
   assert.ok(api.nameOf(p), 'the pool was not named by the drink');
   assert.ok(api.chronicle.some(e => e.text.includes(`calls the pool ${api.nameOf(p)}`)), api.chronicle[0].text);
+});
+
+/* Important 5: a wolf has no camp, so the maul line took whichever camp the beings pass had
+   last stepped. With two camps the wrong one could name the Night of the Wolf. */
+test('a wolf mauling is stamped with the mauled person\'s camp, not whichever camp is current', () => {
+  const { api, a, c } = hearthCamp();
+  const c2 = api.makeCamp('The second camp');
+  c2.site = [a.x, a.y];
+  const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0);
+  mate.camp = c2; mate.homeless = false; mate.asleep = false; api.beings.push(mate);
+  const wolf = api.makeBeing('wolf', a.x + 1, a.y, 'Wolf', 0); api.beings.push(wolf);
+  /* The pass left the first camp current, as it does when it steps a camped being before a wolf. */
+  api.camp = c;
+  api.setTask(wolf, 'stalk', { who: mate.id }, { label: 'Stalking', path: [], progress: 0, fast: true });
+  api.runTask(wolf);
+  const line = api.chronicle.find(e => e.text.includes(`mauls ${mate.name}`));
+  assert.ok(line, 'the wolf did not maul anybody');
+  assert.equal(line.tag, 'wolf');
+  assert.equal(line.camp, c2.id, 'the maul was stamped with the wrong camp');
+  assert.equal(api.isEventLine(line, c2), true, 'the mauled person\'s camp cannot name the night');
+  assert.equal(api.isEventLine(line, c), false, 'another camp can name the night');
+  assert.equal(api.camp, c, 'the stop did not put the current camp back');
 });
 
 /* ---------- epithets, lineage, and fate ---------- */

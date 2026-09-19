@@ -79,9 +79,11 @@ Object.assign(TASKS, {
     stops: [(a, t) => {
       const h = beingById(t.args.who);
       /* The wait is read here as well as in the gate. A wolf that set out before another wolf reached
-         the same person is already past the gate, and four of them mauled one founder in three ticks. */
+         the same person is already past the gate, and four of them mauled one founder in three ticks.
+         A wolf has no camp of its own, so the maul line is stamped with the camp of the person it
+         mauled, the way `raid` stamps the camp it raided. The night belongs to them. */
       if (!h || !h.alive || tick < (h.cooldown.stalked || 0) || ++t.progress > CLOCK.chase.stalk || (h.carrying && h.carrying.kind === 'ember')) return 'fail';
-      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); a.cooldown.stalk = tick + CLOCK.cooldown.stalk; h.cooldown.stalked = tick + CLOCK.cooldown.stalked; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
+      if (near(a, h) <= 1){ h.hp -= 20 + rint(15); h.lastHurt = 'was killed by a wolf'; h.lastHurtAt = tick; h.asleep = false; addThought(h, 'mauled', 'Mauled by a wolf in the dark', -22, CLOCK.thought.mauled); drift(h, 'bravery', -0.04); const prev = camp; camp = h.camp; log(`A wolf comes out of the dark and mauls ${h.name}.`, [h], 'bad', 'wolf'); camp = prev; a.cooldown.stalk = tick + CLOCK.cooldown.stalk; h.cooldown.stalked = tick + CLOCK.cooldown.stalked; a.needs.food = Math.min(100, a.needs.food + 40); failTask(h); startTask(h, 'flee'); return 'done'; }
       const p = bfs(a.x, a.y, a.z, (x, y, z) => z === h.z && dist(x, y, h.x, h.y) <= 1, 500, a); if (!p) return 'fail'; t.path = p.slice(0, 3); return 'continue';
     }] },
   herd: { type: 'wander',

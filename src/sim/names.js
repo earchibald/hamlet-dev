@@ -464,7 +464,10 @@ function eventCandidates(c){
   }
   return out;
 }
-/* The camp names last night's events at its fire. */
+/* The camp names last night's events at its fire. A night takes an event text or no name at all,
+   so once the table's texts are spent the camp says nothing: it has already named its wolf night.
+   The loop breaks at a line older than a day, so a night that took no name is looked at on one
+   pass or two and never again. That is the whole cost of leaving one unnamed. */
 function nameEvents(c){
   if (!c.site) return;
   const by = namerFor(c.site); if (!by) return;
@@ -504,9 +507,13 @@ function namerFor(place){
    text it shares with the ordinary axes keeps `extra`'s score instead of losing the
    dedup to the lower one. The valley is the one kind named from the lore alone: it is
    not a place anyone stands in, so the land and the notable axes have nothing to say
-   about it, and the ordinary pool is left out. */
+   about it, and the ordinary pool is left out. A night is the other kind with a pool of
+   its own: a night is named after what happened, never after a place, so when the event
+   table has no text left the night keeps no name. */
 function nameThing(thing, kind, by, place, extra = []){
-  const pool = kind === 'valley' ? extra : [...extra, ...candidatesFor(kind, by, place)];
+  const pool = kind === 'valley' ? extra
+    : kind === 'event' ? [...extra, ...eventCandidates(camp)]
+    : [...extra, ...candidatesFor(kind, by, place)];
   const scored = scoreCandidates(pool, by, thing);
   const top = scored[0];
   if (!top || top.score <= 0) return null;
