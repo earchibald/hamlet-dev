@@ -86,8 +86,7 @@ function bareIn(file){
     if (r.files && !r.files.includes(file)) continue;
     if (r.rolls && !ROLL_FILES.includes(file)) continue;
     const text = r.rolls && file === 'world' ? src.slice(src.indexOf('function growPlants')) : src;
-    r.re.lastIndex = 0; let m;
-    while ((m = r.re.exec(text))){
+    for (const m of text.matchAll(r.re)){
       const s = m[0];
       if (!hasNumber(s)) continue;
       if (EVENT_CHANCES.includes(s.trim())) continue;
