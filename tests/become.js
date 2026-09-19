@@ -214,3 +214,67 @@ test('leaving mid-turn and becoming the same god again reopens the identical mat
   assert.deepEqual(api.pending.opts, firstOpts, 'the matrix was reused, not redrawn');
   assert.equal(api.step(), 'The turn is yours.');
 });
+
+/* A god below a floor on the trait its act reads. The table is data, so the test reads the table. */
+function godBelow(api, type){
+  const bar = api.GOD_BARS[type];
+  for (const g of api.awakeGods()){ g.traits[bar.trait] = bar.floor - 0.1; return g; }
+  return null;
+}
+
+test('a bar names the trait and the floor, and is a lens on the matrix only', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  const bar = api.GOD_BARS.battle;
+  g.traits[bar.trait] = bar.floor - 0.1;
+  assert.deepEqual(api.barFor(g, 'battle'), bar);
+  g.traits[bar.trait] = bar.floor + 0.1;
+  assert.equal(api.barFor(g, 'battle'), null);
+});
+
+test('with Force Actions off the door refuses a barred option and leaves the turn open', () => {
+  const api = load(); api.startCreation('gamma', {});
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  assert.ok(api.pending);
+  /* Bar whatever is on the table, so the test does not depend on which acts a seed offers. */
+  const row = api.pending.opts[0];
+  api.GOD_BARS[row.type] = { trait: 'bravery', floor: 2, why: 'will not do it' };
+  g.traits.bravery = 0;
+  api.openTurn(g);
+  const barred = api.pending.opts.find(o => o.type === row.type);
+  assert.ok(barred.bar, 'the barred row is in the matrix, with its bar');
+  assert.equal(api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: barred.type, region: barred.region } }),
+    `${g.name} will not do it.`);
+  assert.ok(api.pending, 'the turn stays open');
+});
+
+test('with Force Actions on the barred option is taken, with no penalty', () => {
+  const api = load(); api.startCreation('gamma', { force: true });
+  api.step();
+  const g = api.awakeGods()[0];
+  api.inject({ source: 'player', act: 'become', id: g.id });
+  api.step();
+  const row = api.pending.opts[0];
+  api.GOD_BARS[row.type] = { trait: 'bravery', floor: 2, why: 'will not do it' };
+  g.traits.bravery = 0;
+  const traitsWere = { ...g.traits };
+  api.openTurn(g);
+  const msg = api.inject({ source: 'player', act: 'choose', id: g.id, opt: { type: row.type, region: row.region } });
+  assert.doesNotMatch(msg, /will not do it/);
+  assert.deepEqual(g.traits, traitsWere, 'forcing costs the god nothing');
+});
+
+test('the bars are data, and every barred act reads the trait its score reads', () => {
+  const api = load();
+  for (const type in api.GOD_BARS){
+    const bar = api.GOD_BARS[type];
+    assert.ok(api.GOD_ACTS[type], `${type} is a god act`);
+    assert.ok(typeof bar.trait === 'string' && typeof bar.why === 'string');
+    assert.ok(bar.floor > 0 && bar.floor < 1, `${type}'s floor is a trait value`);
+    assert.match(String(api.GOD_ACTS[type].score), new RegExp(`traits\\.${bar.trait}`), `${type}'s score reads ${bar.trait}`);
+  }
+});

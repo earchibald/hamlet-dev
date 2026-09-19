@@ -354,6 +354,19 @@ const GOD_ACTS = {
   },
 };
 
+/* What a god will not do. Each bar names the trait its act's score already reads, and a floor under
+   which the player is told no. A bar is a lens on the matrix the player is shown; the autonomous
+   chooser never reads it, so a bar cannot move the creation. Force Actions takes a barred option
+   anyway, and it costs the god nothing. */
+const GOD_BARS = {
+  battle: { trait: 'bravery', floor: 0.35, why: 'is not bold enough to make war' },
+  burn: { trait: 'temper', floor: 0.3, why: 'is too calm to set anything alight' },
+  mingle: { trait: 'sociability', floor: 0.25, why: 'keeps too much to itself for that' },
+};
+function barFor(g, type){
+  const bar = GOD_BARS[type];
+  return bar && g.traits[bar.trait] < bar.floor ? bar : null;
+}
 /* godOptions and decideGod draw from rng; call them inside withGodRng, as ageStep does. */
 function godOptions(g){
   const opts = [];
@@ -515,7 +528,11 @@ let runUntil = null;
    reuses it and draws nothing. */
 function openTurn(g){
   if (!agePos.opts) agePos.opts = godOptions(g);
-  pending = { god: g.id, age, opts: agePos.opts.map(o => ({ type: o.type, label: o.label, score: o.score, region: o.region.id })) };
+  pending = { god: g.id, age, opts: agePos.opts.map(o => {
+    const row = { type: o.type, label: o.label, score: o.score, region: o.region.id };
+    const bar = barFor(g, o.type); if (bar) row.bar = bar;
+    return row;
+  }) };
 }
 
 /* Apply one option for the god whose turn is open. An option that does not land leaves the turn open
@@ -526,6 +543,7 @@ function takeTurn(opt){
   const k = pending.opts.findIndex(o => o.type === opt.type && o.region === opt.region);
   if (k < 0) return 'That is not on the table.';
   const row = pending.opts[k];
+  if (row.bar && !options.force) return `${beingById(pending.god).name} ${row.bar.why}.`;
   const r = regionById(row.region);
   let landed = false;
   withGodRng(() => {
