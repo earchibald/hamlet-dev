@@ -24,7 +24,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/settle.js`: the painters, the founding sites, the creatures, the bodies, and the tile check. Fast.
 - `tests/clock.js`: the unit helpers, the table's values, and a lint: no bare time literal in a rule. Fast.
 - `tests/tasks.js`: the table, the executor, that every task and offer is plain data, and that no file holds a closure task. Fast.
-- `tests/snapshot.js`: the streams, `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`, the oracle (save mid-run, load, run on), and the guard that every top-level `let` and mutable `const` is saved or listed with a reason. Fast.
+- `tests/snapshot.js`: the streams, `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`, the oracle (save mid-run, load, run on), and the guard that every top-level `let`, `var`, or mutable `const` is saved or listed with a reason. Fast.
 - `npm run fast` runs them all.
 
 ## Rules of work
@@ -36,7 +36,8 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - A duration or a rate goes in `CLOCK` in `src/sim/clock.js`, or in a `SPECIES`, `LIFE`, or `RECIPES` row written in the unit helpers or in days. `tests/clock.js` fails on a bare one.
 - A task is a plain record. Its behaviour goes in `TASKS` in `src/sim/tasks.js`. Name a thing by id or by coordinates, never by reference.
 - A field that points at another record goes in `REFS` in `src/sim/snapshot.js`. `tests/snapshot.js` fails on one that is missing.
-- A new top-level `let` in `src/sim/` goes in `SAVED_STATE` or `NOT_SAVED`, both in `src/sim/snapshot.js`. `tests/snapshot.js` fails until it does.
+- A new top-level `let`, `var`, or mutable `const` in `src/sim/` goes in `SAVED_STATE` or `NOT_SAVED`, both in `src/sim/snapshot.js`. `tests/snapshot.js` fails until it does.
+- State lives in plain objects and arrays. A `Map` or a `Set` a snapshot must save is a fault the guard reports.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.

@@ -329,7 +329,7 @@ The determinism contract, since the mythos spec. The engine step is pure. Given 
 
 The acts the door knows: light, poke, priority (a goal set off, on, or high), site (the camp site before the pit is built), load, and the four of Become: `become`, `choose`, `run`, and `watch`, which the Become section describes. The site event carries its camp's id, and the act resolves the camp from that id, not from the global `camp`: on replay `camp` defaults to `camps[0]`, so a site chosen for a second camp still lands on that camp, not the first, when the log runs again. Reachability, once a guard in the interface, is now a guard inside the act itself, checked against the target camp's own first living person. A replayed event carries its tick and must arrive at it; the door answers "Not now." otherwise. The test runner`s replay god throws if it falls behind. Nothing in the interface writes sim state except through the door.
 
-`load` replaces the whole world, so it is marked `replacesWorld` on `DOOR_ACTS.load` and `inject` treats it apart from every other act: it applies before logging, skips the tick guard (a save carries no tick of its own to arrive late at), and on success logs a bare `{ source, act: 'load', tick }` at the new tick, never the snapshot. This is the one exception to "every lawful act is logged whether it lands or not": a refused load is not logged at all, because it has no tick of its own to be logged at and the snapshot it carries can run to megabytes. `loadSnapshot` already restores `doorLog` from the save, so the entry before the load is the saved world's own story. A replay passes over a `load` entry; `logGod` in `tests/lib/run.js` skips it, and the entries after it come from the loaded world's own further play. Section 18 has the rest of the snapshot design.
+`load` replaces the whole world, so it is marked `replacesWorld` on `DOOR_ACTS.load` and `inject` treats it apart from every other act: it applies before logging, skips the tick guard (a save carries no tick of its own to arrive late at), and on success logs a bare `{ source, act: 'load', tick }` at the new tick, never the snapshot. This is the one exception to "every lawful act is logged whether it lands or not": a refused load is not logged at all, because it has no tick of its own to be logged at and the snapshot it carries can run to megabytes. `loadSnapshot` already restores `doorLog` from the save, so the entry before the load is the saved world's own story. A replay passes over a `load` entry; `logGod` in `tests/lib/run.js` skips it, and the entries after it come from the loaded world's own further play. So a replayed world tells the same story as the loaded one, but it does not hold the same log: the bare `load` entry is not in it. Section 18 has the rest of the snapshot design.
 
 ## 16. The clock table
 
@@ -435,12 +435,29 @@ The whole-branch review of G2 left these for the snapshots (G3) and the day tier
 | `loadSnapshot(snap)` | Builds a fresh world in a stage, then replaces the state. Returns `null` on success, else the sentence that says why not; a refusal leaves the state untouched. |
 | `REFS` | Names every field of every record that points at another record, and the kind it points at. `tests/snapshot.js` fails on a reference `REFS` does not name. |
 | The door's `load` | The one way a snapshot enters play. It replaces the world and logs a bare entry; a refusal logs nothing. See section 15. |
-| The oracle | Save mid-run, load into a fresh sim, run on: the chronicle, the fingerprint, and the two snapshots all agree with a straight run. Six cases, plus a seventh soak test. |
+| The oracle | Save mid-run, load into a fresh sim, run on: the chronicle, the fingerprint, and the two snapshots all agree with a straight run. Eight cases, plus a ninth soak test. |
 | Save, Load, autosave | The page writes a file, reads one, and keeps one autosave slot in IndexedDB, written at the first frame of each new day. |
 
-**What a snapshot holds.** Everything the rules read: the tick, `nextId`, `fireCount`, `wanderAt`, `doomAt`, the era and age, both random streams' positions, the levels, the raised-tile list, the hills, caves, sectors, groves, camps, beings, items, corpses, the chronicle and legends, the weather, the goal priorities, the name pools, the creation, the field and its boundaries, the resource cache, the start region, and the door log. The spec (section 3) names a placement stream among the state a snapshot holds; no such stream exists yet, because plan G has not reached it, so the snapshot holds the two streams the sim has today, `rng` and `godRng`.
+**What a snapshot holds.** Everything the rules read, and nothing that can be rebuilt from it.
 
-**What it rebuilds instead of saving.** `world` (`levels[ZOFF]`), `itemGrid` (from `items`), `regionOf` and `field.byId` (by walking `field.regions` in order), the search scratch, and `replayHead`. `deciding`, `saidFrom`, and `settleNow` live inside one step; the loader sets them the way `beginCreation` does. A guard test, reading every top-level `let` the sim declares, holds every name to one of two lists, `SAVED_STATE` or `NOT_SAVED` in `src/sim/snapshot.js`, so a new piece of state fails the test until it is named in one. `doomAt` was caught this way: a session added it after the plan was written, and the guard put it in `SAVED_STATE` beside `wanderAt`.
+| Group | Fields |
+|---|---|
+| The world's name | `version`, `seed`, `options` |
+| The clock and the counters | `tick`, `nextId`, `fireCount`, `wanderAt`, `doomAt`, `era`, `age`, `pulseAge` |
+| The streams | `rng`, `godRng`, each as one position |
+| The ground | `levels`, `raised` |
+| The records | `hills`, `caves`, `sectors`, `groves`, `strayGroves`, `camps`, `campNow`, `beings`, `items`, `corpses` |
+| The story | `lines`, `chronicle`, `legends` |
+| The rest of the state | `weather`, `goalPriority`, `namePool`, `godNamePool`, `gestureFallbacks` |
+| The creation | `creation`, `field`, `boundaries` |
+| The caches and the log | `resCache`, `startRegion`, `doorLog` |
+| The player | `inhabited`, `inhabitedTold` |
+
+`campNow` is the index of the global `camp`. The spec (section 3) names a placement stream among the state a snapshot holds. No such stream exists yet, because plan G has not reached it. The snapshot holds the two streams the sim has today, `rng` and `godRng`.
+
+**The versioning policy.** A field added after version 1 is read as optional, with the value a world that never had it holds. The helper is `snapOpt(v, fallback)`. The version stays 1. It rises only when the meaning of a field already saved changes, and a save of an older version is then refused with its own sentence. The reason is the autosave slot: Continue offers what that slot holds, and a rebuilt page must not turn every player's Continue into a refusal. `inhabited`, `inhabitedTold`, and `strayGroves` were the first three fields added this way.
+
+**What it rebuilds instead of saving.** `world` (`levels[ZOFF]`), `itemGrid` (from `items`), `regionOf` and `field.byId` (by walking `field.regions` in order), the search scratch, and `replayHead`. `deciding`, `saidFrom`, and `settleNow` live inside one step; the loader sets them the way `beginCreation` does. `agePos`, `pending`, `runUntil`, and `stops` live only in the ages, and the loader resets all four, so a save loaded while a god's turn is open leaves no turn standing. A guard test, reading every top-level `let` and `var` the sim declares, holds every name to one of two lists, `SAVED_STATE` or `NOT_SAVED` in `src/sim/snapshot.js`, so a new piece of state fails the test until it is named in one. `doomAt` was caught this way: a session added it after the plan was written, and the guard put it in `SAVED_STATE` beside `wanderAt`.
 
 **How a reference is named.**
 
@@ -457,11 +474,30 @@ The whole-branch review of G2 left these for the snapshots (G3) and the day tier
 
 A chronicle line sits in `chronicle`, in `legends`, and in each being's `history`. The snapshot holds each distinct line once, in `lines`, in the order first met, and the three lists hold indexes into it, so the sharing survives the round trip. `camp.snares`, `camp.pitfalls`, `region.marks`, and `field.regions` are homes, not references: a record met there is written whole, not pointed at.
 
-**Why `resCache`, `startRegion`, `raised`, and `fireCount` are saved though each can be rebuilt.** Each can be recomputed from the rest of the state, but a rebuilt value can differ from the live one, and the difference can move the random stream that runs after it or break a rule that reads it. The oracle proved each one by removing it from the loader in turn: without `resCache`, seed `r` parted from its straight run; without `startRegion`, a den dug after the load threw inside `rimExits`; a sorted `raised` broke a burning world's spread; a zeroed `fireCount` did too. All four are saved verbatim and restored verbatim.
+**A record that leaves its list.** Every kind above names its record by its place in one list. That assumes a record never leaves its list while something still points at it. One kind breaks the assumption. `burnOut` takes a grove out of `groves` when its hollow pine burns, and the sprites of that grove keep pointing at it until the last of them dies. Such a grove is a stray: it is named `{ stray: i }` and written whole into `strayGroves`, once, so the sprites that shared one object share one object still. The general rule now sits in the comment above `REF_KINDS`. Before you add a kind, ask what removes a record of it, and whether anything can hold the record after.
 
-**The stage and the refusal.** `loadSnapshot` first checks the version, that the save was taken in the days era, and that its options pass the same checks `setOptions` does, without setting anything. It then builds a `stage`, a half-built world of its own: every list of records, sized from the save's own options, with every id still in place. It walks `REFS` and turns each id into the staged record; `fromId` throws on an id that names nothing. A throw at any point returns `'This save cannot be read.'`, and nothing outside the stage has been touched. Only once the stage is whole does `loadSnapshot` commit: `setOptions`, every global, the two streams, and the derived state, in that order. Nothing in the commit can fail, so the state is never half replaced.
+No other kind loses a referenced record in play. The `caves.splice` calls all drop a cave pushed a moment before, inside the function that made it. `burnOut` takes a burnt snare or pitfall out of its camp, and clears `tile.struct` in the same breath, so nothing points at it after. `setPole` filters a country's marks, but it drops only pole marks, and a hill, cave, or grove mark is never one. The `{ whole: mark }` path is the net under that: it saves such a mark whole, and a mark shared by two holders would then come back as two objects. Several caves can share one mark, so that net is not free, and a mark that could leave its region would want a stray path of its own.
 
-**The oracle.** Each case runs a world once whole, saves it mid-run, loads the save into a fresh sim, and runs both worlds on. Three things must then agree: the chronicle lines, line for line; the fingerprint over the run-on; and the two snapshots, compared by value and as text, so a difference in key order would show too. Six cases cover three seeds (`r`, `x`, `gamma`) at their default size, a fourth (`alpha`) at a small size with snares and pitfalls dug, and `r` at that small size twice more: once saved while the woods burn (so `spreadFire`'s walk over `raised` draws from `rng` on both sides), once saved before a wolf den is dug (so `startRegion` is read through `rimExits`). A seventh test lives in the soak: seed `x` is saved on day 35, loaded, and run to day 70, held to the same golden line the six-seed test reads.
+**Why `resCache`, `startRegion`, `raised`, and `fireCount` are saved though each can be rebuilt.** Each can be recomputed from the rest of the state. A rebuilt value can differ from the live one. The difference can move the random stream that runs after it, or break a rule that reads it. The oracle proved each one by removing it from the loader in turn. Without `resCache`, seed `r` parted from its straight run. Without `startRegion`, a den dug after the load threw inside `rimExits`. A sorted `raised` broke a burning world's spread, and a zeroed `fireCount` did too. All four are saved verbatim and restored verbatim.
+
+**The stage and the refusal.** `loadSnapshot` first checks the version, that the save was taken in the days era, and that its options pass the same checks `setOptions` does, without setting anything. It then builds a `stage`, a half-built world of its own: every list of records, sized from the save's own options, with every id still in place. It walks `REFS` and turns each id into the staged record; `fromId` throws on an id that names nothing. A throw at any point returns `'This save cannot be read.'`, and nothing outside the stage has been touched. The reason it threw is kept in `lastLoadFault`, which the page writes to the console behind the plain sentence. Only once the stage is whole does `loadSnapshot` commit: `setOptions`, every global, the two streams, and the derived state, in that order. Nothing in the commit can fail, so the state is never half replaced.
+
+**A save file is outside data.** A refusal is enough for a save that is merely wrong. Some are worse: they load, and then kill the page a step later. The stage checks the keys the rules index blindly, because a rule that meets an unknown key reads `undefined` and throws. Every `being.species` is a key of `SPECIES`, every tile `ground` a key of `GROUND`, and every `feature` that is not null a key of `FEATURES`. Every `item.kind` is a key of `ITEMS`. Each camp holds an object at `stash`, `fae`, `rot`, `tools`, and `gnomes`, and a place inside the map at `pit`, `stashTile`, and `site`. A region's tiles are indexes inside `regionOf`. The tick and `nextId` are whole counts that adding to keeps exact. This is not a schema validator. It closes the crashes the fuzz run could show, and no more.
+
+**The frame loop's guard.** The loader cannot close every crash, so `frame()` wraps the stepping in a `try`. A throw pauses the game, says "The world stopped on a fault. Load a save or make a new world.", and goes to the console. The frame loop itself runs on, so the page still draws and the player can load a save.
+
+**The oracle.** Each case runs a world once whole, saves it mid-run, loads the save into a fresh sim, and runs both worlds on. Three things must then agree: the chronicle lines, line for line; the fingerprint over the run-on; and the two snapshots, compared by value and as text, so a difference in key order would show too.
+
+| Case | What it was picked for |
+|---|---|
+| `r`, `x`, `gamma`, default size | a founding, two storms, and a grown valley with huts and a spear |
+| `alpha`, small | snares and pitfalls in the ground, and two camps |
+| `r`, small, woods alight | `spreadFire` walks `raised` and draws from `rng` on both sides |
+| `r`, small, before a den is dug | `startRegion` is read through `rimExits` |
+| `beta`, default size, late | a grown valley with a gnome burrow that holds a thing (`cave.holding`) |
+| `r`, small, a hollow pine burnt out | a grove that left `groves` under a living sprite, saved as a stray |
+
+A ninth test lives in the soak: seed `x` is saved on day 35, loaded, and run to day 70, held to the same golden line the six-seed test reads.
 
 Task 4 found no fault: every oracle case passed on its first run. To prove the oracle has teeth, the loader was broken six ways, one at a time, and run against the case built to catch it:
 
@@ -474,7 +510,11 @@ Task 4 found no fault: every oracle case passed on its first run. To prove the o
 | chronicle lines copied per list, so the sharing is lost | seed `r`'s case |
 | the global `camp` forced to `camps[0]` | nothing, and rightly: `step` already resets `camp` to `camps[0]` at the top of every days tick, so between steps it holds no reading the oracle could catch |
 
-The oracle has not yet run a case with an angry grove, a gnome burrow that holds a thing (`cave.holding`), or a mark saved whole (one that lives in no region); none of those occurred in the worlds it used. Three of the six cases run at a size smaller than the default: the pitfall valley, the burning world, and the den world, the last two both on seed `r`.
+The oracle has not yet run a case with an angry grove, or with a mark saved whole (one that lives in no region). Neither occurred in the worlds it used. Four of the eight cases run at a size smaller than the default: the pitfall valley, the burning world, the den world, and the burnt hollow.
+
+**What the guards catch, and what they cannot.** `unnamedRefs()` walks every record and every saved global, and reports three things: a field that points at a record `REFS` does not name; a `Map` or a `Set`, which the encoder would silently turn into `{}`; and anything else that is not plain data, such as a class instance or a typed array. The saved globals come from `savedValues()`, a table a test holds to `SAVED_STATE`, so a new saved global is walked without anyone remembering to add it. `field.byId` is the one exception, listed in `REF_DERIVED` because the loader rebuilds it.
+
+Two lints read the sim's source. The first finds every top-level `let` and `var`, whatever shape it takes, and holds each name to `SAVED_STATE` or `NOT_SAVED`. The second finds every top-level `const` that holds a container, and holds each to `KNOWN_CONSTS` or to a list of frozen tables. Both read the whole file text with comments, strings, and regular expressions blanked, so a keyword inside one is not read as code. What they cannot see is state hung on a function object, such as `f.count = 0`. A grep catches the shape the sim uses, an assignment into a dotted name at the start of a line, and the known ones are listed. State hung on a function elsewhere would pass all three.
 
 **The measured numbers**, day 40 of seed `r`, a 3 714 317-character save:
 
@@ -486,6 +526,12 @@ The oracle has not yet run a case with an angry grove, a gnome burrow that holds
 | `loadSnapshot(snap)` | 13 to 21 ms |
 
 A save and a load together take well under 50 ms, so the page writes the dawn autosave inline in the frame rather than off a timer.
+
+**The page, and what it cannot do.** A save that cannot be taken is said once, in the foot, and the reason goes to the console; it is never swallowed. `saveWorld` says "Saving <name>." and not "Saved as <name>.", because the page hands the file to the browser and is never told what became of it: a sandbox can refuse the download without an error. A Continue slot whose `tick` is not a finite number is treated as no save, so the start dialog never offers day NaN. Ctrl+S and Ctrl+O are not caught while a dialog is open, as Ctrl+N is not: inside a dialog only that dialog's own keys fire.
+
+**A save is taken only in the days era.** In the ages the seed replays the creation, so no snapshot is needed there. The cost falls on Become: a page reloaded in the middle of a steered creation loses that creation. It comes back only when god-era replay or an ages snapshot exists. A world that reached the valley carries `inhabited` and `inhabitedTold` through a save, so the player is still the god they took.
+
+A replayed world tells the same story as the loaded one, but not the same log. See section 15.
 
 ## 19. Become: the player takes a god
 
@@ -514,7 +560,7 @@ It was built as an instrument before a feature. The ages do not read to a player
 - Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
 - A second intelligent mob that trades or raids.
 - Names for events and long grudges in the chronicle, so the Legends-mode feel grows.
-- G3 built the save format: a snapshot as JSON, `REFS`, the door's `load` act, and the page's Save, Load, and one autosave slot. Left for later: an oracle case with an angry grove, one with a gnome burrow holding a thing, and one with a mark saved whole; and the 3.7 MB the autosave writes on IndexedDB at every world day, unmeasured over a long session.
+- G3 built the save format: a snapshot as JSON, `REFS`, the door's `load` act, and the page's Save, Load, and one autosave slot. Left for later: an oracle case with an angry grove, and one with a mark saved whole; a snapshot of the ages, so a steered creation survives a page reload; and the 3.7 MB the autosave writes on IndexedDB at every world day, unmeasured over a long session.
 - G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data (done) and snapshots (done). Each later plan of G adds its own state to the snapshot and its own references to `REFS`: the tier, the placement stream, the counts, the annals, the pending events, and the watch list. The completeness test (`REFS names every field that points at a record`) and the oracle hold each addition to the same proof G3 built.
 - Then the lingering gods. A sleeping god wakes, and later gods are born of side effects or of belief. Of the four inhabit modes, Become is built for a god in the ages; see section 19. Possess, Vessel, and Manifestation are refused by name until each has its spec.
 - `pickBerries`, `pickFibre`, `digClay`, and `takeCuttings` are one shape four times; a `harvestKind` builder like `workKind` would make them four rows. Not done in G2 because G2 moves no behaviour.
