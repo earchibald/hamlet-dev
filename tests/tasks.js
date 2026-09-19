@@ -91,13 +91,38 @@ test('gathering and its kin are in the table, and a gathered stick reaches the s
   }
 });
 
+test('workKind declares the work and the effect, and runs them through the table', () => {
+  const api = load(); api.startWorld('r');
+  const a = api.firstPerson(); api.camp = a.camp; api.failTask(a);
+  let landed = null;
+  api.TASKS.testJob = api.workKind({ label: 'Testing the bench', amount: 5, skill: 'craft', effect: (b, args) => { landed = args.note; } });
+  assert.deepEqual(api.TASKS.testJob.work, { amount: 5, skill: 'craft' });
+  assert.equal(typeof api.TASKS.testJob.effect, 'function');
+  assert.ok(api.startTask(a, 'testJob', { at: [a.x, a.y], note: 'done' }));
+  assert.equal(a.task.type, 'work'); assert.deepEqual(plain(a.task), []);
+  for (let k = 0; k < 50 && a.task; k++) api.runTask(a);
+  assert.equal(landed, 'done'); assert.equal(a.task, null);
+});
+
+test('a skilled worker ends a job in fewer strides', () => {
+  const api = load(); api.startWorld('r');
+  api.TASKS.testJob = api.workKind({ label: 'Twisting cord', amount: 30, skill: 'craft', effect: () => {} });
+  const runs = lvl => { const a = api.firstPerson(); api.camp = a.camp; api.failTask(a); a.skills.craft = lvl; api.startTask(a, 'testJob', { at: [a.x, a.y] }); let n = 0; for (; n < 200 && a.task; n++) api.runTask(a); return n; };
+  assert.ok(runs(4) < runs(0));
+});
+
+test('the snare jobs, the ember, and joining are in the table', () => {
+  const api = load(); api.startWorld('r');
+  for (const k of ['setSnare', 'checkSnare', 'haulPit', 'fetchEmber', 'join']) assert.ok(api.TASKS[k], k);
+});
+
 /* ---------- the ratchet ---------- */
 const SIM = path.join(__dirname, '..', 'src', 'sim');
 /* `start: ` followed by a function or an offer's start. A plain field named start (the gods' rest gate has one) is not a task. */
 const OLD = /\barrive\b|\bcleanup\b|\bstart: (a =>|o\.|r\.|g\b)|\bSTART\b/g;
 /* What each file may still hold. Each task of the plan lowers its files. The close removes the ratchet. */
 const PENDING = {
-  camps: 1, tasks: 26, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
+  camps: 0, tasks: 25, beings: 5, species: 0, fae: 0, goals: 54, recipes: 4,
 };
 test('no file holds more closure tasks than the ratchet allows', () => {
   const over = [];

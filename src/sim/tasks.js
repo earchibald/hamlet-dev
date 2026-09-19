@@ -56,41 +56,59 @@ function runTask(a){
 }
 
 /* ---------- human work tasks ---------- */
-function startFetchEmber(a){
-  const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
-  a.task = { type: 'ember', label: 'Running to the blaze for an ember', path: p, fast: true,
-    arrive(a, t){
-      if (!a.carrying){
-        if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
-        a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, CLOCK.thought.ember);
-        log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
-        const [px, py] = camp.pit; const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
-      }
-      const [px, py] = camp.pit;
-      if (nearAt(a, px, py) > 1){ const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
-      const pit = pitTile().struct; a.carrying = null;
-      if (pit.fuel <= 0) return 'fail';
-      if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
-      pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
-      log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major');
-      addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
-      return 'done';
-    } };
-  return true;
-}
+TASKS.fetchEmber = { type: 'ember',
+  begin(a, args){
+    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
+    return { label: 'Running to the blaze for an ember', path: p, fast: true };
+  },
+  stops: [(a, t) => {
+    if (!a.carrying){
+      if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
+      a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, CLOCK.thought.ember);
+      log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
+      const [px, py] = camp.pit; const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
+    }
+    const [px, py] = camp.pit;
+    if (nearAt(a, px, py) > 1){ const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
+    const pit = pitTile().struct; a.carrying = null;
+    if (pit.fuel <= 0) return 'fail';
+    if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
+    pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
+    log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major');
+    addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
+    return 'done';
+  }] };
+function startFetchEmber(a){ return startTask(a, 'fetchEmber'); }
 
 /* ---------- task builders (humans) ---------- */
 /* Continue straight into a new task from inside an old one. */
 function chain(a, old, ok){ if (!ok) return null; a.task.started = old.started; a.task.key = old.key; return 'continue'; }
+/* The skill a job's label implies, when the job names none. */
+const skillOfLabel = label => /cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build';
+/* A job done at one place: walk to args.at, work until the progress reaches the amount, and then the
+   effect lands. label, amount, and skill are values, or functions of args for a job whose record says
+   them. The kind declares work and effect, so another executor can do the same job without the strides. */
+function workKind({ label, amount, skill, effect, type = 'work' }){
+  const of = (v, args) => typeof v === 'function' ? v(args) : v;
+  return { type, work: { amount, skill }, effect,
+    begin(a, args){
+      const p = pathToStop(a, args.at[0], args.at[1], 1); if (!p) return false;
+      return { label: `Walking to ${of(label, args).toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: args.at, within: 1 };
+    },
+    stops: [(a, t) => {
+      const at = t.args.at, r = goTo(a, t, at[0], at[1], 1); if (r) return r;
+      const l = of(label, t.args), n = of(amount, t.args);
+      t.progress += workSpeed(a, of(skill, t.args) || skillOfLabel(l)); t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
+      if (t.progress < n) return 'continue';
+      effect(a, t.args, t); return 'done';
+    }] };
+}
+/* The old door to a build, for offers that are not data yet. Task 8 of plan G2 removes it. */
 function startBuild(a, at, work, label, done, skill){
   const p = pathToStop(a, at[0], at[1], 1); if (!p) return false;
-  a.task = { type: 'work', label: `Walking to ${label.toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: at, within: 1,
-    arrive(a, t){
-      if (nearAt(a, at[0], at[1]) > 1){ const q = pathToStop(a, at[0], at[1], 1); if (!q) return 'fail'; t.path = q; return 'continue'; }
-      t.progress += workSpeed(a, skill || (/cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build')); t.label = `${label} (${Math.min(99, Math.floor(t.progress / work * 100))}%)`;
-      if (t.progress < work) return 'continue';
-      done(a); return 'done';
-    } };
+  const k = workKind({ label, amount: work, skill, effect: b => done(b) });
+  a.task = { type: 'work', label: `Walking to ${label.toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: at, within: 1, args: { at },
+    arrive: (b, t) => k.stops[0](b, t) };
   return true;
 }
 Object.assign(TASKS, {
@@ -259,28 +277,36 @@ function gardenSpot(){
   }
   return best ? [best.x, best.y] : null;
 }
-function startSetSnare(a){
-  const c = camp.site; let best = null;
-  const s = secOf(c[0], c[1]);
-  for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
-    const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct) continue;
-    const d = dist(x, y, c[0], c[1]); if (d < 6 || d > 18) continue;
-    let bushes = 0; for (const [dx, dy] of RING) if (inb(x + dx, y + dy) && tileAt(x + dx, y + dy).feature === 'bush') bushes++;
-    if (t.ground !== 'grass' || !bushes) continue;
-    if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4)) continue;
-    const rabbits = beings.filter(b => b.alive && b.species === 'rabbit' && nearAt(b, x, y) <= 12).length;
-    const sc = bushes * 4 + rabbits * 6 - d * 0.2 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
-  }
-  if (!best) return false;
-  return startBuild(a, [best.x, best.y], CLOCK.work.setSnare, 'Setting a snare', a => {
-    if (camp.stash.stick < 3 || tileAt(best.x, best.y).struct) return;
-    camp.stash.stick -= 3; const sn = { x: best.x, y: best.y, armed: true, catch: null, camp, chance: Math.min(0.95, 0.5 + a.skills.trap * 0.08 + a.traits.patience * 0.25) }; camp.snares.push(sn); tileAt(best.x, best.y).struct = { type: 'snare', snare: sn };
+TASKS.setSnare = (() => {
+  const k = workKind({ label: 'Setting a snare', amount: CLOCK.work.setSnare, effect(a, args){
+    const [bx, by] = args.at;
+    if (camp.stash.stick < 3 || tileAt(bx, by).struct) return;
+    camp.stash.stick -= 3; const sn = { x: bx, y: by, armed: true, catch: null, camp, chance: Math.min(0.95, 0.5 + a.skills.trap * 0.08 + a.traits.patience * 0.25) }; camp.snares.push(sn); tileAt(bx, by).struct = { type: 'snare', snare: sn };
     gainXp(a, 'trap'); log(`${a.name} sets a snare in the grass near some bushes.`, [a]);
-  });
-}
-function startCheckSnare(a, s){
-  return startBuild(a, [s.x, s.y], CLOCK.work.checkSnare, 'Checking the snare', a => { if (s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; } });
-}
+  } });
+  return { ...k, begin(a, args){
+    const c = camp.site; let best = null;
+    const s = secOf(c[0], c[1]);
+    for (let y = s.sy * LH + 1; y < (s.sy + 1) * LH - 1; y++) for (let x = s.sx * LW + 1; x < (s.sx + 1) * LW - 1; x++){
+      const t = tileAt(x, y); if (!passable(x, y) || t.feature || t.struct) continue;
+      const d = dist(x, y, c[0], c[1]); if (d < 6 || d > 18) continue;
+      let bushes = 0; for (const [dx, dy] of RING) if (inb(x + dx, y + dy) && tileAt(x + dx, y + dy).feature === 'bush') bushes++;
+      if (t.ground !== 'grass' || !bushes) continue;
+      if (camp.snares.some(sn => dist(sn.x, sn.y, x, y) < 4)) continue;
+      const rabbits = beings.filter(b => b.alive && b.species === 'rabbit' && nearAt(b, x, y) <= 12).length;
+      const sc = bushes * 4 + rabbits * 6 - d * 0.2 + rng() * 2; if (!best || sc > best.sc) best = { x, y, sc };
+    }
+    if (!best) return false;
+    args.at = [best.x, best.y];
+    return k.begin(a, args);
+  } };
+})();
+function startSetSnare(a){ return startTask(a, 'setSnare'); }
+TASKS.checkSnare = workKind({ label: 'Checking the snare', amount: CLOCK.work.checkSnare, effect(a, args){
+  const st = tileAt(args.at[0], args.at[1]).struct, s = st && st.type === 'snare' ? st.snare : null;
+  if (s && s.catch){ s.catch = null; a.carrying = { kind: 'carcass', count: 1 }; }
+} });
+function startCheckSnare(a, s){ return startTask(a, 'checkSnare', { at: [s.x, s.y] }); }
 /* Deer live in their meadows and feed at the bushes there, often well past the camp's own sector,
    so a pit close to camp seldom sees one. This scans everywhere passable within thirty tiles of
    the site for grass beside a bush, away from snares and other pits, with a deer standing there
@@ -300,12 +326,30 @@ function pitfallSite(){
   }
   return best ? [best.x, best.y] : null;
 }
-/* Haul a caught deer home from the pit. */
-function startHaulPit(a, p){
-  /* The pit stands away from camp, but startBuild has no way to chain into a walk home, so the
-     catch goes straight to the stash here, the same as any other kill finished at the fire. */
-  return startBuild(a, [p.x, p.y], CLOCK.work.haulDeer, 'Hauling the deer out of the pit', a => { if (!p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good'); });
-}
+/* Haul a caught deer home from the pit. The catch goes straight to the stash here, the same as
+   any other kill finished at the fire. */
+TASKS.haulPit = workKind({ label: 'Hauling the deer out of the pit', amount: CLOCK.work.haulDeer, effect(a, args){
+  const st = tileAt(args.at[0], args.at[1]).struct, p = st && st.type === 'pitfall' ? st.pit : null;
+  if (!p || !p.catch) return; p.catch = null; stashAdd('venison', 1); log(`${a.name} hauls the deer out of the pit.`, [a], 'good');
+} });
+function startHaulPit(a, p){ return startTask(a, 'haulPit', { at: [p.x, p.y] }); }
+/* Walk to the camp, or to a founding party's target when there is no site yet. startJoin(a), in
+   camps.js, is the door, because chooseTask and the founding party call it by name. */
+TASKS.join = { type: 'travel',
+  begin(a, args){
+    const c = a.camp, dest = c.site || c.target; if (!dest) return false;
+    const within = c.site ? 3 : 6; const p = pathToStop(a, dest[0], dest[1], within); if (!p) return false;
+    args.at = [dest[0], dest[1]]; args.within = within;
+    return { label: c.site ? 'Walking toward the smoke' : 'Walking to the new valley', path: p };
+  },
+  stops: [(a, t) => {
+    const at = t.args.at, r = goTo(a, t, at[0], at[1], t.args.within); if (r) return r;
+    const c = a.camp;
+    a.homeless = false;
+    if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
+    else log(`${a.name} reaches the new valley.`, [a]);
+    return 'done';
+  }] };
 
 /* Quarry rocks from a rock face: a walkable tile beside ground that can be quarried, within thirty tiles of the site. */
 TASKS.quarry = { type: 'work',
