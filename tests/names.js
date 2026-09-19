@@ -169,7 +169,12 @@ test('a meaning is never offered to a kind it does not suit', () => {
 });
 
 test('every kind can still name as many things as the heaviest seed asks of it', () => {
-  const DEMAND = { water: 9, hill: 3, cave: 10, grove: 8, ford: 1 };
+  /* hill is derived here, from the six soak seeds' own hill counts, because the helpers this
+     file already has (SEEDS, world()) give it directly. The other four come from the day-1
+     measurement in land-word-kinds.md (cave 10, grove 8, ford 1, water 9); that count is not a
+     landmark this file exposes a getter for, so it is not re-derived here (task 1 review, finding 2). */
+  const heaviestHills = Math.max(...SEEDS.map(seed => world(seed).hills.length));
+  const DEMAND = { water: 9, hill: heaviestHills, cave: 10, grove: 8, ford: 1 };
   for (const kind in DEMAND){
     const api = world();
     let named = 0;

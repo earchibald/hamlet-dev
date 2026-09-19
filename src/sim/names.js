@@ -176,7 +176,7 @@ const LAND_WORD_KINDS = {
   'the thin path': ['hill', 'cave', 'grove', 'ford'], 'the high seat': ['hill'], 'the wet hollow': ['water', 'cave'],
   'the still pool': ['water'], 'the burnt slope': ['hill', 'grove'], 'where the wind rests': ['hill', 'grove'],
   'the grey face': ['hill', 'cave'], 'the salt ground': ['water', 'hill', 'cave', 'grove', 'ford'],
-  'the small light': ['water', 'hill', 'cave', 'grove', 'ford'], 'the heavy rock': ['cave', 'ford'],
+  'the small light': ['water', 'hill', 'cave', 'grove', 'ford'], 'the heavy rock': ['hill', 'cave', 'ford'],
   'the last watch': ['water', 'hill', 'cave', 'grove', 'ford'],
   'the dry hole': ['cave'], 'where the cold sits': ['cave'], 'the stone mouth': ['cave'], 'the low crawl': ['cave'],
   'where the bats sleep': ['cave'], 'the high ridge': ['hill'], 'the slow rise': ['hill'], 'the crooked trees': ['grove'],
