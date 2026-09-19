@@ -113,22 +113,26 @@ const RULES = [
   /* Stops at a `/` too: a chance already named from CLOCK can be divided by an unrelated formula
      (the old-age roll divides by hardiness), and that denominator is not a bare time literal. */
   { name: 'a roll',               re: /rng\(\)\s*[<>]=?\s*[^;)&|/]+/g, rolls: true },
+  { name: 'a legacy marker outside a table', re: /\b(ticks|strides|tickRate|strideRate)\(/g, notFiles: ['species', 'recipes', 'gods'], always: true },
+  { name: 'a world unit outside the table',  re: /\b(days|hours|mins|secs|years)\(\s*[\d.]+[^)]*\)/g },
 ];
 /* Rolls are linted only in the files that hold rules. World generation rolls once and is not time.
    In world.js the rules begin at growPlants. */
 const ROLL_FILES = ['camps', 'beings', 'species', 'fae', 'tasks', 'goals', 'recipes', 'weather', 'main', 'world'];
-/* A chance rolled once per event is not a rate. Each entry is the exact text of a match, with the reason. */
+/* A chance rolled once per event is not a rate. Each entry names the file and the exact text of a
+   match, so a new roll elsewhere with the same text is not waved through by accident. */
 const EVENT_CHANCES = [
-  'rng() < 0.125',                    // rolled once, when an animal steps on the trap
-  'rng() > 0.45 + a.skills.hunt * 0.1',   // the deer that breaks free of a wolf
-  'rng() < 0.6',                          // the carcass roll (whether a venison carcass is finished), and the prank's victim roll
-  'rng() < 0.45 + a.skills.hunt * 0.1',   // the spear's hit on a sprite
-  'rng() < 0.5',                          // one gift roll of a sprite's visit, and two of the prank's rolls
-  "rng() < 0.5 ? 'cord' : 'moss'",        // the other gift roll of a sprite's visit, picking cord over moss
-  'rng() < Math.min(0.75, 0.22 + a.skills.hunt * 0.06 + a.traits.patience * 0.18',   // the fish that bites at the end of a cast
-  'rng() < 0.3 + a.skills.hunt * 0.12',   // the spear's hit on a deer
-  'rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25',   // the sparks that take
-  'rng() < 0.4 + a.traits.patience * 0.4',   // the rocks that prove to be firestones
+  { file: 'beings', text: 'rng() < 0.125', why: "rolled once, when an animal steps on the trap" },
+  { file: 'species', text: 'rng() > 0.45 + a.skills.hunt * 0.1', why: "the deer that breaks free of a wolf" },
+  { file: 'species', text: 'rng() < 0.6', why: "the carcass roll (whether a venison carcass is finished)" },
+  { file: 'fae', text: 'rng() < 0.6', why: "the prank's victim roll" },
+  { file: 'fae', text: 'rng() < 0.45 + a.skills.hunt * 0.1', why: "the spear's hit on a sprite" },
+  { file: 'fae', text: 'rng() < 0.5', why: "one gift roll of a sprite's visit, and two of the prank's rolls" },
+  { file: 'fae', text: "rng() < 0.5 ? 'cord' : 'moss'", why: "the other gift roll of a sprite's visit, picking cord over moss" },
+  { file: 'tasks', text: 'rng() < Math.min(0.75, 0.22 + a.skills.hunt * 0.06 + a.traits.patience * 0.18', why: "the fish that bites at the end of a cast" },
+  { file: 'tasks', text: 'rng() < 0.3 + a.skills.hunt * 0.12', why: "the spear's hit on a deer" },
+  { file: 'goals', text: 'rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25', why: "the sparks that take" },
+  { file: 'goals', text: 'rng() < 0.4 + a.traits.patience * 0.4', why: "the rocks that prove to be firestones" },
 ];
 /* A comparison with zero is not a duration, a digit inside a name is not a number, and a `|| 0)`
    fallback default is not a duration either. */
@@ -138,12 +142,13 @@ function bareIn(file){
   const out = [];
   for (const r of RULES){
     if (r.files && !r.files.includes(file)) continue;
+    if (r.notFiles && r.notFiles.includes(file)) continue;
     if (r.rolls && !ROLL_FILES.includes(file)) continue;
     const text = r.rolls && file === 'world' ? src.slice(src.indexOf('function growPlants')) : src;
     for (const m of text.matchAll(r.re)){
       const s = m[0];
-      if (!hasNumber(s)) continue;
-      if (EVENT_CHANCES.includes(s.trim())) continue;
+      if (!r.always && !hasNumber(s)) continue;
+      if (r.rolls && EVENT_CHANCES.some(e => e.file === file && e.text === s.trim())) continue;
       out.push(`${file}.js: ${r.name}: ${s.trim().slice(0, 120)}`);
     }
   }
@@ -170,14 +175,16 @@ test('every entry of the table is read by a rule', () => {
   assert.deepEqual(unread, []);
 });
 
-/* An entry is dead when no roll has its text, or when the roll holds no number and the lint never asks. */
-test('every event chance names a roll the lint would flag', () => {
+/* An entry is dead when no roll in its own file has its text, or when the roll holds no number and
+   the lint never asks. */
+test('every event chance names a roll the lint would flag, in the file it names', () => {
   const found = new Set();
   for (const f of ROLL_FILES){
     const src = fs.readFileSync(path.join(SIM, f + '.js'), 'utf8');
     const r = RULES.find(r => r.rolls);
-    for (const m of src.matchAll(r.re)) if (hasNumber(m[0])) found.add(m[0].trim());
+    const text = f === 'world' ? src.slice(src.indexOf('function growPlants')) : src;
+    for (const m of text.matchAll(r.re)) if (hasNumber(m[0])) found.add(f + ' ' + m[0].trim());
   }
-  const dead = EVENT_CHANCES.filter(s => !found.has(s));
+  const dead = EVENT_CHANCES.filter(e => !found.has(e.file + ' ' + e.text));
   assert.deepEqual(dead, []);
 });

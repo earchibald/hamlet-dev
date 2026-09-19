@@ -4,7 +4,7 @@
 function resetState(seed, opts){
   setOptions(opts); allocSearch();
   seedText = String(seed); rng = mulberry32(hashSeed(seedText));
-  tick = Math.round(hours(7)); nextId = 1; fireCount = 0;
+  tick = Math.round(CLOCK.startsAt); nextId = 1; fireCount = 0;
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
   goalPriority = {};

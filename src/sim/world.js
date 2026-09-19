@@ -47,7 +47,7 @@ function nearestFire(x, y, r, z = 0){
 /* Count a resource in a sector. Cached for 100 ticks. */
 function sectorCount(s, key, pred){
   const ck = key + ':' + secIdx(s.sx, s.sy);
-  const c = resCache.get(ck); if (c && tick - c.t < CLOCK.every.resourceCount) return c.n;
+  const c = resCache.get(ck); if (c && tick - c.t < CLOCK.limit.resourceCache) return c.n;
   let n = 0;
   for (let y = s.sy * LH; y < (s.sy + 1) * LH; y++) for (let x = s.sx * LW; x < (s.sx + 1) * LW; x++) if (pred(world[idx(x, y)], x, y)) n++;
   resCache.set(ck, { t: tick, n }); return n;
@@ -295,7 +295,7 @@ function hollowUnderHill(sc, h){
     }
     if (c.tiles.length < 3){ for (const t of c.tiles){ t.cave = null; t.ground = 'rock'; } exit.mouth = null; caves.splice(caves.indexOf(c), 1); continue; }
     if (exit.feature === 'tree'){ exit.feature = null; exit.berries = 0; }
-    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - days(300);
+    const inner = c.tiles[c.tiles.length - 1]; inner.feature = 'hollow'; inner.planted = tick - CLOCK.plant.hollowAge;
     c.story.push('The oldest hollow in the valley.');
     /* Old pines stand on the hill above the hollow. Slopes and rock stay bare. keepsPaths only looks at a tile's own
        ring, which is not enough on the narrow floor around a tall hill's core: a run of trees can still wall off a
@@ -305,7 +305,7 @@ function hollowUnderHill(sc, h){
     /* A pine must not stand where a slope lands, or the way up the hill leads nowhere. */
     const lands = t => DIRS.some(([dx, dy]) => { const u = hasTile(t.x + dx, t.y + dy, t.z - 1) ? tileAt(t.x + dx, t.y + dy, t.z - 1) : null; return u && u.slope; });
     for (const t of hillFloors) if (!t.feature && !lands(t) && rng() < 0.3 && keepsPaths(t)){
-      t.feature = 'tree'; t.planted = tick - days(60 + rint(60));
+      t.feature = 'tree'; t.planted = tick - (CLOCK.plant.grovePineAge + days(rint(CLOCK.plant.grovePineSpread / DAY)));
       const anchor = hillFloors.find(f => f.feature !== 'tree');
       const region = anchor && reachable(anchor.x, anchor.y, anchor.z, 4000);
       if (!region || !hillFloors.every(f => f.feature === 'tree' || region.has(idx3(f.x, f.y, f.z)))){ t.feature = null; t.planted = undefined; }
@@ -572,7 +572,7 @@ function paintTile(t, biome, e, f){
       if (rng() < 0.05) loose = 'stick';
       break;
   }
-  if (t.feature === 'tree') t.planted = tick - rint(days(100)); else if (t.feature === 'bush') t.planted = tick - rint(days(60));
+  if (t.feature === 'tree') t.planted = tick - rint(CLOCK.plant.treeAgeSpread); else if (t.feature === 'bush') t.planted = tick - rint(CLOCK.plant.bushAgeSpread);
   if (loose) t.loose = loose;
 }
 /* Every tile of the surface, from its country's biome. Levels are made fresh. */
@@ -685,14 +685,14 @@ function placeGrove(within, mark){
   const t = best.t;
   /* The hollow is solid, so it stands before the ring is vetted. A pine judged beside an open centre can wall off
      a tile that the hollow then seals in. */
-  t.feature = 'hollow'; t.planted = tick - days(300); t.berries = 0;
+  t.feature = 'hollow'; t.planted = tick - CLOCK.plant.hollowAge; t.berries = 0;
   /* The ways around the hollow as they stand. A pine may not make them worse, but dense old forest that was
      already tight is not the grove's doing. */
   const openAround = keepsPaths(t);
   if (trees.length < 8) for (const [dx, dy] of RING){
     const q = inb(t.x + dx, t.y + dy) ? world[idx(t.x + dx, t.y + dy)] : null;
     if (!q || q.feature || q.struct || q.mouth || q.cave || q.slope || !passable(q.x, q.y) || !keepsPaths(q)) continue;
-    q.feature = 'tree'; q.planted = tick - days(60);
+    q.feature = 'tree'; q.planted = tick - CLOCK.plant.grovePineAge;
     /* The hollow keeps two open sides, so the sprites have a door and a way back to it. The ways around the hollow
        must still meet once the pine stands, or the pine and the hollow together seal a pocket. */
     if (DIRS.filter(([ex, ey]) => passable(t.x + ex, t.y + ey)).length < 2 || (openAround && !keepsPaths(t))){ q.feature = null; delete q.planted; }

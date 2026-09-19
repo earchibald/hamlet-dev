@@ -275,18 +275,9 @@ The determinism contract, since the mythos spec. The engine step is pure. Given 
 
 The acts the door knows: light, poke, priority (a goal set off, on, or high), and site (the camp site before the pit is built). The site event carries its camp's id, and the act resolves the camp from that id, not from the global `camp`: on replay `camp` defaults to `camps[0]`, so a site chosen for a second camp still lands on that camp, not the first, when the log runs again. Reachability, once a guard in the interface, is now a guard inside the act itself, checked against the target camp's own first living person. A replayed event carries its tick and must arrive at it; the door answers "Not now." otherwise. The test runner`s replay god throws if it falls behind. Nothing in the interface writes sim state except through the door.
 
-## 16. Next
+## 16. The clock table
 
-- Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
-- A second intelligent mob that trades or raids.
-- Names for events and long grudges in the chronicle, so the Legends-mode feel grows.
-- A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
-- G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data. Tasks as data is what a save format waits on.
-- Then the lingering gods. A sleeping god wakes, later gods are born of side effects or of belief, and the four inhabit modes come through the door.
-
-## 17. The clock table
-
-`src/sim/clock.js` holds the calendar, the unit helpers, and one table, `CLOCK`. It loads directly after `core.js`. No rule in `src/sim/` holds a bare tick count: every duration and every rate is read from `CLOCK` by name.
+`src/sim/clock.js` holds the calendar, the unit helpers, and one table, `CLOCK`. It loads directly after `core.js`. Every duration and every rate is read from `CLOCK` by name, except the rows of `SPECIES`, `LIFE`, and `RECIPES`, which are written in the same unit helpers (`LIFE` in plain days). The base work rate is the `1` in `workSpeed` in `beings.js`; every `CLOCK.work` entry is a count of strides against that `1`.
 
 What counts as time, in short form:
 
@@ -304,10 +295,23 @@ What counts as time, in short form:
 
 A being runs its task once a stride, not once a tick, so a task's progress threshold and period count strides.
 
-`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each returns its argument unchanged. A value inside one is still in today's units: a count of ticks, a count of strides, a rate for each tick, a rate for each stride. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done.
+`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each returns its argument unchanged. A value inside one is still in today's units: a count of ticks, a count of strides, a rate for each tick, a rate for each stride. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done. A chance that sits beside its period, such as `birth.chance` or `arrival.villageChance`, carries no marker; the retune changes it together with its period, and `rollFor` is the tool.
 
 The rows of `SPECIES`, `LIFE`, and `RECIPES` stay in their own tables. They are written with the same unit helpers, not moved into `CLOCK`.
 
-`tests/clock.js` lints `src/sim/` for a bare time literal in a rule: a tick added to, a tick compared, a period, a thought's duration, a multiple of `DAY`, an age in days, a progress threshold, a wait, work in a build or a recipe, a stride, a decay, a small step added or subtracted, a need gained, or a roll. `EVENT_CHANCES` lists each chance that is rolled once per event, not on a repeating period, with the reason: a snare's catch, a spear's hit, sparks that take, the rocks that prove to be firestones, and the rest. A spear's hit on a deer can roll more than once in one hunt, since a missed deer flees and the hunt goes on; it is still a chance for each throw, so it stays in `EVENT_CHANCES`.
+`tests/clock.js` lints `src/sim/` for a bare time literal in a rule: a tick added to, a tick compared, a period, a thought's duration, a multiple of `DAY`, an age in days, a progress threshold, a wait, work in a build or a recipe, a stride, a decay, a small step added or subtracted, a need gained, a roll, a legacy marker outside `SPECIES`, `RECIPES`, or `gods.js`, or a world unit written inline. `EVENT_CHANCES` lists each chance that is rolled once per event, not on a repeating period, by the file and the exact text of the roll, with the reason: a snare's catch, a spear's hit, sparks that take, the rocks that prove to be firestones, and the rest. A spear's hit on a deer can roll more than once in one hunt, since a missed deer flees and the hunt goes on; it is still a chance for each throw, so it stays in `EVENT_CHANCES`.
+
+The lint cannot see everything. A literal passed through a named constant, a whole-number step such as `t.fire -= 2`, a division of `tick` by a literal, and a new data table with its own field names all pass it unread. A reviewer must catch those.
+
+Left for the retune (G4): `tests/lib/run.js` and `tests/door.js` each hard-code `DAY = 1000`; `src/ui/derive.js` holds pulse durations of 1500 ticks and `src/ui/map.js` refreshes its cache every 40 ticks, and the lint does not scan `src/ui/`; `tasks.js` near line 393 advances tree cutting by its own `1 + a.skills.woodcut * 0.3` and not by `workSpeed`, which plan G2 can fold in; `hours`, `mins`, and `secs` return fractions of a tick while `DAY` is 1000, so a caller must round; `CLOCK.thought.over` and `CLOCK.thought.wouldnothold` count ages of a god, not ticks.
 
 The soak's six-seed fingerprint did not move through the whole plan. G1 is a pure refactor: every literal moved to `CLOCK` at its same value, in the same order of rolls.
+
+## 17. Next
+
+- Life clocks were the last round. Sprites and settlement buildings came with them. Wisps in the marsh (a lure at night) were designed but not built.
+- A second intelligent mob that trades or raids.
+- Names for events and long grudges in the chronicle, so the Legends-mode feel grows.
+- A save format. The scenario runner is done: a seed, its options, and its door log replay the same story.
+- G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data. Tasks as data is what a save format waits on.
+- Then the lingering gods. A sleeping god wakes, later gods are born of side effects or of belief, and the four inhabit modes come through the door.

@@ -4,15 +4,19 @@
 const DAY = 1000, TPS = 12;
 const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 
-/* World units into ticks. */
+/* World units into ticks. Built for the retune. No rule reads secs, mins, or years yet. */
 const secs = n => n * DAY / 86400;
 const mins = n => n * DAY / 1440;
 const hours = n => n * DAY / 24;
 const days = n => n * DAY;
 const years = n => n * SEASON_DAYS * 4 * DAY;
-/* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike. */
+/* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
+   the linear form is exact for an amount, and only an approximation for a chance, since a chance
+   does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
 const perHour = p => p / hours(1);
-/* The chance that a roll made once a tick at `rate` comes up at least once in `n` ticks. */
+/* The chance that a roll made once a tick at `rate` comes up at least once in `n` ticks. Over one
+   tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
+   and a roll must not move. */
 const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
 /* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
    clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
@@ -30,7 +34,7 @@ const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
    this table by name. No rule holds a bare tick count. */
 const CLOCK = {
   rate: {
-    pitBurn: tickRate(0.25),   // fuel the lit pit burns
+    pitBurn: tickRate(0.25),   // fuel the lit pit burns (a burning tile's rate is `fire.burn`)
     lightningLit: tickRate(0.0006), lightningOut: tickRate(0.0035),   // near a camp in a storm, hearth lit or out
     strayLightning: tickRate(0.0008),
     fireWarms: tickRate(0.5),          // warmth gained within 3 tiles of a lit pit
@@ -48,7 +52,9 @@ const CLOCK = {
     gnomeHolds: days(2),              // a borrowed thing comes back after this
     guardEmber: ticks(500),           // how long the brand lasts while driving off a wolf
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
+    resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
+  startsAt: hours(7),   // the hour of the first day at which a world begins
   /* Warmth a person loses each tick, by where and when. */
   cold: { under: tickRate(0.012), winterNight: tickRate(0.06), winterDay: tickRate(0.025), summer: tickRate(0), night: tickRate(0.012), day: tickRate(0.003) },
   /* How long the base tasks take, in strides. */
@@ -59,7 +65,9 @@ const CLOCK = {
     eatCarcass: strides(25), eatShrooms: strides(8), denRest: strides(60), kinChat: strides(20),
   },
   /* How much work a job takes. A worker adds workSpeed to the job's progress each stride, and
-     workSpeed is 1 for a person with no skill, so an entry is the strides the job takes them. */
+     workSpeed is 1 for a person with no skill, so an entry is the strides the job takes them. The
+     four entries that end in `Every` are periods inside a gathering task: one thing is gathered
+     each time that many strides pass. */
   work: {
     firepit: strides(70), feedFire: strides(6), strikeSparks: strides(40), mossLight: strides(10), layFire: strides(15),
     butcherDeer: strides(60), cookFish: strides(25), cookCatch: strides(35),
@@ -78,7 +86,6 @@ const CLOCK = {
     prune: ticks(200),          // the dead leave the list of beings
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
-    resourceCount: ticks(100),  // a sector's resource count is cached this long
   },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
@@ -128,27 +135,32 @@ const CLOCK = {
     wait: ticks(900), spread: ticks(900),         // between two chances of a newcomer
     chance: 0.7, villageChance: 0.85,
   },
-  party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },
+  party: { coalsLast: ticks(6000), foodKeeps: ticks(3000), campAge: days(8) },   // foodKeeps: what the stash keeps is under `food`
   storm: {
     first: ticks(1500), firstSpread: ticks(2000),
     length: ticks(150), lengthSpread: ticks(300),
     gap: ticks(2000), summerGap: ticks(4000), gapSpread: ticks(3000),
   },
   fire: {
-    burn: tickRate(1),           // fuel a burning tile loses
+    burn: tickRate(1),           // fuel a burning tile loses (the pit's rate is `rate.pitBurn`)
     stormQuench: tickRate(2),    // more, in rain
     spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
-    strikeFuel: 240,            // a lightning strike smoulders at least this long at `burn`
+    strikeFuel: ticks(240),      // a lightning strike smoulders at least this long at `burn`
   },
   plant: {
-    samples: 60,                // random tiles looked at each tick. Each chance below is for one look.
-    bushOld: days(60), bushDies: 0.01,
+    samples: tickRate(60),       // random tiles looked at each tick. Each chance below is a chance for one look on one tick.
+    bushOld: days(60), bushDies: tickRate(0.01),
     bushYoung: days(3), bushTired: days(48),
-    berryGrow: { spring: 0.15, summer: 0.25, autumn: 0.35, winter: 0 }, berryWither: 0.15,
-    bushSeedsFrom: days(5), bushSeeds: 0.012,
-    saplingGrown: days(12), shroomGrow: 0.3,
-    pineOld: days(100), pineFalls: 0.03, stickDrops: 0.02,
-    ashHeals: 0.05, saplingSprouts: 0.004,
+    berryGrow: { spring: tickRate(0.15), summer: tickRate(0.25), autumn: tickRate(0.35), winter: tickRate(0) }, berryWither: tickRate(0.15),
+    bushSeedsFrom: days(5), bushSeeds: tickRate(0.012),
+    saplingGrown: days(12), shroomGrow: tickRate(0.3),
+    pineOld: days(100), pineFalls: tickRate(0.03), stickDrops: tickRate(0.02),
+    ashHeals: tickRate(0.05), saplingSprouts: tickRate(0.004),
+    hollowAge: days(300),        // age given to a grove's hollow when the world is made
+    grovePineAge: days(60),      // age given to a grove pine when the world is made
+    grovePineSpread: days(60),   // spread added to a grove pine's age when the world is made
+    treeAgeSpread: days(100),    // age given to a tree when the world is made
+    bushAgeSpread: days(60),     // age given to a bush when the world is made
   },
   thought: {
     journey: ticks(2000), parting: ticks(1200), joined: ticks(1500), newcomer: ticks(800),
