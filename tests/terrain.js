@@ -2,6 +2,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+/* The dark's slow factor, read from the table rather than written as a 2 in the assertions below. */
+const CLOCK_DARK = api => api.CLOCK.dark.slower;
 
 test('the surface is level 0 and the levels below are empty', () => {
   const api = load(); api.startWorld('r');
@@ -369,7 +371,12 @@ function makeCave3(api, x0, y0){
 test('no rain falls under rock, and the ground below stays mild', () => {
   const api = load(); api.startWorld('r'); const x0 = 160, y0 = 62;
   makeCave3(api, x0, y0);
-  api.tick = 60 * 1000 + 100; api.weather.storm = true; api.weather.until = api.tick + 500;
+  /* Day 60 of the old 8-day-season year was winter; the G4 calendar is 365 days with winter from
+     day 274, so the same intent is day 300. The day number was an encoding of "winter" and the
+     encoding changed, so it is rewritten rather than converted. A tenth of the way into the day is
+     02:24, which is night under either calendar. */
+  api.tick = 300 * api.DAY + api.DAY / 10; api.weather.storm = true; api.weather.until = api.tick + api.mins(10);
+  assert.ok(api.isWinter(), 'the test means a winter night');
   const inside = api.firstPerson(); inside.x = x0 + 1; inside.y = y0; inside.z = -1; inside.asleep = false; inside.needs.warmth = 50; inside.thoughts = [];
   api.updateBeing(inside);
   assert.ok(!inside.thoughts.some(t => t.key === 'wet'), 'no rain underground');
@@ -397,12 +404,19 @@ test('below the surface without a brand it is too dark to work, and walking is s
   const out = { type: 'wander', label: 'Feeling for the light', path: [[x0 + 1, y0, -1], [x0, y0, -1], [x0 - 1, y0, 0]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   a.task = out;
   api.updateBeing(a); assert.equal(a.task, out, 'a walk that ends in the light is allowed');
-  /* Set the walker back at the far end of the passage: the speed is measured over two steps, wherever the last task left them. */
+  /* Set the walker back at the far end of the passage: the speed is measured over two steps, wherever
+     the last task left them.
+     Rewritten by G4 task 1, which is the task that changed the walk. A being now moves one tile a
+     tick, and the dark no longer has its own step size: `runTask` simply refuses to move when
+     `tick % CLOCK.dark.slower` is not zero. So the speed shows in HOW LONG two steps take and no
+     longer in how many of four calls move, and the tick has to advance for the rule to be exercised
+     at all. Counting moves alone cannot see this any more: at full speed two steps also take two
+     moves, and the old loop called `runTask` four times on a task that had already ended. */
   a.x = x0 + 2; a.y = y0; a.z = -1;
-  let moved = 0;
   a.task = { type: 'wander', label: 'Feeling along the wall', path: [[x0 + 1, y0, -1], [x0, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
-  for (let k = 0; k < 4; k++){ const bx = a.x; api.runTask(a); if (a.x !== bx) moved++; }
-  assert.equal(moved, 2, 'two steps in four calls: half speed');
+  const from = api.tick - api.tick % CLOCK_DARK(api), moves = [];
+  for (let k = 0; k < 8 && a.task; k++){ api.tick = from + k; const bx = a.x; api.runTask(a); if (a.x !== bx) moves.push(k); }
+  assert.deepEqual(moves, [0, 2], `two steps in the dark fall on the slow ticks; they fell on ${moves.join(', ')}`);
   a.x = x0 + 2; a.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; a.thoughts = [];
   const lit = { type: 'wander', label: 'Going in with a brand', path: [[x0 + 1, y0, -1]], kind: 'wander', stop: 0, started: api.tick, key: 'wander' };
   a.task = lit;

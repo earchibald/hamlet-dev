@@ -53,6 +53,13 @@ const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
    reading is not, and a value that arrives at its task already looking settled is not asked the
    question the task owes it. A marker may be removed, never added. */
 const ticks = n => Math.round(n * 86.4), strides = n => Math.round(n * 172.8), tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+/* `lookRate` is a legacy marker that does not convert, and it is deliberate. A chance for one look
+   is not a chance a tick: the rule draws a number of looks, that count carries the world time, and
+   the chance rides on top of it unchanged. Converting one of these as a chance a tick divides it by
+   86.4 a second time, on top of the look count that was already divided. That is what happened to
+   the plant block in G4 task 1 and it stopped plant growth in the valley. The marker still says
+   nobody has decided what the value should be; it says only that the rebasing must not touch it. */
+const lookRate = p => p;
 
 /* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
    because the seasons are not all the same length.
@@ -213,14 +220,18 @@ const CLOCK = {
     strikeFuel: ticks(240),      // a lightning strike smoulders at least this long at `burn`
   },
   plant: {
-    samples: tickRate(60),       // random tiles looked at each tick. Each chance below is a chance for one look on one tick.
-    bushOld: days(60), bushDies: tickRate(0.01),
+    samples: tickRate(60),       /* Looks a tick, and after the rebasing a fraction: sixty looks an
+                                    old tick is 0.694 looks a world second, so 60,000 looks a world
+                                    day either way. `growPlants` draws a whole number from it.
+                                    Every chance below is a chance for ONE LOOK, so each is marked
+                                    `lookRate` and none of them converts. */
+    bushOld: days(60), bushDies: lookRate(0.01),
     bushYoung: days(3), bushTired: days(48),
-    berryGrow: { spring: tickRate(0.15), summer: tickRate(0.25), autumn: tickRate(0.35), winter: tickRate(0) }, berryWither: tickRate(0.15),
-    bushSeedsFrom: days(5), bushSeeds: tickRate(0.012),
-    saplingGrown: days(12), shroomGrow: tickRate(0.3),
-    pineOld: days(100), pineFalls: tickRate(0.03), stickDrops: tickRate(0.02),
-    ashHeals: tickRate(0.05), saplingSprouts: tickRate(0.004),
+    berryGrow: { spring: lookRate(0.15), summer: lookRate(0.25), autumn: lookRate(0.35), winter: lookRate(0) }, berryWither: lookRate(0.15),
+    bushSeedsFrom: days(5), bushSeeds: lookRate(0.012),
+    saplingGrown: days(12), shroomGrow: lookRate(0.3),
+    pineOld: days(100), pineFalls: lookRate(0.03), stickDrops: lookRate(0.02),
+    ashHeals: lookRate(0.05), saplingSprouts: lookRate(0.004),
     hollowAge: days(300),        // age given to a grove's hollow when the world is made
     grovePineAge: days(60),      // age given to a grove pine when the world is made
     grovePineSpread: days(60),   // spread added to a grove pine's age when the world is made

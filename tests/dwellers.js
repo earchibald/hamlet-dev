@@ -24,7 +24,9 @@ test('some soak seed digs dens for the foxes and the wolves that were made', () 
   assert.ok(seedWithDen('wolf'), 'no soak seed has a wolf in a den');
   assert.ok(seedWithDen('fox'), 'no soak seed has a fox in a den');
 });
-const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
+/* `n` is a budget in ticks of the old 1000-tick day, which is what every caller is written in.
+   G4 task 1 converts it here so no call site had to be re-read. */
+const run = (api, b, n) => { for (let k = 0, b2 = api.ticks(n); k < b2 && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
 const inDen = (b) => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
 
 test('a wolf rests in its den by day', ctx => {
@@ -32,10 +34,10 @@ test('a wolf rests in its den by day', ctx => {
   const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.rest = 30;
-  api.tick = 10 * 1000 + 500; /* midday */
+  api.tick = api.ticks(10 * 1000 + 500); /* midday */
   /* A wolf that has slept its fill leaves the den again, so the run stops at the rest, not at a fixed tick. */
   let rested = false;
-  for (let k = 0; k < 400 && !rested; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; rested = inDen(b) && b.needs.rest > 30; }
+  for (let k = 0, b2 = api.ticks(400); k < b2 && !rested; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; rested = inDen(b) && b.needs.rest > 30; }
   assert.ok(rested, `the wolf should be home and resting; it is at ${b.x},${b.y},${b.z} doing ${b.task && b.task.label} with rest ${Math.round(b.needs.rest)}`);
 });
 
@@ -44,11 +46,11 @@ test('a wolf carries a kill home to its den before eating', ctx => {
   const { api, b, den } = home;
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
-  api.tick = 22 * 1000 + 100; /* night */
+  api.tick = api.ticks(22 * 1000 + 100); /* night */
   const r = api.beings.find(o => o.species === 'rabbit' && o.alive); r.x = out.x + 2; r.y = out.y; r.z = 0; r.task = null;
   for (const t of [[out.x + 1, out.y], [out.x + 2, out.y]]){ const q = api.tileAt(...t); q.feature = null; q.struct = null; if (q.ground === 'water') q.ground = 'grass'; }
   let carried = false;
-  for (let k = 0; k < 400 && !(carried && !b.carrying); k++){ api.camp = api.camps[0]; api.updateBeing(b); if (b.carrying && b.carrying.kind === 'carcass') carried = true; api.tick = api.tick + 1; }
+  for (let k = 0, b2 = api.ticks(400); k < b2 && !(carried && !b.carrying); k++){ api.camp = api.camps[0]; api.updateBeing(b); if (b.carrying && b.carrying.kind === 'carcass') carried = true; api.tick = api.tick + 1; }
   assert.ok(carried, 'the wolf never picked up the kill');
   assert.equal(b.carrying, null, 'the kill was eaten at home');
   assert.ok(inDen(b), 'eaten in the den');
@@ -62,11 +64,11 @@ test('a wolf eats a kill where it fell when the den floor is unreachable', ctx =
   const out = den.exit; b.x = out.x; b.y = out.y; b.z = 0; b.task = null; b.asleep = false;
   b.den = Object.assign({}, den, { tiles: [] }); /* no floor tile to carry the kill to */
   for (const k in b.needs) b.needs[k] = 90; b.needs.food = 20;
-  api.tick = 22 * 1000 + 100; /* night */
+  api.tick = api.ticks(22 * 1000 + 100); /* night */
   const r = api.beings.find(o => o.species === 'rabbit' && o.alive); r.x = out.x + 2; r.y = out.y; r.z = 0; r.task = null;
   for (const t of [[out.x + 1, out.y], [out.x + 2, out.y]]){ const q = api.tileAt(...t); q.feature = null; q.struct = null; if (q.ground === 'water') q.ground = 'grass'; }
   let killed = false;
-  for (let k = 0; k < 400 && !killed && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); killed = !r.alive; api.tick = api.tick + 1; }
+  for (let k = 0, b2 = api.ticks(400); k < b2 && !killed && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); killed = !r.alive; api.tick = api.tick + 1; }
   assert.ok(killed, 'the wolf never made the kill');
   assert.equal(b.carrying, null, 'nothing left carried when the den could not be reached');
   assert.equal(b.needs.food, 100, 'the wolf ate the kill where it fell');
@@ -118,14 +120,14 @@ test('a den with two adults bears one young in spring, once a year', ctx => {
   const { api, den } = home;
   const adults = api.beings.filter(b => b.alive && b.species === 'wolf' && b.den === den);
   assert.equal(adults.length, 2);
-  api.tick = 1000; /* spring, and before either den wolf on seed r ages into 'old' */
+  api.tick = api.ticks(1000); /* spring, and before either den wolf on seed r ages into 'old' */
   for (const w of adults){ const t = den.tiles[0]; w.x = t.x; w.y = t.y; w.z = t.z; }
   const before = api.beings.filter(b => b.species === 'wolf').length;
-  api.denTick(); api.tick = api.tick + 500; api.denTick();
+  api.denTick(); api.tick = api.tick + api.ticks(500); api.denTick();
   const after = api.beings.filter(b => b.species === 'wolf').length;
   assert.equal(after, before + 1, 'one pup, not two');
   const pup = api.beings[api.beings.length - 1];
-  assert.equal(pup.den, den); assert.equal(pup.born, api.tick - 500); assert.ok(inDen(pup));
+  assert.equal(pup.den, den); assert.equal(pup.born, api.tick - api.ticks(500)); assert.ok(inDen(pup));
   assert.ok(api.chronicle.some(e => e.text.includes('pup') || e.text.includes('kit')));
 });
 
@@ -134,7 +136,7 @@ test('a person who walks into a wolf den is attacked, brand or no brand, by day'
   const { api, b, den } = home;
   const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); b.x = t.x; b.y = t.y; b.z = t.z; b.task = null; b.asleep = false;
   for (const k in b.needs) b.needs[k] = 90;
-  api.tick = 10 * 1000 + 500;
+  api.tick = api.ticks(10 * 1000 + 500);
   const h = api.firstPerson(); h.x = t.x; h.y = t.y; h.z = t.z; h.carrying = { kind: 'ember', count: 1, dies: api.tick + 400 }; h.hp = 100; h.thoughts = [];
   api.camp = api.camps[0]; api.updateBeing(b);
   assert.ok(h.hp < 100, 'the wolf should have bitten');
@@ -149,7 +151,7 @@ test('one bite per den per 150 ticks: two adult wolves at home only bite once be
   assert.equal(owners.length, 2, 'the wolf den on seed r starts with two grown owners');
   const t = den.tiles.find(t => api.passable(t.x, t.y, t.z));
   for (const w of owners){ w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; w.cooldown = {}; }
-  api.tick = 10 * 1000 + 500;
+  api.tick = api.ticks(10 * 1000 + 500);
   const h = api.firstPerson(); h.x = t.x; h.y = t.y; h.z = t.z; h.hp = 60; h.thoughts = [];
   api.camp = api.camps[0];
   for (const w of owners) api.updateBeing(w);
@@ -163,17 +165,20 @@ test('a cross sprite steals a pot, and a pleased one leaves cord on the stone', 
   c.fae.known = true; c.fae.favor = -30; c.stash.pot = 1; c.stash.berries = 5; c.fae.lastPrank = 0;
   const sp = api.beings.find(b => b.species === 'sprite');
   sp.x = c.stashTile[0]; sp.y = c.stashTile[1]; sp.z = 0; sp.task = null;
-  api.tick = 22 * 1000;
+  api.tick = api.ticks(22 * 1000);
   let stolen = false;
   for (let k = 0; k < 40 && !stolen; k++){ c.stash.pot = 1; c.fae.lastPrank = 0; api.startTask(sp, 'prank'); api.taskStop(sp); stolen = c.stash.pot === 0; }
   assert.ok(stolen, 'the pot was never taken in forty pranks');
   assert.ok(api.chronicle.some(e => e.text.includes('pot is gone')));
-  /* The sprites leave nothing on a stone that already has something on it, so the tile is cleared first. */
+  /* The sprites leave nothing on a stone that already has something on it, so the tile is cleared first.
+     The watch is wound to one tick short of the gift, which the rule spends as `++t.progress ===
+     CLOCK.sprite.visitGift`. That was written as a bare 119 and G4 task 1 made the gift 10,368 ticks
+     rather than 120, so the number is now read from the table and cannot rot again. */
   c.fae.favor = 50; c.stone = [c.pit[0] + 3, c.pit[1]];
   for (const i of api.items.filter(i => i.x === c.stone[0] && i.y === c.stone[1] && i.z === 0)) api.removeItem(i);
   api.tileAt(...c.stone).struct = { type: 'stone', camp: c, offering: 0 };
   let cord = false;
-  for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.startTask(sp, 'watch'); sp.task.progress = 119; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; api.taskStop(sp); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
+  for (let k = 0; k < 40 && !cord; k++){ sp.task = null; api.startTask(sp, 'watch'); sp.task.progress = api.CLOCK.sprite.visitGift - 1; sp.x = c.pit[0] + 5; sp.y = c.pit[1]; api.taskStop(sp); cord = !!api.items.find(i => i.kind === 'cord' && i.x === c.stone[0] && i.y === c.stone[1]); for (const i of api.items.filter(i => i.kind === 'moss' && i.x === c.stone[0])) api.removeItem(i); }
   assert.ok(cord, 'no cord on the stone in forty nights');
   assert.ok(api.chronicle.some(e => e.text.includes('coil of cord lies')));
 });
@@ -187,7 +192,7 @@ test('a wolf raid takes fish as it takes meat', () => {
   let w = api.beings.find(b => b.species === 'wolf');
   if (!w){ w = api.makeBeing('wolf', c.stashTile[0], c.stashTile[1], null, 0); api.beings.push(w); }
   w.x = c.stashTile[0]; w.y = c.stashTile[1]; w.z = 0; w.task = null; w.needs.food = 20; w.cooldown = {};
-  api.tick = 22 * 1000;
+  api.tick = api.ticks(22 * 1000);
   assert.ok(api.startTask(w, 'raid'), 'the raid should start with fish in the stash');
   api.taskStop(w);
   assert.equal(c.stash.fish, 1);
@@ -198,7 +203,7 @@ test('a wolf raid takes fish as it takes meat', () => {
    the wolves are put there by hand, and the other people are taken out of the valley so the victim is alone. */
 function lonePerson(){
   const api = load(); api.startWorld('r');
-  api.tick = 22 * 1000;                       // hour 0, which is night
+  api.tick = api.ticks(22 * 1000);                       // hour 0, which is night
   const h = api.firstPerson();
   for (const o of api.beings) if (o.species === 'human' && o !== h) o.alive = false;
   h.hp = 100; h.thoughts = []; h.carrying = null; h.cooldown = {}; h.task = null; h.asleep = false;

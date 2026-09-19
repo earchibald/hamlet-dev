@@ -132,9 +132,14 @@ test('a brand task with no next step ends with no live ember', () => {
 test('every offer is data', () => {
   const api = load(); api.startWorld('r');
   const seen = new Set();
-  for (let k = 0; k < 9000; k++){
+  /* Nine days of the old 1000-tick day, sampled every 50 old ticks. Both convert, so the run covers
+     the same nine world days and takes the same number of samples as it always did. Renumbering only
+     the bound would have sampled 86.4 times as often; renumbering neither left the test watching a
+     tenth of one day, which is why it saw too few kinds and went red. */
+  const span = api.ticks(9000), every = api.ticks(50);
+  for (let k = 0; k < span; k++){
     api.step();
-    if (k % 50) continue;
+    if (k % every) continue;
     for (const h of api.humans()){ api.camp = h.camp; if (!h.camp) continue;
       for (const o of api.offersFor(h)){ seen.add(o.task && o.task.kind); assert.deepEqual(plain(o, 'offer'), [], o.label); assert.ok(api.TASKS[o.task.kind], o.label); } }
   }
@@ -157,7 +162,8 @@ test('two people may break one fallen rock, and the second to finish does not fa
   second.camp = first.camp; api.beings.push(second); api.camp = first.camp;
   if (!api.camp.stashTile) api.camp.stashTile = [first.x, first.y];
   for (const p of [first, second]){ api.failTask(p); p.x = spot[0]; p.y = spot[1]; p.z = spot[2]; assert.ok(api.startTask(p, 'clearRock', { cave, rock }), 'the work starts'); assert.deepEqual(plain(p.task), []); }
-  for (let k = 0; k < 400 && (first.task || second.task); k++) for (const p of [first, second]) if (p.task && p.task.kind === 'clearRock' && p.task.stop === 0) api.runTask(p); else if (p.task) api.failTask(p);
+  /* 400 ticks of the old day, converted: the work takes the same world time it always did. */
+  for (let k = 0, b = api.ticks(400); k < b && (first.task || second.task); k++) for (const p of [first, second]) if (p.task && p.task.kind === 'clearRock' && p.task.stop === 0) api.runTask(p); else if (p.task) api.failTask(p);
   assert.equal(c.blocked, null); assert.equal(api.tileAt(...rock).ground, 'stone');
 });
 

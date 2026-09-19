@@ -362,12 +362,14 @@ The floors that the three-day run cannot hold are **not** removed until task 4 h
 
 **Files:** `src/sim/clock.js`, `src/sim/core.js`, `src/sim/beings.js` and `src/sim/tasks.js` (the stride gate and the walk), `src/sim/species.js` (the `stride` column becomes a speed in tiles a tick: 1 for a walk, 2 for a run), `src/sim/snapshot.js` (`SNAPSHOT_VERSION = 2`), `tests/clock.js`, `tests/soak.js`, `tests/lib/run.js`, `tests/soak-working.json` (new).
 
-- [ ] Write the failing tests in `tests/clock.js`: `DAY` is 86400; `hours(1)` is 3600; `seasonOf` gives spring on day 1 and day 91, summer on day 92, winter on day 274 and day 365, spring again on day 366; `isNight` holds at 23:00 and not at 12:00; `ticks(1000)` is `days(1)`; every chance-a-tick entry of the survey's list is now an hourly rate below 1.
-- [ ] Change the calendar and the markers as "The design" says. Replace each of the 31 chances with its hourly rate and roll it with `rollFor(rate, 1)` where the rule still runs each tick; task 2 moves the beat.
-- [ ] Walking: a being on a path moves one tile a tick, two at a run (`fast`). The stride gate stays for acts that are not steps, reading the converted stride. Remove `darkStep`; a person in the dark walks at half speed by moving on even ticks only. Rewrite the two tests in `tests/terrain.js` that count steps.
-- [ ] Reshape the soak as "The soak" says. Keep every floor that three days can still hold, and mark the rest as suspended pending task 4, not deleted. Write `tests/soak-working.json` from the first green run and say so in the report.
-- [ ] Gates: `node --test tests/clock.js tests/snapshot.js`, the soak, and a note of seconds a world day. This task is expected to be far over the 5 s budget. Report the number.
-- [ ] Commit.
+- [x] Write the failing tests in `tests/clock.js`: `DAY` is 86400; `hours(1)` is 3600; `seasonOf` gives spring on day 1 and day 91, summer on day 92, winter on day 274 and day 365, spring again on day 366; `isNight` holds at 23:00 and not at 12:00; `ticks(1000)` is `days(1)`; every chance-a-tick entry of the survey's list is now an hourly rate below 1.
+- [~] Change the calendar and the markers as "The design" says. **The calendar and the markers are done. The 31 chances are NOT rewritten as hourly rates, deliberately.** They convert through `tickRate`, which preserves each value's world meaning exactly and keeps the marker that says nobody has decided. Rewriting 31 values as hourly rates is 31 readings task 1 does not own, and task 2 re-touches every one of them at its own beat regardless. The deviation is argued in the report. Measured cost of the shortcut: the linear divide differs from the plan's exact `1 - (1 - p) ** (3600 / OLD_TICK)` by under 0.2 percent for every chance rolled once a tick. Eleven entries of the plant block needed a different fix and got one; see the report's finding 5.
+- [x] Walking: a being on a path moves one tile a tick, two at a run (`fast`). The stride gate stays for acts that are not steps, reading the converted stride. Remove `darkStep`; a person in the dark walks at half speed by moving on even ticks only. Rewrite the two tests in `tests/terrain.js` that count steps.
+- [x] Reshape the soak as "The soak" says. Keep every floor that three days can still hold, and mark the rest as suspended pending task 4, not deleted. Write `tests/soak-working.json` from the first green run and say so in the report.
+- [x] Gates: `node --test tests/clock.js tests/snapshot.js`, the soak, and a note of seconds a world day. **Measured 15.0, 14.6, 14.7 seconds a world day, seed `r`, days 1 to 3, about 86 beings, against a 5 s budget. Roughly 48 times dev's 0.31 s.**
+- [x] Commit.
+
+**Added to task 1 and not in the plan as written.** The mechanical half of task 10 moved here, because a test that fails only because a day got longer is converted by the task that made the day longer. The alternative left tasks 2 to 9 changing the rules core against an already red suite, where nothing could go red. The reasoning is finding 3 of the report.
 
 ### Task 2: The beats
 

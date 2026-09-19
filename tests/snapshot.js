@@ -429,14 +429,19 @@ test('a world saved before anybody living has named a thing round-trips whole', 
 });
 /* The versioning policy again: a save written before the naming work holds none of these fields, and
    the loader seeds the name stream as a fresh world does. Such a save names no water, no pond, and no
-   crossing, so no tile of it points at one. */
-test('a version 1 save written before the names loads, and the world starts its names afresh', () => {
+   crossing, so no tile of it points at one.
+   G4 task 1 rebased this test from version 1 to version 2. The version rose because the meaning of
+   `tick` changed, so a version 1 save is now refused outright, which the refusal test below asserts.
+   What this test is about is not the number: it is that the decoder tolerates a save missing fields
+   added after it was written. That policy did not change with the version, so the test follows the
+   version up rather than being deleted with it. */
+test('a save written before the names loads, and the world starts its names afresh', () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   for (const k of ['nrng', 'lore', 'tongue', 'valley', 'river', 'stillWater', 'ponds', 'fords']) delete old[k];
   for (const lv of old.levels) for (const t of lv){ if (!t) continue; delete t.water; delete t.pond; delete t.ford; }
   for (const list of ['hills', 'caves', 'sectors', 'groves', 'camps', 'beings', 'lines'])
     for (const r of old[list]){ delete r.names; delete r.nameKnown; delete r.epithet; delete r.epithets; }
-  assert.equal(old.version, 1);
+  assert.equal(old.version, api.SNAPSHOT_VERSION);
   assert.equal(api.loadSnapshot(old), null);
   assert.equal(api.lore, null);
   assert.equal(api.nameOf(api.valley), null);
@@ -516,12 +521,13 @@ test('a save carries who the player is and whether they have been told', () => {
   assert.deepEqual(back.inhabited, marked.inhabited);
   assert.equal(back.inhabitedTold, true);
 });
-/* The versioning policy: a field added after version 1 is read as optional, with the value a world
-   that never had it holds. The version stays 1, so a rebuilt page does not refuse every autosave. */
-test('a version 1 save written before Become loads, and the player is nobody', () => {
+/* The versioning policy: a field added after the current version is read as optional, with the value
+   a world that never had it holds. The version does not rise for a new field, so a rebuilt page does
+   not refuse every autosave. It rises only when a saved field changes meaning, as `tick` did in G4. */
+test('a save written before Become loads, and the player is nobody', () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   delete old.inhabited; delete old.inhabitedTold; delete old.strayGroves;
-  assert.equal(old.version, 1);
+  assert.equal(old.version, api.SNAPSHOT_VERSION);
   assert.equal(api.loadSnapshot(old), null);
   assert.equal(api.inhabited, null);
   assert.equal(api.inhabitedTold, false);
@@ -626,10 +632,15 @@ test('a save that would kill the page a step later is refused, and the world sta
   assert.equal(api.loadSnapshot(through(good)), null);
   for (let i = 0; i < 200; i++) api.step();
 });
+/* A version 1 save is refused, and this is the test that says so. G4 task 1 made a tick 86.4 world
+   seconds, so a version 1 save holds a tick and every stamp beside it meaning 86.4 times less. No
+   per-field default rescues that, so the save is refused whole rather than read wrong. */
 test('the version refusal names both versions, and a version that is no number says so plainly', () => {
   const api = load(), good = through(lateWorld().takeSnapshot());
-  assert.equal(api.loadSnapshot({ ...good, version: 2 }), 'This save is version 2. This world reads version 1.');
-  assert.equal(api.loadSnapshot({ ...good, version: '1' }), 'This file is not a save this world can read.');
+  assert.equal(api.SNAPSHOT_VERSION, 2);
+  assert.equal(api.loadSnapshot({ ...good, version: 1 }), 'This save is version 1. This world reads version 2.');
+  assert.equal(api.loadSnapshot({ ...good, version: 3 }), 'This save is version 3. This world reads version 2.');
+  assert.equal(api.loadSnapshot({ ...good, version: '2' }), 'This file is not a save this world can read.');
   assert.equal(api.loadSnapshot({ ...good, version: null }), 'This file is not a save this world can read.');
 });
 test('a refused load keeps the reason it threw, and a load that lands clears it', () => {

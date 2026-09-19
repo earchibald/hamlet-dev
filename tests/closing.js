@@ -27,13 +27,17 @@ function readyDenCamp(){ const s = seedWithWolfDen(); return s ? readyCamp(s) : 
 
 test('some soak seed digs a wolf den', () => { assert.ok(seedWithWolfDen(), 'no soak seed digs a wolf den'); });
 
+/* `ticks` is a budget in ticks of the old 1000-tick day, which is what every caller below was
+   written in. G4 task 1 made a tick one world second, so the budget converts here rather than at
+   each call site: the world time each caller meant is unchanged, and no caller had to be re-read. */
 function doOffer(api, a, label, ticks = 2000){
   const o = api.offersFor(a).find(o => o.label === label || o.label.startsWith(label));
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
   assert.ok(api.startTask(a, o.task.kind, o.task.args), `offer "${label}" would not start`);
   a.task.started = api.tick; a.task.key = label;
-  for (let k = 0; k < ticks && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
-  assert.equal(a.task, null, `"${label}" did not finish in ${ticks} ticks`);
+  const budget = api.ticks(ticks);
+  for (let k = 0; k < budget && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
+  assert.equal(a.task, null, `"${label}" did not finish in ${ticks} old ticks, which is ${(budget / api.DAY).toFixed(1)} world days`);
 }
 /* Move the camp near a cave's exit so the walk is short. `gap` is how far off the exit the site sits: two tiles
    for a cave nobody lives in, and further for a den, so a wolf standing in its own mouth is not already a threat
@@ -61,7 +65,7 @@ test('a brave person takes a brand, walks to the deep chamber, and brings the fi
   const cave = api.caves.find(k => k.kind === 'water' && !k.blocked); assert.ok(cave, 'an open water cave on seed r');
   campByCave(api, c, a, cave);
   const find = api.items.find(i => i.x === cave.deep.x && i.y === cave.deep.y && i.z === -2); assert.ok(find);
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   assert.equal(api.goalState(api.GOALS.find(g => g.id === 'caves')).s, 'active');
   doOffer(api, a, 'search the cave with a brand', 3000);
   assert.equal(cave.searched, c);
@@ -79,11 +83,11 @@ test('a cave is claimed once the search begins; interrupted, it releases and not
   campByCave(api, c, a, cave);
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.9; mate.homeless = false; mate.hp = 100;
   api.beings.push(mate);
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   const o = api.offersFor(a).find(o => o.label === 'search the cave with a brand');
   assert.ok(o, 'no search offer'); assert.ok(api.startTask(a, o.task.kind, o.task.args));
   a.task.started = api.tick; a.task.key = 'search the cave with a brand';
-  for (let k = 0; k < 3000 && a.task && a.task.type !== 'search'; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
+  for (let k = 0, b = api.ticks(3000); k < b && a.task && a.task.type !== 'search'; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.ok(a.task && a.task.type === 'search', 'never reached the search task');
   assert.equal(cave.claimed, a.id, 'the cave is claimed while the search runs');
   assert.ok(!api.offersFor(mate).some(o => o.label === 'search the cave with a brand'), 'a claimed cave still offers a search to a second person');
@@ -104,7 +108,7 @@ test('fallen rock is cleared with the axe before the search', () => {
   /* A mark-painted world can put a second cave within reach of the same camp. The others count as searched, so
      the only cave on offer is the one with rock in it. */
   for (const k of api.caves) if (k !== cave && k.kind === 'water') k.searched = c;
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   const labels = api.offersFor(a).map(o => o.label);
   assert.ok(labels.includes('clear the fallen rock'), labels.join(', ')); assert.ok(!labels.includes('search the cave with a brand'));
   doOffer(api, a, 'clear the fallen rock', 3000);
@@ -119,18 +123,18 @@ test('two brave people with brands and the spear clear a wolf den; the wolves di
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   assert.equal(api.goalState(api.GOALS.find(g => g.id === 'dens')).s, 'active');
   doOffer(api, a, 'clear the den with brands', 3000);
   assert.equal(den.cleared, c);
   for (const w of wolves) assert.equal(w.den, null);
   assert.ok(api.chronicle.some(e => e.text.includes('drive the wolves')));
   /* Three days on, the wolves have a new den on another hill. */
-  api.tick = api.tick + 3 * 1000 + 10; for (let k = 0; k < 4; k++){ api.tick = api.tick + 500; api.denTick(); }
+  api.tick = api.tick + api.ticks(3 * 1000 + 10); for (let k = 0; k < 4; k++){ api.tick = api.tick + api.ticks(500); api.denTick(); }
   const fresh = wolves[0].den; assert.ok(fresh && fresh !== den && fresh.hill !== den.hill, 'a new den on another hill');
   /* The fire goes out for a day: the old den goes back to wolves. */
   api.tileAt(...c.pit).struct.lit = false; c.outSince = api.tick - 1000 - 1;
-  for (let k = 0; k < 2; k++){ api.tick = api.tick + 500; api.denTick(); }
+  for (let k = 0; k < 2; k++){ api.tick = api.tick + api.ticks(500); api.denTick(); }
   assert.equal(den.cleared, null);
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
 });
@@ -143,13 +147,13 @@ test('a den reverts to homeless owners too, when the fire fails before they redi
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   doOffer(api, a, 'clear the den with brands', 3000);
   assert.equal(den.cleared, c);
   for (const w of wolves) assert.equal(w.den, null);
   /* The fire goes out for a day, well within the three-day redig window: the homeless owners come home. */
   api.tileAt(...c.pit).struct.lit = false; c.outSince = api.tick - 1000 - 1;
-  for (let k = 0; k < 2; k++){ api.tick = api.tick + 500; api.denTick(); }
+  for (let k = 0; k < 2; k++){ api.tick = api.tick + api.ticks(500); api.denTick(); }
   assert.equal(den.cleared, null);
   for (const w of wolves) assert.equal(w.den, den);
   assert.ok(api.chronicle.some(e => e.text.includes('back in the den')));
@@ -163,7 +167,7 @@ test('the party keeps its brands lit until home, and the guard goal leaves a jus
   const mate = api.makeBeing('human', a.x, a.y, 'Mate', 0); mate.camp = c; mate.traits.bravery = 0.8; mate.homeless = false; mate.hp = 100; api.beings.push(mate);
   const wolves = api.beings.filter(b => b.species === 'wolf' && b.den === den);
   for (const w of wolves){ const t = den.tiles.find(t => api.passable(t.x, t.y, t.z)); w.x = t.x; w.y = t.y; w.z = t.z; w.task = null; }
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   const o = api.offersFor(a).find(o => o.label.startsWith('clear the den with brands'));
   assert.ok(o, 'no den-clearing offer'); assert.ok(api.startTask(a, o.task.kind, o.task.args));
   a.task.started = api.tick; a.task.key = 'clear the den with brands';
@@ -191,7 +195,7 @@ test('the party keeps its brands lit until home, and the guard goal leaves a jus
 
 test('withBrand ends with no live ember when the chain does not start', () => {
   const { api, a, c } = readyCamp();
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   api.TASKS.never = { type: 'work', begin: () => false, stops: [() => 'done'] };
   assert.ok(api.withBrand(a, 'Testing', { kind: 'never', args: {} }));
   for (let k = 0; k < 20 && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
@@ -212,10 +216,10 @@ test('a walled-off mate carries no ember, and an ember can never be stashed', ct
   assert.ok(iso, 'no open tile far from the leader');
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ if (!api.hasTile(iso.x + dx, iso.y + dy, 0)) continue; const q = api.tileAt(iso.x + dx, iso.y + dy, 0); q.ground = 'water'; q.feature = null; q.struct = null; }
   mate.x = iso.x; mate.y = iso.y; mate.z = 0;
-  api.tick = 9 * 1000;
+  api.tick = api.ticks(9 * 1000);
   assert.ok(api.startClearDen(a, den), 'the leader\'s walk to the fire should still start');
   a.task.started = api.tick; a.task.key = 'clear the den with brands';
-  for (let k = 0; k < 3000 && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
+  for (let k = 0, b = api.ticks(3000); k < b && a.task; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null, 'the leader\'s task never ended');
   assert.equal(a.carrying, null, 'the leader is left holding an ember after the chain failed');
   assert.equal(mate.carrying, null, 'the mate holds an ember though its own leg never started');

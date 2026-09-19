@@ -94,6 +94,12 @@ test('every marker converts the old clock, and none is an identity', () => {
   assert.equal(api.tickRate(86.4), 1);
   assert.equal(api.strideRate(172.8), 1);
   assert.ok(Math.abs(api.tickRate(0.0006) * api.days(1) - 0.6) < 1e-9, 'a chance a tick no longer means what it meant a day');
+  /* `lookRate` is the one identity, and it is named here so that the title above stays true. A
+     chance for one look is not a chance a tick: the rule draws a number of looks, and that count
+     already carries the world time. Converting such a chance divides it a second time. Adding a
+     marker that does nothing is otherwise the mistake this test exists to catch, so the exception
+     is written down rather than left to the absence of an assertion. */
+  assert.equal(api.lookRate(0.35), 0.35);
 });
 
 /* A duration is a whole number of world seconds, because rules compare durations with `%` and a
@@ -297,4 +303,40 @@ test('every event chance names a roll the lint would flag, in the file it names'
   }
   const dead = EVENT_CHANCES.filter(e => !found.has(e.file + '\0' + e.text));
   assert.deepEqual(dead, []);
+});
+
+/* G4 task 1, the second regression of its kind, and the reason this gate is behavioural rather than
+   a lint. `CLOCK.plant.samples` is looks a tick. The rebasing made it 0.694, a `for` bound truncated
+   it to one, and every per-look chance beside it had been divided by 86.4 as though it were a chance
+   a tick. Neither half was visible: the table's values all checked out, the soak stayed green, and
+   the valley quietly stopped growing. Measured against this same call over a tenth of a world day:
+   24 berries on dev, 0 before the fix, 23 after. A lint on the table would have passed on both sides
+   of the fault, because the fault was in how the numbers were used and not in what they were. So the
+   gate runs the rule and asks whether it still happens. */
+test('growPlants still grows: a tenth of a world day makes berries', () => {
+  const api = load();
+  api.startWorld('r', {});
+  const berries = () => api.world.reduce((s, t) => s + (t.berries || 0), 0);
+  const before = berries();
+  /* The rule is called on its own, with the tick driven by hand, so that the count is the growth
+     the rule makes and not growth net of what the people of the valley eat. The tick must move
+     because the look count is a closed form of it. */
+  const from = api.tick;
+  for (let i = 0; i < api.DAY / 10; i++){ api.tick = from + i; api.growPlants(); }
+  const gained = berries() - before;
+  assert.ok(gained >= 10, `a tenth of a world day grew ${gained} berries, and dev grows about 24`);
+});
+
+/* The look count is the other half, and it is checked on its own so that a failure says which half
+   broke. Sixty looks an old tick of 86.4 world seconds is 60,000 looks a world day, whatever a tick
+   is now worth. A chance for one look rides on this count and must never be converted again. */
+test('the plant block looks at sixty thousand tiles a world day, and its chances are per look', () => {
+  const api = load();
+  assert.ok(Math.abs(api.CLOCK.plant.samples * api.DAY - 60000) / 60000 < 0.02,
+    `the plant block looks at ${Math.round(api.CLOCK.plant.samples * api.DAY)} tiles a world day, not 60,000`);
+  const src = fs.readFileSync(path.join(SIM, 'clock.js'), 'utf8');
+  const block = src.slice(src.indexOf('plant: {'), src.indexOf('hollowAge'));
+  const converted = [...block.matchAll(/(\w+):\s*tickRate\(/g)].map(m => m[1]).filter(k => k !== 'samples');
+  assert.deepEqual(converted, [],
+    `these are chances for one look and must be marked lookRate, not tickRate: ${converted.join(', ')}`);
 });

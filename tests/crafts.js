@@ -15,14 +15,18 @@ function readyCamp(seed = 'r'){
   for (const k in a.needs) a.needs[k] = 90;
   return { api, a, c };
 }
-/* Take one offer by label and run the person until the task ends or 600 ticks pass. */
+/* Take one offer by label and run the person until the task ends or the budget runs out. The budget
+   was 600 ticks of the old 1000-tick day. G4 task 1 made a tick one world second, so the same budget
+   in world time is `ticks(600)`, about 14 hours. It is converted rather than renumbered: 600 was
+   never a considered figure, only "long enough for any craft", and it still says that. */
 function doOffer(api, a, label){
   const o = api.offersFor(a).find(o => o.label === label);
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
   assert.ok(api.startTask(a, o.task.kind, o.task.args), `offer "${label}" would not start`);
   a.task.started = api.tick; a.task.key = label;
-  for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
-  assert.equal(a.task, null, `"${label}" did not finish in 600 ticks`);
+  const budget = api.ticks(600);
+  for (let k = 0; k < budget && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  assert.equal(a.task, null, `"${label}" did not finish in ${budget} ticks, which is ${(budget / api.DAY).toFixed(1)} world days`);
 }
 const goal = (api, id) => api.GOALS.find(g => g.id === id);
 
@@ -72,10 +76,10 @@ test('a basket lets a gatherer carry three more', () => {
   for (let k = 0; k < 12; k++) api.addItem('stick', c.stashTile[0] + 3 + (k % 4), c.stashTile[1] + 2 + Math.floor(k / 4));
   for (const t of api.world) if (t.struct === null && Math.abs(t.x - c.stashTile[0]) <= 8 && Math.abs(t.y - c.stashTile[1]) <= 8){ t.feature = null; if (t.ground === 'water') t.ground = 'grass'; }
   a.skills.gather = 0; c.stash.stick = 0;
-  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0; k < 400 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0, b = api.ticks(400); k < b && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(c.stash.stick, 3, 'three sticks a trip without a basket');
   c.tools.basket = 1; c.stash.stick = 0;
-  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0; k < 600 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
+  api.startTask(a, 'gather', { item: 'stick' }); for (let k = 0, b = api.ticks(600); k < b && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(c.stash.stick, 6, 'six a trip with a basket');
 });
 
@@ -123,7 +127,7 @@ test('hide clothes go to the coldest person and keep them warmer', () => {
   doOffer(api, a, 'sew hide clothes');
   assert.equal(a.clothes, true); assert.equal(c.stash.hide, 0);
   assert.equal(api.goalState(goal(api, 'clothes')).s, 'idle', 'everyone is clothed');
-  api.tick = 60 * 1000 + 100; /* a winter night */
+  api.tick = api.ticks(60 * 1000 + 100); /* a winter night */
   const bare = api.beings.find(b => b.species === 'human' && b !== a) || api.makeBeing('human', a.x, a.y, 'Test', 0);
   if (!api.beings.includes(bare)) api.beings.push(bare);
   bare.camp = c; bare.clothes = false; bare.needs.warmth = 60; a.needs.warmth = 60; bare.x = a.x; bare.y = a.y; bare.z = 0; bare.traits.hardiness = a.traits.hardiness; bare.homeless = false; bare.asleep = false; a.asleep = false; bare.born = a.born;
