@@ -236,7 +236,23 @@ function theLoneFounder(){
   if (camps.some(c => c.overTheHills && humans().some(h => h.camp === c))) return;
   const here = secOf(last.x, last.y);
   const cands = campSites().map(s => ({ s, sc: dist(s.sx, s.sy, here.sx, here.sy) + rng() })).sort((p, q) => q.sc - p.sc);
-  if (!cands.length) return;
+  /* No founding site anywhere, because the valley is short of loose rock, sticks, or water within
+     reach. That is a passing state, not a settled one: loose items come and go as the world runs, so
+     the ground the rule wants may be there tomorrow. Look again soon rather than every tick, the way
+     a driven-out wolf that finds no hill waits `CLOCK.den.digRetry` instead of digging at the world
+     every tick. The full stretch would be wrong here: it would hold the founder back for up to ten
+     days after the ground came good, in the one case this rule exists for.
+     The wait is restarted, not cleared. `doomAt` carries two meanings and has no third. Zero means
+     the wait is over and a founder arrived. A tick ahead means the wait is running. Nothing in it
+     says "the wait ran out and nothing could be done", so a failure has to borrow the second meaning,
+     and a short value fits that meaning exactly. Clearing it looks obviously right and is wrong: zero
+     sends the next tick back into the branch above, where the hermit is still alone beside a cold
+     hearth, so the wait is set afresh and "This line ends with them" is said again, and again every
+     ten days after. The chronicle says it once.
+     Nothing was drawn to reach this line. The `rng()` sits inside the map's callback, so an empty
+     `campSites()` calls it zero times by construction. Changing how often this block runs cannot
+     change how often it draws, because the count is zero either way. */
+  if (!cands.length){ doomAt = tick + CLOCK.arrival.foundRetry; return; }
   const nc = makeCamp('The new camp');
   for (const { s } of cands){
     /* `setSite` names the camp from whoever stands near it when the camp has no founder yet. The new
@@ -250,7 +266,19 @@ function theLoneFounder(){
     log(`${b.name} comes over the hills into the ${s.name.toLowerCase()} and stops there. No smoke called them. They do not know that ${last.name} keeps a cold hearth on the far side of the valley.`, [b], 'major');
     return;
   }
-  camps.pop();   // no ground the world's edge can reach; the camp record goes with it
+  /* No ground the world's edge can reach, so the camp record goes with it. Take it out by identity,
+     not by position: `camps` is a global array, and the loop above called `setSite` and
+     `comeOverTheHills`, so the new camp being last is an assumption, not a guarantee. A `pop` that
+     is ever wrong removes somebody else's camp and says nothing. */
+  camps.splice(camps.indexOf(nc), 1);
+  /* Wait the whole stretch out again, not the short retry the line above takes. The two failures are
+     not the same failure, and the two waits are the point rather than an untidiness. No candidate
+     ground reachable from any edge of the world is terrain, and terrain does not change tick to tick,
+     so looking again soon costs a camp record and a flood fill per site and gains nothing. Running
+     short of loose rock and sticks does change, so that one looks again soon. A stable failure waits
+     the stretch; a passing one waits half a day.
+     Restart the wait here too; do not clear it, for the reason written out above at `!cands.length`. */
+  doomAt = tick + CLOCK.arrival.afterTheLast;
 }
 
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
