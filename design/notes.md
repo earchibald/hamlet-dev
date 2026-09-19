@@ -703,10 +703,16 @@ sounds. A decision can write more than one gesture — a split that also gives b
 turn and not the newest gesture. And `unmake` and `backstop` run from `ageEnd`, after every god in the age
 has finished, and write no turn at all: on those beats nothing is lit, because nothing is on stage.
 
-**How long a creation is.** Measured on 32 seeds, by stepping `startCreation` to settle and counting
-the beats: **78 to 229 beats**, median 105, from 15 to 32 ages and 63 to 197 decisions. The E3 plan
-said 43 to 110, and neither end holds — the floor is nearly twice the claim and the ceiling is more
-than double it. At pace 1 the median creation is about a minute and three quarters and the longest is
+**A beat is not an act, and the two numbers differ by the number of ages.** A beat is one `step(true)`:
+one unit of playback, and what the pace governs. Most beats are one god's act and are recorded in
+`creation.choices`. Exactly one beat per age is the age's **close**, where `ageEnd` runs: it decides
+nothing and writes no choice, but it can write an `unmade` or a `backstop` gesture. So
+`beats = acts + ages`, exactly, on every one of the 32 seeds measured. That closing beat is the one the
+timeline lights nothing on, because no turn is on stage.
+
+**How long a creation is.** Measured on 32 seeds, by stepping `startCreation` to settle: **78 to 229
+beats**, median 102 — which is **62 to 197 acts**, median 82, over 15 to 32 ages. The E3 plan said 43 to
+110 acts, and neither end holds. At pace 1 the median creation is about a minute and three quarters and the longest is
 near four minutes; at a quarter pace the longest is a quarter of an hour. That is the argument for
 nothing above double on the ladder, and it is also the reason `H` exists and has to ask first.
 
