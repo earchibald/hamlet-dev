@@ -1063,6 +1063,24 @@ test('unfolded, every row has one cell per age in the span, so a column names on
   assert.ok(someBlank, 'at least one god has a blank age somewhere in an eight-age creation');
 });
 
+test('the timeline lights exactly one cell: the act now playing, and none once the ages are over', () => {
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'timelineModel']);
+  api.startCreation('gamma', {});
+  for (let k = 0; k < 5; k++) api.step(true);
+  const lit = api.timelineModel().rows.flatMap(r => r.cells).filter(c => c && c.playing);
+  assert.equal(lit.length, 1, 'one act is playing, so one cell is lit');
+  /* Not just any cell: the one that names the god and age of the turn now on stage. A count of one is
+     not proof of that on its own. The turn, not the newest gesture, is the ground truth: a decision can
+     write more than one gesture (a split that also gives birth to a new god writes both), and a birth
+     gesture is credited to the newborn, who has no timeline row of its own yet. */
+  const thisAge = api.creation.choices.filter(c => c.age === api.age);
+  const lastAct = thisAge[thisAge.length - 1];
+  assert.equal(lit[0].chip, `${api.age}:${lastAct.god}`, 'the lit cell names the god and age of the turn now on stage');
+  api.runAges();
+  const after = api.timelineModel().rows.flatMap(r => r.cells).filter(c => c && c.playing);
+  assert.equal(after.length, 0, 'the ages are over and nothing is playing');
+});
+
 test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
   const api = loadUI(['state', 'derive'], TL_API);
   api.startCreation('gamma', {});

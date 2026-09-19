@@ -390,7 +390,7 @@ function tlCellText(rec, withWho){
 
 /* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
    cell, blank so timeline.js can draw it and give it the filled cell's own width. */
-const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
   const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
@@ -398,7 +398,16 @@ function timelineModel(){
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
-  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
+  /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
+     more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
+     gesture in a row), and the birth is credited to the newborn, who has no choices row of its own yet.
+     Following `liveGestures().now` would then light nothing, or the wrong row, for exactly the beat
+     that gesture draws. The turn itself is what the timeline's rows and the act card both key on, so
+     that is what stays lit until the next god decides. */
+  const thisAge = creation.choices.filter(c => c.age === age);
+  const last = thisAge.length ? thisAge[thisAge.length - 1] : null;
+  const playing = rec => !!last && last.god === rec.god && rec.age === age;
+  const cell = (rec, withWho) => ({ age: rec.age, god: rec.god, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
@@ -421,7 +430,7 @@ function timelineModel(){
   const gate = creation.gate;
   const gateCells = [];
   for (let a = from; a <= to; a++){
-    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
   return { shown: true, folded: false, from, to, now, rows, marks: [] };
