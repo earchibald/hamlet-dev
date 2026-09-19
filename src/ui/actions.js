@@ -314,6 +314,25 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
+     slice about what the player experiences must be reachable by a player. The turn card waits.
+     The seed is the caller's: the start dialog's close handler reads the box once and hands it in here,
+     so a typed seed is kept, the same way makeWorld leaves newWorld's seed to that one reader. Alt+G
+     is the same button pressed by keyboard: with no seed given yet, it only closes the dialog as 'take',
+     which reaches this again through that same close handler, seed in hand. */
+  takeGod(seed){
+    if (seed === undefined){ $('start').close('take'); return; }
+    newWorld(seed);
+    /* The first god is born at the first age, which a step opens, not startCreation. Take one here so
+       there is a god to take; ageBegin only, never ageDecide, so the turn card still waits and no act
+       runs on its own. The god picture is drawn on the gods' own stream, as every age's is. */
+    withGodRng(() => ageBegin());
+    const g = gods()[0];
+    const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });
+    say(answer);
+    setPaused(true);
+    renderUI(true);
+  },
   saveWorld(){ saveWorld(); },
   loadWorldFile(){ loadWorldFile(); },
   continueWorld(){ continueWorld(); },

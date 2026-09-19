@@ -681,6 +681,31 @@ test('Enter makes the world only in Start, and does nothing of its own in help',
   assert.equal(typeof api.ACTIONS.makeWorld, 'function');
 });
 
+test('Alt+G is a free chord in Start, distinct from the plain g that opens the stage chord', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);
+  assert.deepEqual(keyHit(api, ev('g', { altKey: true }), 'dialog:start'), { action: 'takeGod', arg: undefined });
+  assert.equal(api.keyAction(ev('g'), 'map').action, 'chord', 'plain g still opens the stage chord elsewhere');
+});
+
+test('take a god: the world is made, a god is taken, and the creation waits on the player', () => {
+  /* newWorld touches wcv, ocv, and dpr directly, and setPace/setPaused reach the page through $. There
+     is no browser here, so the canvases are stubbed and the page calls are withPage's, the same rig
+     the un-pausing test above uses for the same reason. */
+  const api = loadUI(['state', 'derive', 'actions'], [...DERIVE, 'ACTIONS', 'inAges',
+    'get paused(){ return paused; }, set paused(v){ paused = v; }'], {
+    setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }',
+  });
+  api.setUp();
+  withPage(() => api.ACTIONS.takeGod('gamma'));
+  assert.equal(api.inAges(), true, 'it opens in the ages');
+  assert.equal(api.paused, true, 'it opens paused, on the player\u2019s own step');
+  assert.ok(api.inhabited && api.inhabited.id != null, 'a god is taken');
+  assert.equal(api.inhabited.mode, 'become');
+  /* The gap in the brief's own test: it seeded a field newWorld never reads, so it could not tell a kept
+     seed from a thrown-away one. This is the seed actually reaching the world. */
+  assert.equal(api.seedText, 'gamma', 'the typed seed is kept, not swapped for a random one');
+});
+
 test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a time along that edge', () => {
   const api = loadUI(['state', 'derive'], CURSOR); api.startWorld('r');
   const { LW, LH, W, H } = api, at = (x, y) => ({ x, y, z: 0 });

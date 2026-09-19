@@ -55,10 +55,15 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
+     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
+     typed seed survives Take a god the same way it already does Make world. */
   $('start').addEventListener('close', () => {
-    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
-    if (make) newWorld($('seed').value.trim() || randomSeed());
+    ui.focus = 'map'; const rv = $('start').returnValue; $('start').returnValue = '';
+    if (rv === 'make' || rv === 'take'){
+      const seed = $('seed').value.trim() || randomSeed();
+      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+    }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });

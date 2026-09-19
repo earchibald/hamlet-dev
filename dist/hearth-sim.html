@@ -235,7 +235,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
 </dialog>
@@ -7319,6 +7319,7 @@ const KEYMAP = [
   { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
   /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
   { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
+  { key: 'g',          alt: true, focus: 'dialog:start', action: 'takeGod', label: 'Take a god', button: 'takeGod' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
      clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
@@ -8763,6 +8764,25 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
+     slice about what the player experiences must be reachable by a player. The turn card waits.
+     The seed is the caller's: the start dialog's close handler reads the box once and hands it in here,
+     so a typed seed is kept, the same way makeWorld leaves newWorld's seed to that one reader. Alt+G
+     is the same button pressed by keyboard: with no seed given yet, it only closes the dialog as 'take',
+     which reaches this again through that same close handler, seed in hand. */
+  takeGod(seed){
+    if (seed === undefined){ $('start').close('take'); return; }
+    newWorld(seed);
+    /* The first god is born at the first age, which a step opens, not startCreation. Take one here so
+       there is a god to take; ageBegin only, never ageDecide, so the turn card still waits and no act
+       runs on its own. The god picture is drawn on the gods' own stream, as every age's is. */
+    withGodRng(() => ageBegin());
+    const g = gods()[0];
+    const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });
+    say(answer);
+    setPaused(true);
+    renderUI(true);
+  },
   saveWorld(){ saveWorld(); },
   loadWorldFile(){ loadWorldFile(); },
   continueWorld(){ continueWorld(); },
@@ -8864,10 +8884,15 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
+     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
+     typed seed survives Take a god the same way it already does Make world. */
   $('start').addEventListener('close', () => {
-    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
-    if (make) newWorld($('seed').value.trim() || randomSeed());
+    ui.focus = 'map'; const rv = $('start').returnValue; $('start').returnValue = '';
+    if (rv === 'make' || rv === 'take'){
+      const seed = $('seed').value.trim() || randomSeed();
+      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+    }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });

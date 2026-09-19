@@ -78,6 +78,7 @@ const KEYMAP = [
   { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
   /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
   { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
+  { key: 'g',          alt: true, focus: 'dialog:start', action: 'takeGod', label: 'Take a god', button: 'takeGod' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
      clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
