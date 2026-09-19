@@ -100,7 +100,9 @@ So: do not drop the floors and do not promise to keep them. Task 4 measures seco
 ## Global Constraints
 
 - Work in `/Users/earchibald/Worktrees/hamlet-tiers` on branch `tiers-g4`, cut from dev at the commit this plan branches off. Issue 25 lands before task 1 starts. Never check out, stash, or commit in `~/Code/hamlet`.
-- G4 merges into dev through dev-coordinator, which is the only session that merges. A merge into dev publishes the built page to GitHub Pages, so the merge is a release. Ruling 1 means dev must be playable at that merge.
+- G4 merges into dev through dev-coordinator, which is the only session that merges. A merge into dev publishes the built page to GitHub Pages within about three minutes, so the merge is a release to the public site. There is no staging step and nobody looks at it in between. Ruling 1 means dev must be playable at that merge, and so must the published page one minute later.
+- **G4 lands as one merge.** Build it on the branch, in as many commits as it takes, and merge once. A retune that reaches dev in pieces publishes every piece, and an intermediate state of this plan is exactly the state that can hold neither the golden nor the playability. This reverses the usual preference for landing early: for inert work early is cheap, and for this work every intermediate landing is a public release of a half-retuned world.
+- **The playability gate is a gate, not a report.** "The player's gate" below says what playable means in numbers a person can check on the built page. Task 9 measures it and task 11 repeats it. A task that cannot meet it says so and does not open the pull request.
 - G4 moves the golden once. No task runs `UPDATE_GOLDEN=1`. Task 11 prepares the report; the user blesses. Until then `tests/soak.js` compares against a working record, `tests/soak-working.json`, which each task may rewrite and must say so in its report with the reason.
 - Between the first task and the bless, three gates stand in for the golden: a seed run twice gives the same fingerprint; the snapshot oracle (`tests/snapshot.js`) holds; and no death in the soak or the long run has a cause other than old age.
 - From task 4 on, a fourth gate joins them: a run that skips and a run that steps give the same fingerprint, the same chronicle, and the same layout. A skip that changes the story is a bug in the skip, never a new golden.
@@ -171,7 +173,9 @@ Task 3 gives every being the tick of its next act. Task 2 gives every system the
 
 **What forbids a jump.** Ruling 6 puts a proximity pass on every tick, and a pass on every tick is a pass that cannot be skipped. It is only a real constraint when it has work. So a burning tile, or an awake predator within its own reach of a sleeping or working person, pins the horizon to the next tick. Nothing else does. When something dangerous stands near people the engine steps one tick at a time, which is right: that is the part of the world worth watching. When nothing does, the pass has nothing to find and the engine jumps. Ruling 6 is not weakened; it is given a precondition that is cheap to test and that names exactly today's rule.
 
-**What proves it.** A seed run by `runTo` and the same seed run tick by tick give the same fingerprint, the same chronicle, and the same layout. That test is the task. Every way a skip can be wrong — a beat missed, a need that crosses zero inside a jump, a season turned over without a rule reading it — shows as a difference there.
+**What proves it.** A seed run by `runTo` and the same seed run tick by tick give the same fingerprint, the same chronicle, and the same layout. That test is the task.
+
+The comparison is against the stepped run and never against a stored record. A stored record remembers the numbers, and a broken skip that draws the same numbers agrees with it. The golden fixes the random number stream, so anything that moves no number is invisible to it, and the skip's horizon is exactly that kind of thing: a missed beat or a season turned over without a rule reading it can leave the stream untouched and the world wrong. Compare against the thing being preserved, not against a file that only remembers what was drawn. Every way a skip can be wrong — a beat missed, a need that crosses zero inside a jump, a season turned over without a rule reading it — shows as a difference there.
 
 **What the skip is not.** It is not pacing and it does not pass the door. A jump is the engine deciding that it has nothing to do, and it gives the same story either way, which is what the fingerprint test proves. What passes the door is where to run to, and that is the watch list's business.
 
@@ -182,6 +186,22 @@ Task 3 gives every being the tick of its next act. Task 2 gives every system the
 Task 9 gives the days era `run({ what: 'day' | 'season' | 'year', at })` and stops on events as well as on times: a death, a birth, a hearth gone out, a person cut off, a newcomer, a goal reached. Each is a tag `log` already takes. A stop fires once, is spent, and writes its line. That is the ages' rule and it does not change.
 
 This is what lets a player reach winter. A ladder cannot: at an hour a wall second, a season is still 36 wall minutes. A run to winter over a skipping engine is seconds, and it stops with a sentence that says where the world got to.
+
+### The player's gate
+
+Ruling 1 makes playability a condition of the merge, so it needs a threshold somebody else can check. These are measured in a browser on the built `dist/hearth-sim.html`, on seed `r` and on one other named seed, from a new world.
+
+| What | Threshold |
+|---|---|
+| A new world to the first day of winter (day 274), by a run | under 60 wall seconds, ending on a line that says where the world got to |
+| A new world to day 3, by a run | under 2 wall seconds |
+| The top ladder rung held for a world day | a world day in 24 wall seconds, within a fifth |
+| The page answers a click while a run is in flight | under 200 ms, and the run can be stopped by the player |
+| The chronicle at the `major` filter, on reaching winter | under 200 lines, each one a sentence a newcomer can read |
+| A line in it that the retune made false | none |
+| A camp's first ten days | a fire by day 3, tools by day 5, a shelter by day 7, a newcomer by day 10, as task 11 tunes for |
+
+Two honest limits on this table. A wall-time number measured in a browser is a property of the machine, so it is a floor to be met on the machine that merges and not a benchmark to be compared across machines. And the last two rows are read by a person, not asserted by a test; the task reports what it saw and pastes the lines, so the reader can disagree.
 
 ### The soak
 
@@ -295,7 +315,7 @@ This task is ruling 1's substance. Read "The watch list" first.
 - [ ] Task 4's horizon must never jump over a stop. Add the case to `tests/skip.js`: a run to day 30 with a stop on day 12 ends on day 12, skipped and stepped alike.
 - [ ] The chronicle's filter: `ui.chronFilter` is `'all'` or `'major'` today. At 86,400 ticks a day that is not enough. Filter by tag and by person, on top of the `ui.chronSearch` that exists. A filter is view state and does not pass the door.
 - [ ] The interface: a place to set a stop, a place to see the stops that are set, and a Run button that says where it is running to. A run in progress shows what it is waiting for, and can be stopped by the player.
-- [ ] The gate the user asked for: from a new world, a person reaches winter in under a wall minute, and the chronicle they read on arrival is legible. Say how long it took and paste the lines.
+- [ ] Measure "The player's gate" in full, in a browser on the built page, and put the table in the commit with the numbers you saw and the machine you saw them on. Paste the chronicle you read on reaching winter. If a row fails, say which and by how much; do not round it into a pass.
 - [ ] Gates: `tests/door.js`, `tests/ui.js`, `tests/skip.js`, `tests/snapshot.js`. Commit.
 
 ### Task 10: The rest of the tests in world units
@@ -320,7 +340,9 @@ This task is ruling 1's substance. Read "The watch list" first.
 - [ ] The notes gain a section on the real clock and the skip, the spec gains "As built (G4)", and `CLAUDE.md`'s soak paragraph says three days and `LONG=1`.
 - [ ] Watch the hermit rule. The branch in `src/sim/camps.js` that fires when one person is left holds on zero ticks of all six seeds for 70 days today, measured by dev-coordinator, and every seed does fall to one living person. The hearth condition is the only thing that prevents it. This retune changes when a pit goes out, so the rule can start to fire. Report it in the long run if it does. Issue 25 landed at 7c62d70 before this plan starts, by dev-coordinator's ruling, so read the rule under its new name and expect a second camp to be founded rather than the old false line to be printed.
 - [ ] Watch `theLoneFounder` for an unbounded retry, and read this before you chase a slow seed. Issue 25 left a known path that patcher flagged rather than buried: if no candidate ground can be reached from any edge of the world, the rule falls through without clearing `doomAt`, so it retries every tick. Each retry makes a fresh camp record, calls `setSite`, and runs a full `reachable()` flood fill for every candidate, while `nextId` climbs by one a tick forever. It cannot be reached on any soak seed today. It belongs to this plan because the retune changes when a pit goes out, which is what decides whether the outer rule fires at all. If it starts firing under G4 and a seed has a walled-off founding site, **this presents as a performance regression and not as a logic fault**, so anyone chasing a slow seed will read the tick loop and not a founding rule. dev-coordinator asked patcher to close it with a one-line fix before task 1, so it should be gone by the time you read this. Check that it is. If the fix slipped, this note is the diagnosis, and a slow seed with a climbing `nextId` is the symptom to look for.
-- [ ] Do not bless. Open the pull request with the report, and tell dev-coordinator that it waits for the user.
+- [ ] Measure "The player's gate" again on the final build, because task 11 moves values that tasks 8 and 9 measured against.
+- [ ] Tell dev-coordinator before the pull request opens, not after. dev-coordinator will not merge G4 on a routine gate pass, and this is right: the merge changes what the published game is, and the moment of that change is the user's to pick, not a coordinator's and not mine. The standing rule covers landing work in dev; it does not cover changing the character of a live site.
+- [ ] Do not bless. Open the pull request with the report, and tell dev-coordinator that it waits for the user on two counts: the golden, and the timing of the release.
 
 **An option, not a task.** Nothing catches prose that states a duration. `tests/clock.js` reads rules, not strings, so issue 37 and the strings above all passed it. A lint that flags a number word beside "day", "days", "winter" or "year" in a player-facing string would have caught all of them. It would also be noisy. Offer it to the user with the report; do not build it inside G4.
 
