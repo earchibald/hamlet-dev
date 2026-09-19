@@ -12,6 +12,9 @@ them.
 | The pace ladder | 1/4, 1/2, 1, 2. Nothing faster; `H` hurries. | `src/ui/state.js`, `src/ui/panels.js` |
 | The field | Redrawn after each act, from the state that act left. | `src/ui/map.js` |
 | The caption | Names the act being played, not the age. | `src/ui/map.js` |
+| The hurry | `H` asks before it skips. It cannot be taken back. | `src/ui/actions.js`, `src/ui/dialogs.js` |
+| The act's face | Every act draws a figure and a word, not only lines and colour. | `src/ui/map.js` |
+| Take a god | A second button on the start dialog. No longer deferred. | `src/ui/dialogs.js`, `src/ui/actions.js` |
 | The timeline | Lights the cell of the act being played. | `src/ui/timeline.js` |
 | The gate | Act by act equals age by age, on twenty-four seeds. | `tests/ages.js`, `tests/ui.js` |
 
@@ -171,6 +174,48 @@ about the timeline changes.
 This is the whole point of the slice: what the player watches and what the player reads name the same
 act at the same moment.
 
+## The hurry confirms
+
+`H` skips the rest of the creation and cannot be undone. Under E3 it throws away the thing the slice
+exists to show, so it asks first. The dialog names what is lost — the rest of the creation, drawn —
+and offers to go on or to stay. The ages hold while it is open, as they hold behind any dialog.
+
+A hurry is still a hurry once confirmed: it snaps, draws nothing, and ends in the day era.
+
+## The act's face
+
+Colour, lines and a moving star do not say what a god did. A split and a claim both recolour a
+country. A burn, a freeze, a hiding and a showing all wash it. The player is asked to read fifteen
+acts from four visual devices, and cannot.
+
+So each act draws its own figure and its own word, on the ground it names, for the length of its
+beat. Fifteen acts need fifteen faces:
+
+`split`, `claim`, `make`, `raise`, `dig`, `flow`, `pool`, `burn`, `freeze`, `hide`, `show`,
+`battle`, `twist`, `mingle`, `sleep` — and the three gestures that are not acts: `born`, `unmade`,
+`backstop`.
+
+The figure is drawn on the map canvas, in the palette already defined, and fades with its beat. It is
+never a sprite sheet and never an emoji: the game draws its own marks, so the interface draws in the
+same hand.
+
+The design of those marks is a visual question and is settled by mockup, not by prose. The mockups
+decide: the shape of each figure, where the word sits relative to the figure and the ground, how a
+figure reads against a dark country and a light one, and what happens when two acts in consecutive
+beats touch the same country.
+
+## Take a god
+
+Not deferred. E3 cannot be tested by hand without it, and a slice about what the player experiences
+must be reachable by a player.
+
+The start dialog gains a second button beside `Make world`: `Take a god`. It makes the world, takes
+the first god, and opens in control and paused, so the creation begins on the player's own step.
+
+This is E1's `become` act through the door, with no new power behind it. The turn card is still
+deferred; a player who takes a god this way sees the matrix in the foot, as E2 already draws it, and
+chooses through the existing acts.
+
 ## Determinism and tests
 
 A creation watched act by act must equal a creation watched age by age, line for line. Pacing is view
@@ -192,12 +237,17 @@ state and never passes the door, so a failure here means something has leaked in
 - `tests/ui.js` covers the new pure parts in `derive.js`: the beat count of an age, the beat at a
   fraction, the tier of a beat at each pace, and the close counted as a beat.
 - `tests/ui.js` covers the split `still` rule: a paused world holds, a stepped world plays.
+- `tests/ui.js` covers that every gesture kind has a face and a word, so a new act cannot reach the
+  map with nothing to draw. This is the same shape as the rule that every button has a key.
+- `tests/ui.js` covers that the hurry asks before it skips, and that declining leaves the creation
+  where it stood.
 - `npm run soak` must not move. No number in this slice enters `src/sim/`.
 
 ## What is deferred
 
-- The turn card, and `Take a god` on the start dialog. E3 was specced as these before E2 measured the
-  fault. The measurement said the fault was reading, not acting, so they wait for a later slice.
+- The turn card. E3 was specced as the card before E2 measured the fault, and the measurement said
+  the fault was reading rather than acting. `Take a god` is no longer deferred with it: without a way
+  in, E3 cannot be tested by hand. The card itself waits for a later slice.
 - Stepping backwards through beats. The record holds what happened, but the field does not, and
   running the rules backwards is not a thing this engine does.
 - A stop on an event, which still needs an event kind on every chronicle line. That is G section 7.
