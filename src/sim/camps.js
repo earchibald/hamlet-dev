@@ -115,7 +115,7 @@ function startFoundCamp(leader){
   for (const p of [leader, mate]){ failTask(p); p.camp = nc; p.homeless = true; p.asleep = false; addThought(p, 'journey', 'Set out to found a new camp', 6, CLOCK.thought.journey); }
   for (const h of humans()) if (h.camp === old) addThought(h, 'parting', `${leader.name} and ${mate.name} left for a new valley`, -3, CLOCK.thought.parting);
   log(`${leader.name} and ${mate.name} set out for the ${target.name.toLowerCase()} to the ${target.sx < here.sx ? 'west' : target.sx > here.sx ? 'east' : target.sy < here.sy ? 'north' : 'south'}, carrying coals in a bundle of bark.`, [leader, mate], 'major');
-  return startJoin(leader);
+  return startTask(leader, 'join');
 }
 function shelterSite(){
   const [px, py] = camp.pit; let best = null;
@@ -125,18 +125,6 @@ function shelterSite(){
     const sc = -d + (t.ground === 'soil' ? 1 : 0) + rng(); if (!best || sc > best.sc) best = { x, y, sc };
   }
   return best ? [best.x, best.y] : null;
-}
-
-function startJoin(a){
-  const c = a.camp, dest = c.site || c.target; if (!dest) return false;
-  const [cx, cy] = dest, within = c.site ? 3 : 6; const p = legPath(a, cx, cy, within); if (!p) return false;
-  a.task = { type: 'travel', label: c.site ? 'Walking toward the smoke' : 'Walking to the new valley', path: p,
-    arrive(a, t){ if (nearAt(a, cx, cy) > within){ const q = legPath(a, cx, cy, within); if (!q) return 'fail'; t.path = q; return 'continue'; }
-      a.homeless = false;
-      if (c.site){ log(`${a.name} arrives at ${c.name === 'The first camp' ? 'the camp' : c.name} and is welcomed by the fire.`, [a], 'major'); addThought(a, 'joined', 'Found people and a fire', 12, CLOCK.thought.joined); for (const o of campHumans()) if (o !== a) addThought(o, 'newcomer', `${a.name} joined the camp`, 4, CLOCK.thought.newcomer); }
-      else log(`${a.name} reaches the new valley.`, [a]);
-      return 'done'; } };
-  return true;
 }
 
 /* The camp's name as the chronicle says it. The first camp has no name of its own yet. */
@@ -163,7 +151,7 @@ function afterTheLast(){
   if (humans().length){ wanderAt = 0; return; }
   if (!wanderAt){
     wanderAt = tick + CLOCK.arrival.afterTheLast;
-    log('The last person in the valley is dead. No one is left to tend a fire. No smoke will call anyone here.', [], 'major');
+    log('The last person in the valley is dead. No one is left to feed the fire. The camp stands empty.', [], 'major');
     return;
   }
   if (tick < wanderAt || isWinter()) return;
@@ -174,9 +162,49 @@ function afterTheLast(){
   log(`${b.name} comes over the hills alone. No smoke called them. The hearth at ${campName()} is cold. The bones of the people who lived here lie about it.`, [b], 'major');
 }
 
+/* The line that cannot go on. A birth needs two adults who like each other, so one person alone can
+   never make a second. A valley down to one living person is finished, and the smoke arrival cannot
+   save it either, because a cold pit makes no smoke.
+   One person with the fire out is not enough on its own. A camp is briefly down to one person with a
+   cold pit often enough: mid-winter, mid-journey, a founding party on the road. So the hearth must
+   have been cold a long while, and every hearth in the valley must be cold. `outSince` is the tick a
+   pit went out, and it is 0 while the pit burns. */
+function lineIsDoomed(){
+  const hs = humans();
+  if (hs.length !== 1) return false;
+  if (hs.filter(h => stage(h) === 'adult').length >= 2) return false;
+  const hearths = camps.filter(c => c.pit);
+  if (!hearths.length) return false;
+  return hearths.every(c => { const t = tileAt(c.pit[0], c.pit[1]); return !!(t && t.struct && !t.struct.lit && c.outSince && tick - c.outSince >= CLOCK.arrival.afterTheDoomed); });
+}
+
+/* The wanderer who comes to the last of a line. The chronicle says the line is doomed, and one
+   stranger crosses the hills after the same wait as after the last death, outside winter. They meet
+   somebody alive, which is a different meeting from a cold hearth among bones.
+   Only the count of the people holds the wait open. If the last one dies, `afterTheLast` takes the
+   valley over, and this rule drops its wait rather than run a second one beside it. If a stranger
+   arrives, the valley is two again and the wait is over. */
+function theDoomedLine(){
+  if (humans().length !== 1){ doomAt = 0; return; }
+  const last = humans()[0];
+  if (!doomAt){
+    if (!lineIsDoomed()) return;
+    doomAt = tick + CLOCK.arrival.afterTheLast;
+    log(`${last.name} is the only person left in the valley. The hearth is cold. No child comes of one person alone.`, [last], 'major');
+    return;
+  }
+  if (tick < doomAt || isWinter()) return;
+  const home = camps.find(c => c.site); if (!home) return;
+  camp = home;
+  const b = comeOverTheHills(); if (!b) return;
+  doomAt = 0;
+  log(`${b.name} comes over the hills to ${campName()}. No smoke called them. ${last.name} is not the last of the people now.`, [b, last], 'major');
+}
+
 /* One tick of camp life: the pit burns, food spoils, the sprites weigh the camp, people are born, lightning falls, and the smoke draws newcomers. */
 function updateCamps(){
   afterTheLast();
+  theDoomedLine();
   for (const c of camps){
     camp = c;
     const pt = pitTile();

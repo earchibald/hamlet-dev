@@ -117,6 +117,9 @@ let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chron
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;
+/* The valley down to one person. doomAt is 0 unless the line is doomed. It holds the tick a lone
+   wanderer may arrive on once the chronicle has said the line cannot go on. */
+let doomAt = 0;
 /* The eras. In the gods era a step is an age and nothing has a tile yet. field and boundaries are the
    regions the gods made; legends keeps every god-era line and is never trimmed; creation is the record
    of the run. godRng is the gods' own stream. */

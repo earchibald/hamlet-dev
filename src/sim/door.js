@@ -7,7 +7,7 @@
    message for whoever asked.
 
    Tick rule: an event stamped with tick N was applied after step N and before step N+1. An event
-   that arrives with a tick of its own, as a replayed one does, must arrive at that tick; the door
+   that comes with a tick of its own, as a replayed one does, must come at that tick; the door
    refuses it otherwise, so a replayer that runs late fails loudly instead of telling a different
    story. The test runner keeps the order (`api.step(); god(api, i);`). */
 const DOOR_SOURCES = ['player', 'chance', 'llm', 'human'];
