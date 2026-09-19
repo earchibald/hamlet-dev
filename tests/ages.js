@@ -32,9 +32,9 @@ function creationOf(seed){
    door. Force Actions is on, because a bar is a lens on the matrix and not a rule: with it off a
    barred top row could not be taken, and the player could not follow the engine.
    Returns the api and how many turns the player took, so a run that opened none fails. */
-function steeredOf(seed){
+function steeredOf(seed, oneAct){
   const api = load(); api.startCreation(seed, { force: true });
-  api.step();
+  api.step(oneAct);
   const first = api.awakeGods()[0];
   assert.equal(api.inject({ source: 'player', act: 'become', id: first.id }),
     `You are ${first.name}, ${first.epithet}.`, 'the first god that wakes is taken');
@@ -53,7 +53,7 @@ function steeredOf(seed){
       }
       /* Nothing on the table can land. Hand the god back and let it fall through the same failures. */
       api.inject({ source: 'player', act: 'become', id: null });
-      api.step();
+      api.step(oneAct);
       continue;
     }
     const me = api.inhabited && api.beingById(api.inhabited.id);
@@ -61,9 +61,36 @@ function steeredOf(seed){
       const g = api.awakeGods()[0];
       assert.equal(api.inject({ source: 'player', act: 'become', id: g.id }), `You are ${g.name}, ${g.epithet}.`);
     }
-    api.step();
+    api.step(oneAct);
   }
   return { api, turns };
+}
+
+/* The creation run one act at a time, as the view plays it. Every stop is checked as it happens, and
+   against where it was owed rather than against the one before it: equal fingerprints prove the
+   stream did not move, and say nothing about where the age stopped. A stop that fires on a god that
+   was asleep hands the view a beat in which nothing happened, and it moves no number at all.
+   So the next awake god is found before the call, while its status is still the status the age will
+   read, and the stop is owed exactly one past it. A stop short of it skipped an act; a stop before
+   it fired on a god that was not acting; and if no god is awake the age owes no further stop and
+   must end on this call. */
+function actByActOf(seed){
+  const api = load(); api.startCreation(seed);
+  let stops = 0;
+  const max = (api.options.ageLimit * 2 + 2) * 60;
+  let n = 0;
+  for (; api.era === 'gods' && n < max; n++){
+    const pos = api.agePos;
+    const owed = pos ? pos.list.findIndex((g, k) => k >= pos.i && g.status === 'awake') : -1;
+    api.step(true);
+    if (!pos) continue;                       // the age had not begun; this call began it
+    if (owed < 0){ assert.equal(api.agePos, null, `seed ${seed}: no god was awake and the age did not end`); continue; }
+    assert.ok(api.agePos, `seed ${seed}: the age ended with an awake god at ${owed} still to act`);
+    assert.equal(api.agePos.i, owed + 1, `seed ${seed}: the age stopped at ${api.agePos.i}, and the acting god was ${owed}`);
+    stops++;
+  }
+  assert.ok(n < max, `seed ${seed}: the act-by-act run never reached the valley`);
+  return { api, stops };
 }
 
 const rows = [];
@@ -75,7 +102,7 @@ const work = { ages: 0, discards: 0, gestures: 0 };
 /* The gesture record, counted across every seed. The design claims every act writes a usable mark, so
    the fallback to the heart of a country should never fire; and it sets no cap on the gestures in one
    age until there is a real number to set it against. These two tables are that number. */
-const fallbacks = {}, ages = {}, kinds = {};
+const fallbacks = {}, ages = {}, kinds = {}, beats = {};
 for (const seed of SEEDS){
   test(`seed ${seed}: the ages end`, t => {
     const { api, ms, gs, contrasts, species, scars, perAge, gestures } = creationOf(seed);
@@ -121,7 +148,37 @@ for (const seed of SEEDS){
     assert.equal(b.tick, a.tick);
     assert.equal(b.firstPerson().name, a.firstPerson().name);
   });
+
+  /* Pacing is view state and never passes the door, so a creation watched act by act must be the
+     creation watched age by age, line for line. A failure here means a pace has leaked into a rule. */
+  test(`seed ${seed}: a creation watched act by act is an unwatched one`, () => {
+    const a = load(); a.startWorld(seed);
+    const { api: b, stops } = actByActOf(seed);
+    assert.ok(stops > 0, 'the age never stopped between acts');
+    assert.equal(b.era, 'days');
+    assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+    assert.equal(b.tick, a.tick);
+    assert.equal(b.creation.ages, a.creation.ages);
+    assert.equal(b.firstPerson().name, a.firstPerson().name);
+    beats[seed] = stops;
+  });
 }
+
+/* The two reasons an age stops, interleaved through one `agePos`. Act by act alone never sets
+   `pending`, and a driven creation alone never asks for one act, so neither gate on its own ever
+   resumes a turn that was opened inside an act-by-act run. That is where `prepared` and the drawn
+   matrix would break, because both belong to the god at `agePos.i` and both must survive either
+   kind of stop. One seed is enough to hold the shape; every seed would cost the run its speed. */
+test('a creation both driven and watched act by act is an unwatched one', () => {
+  const seed = 'r';
+  const a = load(); a.startWorld(seed);
+  const { api: b, turns } = steeredOf(seed, true);
+  assert.ok(turns > 0, 'no turn ever opened: the two reasons never interleaved');
+  assert.equal(b.era, 'days');
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  assert.equal(b.tick, a.tick);
+  assert.equal(b.firstPerson().name, a.firstPerson().name);
+});
 
 test('report', t => { for (const line of rows) t.diagnostic(line); });
 
@@ -136,6 +193,10 @@ test('the gesture record over every seed', t => {
   /* The work over every seed. A per-seed cap misses a change that adds one discard to every seed, so
      the discards are capped across the seeds together as well. The sum is 6 today. */
   t.diagnostic(`work over ${SEEDS.length} seeds: ages ${work.ages}, discards ${work.discards}, gestures ${work.gestures}`);
+  /* What the view has to play. One act is one beat, and an age's close is one more, so a creation is
+     about these many beats plus its ages. The spec's hundred seconds at single speed is read here. */
+  const played = Object.values(beats);
+  if (played.length) t.diagnostic(`acts to play: ${Math.min(...played)} to ${Math.max(...played)} a creation, ${played.reduce((p, q) => p + q, 0)} over ${played.length} seeds`);
   if (!process.env.SEEDS) assert.ok(work.discards <= SUM_DISCARDS, `${work.discards} discards over ${SEEDS.length} seeds (want <= ${SUM_DISCARDS})`);
   /* Every act in the table leaves a row, and every row is one of the kinds the design names. */
   const KNOWN = ['split', 'claim', 'make', 'raise', 'dig', 'flow', 'pool', 'burn', 'wash', 'battle', 'twist', 'mingle', 'sleep', 'born', 'unmade', 'backstop'];
