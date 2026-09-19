@@ -49,3 +49,23 @@ test('keeping the choices does not move the creation', () => {
   b.startCreation('gamma', {}); let n = 0; while (b.era === 'gods' && n++ < 1000) b.step();
   assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
 });
+
+test('an age split in two draws what an unbroken age drew', () => {
+  const a = load(), b = load();
+  a.startCreation('beta', {}); b.startCreation('beta', {});
+  for (let n = 0; n < 12; n++){ a.step(); b.step(); }
+  /* b runs its next age through the resumable parts by hand, in the same order ageStep uses. */
+  a.step();
+  b.withGodRng(() => { b.ageBegin(); b.ageDecide(); b.ageEnd(); });
+  assert.equal(b.age, a.age);
+  assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
+  assert.deepEqual(b.creation.choices, a.creation.choices);
+  assert.equal(b.godRng(), a.godRng(), 'the god stream stands at the same place');
+});
+
+test('agePos is null between ages', () => {
+  const api = load(); api.startCreation('beta', {});
+  assert.equal(api.agePos, null);
+  api.step();
+  assert.equal(api.agePos, null, 'a finished age leaves no position behind');
+});

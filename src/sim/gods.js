@@ -487,23 +487,54 @@ function outgrown(){
 /* Settle paints the ground, and painting draws from the people's stream. The age that ends the creation
    raises this flag inside the god stream; settle runs after it, outside. */
 let settleNow = false;
+
+/* Where the age stands. Null between ages. `{ i }` is the index of the next god to decide in the
+   list `ageDecide` took at the head of this age. An age is split so a player's turn can suspend in
+   the middle of it; the parts run in the order the one closure ran them, and the god stream is
+   drawn from identically. */
+let agePos = null;
+
+function ageBegin(){
+  age++;
+  /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
+  creation.gestures = []; creation.gestureAge = age;
+  if (age === 1) firstGod();
+  /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
+  if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
+  agePos = { i: 0 };
+}
+
+/* Runs the awake gods from the position on. Returns false when the age is suspended, true when its
+   gods are done. `gods()` filters `beings` fresh on every call, so the one loop it replaces took its
+   list once, at the head of the age: a god made mid-age by a split lands in `beings` but not in that
+   list, and so is not reached until the next age. This takes the same one list, once, to match. */
+function ageDecide(){
+  const list = gods();
+  while (agePos.i < list.length){
+    const g = list[agePos.i];
+    if (g.status === 'awake'){ settleHome(g); godNeeds(g); decideGod(g); }
+    agePos.i++;
+  }
+  return true;
+}
+
+function ageEnd(){
+  agePos = null;
+  for (const g of gods()) if (g.status !== 'dead' && g.acted > 0 && poleShare(g.pole) === 0) unmake(g);
+  const gate = restGate(); creation.gate = gate;
+  /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
+  if (!gate.ok && pulseAge !== null) strain(gate.lack);
+  if (pulseAge !== null) outgrown();
+  if (!awakeGods().length){ settleNow = true; return; }
+  if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
+  if (age >= options.ageLimit) backstop();
+}
+
 function ageStep(){
   withGodRng(() => {
-    age++;
-    /* The gestures replay one age. The list is replaced at the head of the next, before anything acts. */
-    creation.gestures = []; creation.gestureAge = age;
-    if (age === 1) firstGod();
-    /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
-    if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
-    for (const g of gods()) if (g.status === 'awake'){ settleHome(g); godNeeds(g); decideGod(g); }
-    for (const g of gods()) if (g.status !== 'dead' && g.acted > 0 && poleShare(g.pole) === 0) unmake(g);
-    const gate = restGate(); creation.gate = gate;
-    /* Before time there is only the Sundering; the world is not yet strained by what it lacks. */
-    if (!gate.ok && pulseAge !== null) strain(gate.lack);
-    if (pulseAge !== null) outgrown();
-    if (!awakeGods().length){ settleNow = true; return; }
-    if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
-    if (age >= options.ageLimit) backstop();
+    if (!agePos) ageBegin();
+    if (!ageDecide()) return;
+    ageEnd();
   });
   if (settleNow){ settleNow = false; settle(); }
 }
