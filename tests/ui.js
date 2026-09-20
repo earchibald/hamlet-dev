@@ -302,6 +302,37 @@ test('every template button prints a key, and every keyed button id is in the te
   for (const k of api.KEYMAP) if (k.button && !RUNTIME.includes(k.button)) assert.ok(ids.has(k.button), `key map names button #${k.button}, which is not in the template`);
 });
 
+/* A click reads the template, not the constant: main.js hands `Number(b.dataset.pace)` or
+   `Number(b.dataset.speed)` to `ACTIONS.speed`. So this test reads the template too. A test that
+   walked `PACES` and `SPEEDS` again would agree with the constants and never see the template drift
+   away from them, which is how `data-pace="4"` could set an unknown pace with a green suite. */
+test('every data-pace and data-speed in the template is a rung of its ladder, and every rung has a button', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS']);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  for (const [attr, name, rungs] of [['pace', 'PACES', api.PACES], ['speed', 'SPEEDS', api.SPEEDS]]){
+    const found = [...html.matchAll(new RegExp(`data-${attr}="([^"]*)"`, 'g'))].map(m => Number(m[1]));
+    assert.ok(found.length, `the template holds no data-${attr} attribute, so this test reads nothing`);
+    for (const v of found) assert.ok(rungs.includes(v), `the template holds data-${attr}="${v}", which is not on ${name} (${rungs.join(', ')}); a click on that button would set it`);
+    for (const r of rungs) assert.ok(found.includes(r), `${name} holds ${r}, which no data-${attr} button in the template can reach`);
+  }
+});
+
+/* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site
+   added later. 4 is on SPEEDS and not on PACES, and 2 is on PACES and not on SPEEDS, so each case is
+   the drift between the two ladders, not a value invented for the test. */
+test('setPace and setSpeed throw on a value off the ladder, and the ladder keeps its last good value', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS', 'setPace', 'setSpeed'],
+    { getPace: '() => pace', getSpeed: '() => speed' });
+  withPage(() => {
+    api.setPace(api.PACES[1]); api.setSpeed(api.SPEEDS[1]);
+    const p = api.getPace(), s = api.getSpeed();
+    assert.throws(() => api.setPace(4), /setPace was given 4, which is not on the ladder PACES/);
+    assert.throws(() => api.setSpeed(2), /setSpeed was given 2, which is not on the ladder SPEEDS/);
+    assert.equal(api.getPace(), p, 'a rejected pace leaves the pace alone');
+    assert.equal(api.getSpeed(), s, 'a rejected speed leaves the speed alone');
+  });
+});
+
 const unesc = t => t.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 const ARROW = { ArrowLeft: '\u2190', ArrowRight: '\u2192', ArrowUp: '\u2191', ArrowDown: '\u2193' };
 
@@ -1019,7 +1050,10 @@ test('every action holds in the ages: the view stays on the world, nothing follo
     for (let i = 0; i < 6; i++) api.step();
     assert.equal(api.era, 'gods', 'the probe must start in the ages');
     const god = api.gods()[0].id;
-    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 4, drawer: 'legends', campN: 1,
+    /* The probe runs in the ages, where `speed` sets the pace. 4 is a rung of SPEEDS and not of
+       PACES, so it is now rejected at the door; 1 is a rung of both. `speedStep` takes a place on
+       the ladder, and without an arg it indexed the ladder with NaN and handed setPace undefined. */
+    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 1, speedStep: 0, drawer: 'legends', campN: 1,
       cursor: [1, 0, 1], nav: [1, 0], stage: 'fire', goalPri: { id: 'firepit', pri: 1 }, gotoSector: { sx: 0, sy: 0 },
       jumpChip: 1, muteMenu: 1, muteChoice: 1, rowPick: 1, palettePick: 1, paletteMove: 1, unmute: 'x' };
     /* `hurryGo` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it.
