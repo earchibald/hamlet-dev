@@ -14,7 +14,7 @@
 |---|---|---|
 | 1 | The calendar at real units, the markers as converters, walking at a tile a tick, the soak reshaped | determinism, invariants, the oracle |
 | 2 | The beats: cellular systems once a world minute, camp rules at hourly rates, periods in world time | the same, and plant and fire counts a world day within a table of tolerances |
-| 3 | A being's head off the tick: state from elapsed time, a cheap proximity pass each tick | the same, and a world day in under 5 s |
+| 3 | A being's head off the tick: state from elapsed time, a cheap proximity pass each tick | the same, and a world day in under 5 s. **Day 3 met at 3.05 s against 9.86 s; day 50 missed at 17.98 s with 82 people.** |
 | 4 | The skip: the engine jumps to the next tick at which anything happens | a skipped run and a stepped run give the same fingerprint, chronicle, and layout; the floors measured and reported |
 | 5 | Work, sleep, and needs in world time | the same, and the crafts tests in world units |
 | 6 | Lives, ages, births, and plants | the same |
@@ -408,10 +408,10 @@ The floors that the three-day run cannot hold are **not** removed until task 4 h
 
 **Files:** `src/sim/beings.js`, `src/sim/tasks.js`, `src/sim/snapshot.js`, `tests/beings-lazy.js` (new), `package.json`.
 
-- [ ] Write the failing tests in `tests/beings-lazy.js`. For a person who sleeps 8 hours by a lit pit across a dawn: needs, warmth, hp, and thoughts after `catchUp` equal, within 1e-6, the values a tick-by-tick reference gives (keep the old head as a test-only function for this). The same for a person who starves to zero food mid-stretch, for one who freezes, and across a season's turn. A thought ends at its `until`. A sleeper on a tile that catches fire wakes on that tick. A sleeper with a wolf at 5 tiles wakes on that tick.
-- [ ] Build `catchUp`, `a.seen`, the next-act tick, and the proximity pass, as "A being between acts" says. The old-age roll runs once a world day for a being past its span, with `rollFor`.
-- [ ] Budget test: a world day on seed `r` at day 3 in under 5 s. Report seconds for day 3 and, from the long run, day 50.
-- [ ] Gates as task 1, plus `tests/snapshot.js` green with the new fields. Commit.
+- [x] Write the failing tests in `tests/beings-lazy.js`. For a person who sleeps 8 hours by a lit pit across a dawn: needs, warmth, hp, and thoughts after `catchUp` equal, within 1e-6, the values a tick-by-tick reference gives (keep the old head as a test-only function for this). The same for a person who starves to zero food mid-stretch, for one who freezes, and across a season's turn. A thought ends at its `until`. A sleeper on a tile that catches fire wakes on that tick. A sleeper with a wolf at 5 tiles wakes on that tick. **Done: 13 tests, all watched failing first, and each break in `catchUp` planted in turn to prove the reference can disagree. One control came back blind and is written up.**
+- [x] Build `catchUp`, `a.seen`, the next-act tick, and the proximity pass, as "A being between acts" says. The old-age roll runs once a world day for a being past its span, with `rollFor`. **Done. A sleeper is roused by fire or a hunter within five tiles, which the old head could not do, with a thought so the player sees it.**
+- [x] Budget test: a world day on seed `r` at day 3 in under 5 s. Report seconds for day 3 and, from the long run, day 50. **Day 3 met: 3.05 s against dev's 9.86 s. Day 50 MISSED: 17.98 s, with 82 people against day 3's 2. Seconds a person a world day is flat from day 25 on, so the day-50 miss is the valley filling and not the body; the report says so and does not explain it away. The last 2.3 s of the day-3 win came from `threatsFor`, which ruling 6 runs for every being on every tick.**
+- [~] Gates as task 1, plus `tests/snapshot.js` green with the new fields. Commit. **The soak, `npm run fast`, `tests/clock.js` and `tests/tasks.js` are green; the working record was rewritten and what moved is explained. `tests/snapshot.js` is SUSPENDED by task 1 and was not run: the snapshot gate that ran is the soak's oracle, which carries every new field across a save. Task 4 owes the file a run.**
 
 ### Task 4: The skip
 
