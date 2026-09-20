@@ -172,7 +172,7 @@ button{ font:inherit; font-weight:500; color:var(--ground); background:var(--riv
 <p>Two shipped games use them. RimWorld's colonists once searched the whole map for a route that did not exist.<sup><a class="fn" data-k="rimworld"></a></sup> The fix was to number every connected area, and to skip the search when the two numbers differ. Dwarf Fortress does the same on top of its A* search.<sup><a class="fn" data-k="df"></a></sup></p>
 
 <h3>3. Pass the camp as an argument</h3>
-<p><code>camp</code> is a global. At the start of each being's turn, <code>updateBeing</code> sets it to that being's camp, and about 200 places then read it without saying so. The G3 notes already call it "a hidden input of every stride." It blocks a Web Worker, a port, and the day tier alike, because no function says what it reads. The fix touches every file but changes no behaviour. The golden holds or the fix is wrong.</p>
+<p><code>camp</code> is a global. At the start of each being's turn, <code>updateBeing</code> sets it to that being's camp. About 450 lines in <code>src/sim/</code> then read it without saying so. That count is every line that names <code>camp</code> alone and does not assign it. The G3 notes already call it "a hidden input of every stride." It blocks a Web Worker, a port, and the day tier alike, because no function says what it reads. The fix touches every file but changes no behaviour. The golden holds or the fix is wrong.</p>
 
 <h3>4. A scheduler in place of a visit every tick</h3>
 <p>Today every living being runs every tick, and only its task work waits for its stride. Plan G5 already describes the replacement: "A queue holds every individual by the time its task ends." A sleeping person then costs nothing for eight hours. At 86,400 ticks a day this matters more than anything else on this page.</p>
@@ -274,7 +274,7 @@ flowchart TD
   C --> D["Desktop build<br/>a wrapper now, a game engine later if wanted"]
   T["Tests in Node<br/>soak · door · snapshot"] --> C
 </pre>
-<p>Before that split can happen, the page has to stop reading the core's variables directly. It names them in about 300 places today, and writes one of them (<code>camp</code>). A Web Worker needs the same separation.<sup><a class="fn" data-k="worker"></a></sup> GitHub Pages cannot send the headers that shared memory between threads requires, so a worker would exchange messages with the page.<sup><a class="fn" data-k="ghheaders"></a></sup><sup><a class="fn" data-k="transfer"></a></sup></p>
+<p>Before that split can happen, the page has to stop reading the core's variables directly. It names the core's saved variables about 380 times today, on about 260 lines, and writes one of them (<code>camp</code>). A Web Worker needs the same separation.<sup><a class="fn" data-k="worker"></a></sup> GitHub Pages cannot send the headers that shared memory between threads requires, so a worker would exchange messages with the page.<sup><a class="fn" data-k="ghheaders"></a></sup><sup><a class="fn" data-k="transfer"></a></sup></p>
 
 <h2 id="choose">Try a path</h2>
 <div class="box">
