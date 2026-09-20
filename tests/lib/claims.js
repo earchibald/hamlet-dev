@@ -25,8 +25,9 @@ const SEASON_CLAIM_DAYS = 365;
 /* About seventy days. This literal is NOT a calendar fact, and nothing can pin it exactly.
 
    ON THIS BRANCH IT IS A LOWER BOUND AND NOT A MEASURED FLOOR. Read it as a placeholder with an
-   arithmetic bound under it. The measurement is owed by G4 task 4, the skip, and until that lands no
-   run this branch performs makes the claim.
+   arithmetic bound under it. The measurement is owed by G4 task 4, the skip. One run does make the
+   claim meanwhile: `LONG=1` sets DAYS to 70, and 70 >= 70, so the claim is made on a run whose
+   length nobody has re-measured at this clock. The default soak, at three days, skips it.
 
    Where the 70 came from, and why it is not a measurement here. On dev, at dev's 1000-tick day, the
    six default seeds gave 12, 6, 5, 15, 6 and 8 old-age deaths over 70 days. The retune did not touch

@@ -25,3 +25,11 @@ const misspelledFromBeingsArray = beings[0].hungerr; // PROBE: expect TS2339 her
 const misspelledFromTileAt = tileAt(1, 2, 0).bogus; // PROBE: expect TS2339 here
 const misspelledFromItemsArray = items[0].bogusItemField; // PROBE: expect TS2339 here
 const misspelledFromCampGlobal = camp.bogusCampField; // PROBE: expect TS2339 here
+
+// A Thought and a Task are reached the same way, one step further in: off a being's own
+// thoughts and its current task. Both records gained a field in the G4 retune (a thought's
+// `until`, a task's `worked`, `due`, and `waitUntil`), and neither kind was covered here
+// before, so a catch-all index signature on either would have gone unseen. These two lines
+// keep that from being true again.
+const misspelledThoughtField = beings[0].thoughts[0].untill;  // PROBE: expect TS2339 here
+const misspelledTaskField = beings[0].task.workedd;           // PROBE: expect TS2339 here
