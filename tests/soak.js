@@ -82,8 +82,10 @@ for (const seed of SEEDS){
        for a being taken off the board another way. Three paths do that today: the snared rabbit
        (beings.js:330), the deer in the pitfall (beings.js:338) and an unmade god (gods.js:467).
        All three are non-human, so no number here is touched. A human killed down a path like
-       those would answer NaN to every comparison below and drop out of `grown` and `pastSpan`
-       with no error at all, so a fourth such path needs `diedAt` with it. */
+       those would answer NaN to every comparison below. It drops out of `grown` and `pastSpan`
+       in silence. It does not leave quietly, though: `oldestHuman` spreads the NaN through
+       `Math.max`, and the diagnostic below prints `NaN` days. So a fourth such path needs
+       `diedAt` with it. */
     const LH = api.LIFE.human;
     const lastAge = b => ((b.alive ? api.tick : b.diedAt) - b.born) / api.DAY;
     const bornHere = api.beings.filter(b => b.species === 'human' && b.parents);
@@ -114,7 +116,12 @@ for (const seed of SEEDS){
        `a.deeds`, so no being id and no species reaches the chronicle line. A run's events were
        enumerated to check it: the fields are age, camp, kind, nameKnown, names, tag, text, tick,
        when. So the count rests on the tag, and the assertion below carries a guard against the day
-       beings.js:83 changes. */
+       beings.js:83 changes.
+
+       That guard is dormant at `DEFAULT_DAYS`. A tag added to beings.js:83 leaves all six seeds
+       green at 70 days, and turns all six red at 90 days. The arithmetic behind the two numbers is
+       written out at the old-age claim below. Read the guard as a tripwire for a longer run, not
+       as a check the default soak performs. */
     const humanOldAge = events.filter(e => e.kind === 'death' && (e.tag === 'old' || e.tag === 'oldCold')).length;
     /* The guard's other half, read off the beings, where the species IS named. The old-age roll
        fires at `ageDays(a) > LIFE[a.species].life` and `diedAt` is that same tick, so every human
@@ -123,7 +130,7 @@ for (const seed of SEEDS){
        killed by something else lifts this number and not the tag count, and that death is the
        sibling claim's business, not this one's. */
     const humanOldDead = api.beings.filter(b => b.species === 'human' && !b.alive && lastAge(b) > LH.life).length;
-    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them alive and grown up; ${pastSpan.length} passed the span, ${humanOldAge} people died of old age (${counts.oldAge} lines of old age all told, gnomes among them); oldest ${oldestHuman.toFixed(1)} days`);
+    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them alive and grown up; ${pastSpan.length} passed the span, ${humanOldAge} people died of old age (${counts.oldAge} lines of old age all told, gnomes too, if any); oldest ${oldestHuman.toFixed(1)} days`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
       const c = api.camps[0];
@@ -194,15 +201,27 @@ for (const seed of SEEDS){
        altogether, `oddDeaths` would stay empty and every seed would still be green (issue #94). So
        the mechanism answers for itself. Old age is rolled in one place, at `ageDays(a) >
        LIFE[a.species].life`, behind `CLOCK.rate.oldAgeDeath` divided by hardiness
-       (src/sim/beings.js), and nothing else in the sim ends a life of its own accord.
+       (src/sim/beings.js:371). Other causes end a life a few lines further down, where hp at or
+       below zero kills by fire, thirst, hunger or cold (beings.js:378). The one place is the old-age
+       roll, and that is all this claim needs.
 
-       The count is human-only, and it is a tag count for that reason. The roll runs for every
-       species, so a gnome dying of old age writes `A gnome died of old age.` and joins any count
-       made by matching the text. With `counts.oldAge` in the assertion, the claim stayed green
-       with the roll switched off for humans alone, and the diagnostic reported two human old-age
-       deaths where there were none. `LIFE.gnome.life` is 110 days and a gnome starts the run about
-       35 days old, so it is only arithmetic that keeps a gnome under the span at 70 days; DAYS=90
-       opens it. A future mourning line that logged a dead elder's full name would open it another
+       The count is human-only, and it is a tag count for that reason. `counts.oldAge` is a
+       substring match over the whole chronicle: `ev` at tests/lib/run.js:81, summed at :93. The
+       gnome branch of `die()` writes `A gnome died of old age.` into that same chronicle
+       (beings.js:83), so the text match would count a gnome's death as a person's. It reads
+       species-exact today for one reason only. `LIFE.gnome.life` is 110 days
+       (src/sim/species.js:2), a gnome walks in between 20 and 35 days old (beings.js:12), and 70
+       days cannot carry it past the span. Raise DAYS to about 90, or lower that 110, and the text
+       count takes gnomes in. Of the five species branches in `die()`, only human (:69) and gnome
+       (:83) put `cause` into a chronicle line, so the gnome is the single contaminant.
+
+       Two plants measured it, on seed r unless stated. Drop the `tag` argument from the human line
+       at beings.js:69: the tag count falls to 0 while `counts.oldAge` holds at 12, so the tag
+       reading goes red where the text reading stays green. Add a tag to beings.js:83 instead: all
+       six seeds stay green at 70 days, and all six go red at 90. That second pair is the dormancy
+       above, arriving, and it is the same fact the `humanOldAge` guard note records.
+
+       A future mourning line that logged a dead elder's full name would open the text count another
        way: `FATE_EPITHETS.oldCold` is the string 'who died of old age' (src/sim/names.js:766),
        which reaches no sim path today because `fullName()` is read only in src/ui/. A tag count
        closes both, and see `humanOldAge` above for why it is human-only, which is not the reason a
