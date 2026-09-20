@@ -4,25 +4,14 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { load, FILES } = require('../src/sim/index.js');
-const { runDays, collect, runOn, fingerprint } = require('./lib/run.js');
+const { DAY, runDays, collect, runOn, fingerprint } = require('./lib/run.js');
 
-/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
-   This file asks for 40 world days, and no day count in it has been changed. A world day
-   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
-   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
-   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
-   slow engine is a gate nobody measured.
-   Run it with SLOW=1. Task 4 restores it.
-   The plan names the snapshot oracle as one of the three gates standing in for the golden
-   between task 1 and the bless. Suspending this file does NOT remove that gate: the oracle also
-   runs in `tests/soak.js` as "seed x saved on day 1.5, loaded into a fresh sim, tells the same
-   story to day 3", which runs at every task's gate. The gate moves; it does not go. */
-const SUSPENDED_FOR_G4 = process.env.SLOW ? false
-  : 'suspended for G4: this file asks for 40 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
-if (SUSPENDED_FOR_G4){
-  test('tests/snapshot.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
-  return;
-}
+/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 because a world day
+   cost about fifteen seconds and the file asks for 40 world days, and the oracle spans below on top of them. Every day count is
+   exactly as task 1 left it: none was cut to fit the engine. The runs that still cost more
+   than the plan's hundred and twenty seconds sit behind LONG=1 one by one, and each states
+   its day count, its measured seconds and the flag in its own skip message. A file behind a
+   flag is still a test; a file with a smaller day count is not the same test. */
 
 
 test('a stream gives the numbers it gave before', () => {
@@ -167,9 +156,19 @@ test('a save that cannot be read is refused and the world stays as it was', () =
 test('a world of another size loads into a sim of the default size', () => {
   const small = load(); small.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 3000; i++) small.step();
   const api = load(); api.startWorld('x'); assert.equal(api.loadSnapshot(through(small.takeSnapshot())), null);
-  assert.equal(api.W, small.W); for (let i = 0; i < 500; i++) api.step();
+  assert.equal(api.W, small.W); for (let i = 0; i < d(0.5); i++) api.step();
 });
 
+/* ---------- the spans, in world time ----------
+   EVERY STEP COUNT BELOW WAS A COUNT OF OLD TICKS and none of them was converted when plan G4 made a
+   world day 86,400 ticks instead of 1,000. So `12400` meant twelve and a half world days on dev and
+   meant a seventh of one here. Restoring this file without converting them would have restored an
+   oracle weaker than the three-day soak's while reading as a restored gate, and the plan names this
+   oracle as one of the three that stand in for the golden until the bless.
+   `d(n)` is n world days. One old tick was 86.4 world seconds, so an old count of N ticks is N/1000
+   world days, and every number below is the old number divided by a thousand. Nothing was rounded to
+   something tidier: the spans are the spans the file was written with, at their real length. */
+const d = n => Math.round(n * DAY);
 /* ---------- the oracle ---------- */
 /* The round trip proves a save can be read back. The oracle proves the save was whole: run N steps,
    save, load into a fresh sim, and run both worlds on for M more. The loaded world must tell the
@@ -207,13 +206,13 @@ function sameStory(o){
    allows, because each one runs its world once whole and then twice more from the save. */
 const SMALL = { sw: 8, sh: 5 };
 const CASES = [
-  ['r', 12400, 8000, {}],        // one camp founds a second after the load, and a storm rolls in
-  ['x', 12400, 4000, {}],        // another valley, two storms after the load
-  ['gamma', 30300, 2000, {}],    // a grown valley: two camps, huts, and a spear
-  ['alpha', 20000, 3000, SMALL], // a small valley with snares and pitfalls in the ground, and two camps
+  ['r', d(12.4), d(8), {}],        // one camp founds a second after the load, and a storm rolls in
+  ['x', d(12.4), d(4), {}],        // another valley, two storms after the load
+  ['gamma', d(30.3), d(2), {}],    // a grown valley: two camps, huts, and a spear
+  ['alpha', d(20), d(3), SMALL], // a small valley with snares and pitfalls in the ground, and two camps
 ];
 for (const [seed, N, M, opts] of CASES)
-  test(`seed ${seed}: saved at step ${N}, loaded, and run on, the story is the straight run's`, t => {
+  test(`seed ${seed}: saved on world day ${(N / DAY).toFixed(2)}, loaded, and run on ${(M / DAY).toFixed(2)} days, the story is the straight run's`, t => {
     const o = oracle(seed, N, M, opts);
     t.diagnostic(`${seed}: ${o.midTask} walking, ${o.working} at work, ${o.a.camps.length} camps, ${o.after.length} lines after the save`);
     sameStory(o);
@@ -228,11 +227,11 @@ function lightTheWoods(a, ca, N){
   assert.ok(trees.length > 6 && high.length > 3, 'this world was meant to have woods and tiles off the surface that burn');
   for (const t of trees.slice(0, 6)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: 0 });
   for (const t of high.slice(0, 3)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: t.z });
-  runOn(a, N, 60, ca);   // long enough for the fire to spread, short enough that it still burns
+  runOn(a, N, d(0.06), ca);   // long enough for the fire to spread, short enough that it still burns
   return N + 60;
 }
 test('a world saved while the woods burn runs on as the straight run does', t => {
-  const o = oracle('r', 6000, 3000, SMALL, lightTheWoods);
+  const o = oracle('r', d(6), d(3), SMALL, lightTheWoods);
   const alight = lv => lv.filter(t => t && t.fire > 0).length;
   const offSurface = o.snap.levels.reduce((n, lv, i) => n + (i === o.a.ZOFF ? 0 : alight(lv)), 0);
   t.diagnostic(`fire at the save: ${o.snap.fireCount} tiles, ${offSurface} of them off the surface; grove anger ${JSON.stringify(o.a.groves.map(g => g.anger))}`);
@@ -245,7 +244,7 @@ test('a world saved while the woods burn runs on as the straight run does', t =>
    of about thirty thousand numbers that the save carries whole. A world that digs no den after the
    load would never touch it. This small valley clears a den at tick 4994 and digs a new one at 7994. */
 test('a world that digs a wolf den after the load runs on as the straight run does', t => {
-  const o = oracle('r', 6000, 2500, SMALL);
+  const o = oracle('r', d(6), d(2.5), SMALL);
   const dug = o.loaded.filter(e => /dug a new den/.test(e.text));
   t.diagnostic(`${o.denless} wolves were den-less at the save; after the load: ${dug.map(e => e.text).join(' ')}`);
   assert.equal(dug.length, 1, 'no den was dug after the load, so startRegion and rimExits went untested');
@@ -256,7 +255,7 @@ test('a world that digs a wolf den after the load runs on as the straight run do
 /* A late save of a world of the default size. The three cases above are early or small, so a grown
    valley with a gnome burrow holding a thing and two camps went untested. */
 test('a grown valley of the default size, saved late, runs on as the straight run does', t => {
-  const o = oracle('beta', 13779, 2500, {});
+  const o = oracle('beta', d(13.779), d(2.5), {});
   /* The preconditions are read off the save, not off the world after it ran on: a burrow gives up
      what it holds, and a camp is founded later. */
   const holding = o.snap.caves.filter(c => c.holding).length;
@@ -277,12 +276,15 @@ function burnAHollow(a, ca, N){
   a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: t.z });
   const orphaned = () => a.beings.some(b => b.alive && b.grove && !a.groves.includes(b.grove));
   let at = N;
-  for (let i = 0; i < 800 && !orphaned(); i++){ runOn(a, at, 1, ca); at++; }
+  /* Up to four fifths of a world day, a beat at a time. The bound was 800 old ticks, which was the
+     same span; the grain is the world's own beat because fire spreads on it and no finer. */
+  const beat = a.CLOCK.every.cellular;
+  for (const end = at + d(0.8); at < end && !orphaned(); at += beat) runOn(a, at, beat, ca);
   assert.ok(orphaned(), 'the hollow never burned out under a living sprite, so the stray path went untested');
   return at;
 }
 test('a world whose hollow pine burned out under its sprites saves, loads, and runs on', t => {
-  const o = oracle('r', 4000, 1500, SMALL, burnAHollow);
+  const o = oracle('r', d(4), d(1.5), SMALL, burnAHollow);
   t.diagnostic(`${o.snap.strayGroves.length} stray grove(s) in the save; ${o.b.groves.length} groves left in the world`);
   assert.ok(o.snap.strayGroves.length > 0, 'the save was meant to hold a grove that is in no list');
   /* Several sprites can share one dead grove, and the rules compare `o.grove === g`. */
@@ -297,7 +299,7 @@ test('a world whose hollow pine burned out under its sprites saves, loads, and r
    hold that text after a load, and hold it against the one object the sprites share, or a later
    naming would hand the dead grove's name to something else. */
 test('a grove that burnt out under its sprites keeps its name, held against the grove the sprites share', t => {
-  const o = oracle('r', 4000, 1500, SMALL, burnAHollow);
+  const o = oracle('r', d(4), d(1.5), SMALL, burnAHollow);
   const strays = w => [...new Set(w.beings.filter(b => b.grove && !w.groves.includes(b.grove)).map(b => b.grove))];
   const was = o.a, api = o.b, sa = strays(was), sb = strays(api);
   const texts = sa.flatMap(g => (g.names || []).map(r => r.text));
@@ -321,14 +323,15 @@ function burnAndEmptyAGrove(a, ca, N){
   let at = burnAHollow(a, ca, N);
   const stray = a.beings.filter(b => b.alive && b.grove && !a.groves.includes(b.grove))[0].grove;
   for (const b of a.beings) if (b.alive && b.grove === stray) a.die(b, 'went out with the grove');
-  for (let i = 0; i < 4000 && a.beings.some(b => b.grove === stray); i++){ runOn(a, at, 1, ca); at++; }
+  const beat = a.CLOCK.every.cellular;
+  for (const end = at + d(4); at < end && a.beings.some(b => b.grove === stray); at += beat) runOn(a, at, beat, ca);
   assert.ok(!a.beings.some(b => b.grove === stray), 'the dead sprites were meant to be pruned out of beings');
   assert.ok(!a.groves.includes(stray), 'the grove was meant to be in no list');
   assert.ok(a.nameOf(stray), 'the grove was meant to carry a name');
   return at;
 }
 test('a named grove that no list and no being holds any more saves, loads, and keeps its text taken', t => {
-  const o = oracle('r', 4000, 1200, SMALL, burnAndEmptyAGrove);
+  const o = oracle('r', d(4), d(1.2), SMALL, burnAndEmptyAGrove);
   const was = o.a, api = o.b;
   const lost = o.snap.lostNames.flatMap(h => h.names.map(r => r.text));
   t.diagnostic(`${o.snap.lostNames.length} name(s) the index alone holds: ${lost.join(', ')}`);
