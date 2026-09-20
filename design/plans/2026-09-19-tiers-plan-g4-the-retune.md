@@ -400,6 +400,20 @@ This task answers ruling 2. It is also the task whose numbers decide the floors,
 - [ ] Check that the collector fix has landed, as "The instrument" says. Do not build this gate on the old collector: it would measure the harness. If the fix has not landed, stop and say so rather than working around it.
 - [ ] Write the failing test in `tests/skip.js`, and write it so that it fails against a `runTo` that merely loops `step()`. Six seeds, three world days, skipped and stepped: the same fingerprint, the same chronicle line for line, and the same `tests/names.js` layout. Then the same over 70 days on seed `r`.
 - [ ] Write the adversarial cases as their own tests, each of which must fail if the horizon ignores it: a need that crosses zero inside a jump; a season that turns inside a jump; a pit that goes out inside a jump; a thought whose `until` falls inside a jump; a stop set inside a jump (task 9 reads this one again).
+- [ ] **The pit's out-tick is a REQUIRED entry in `nextEvent()`, and it is the one that is arithmetic
+  rather than a stored tick.** It is the earliest `fuel / (rate × modifiers)` across every lit pit,
+  recomputed whenever a modifier changes — a storm beginning or ending, a season turning, the
+  sprites' favour crossing 30. `src/sim/camps.js:294` writes a chronicle line on that tick, *"The
+  fire goes out. Only embers and cold stone remain."*, and `fingerprint()` hashes `tick|kind|text`,
+  so a jump that crosses the out-tick puts that line at the wrong tick and the skipped and stepped
+  runs disagree. Three more things ride on the same tick and break the same way: `camp.outSince`,
+  `camp.streak` resetting to zero, and the thought added to every camp human with its own `until`.
+  **Every other horizon entry is a tick somebody stored; this one is a division somebody has to
+  remember to register, which is the kind that gets left out.** It is its own adversarial case in
+  `tests/skip.js`, beside the five above.
+- [ ] **`camp.litTicks` and `camp.streak` advance by the span, they are not stepped.** Both run
+  every tick, so a jump must add N rather than loop N times. The two are easy to confuse and only
+  one is right. `camp.bestStreak` follows from the new streak, not from a loop.
 - [ ] Build `nextEvent()` and `runTo(t)` as "The skip" says. `nextEvent()` reads the next-act ticks of task 3 and the next-beat ticks of task 2. Nothing in it reads a wall clock.
 - [ ] The hazard precondition: a burning tile, or an awake predator within reach of a sleeping or working person, pins the horizon to the next tick. Write the test that a wolf closing on a sleeper is never skipped over, and that its absence is.
 - [ ] `runTo` is what the soak, the long run, and `tests/lib/run.js` use. A stepped run stays available and the skip test is what keeps the two honest.
