@@ -93,8 +93,13 @@ test('fire on a hilltop burns and is seen from the hilltop, not from below', () 
   assert.ok(top.fire > 0);
   assert.equal(api.nearestFire(x0 + 1, y0 + 2, 2, 1), 1);
   assert.equal(api.nearestFire(x0 + 1, y0 + 4, 3, 0), -1, 'a fire one level up is not on this level');
-  const before = top.fire; api.step();
-  assert.ok(top.fire < before, 'the hilltop fire should burn down each tick');
+  /* G4 task 2 put `spreadFire` on the cellular beat, so a fire burns down once a minute of world
+     time rather than once a tick. It burns down by the beat's worth each time, so the same fuel
+     lasts the same world time; only the grain changed. Stepping to the next beat is therefore what
+     this assertion has to do, and stepping a single tick would now prove nothing. */
+  const before = top.fire;
+  for (let k = 0; k <= api.CLOCK.every.cellular; k++) api.step();
+  assert.ok(top.fire < before, `the hilltop fire should burn down over a beat: ${before} -> ${top.fire}`);
   assert.equal(api.lightTile(x0 + 1, y0 + 1, 2), 'Nothing here but air.');
 });
 

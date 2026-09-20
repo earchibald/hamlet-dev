@@ -728,8 +728,13 @@ function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive &&
    boundary and not a length of time, and the lint cannot tell the two apart. It also reads comments,
    so this note avoids spelling the expression out. */
 function growPlants(){
+  if (!onBeat('growPlants')) return;
+  /* Looks a run, not looks a tick. The closed form of task 1 is gone with the per-tick call: on a
+     beat the count is the rate times the beat's ticks, which is 60,000 a world day either way. It is
+     still drawn without a random number, so the system keeps a next beat task 4 can name. */
   const rate = CLOCK.plant.samples, at = tick * rate;
-  const samples = Math.floor(at + rate) - Math.floor(at);
+  const samples = Math.floor(at + rate * CLOCK.every.cellular) - Math.floor(at);
+  beats.growPlants.looks += samples;
   for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
@@ -751,7 +756,11 @@ function growPlants(){
   }
 }
   /* Old carcasses rot. */
+/* On the beat, but the sweep itself keeps its own longer period: it walks every item, and food does
+   not spoil finely enough to be worth that 1,440 times a day. The beat is the gate; the period is
+   the work. Both are multiples of the beat, so the next beat is still exactly nameable. */
 function rotCarcasses(){
+  if (!onBeat('rotCarcasses')) return;
   if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */

@@ -112,6 +112,7 @@ function faeTick(){
 }
 /* Groves calm down over time and bear a new sprite in a quiet spring. */
 function groveTick(){
+  if (!onBeat('groveTick')) return;
   if (tick % CLOCK.grove.every === 0) for (const g of groves){ g.anger = Math.max(0, g.anger - 1); const kin = beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g);
     if (seasonOf() === 'spring' && kin.length < 5 && g.anger < 20 && tick - g.lastBirth > CLOCK.grove.birthGap && sectorCount(g.sector, 'oldpines', t => t.feature === 'tree' && tick - (t.planted || 0) > CLOCK.grove.oldPine) > 25 && rng() < CLOCK.grove.birthChance){ g.lastBirth = tick; const q = nearFind(g.x, g.y, q => passable(q.x, q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.born = tick; sp.grove = g; beings.push(sp); } } }
 }

@@ -13,6 +13,7 @@ function burnOut(t){
 
 /* Fire spreads to neighbours and burns down. Rain slows it. Surface tiles first, then the tiles off the surface. */
 function spreadFire(){
+  if (!onBeat('spreadFire')) return;
   if (fireCount <= 0) return;
   let count = 0;
   for (const t of world) if (t.fire > 0){ count++; burnTile(t); }
@@ -21,19 +22,20 @@ function spreadFire(){
 }
 /* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
 function burnTile(t){
-  t.fire -= CLOCK.fire.burn;
+  t.fire -= CLOCK.fire.burn * CLOCK.every.cellular;
   for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
   if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
   for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
-  if (weather.storm) t.fire -= CLOCK.fire.stormQuench;
+  if (weather.storm) t.fire -= CLOCK.fire.stormQuench * CLOCK.every.cellular;
   if (t.fire <= 0) burnOut(t);
 }
 function spreadTo(nx, ny, nz, mult){
   if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
-  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult) ignite(nb);
+  const f = tileFlam(nb); if (f > 0 && rng() < rollFor(f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult, CLOCK.every.cellular)) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
+  if (!onBeat('updateWeather')) return;
   if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
   if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 }
@@ -41,7 +43,7 @@ function updateWeather(){
 function tryLightning(){
   if (camp.site && weather.storm){
     const out = camp.pit && !pitLit();
-    if (rng() < (out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit)){
+    if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
@@ -51,6 +53,9 @@ function tryLightning(){
   }
 }
 /* A stray strike anywhere in the world. */
+/* The chance was a chance a tick and is now rolled once a beat over the beat's ticks, so the strikes
+   a storm makes in a world day are what they were. `rollFor` compounds; it does not multiply. */
 function strayLightning(){
-  if (weather.storm && rng() < CLOCK.rate.strayLightning){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+  if (!onBeat('strayLightning')) return;
+  if (weather.storm && rng() < rollFor(CLOCK.rate.strayLightning, CLOCK.every.cellular)){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
 }

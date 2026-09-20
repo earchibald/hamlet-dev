@@ -147,6 +147,7 @@ const CLOCK = {
     prune: ticks(200),          // the dead leave the list of beings
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
+    cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
   },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
@@ -277,3 +278,35 @@ const CLOCK = {
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
+
+/* ---------- the beats ----------
+   The six systems that look at the world rather than at a being. None of them needs a tick's
+   resolution: a minute of world time is finer than anything a player can see in a plant growing or a
+   fire spreading, and before the retune each ran once per 86.4 world seconds anyway. Running them
+   every tick is 86.4 times the work for a resolution nobody asked for.
+
+   `beats` is the record task 4 reads. `next` is the tick a system runs on again, which is what a
+   horizon needs; `runs` and `looks` are counted for the tests. No rule reads any of it, so it is in
+   NOT_SAVED: a loaded world recomputes every `next` on its first beat.
+
+   A chance that used to be rolled once a tick is now rolled once a beat with `rollFor(rate, n)`,
+   which is the compounded probability over n ticks and not the rate times n. A chance for one LOOK
+   is not rolled at all: the look count carries the world time, and rolling it as well would be task
+   1's finding 5 a second time. */
+const CELLULAR = ['growPlants', 'spreadFire', 'updateWeather', 'strayLightning', 'rotCarcasses', 'groveTick'];
+/* A const container that is emptied and refilled rather than reassigned, because the manifest takes
+   the API's references once at load and a reassignment would leave every reader holding the old
+   object. It is a container, so it is named in KNOWN_CONSTS rather than in SAVED_STATE. */
+const beats = {};
+function resetBeats(){
+  for (const k in beats) delete beats[k];
+  for (const k of CELLULAR) beats[k] = { runs: 0, next: CLOCK.every.cellular, looks: 0 };
+}
+/* True on the ticks a cellular system runs, and it records the next one as it goes. Called at the
+   head of each of the six, so the beat lives in one place rather than in six copies of a modulo. */
+function onBeat(name){
+  if (tick % CLOCK.every.cellular) return false;
+  const b = beats[name] || (beats[name] = { runs: 0, next: 0, looks: 0 });
+  b.runs++; b.next = tick + CLOCK.every.cellular;
+  return true;
+}

@@ -798,6 +798,11 @@ const KNOWN_CONSTS = {
   GOALS: 'a table, filled at load time by recipes.js', SPECIES: 'a table, the god row added at load time',
   LIFE: 'a table, the god row added at load time',
   bfsOut: 'search scratch',
+  /* G4 task 2. The tick each cellular system next runs on, and counters for the tests. No rule reads
+     it, so it is not saved: a loaded world refills it on its first beat, and `resetBeats` empties and
+     refills the same object rather than reassigning it, because the manifest takes the API's
+     references once at load. */
+  beats: 'the cellular beats, rebuilt by resetBeats at every world start',
 };
 /* The containers nothing writes into after load time. Each was checked by the same grep, and none of
    them was hit. A table needs no reason beyond being a table, so this is a list of names. */
@@ -806,6 +811,8 @@ const FROZEN_TABLES = new Set(['SEASON_LENGTHS', 'DIRS', 'RING', 'NEAR', 'AROUND
   'NAMES', 'GATHERERS', 'RECIPES', 'PLACES', 'MAKERS', 'GOD_NAMES', 'EPITHET', 'BODY', 'LEAVES', 'SCAR_OF', 'MAKES',
   'KINDS', 'STRAIN', 'GOD_ACTS', 'GOD_BARS', 'SCAR_PAINTERS', 'SPAWN', 'REFS', 'REF_HOMES', 'REF_DERIVED', 'REF_KINDS',
   'SAVED_STATE', 'NOT_SAVED', 'WALK_HOME', 'DOOR_SOURCES', 'DOOR_ACTS',
+  /* G4 task 2: the names of the systems that run on the cellular beat. Read by `resetBeats`, written by nothing. */
+  'CELLULAR',
   /* The naming tables. The namer reads each one and writes into none of them. */
   'OLD_ONSETS', 'OLD_VOWELS', 'OLD_CODAS', 'OLD_FORBID', 'LAND_WORDS', 'LORE_BUILT', 'LORE_TOOK', 'SKY_MEANINGS',
   'SPRITE_MEANINGS', 'OLD_CAVE_KINDS', 'BIOME_WORD', 'LAND_MARKS', 'WORD_TAIL', 'WORD_PHRASE', 'NOTABLE_TAILS',

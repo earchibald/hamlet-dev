@@ -619,6 +619,7 @@ const CLOCK = {
     prune: ticks(200),          // the dead leave the list of beings
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
+    cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
   },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
@@ -749,6 +750,38 @@ const CLOCK = {
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
+
+/* ---------- the beats ----------
+   The six systems that look at the world rather than at a being. None of them needs a tick's
+   resolution: a minute of world time is finer than anything a player can see in a plant growing or a
+   fire spreading, and before the retune each ran once per 86.4 world seconds anyway. Running them
+   every tick is 86.4 times the work for a resolution nobody asked for.
+
+   `beats` is the record task 4 reads. `next` is the tick a system runs on again, which is what a
+   horizon needs; `runs` and `looks` are counted for the tests. No rule reads any of it, so it is in
+   NOT_SAVED: a loaded world recomputes every `next` on its first beat.
+
+   A chance that used to be rolled once a tick is now rolled once a beat with `rollFor(rate, n)`,
+   which is the compounded probability over n ticks and not the rate times n. A chance for one LOOK
+   is not rolled at all: the look count carries the world time, and rolling it as well would be task
+   1's finding 5 a second time. */
+const CELLULAR = ['growPlants', 'spreadFire', 'updateWeather', 'strayLightning', 'rotCarcasses', 'groveTick'];
+/* A const container that is emptied and refilled rather than reassigned, because the manifest takes
+   the API's references once at load and a reassignment would leave every reader holding the old
+   object. It is a container, so it is named in KNOWN_CONSTS rather than in SAVED_STATE. */
+const beats = {};
+function resetBeats(){
+  for (const k in beats) delete beats[k];
+  for (const k of CELLULAR) beats[k] = { runs: 0, next: CLOCK.every.cellular, looks: 0 };
+}
+/* True on the ticks a cellular system runs, and it records the next one as it goes. Called at the
+   head of each of the six, so the beat lives in one place rather than in six copies of a modulo. */
+function onBeat(name){
+  if (tick % CLOCK.every.cellular) return false;
+  const b = beats[name] || (beats[name] = { runs: 0, next: 0, looks: 0 });
+  b.runs++; b.next = tick + CLOCK.every.cellular;
+  return true;
+}
 
 /* ---------- names: the record, the second stream, and the old tongue ----------
    A name is a record. Every nameable thing keeps a list of records, newest
@@ -2372,8 +2405,13 @@ function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive &&
    boundary and not a length of time, and the lint cannot tell the two apart. It also reads comments,
    so this note avoids spelling the expression out. */
 function growPlants(){
+  if (!onBeat('growPlants')) return;
+  /* Looks a run, not looks a tick. The closed form of task 1 is gone with the per-tick call: on a
+     beat the count is the rate times the beat's ticks, which is 60,000 a world day either way. It is
+     still drawn without a random number, so the system keeps a next beat task 4 can name. */
   const rate = CLOCK.plant.samples, at = tick * rate;
-  const samples = Math.floor(at + rate) - Math.floor(at);
+  const samples = Math.floor(at + rate * CLOCK.every.cellular) - Math.floor(at);
+  beats.growPlants.looks += samples;
   for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
@@ -2395,7 +2433,11 @@ function growPlants(){
   }
 }
   /* Old carcasses rot. */
+/* On the beat, but the sweep itself keeps its own longer period: it walks every item, and food does
+   not spoil finely enough to be worth that 1,440 times a day. The beat is the gate; the period is
+   the work. Both are multiples of the beat, so the next beat is still exactly nameable. */
 function rotCarcasses(){
+  if (!onBeat('rotCarcasses')) return;
   if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */
@@ -2743,12 +2785,22 @@ function theLoneFounder(){
 function updateCamps(){
   afterTheLast();
   theLoneFounder();
+  /* Read once rather than per camp: every camp's rate-driven work shares the world's beat. The
+     event-driven parts below -- an arrival whose tick is stored, a village promotion that waits on a
+     storehouse -- are not on it, because their next moment is already named by something else. */
+  const onCampBeat = tick % CLOCK.every.cellular === 0;
   for (const c of camps){
     camp = c;
     const pt = pitTile();
-    if (pt && pt.struct.lit){
+    /* The pit burns by elapsed time, on the beat, rather than a tick at a time. `pitBurn` is fuel a
+       tick, so a beat costs it the beat's ticks, and `litTicks` and `streak` ADD the beat rather
+       than being stepped through it. They stay counts of ticks; only the grain changes.
+       The tick a fire goes out is therefore a division and not a roll, which is what lets task 4
+       name it ahead of time. It is quantised to the beat now, which is still exactly nameable. */
+    if (pt && pt.struct.lit && onCampBeat){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      const n = CLOCK.every.cellular;
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * n * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks += n; camp.streak += n; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
       if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, CLOCK.thought.fireout); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
@@ -2779,7 +2831,7 @@ function updateCamps(){
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
-    tryLightning();
+    if (onCampBeat) tryLightning();
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
@@ -4215,6 +4267,7 @@ function faeTick(){
 }
 /* Groves calm down over time and bear a new sprite in a quiet spring. */
 function groveTick(){
+  if (!onBeat('groveTick')) return;
   if (tick % CLOCK.grove.every === 0) for (const g of groves){ g.anger = Math.max(0, g.anger - 1); const kin = beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g);
     if (seasonOf() === 'spring' && kin.length < 5 && g.anger < 20 && tick - g.lastBirth > CLOCK.grove.birthGap && sectorCount(g.sector, 'oldpines', t => t.feature === 'tree' && tick - (t.planted || 0) > CLOCK.grove.oldPine) > 25 && rng() < CLOCK.grove.birthChance){ g.lastBirth = tick; const q = nearFind(g.x, g.y, q => passable(q.x, q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.born = tick; sp.grove = g; beings.push(sp); } } }
 }
@@ -4798,6 +4851,7 @@ function burnOut(t){
 
 /* Fire spreads to neighbours and burns down. Rain slows it. Surface tiles first, then the tiles off the surface. */
 function spreadFire(){
+  if (!onBeat('spreadFire')) return;
   if (fireCount <= 0) return;
   let count = 0;
   for (const t of world) if (t.fire > 0){ count++; burnTile(t); }
@@ -4806,19 +4860,20 @@ function spreadFire(){
 }
 /* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
 function burnTile(t){
-  t.fire -= CLOCK.fire.burn;
+  t.fire -= CLOCK.fire.burn * CLOCK.every.cellular;
   for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
   if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
   for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
-  if (weather.storm) t.fire -= CLOCK.fire.stormQuench;
+  if (weather.storm) t.fire -= CLOCK.fire.stormQuench * CLOCK.every.cellular;
   if (t.fire <= 0) burnOut(t);
 }
 function spreadTo(nx, ny, nz, mult){
   if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
-  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult) ignite(nb);
+  const f = tileFlam(nb); if (f > 0 && rng() < rollFor(f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult, CLOCK.every.cellular)) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
+  if (!onBeat('updateWeather')) return;
   if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
   if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 }
@@ -4826,7 +4881,7 @@ function updateWeather(){
 function tryLightning(){
   if (camp.site && weather.storm){
     const out = camp.pit && !pitLit();
-    if (rng() < (out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit)){
+    if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
@@ -4836,8 +4891,11 @@ function tryLightning(){
   }
 }
 /* A stray strike anywhere in the world. */
+/* The chance was a chance a tick and is now rolled once a beat over the beat's ticks, so the strikes
+   a storm makes in a world day are what they were. `rollFor` compounds; it does not multiply. */
 function strayLightning(){
-  if (weather.storm && rng() < CLOCK.rate.strayLightning){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+  if (!onBeat('strayLightning')) return;
+  if (weather.storm && rng() < rollFor(CLOCK.rate.strayLightning, CLOCK.every.cellular)){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
 }
 
 /* ---------- the primal gods ----------
@@ -5827,7 +5885,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0; doomAt = 0;
+  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats();
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
