@@ -121,7 +121,23 @@ function fingerprint(api, events){
     beings: fnv(api.beings.map(b => `${b.id}|${b.species}|${b.alive ? 1 : 0}|${b.x},${b.y},${b.z}|${b.camp ? b.camp.id : ''}`).join('\n')),
     items: fnv(api.items.map(i => `${i.id}|${i.kind}|${i.x},${i.y},${i.z}`).join('\n')),
     legends: fnv(api.legends.map(e => `${e.age}|${e.kind}|${e.text}`).join('\n')),
+    tiles: tileHash(api),
   };
+}
+
+/* What a tile IS, over every level in order: the ground, what stands on it, its berries, its fire,
+   and its structure's type, fuel and lit flag. Nothing else in the fingerprint reads the map, so a
+   change confined to tiles was invisible to the record: a lightning fire that burned twenty world
+   days instead of a quarter of one moved no being and no item, and the golden did not stir (issue
+   74). A null is an unmade tile off the surface and keeps its place in the order. */
+function tileHash(api){
+  const rows = [];
+  for (const level of api.levels){
+    for (const t of level){
+      rows.push(t ? `${t.ground}|${t.feature || ''}|${t.berries}|${t.fire}|${t.struct ? `${t.struct.type},${t.struct.fuel},${t.struct.lit ? 1 : 0}` : ''}` : '');
+    }
+  }
+  return fnv(rows.join('\n'));
 }
 
 /* Living humans, and every den, water cave, and burrow, that cannot be walked to from the first

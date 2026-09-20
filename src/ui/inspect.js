@@ -111,8 +111,11 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
-  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
+     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     hover on the mark reads the act and not the ground it changed. */
+  const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
+    : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     /* sectorSummary is one plain sentence, not markup of its own, so it is escaped whole here,
        at the one place it becomes the tip's innerHTML. Nothing inside it escapes itself first. */

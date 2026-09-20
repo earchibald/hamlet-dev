@@ -5,9 +5,23 @@ const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
+/* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
+   of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
+function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
+function captionFor(rec){
+  return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
+}
+/* The one or two gestures drawn this beat: the act on stage, and the act before it while it fades.
+   Mirrors the pair drawField reads in map.js, so a hover on the mark finds the same act the mark shows.
+   `creation.gestures` holds only the age now playing; an age that has moved on keeps none of them. */
+function liveGestures(){
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  return { now: recs.length ? recs[recs.length - 1] : null, before: recs.length > 1 ? recs[recs.length - 2] : null };
+}
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
 function standsIn(g){
   let r = g.region === null || g.region === undefined ? null : regionById(g.region);
@@ -27,36 +41,66 @@ function countryLine(r){
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
   return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
 }
+/* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
+   both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
+   the player made: decideGod marks every option it tried, so the taken row is the first unfailed row and
+   is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
+   row. E3 does not store the row a player took; a later slice does.
+   No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
+   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a country's "Country" row. */
+function actCard(rec){
+  const m = markFor(rec.kind, rec.value);
+  const g = beingById(rec.god);
+  const said = captionFor(rec);
+  const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
+  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const r = regionById(rec.region !== undefined ? rec.region : rec.near);
+  if (r) rows.push({ label: 'where', value: countryLine(r) });
+  if (rec.weighed && !rec.byPlayer){
+    rows.push({ label: 'weighed', value: rec.weighed.opts.map(o => `${o.type} ${Math.round(o.score)}`).join(' · ') });
+  }
+  return { head, rows };
+}
+/* The act behind a timeline chip, `age:god`, for the foot to show the same card a hover would. Only the
+   age now playing keeps its gestures (see liveGestures), so a chip from an earlier age finds none here;
+   the foot falls back to the chip's own matrix in that case. */
+function actCardForChip(key){
+  if (!key) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  if (creation.gestureAge !== a) return null;
+  const rec = creation.gestures.find(x => x.age === a && x.god === id);
+  return rec ? actCard(rec) : null;
+}
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
   return gods().map(g => ({ a: g, m: g.needs.rest, trouble: g.status === 'awake' && g.needs.calm < 20,
     status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
 }
 
-/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
-function agesDue(acc, dt, pace){
-  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+/* How many beats a frame owes. acc is the part of a beat carried from the last frame. At most eight in a
+   frame: more than that is a tab that slept, and a slept tab snaps rather than replaying in fast forward. */
+function beatsDue(acc, dt, pace){
+  const a = acc + dt * pace / BEAT_MS, n = Math.floor(a);
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
-/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+/* Whether the drawing holds at the end of its beat instead of playing. A world the player paused between
+   beats holds, so nothing sits half drawn. A world the player stepped plays its beat and then holds, which
+   is the whole of what Step is for. A dialog holds everything. */
+function beatStill(dialogOpen){ return dialogOpen || (paused && !ui.playing); }
+
+/* ---- the act in motion ---- The pure parts of the tween. map.js draws; these three say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
-/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
-   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+/* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run
+   time, so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
    caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
-function tweenTier(ms){
+function beatTier(ms){
   if (ms >= TWEEN.full) return 'full';
   if (ms >= TWEEN.figure) return 'figure';
   if (ms >= TWEEN.walk) return 'walk';
   return 'none';
-}
-/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
-   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
-   the order is the chronicle's order, and the last one still finishes. */
-function gestureSlice(i, n, f){
-  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
-  return clamp((f - start) / (1 - start), 0, 1);
 }
 /* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
    is nowhere to draw, and with no `from` the star is already where it belongs. */
@@ -346,7 +390,7 @@ function tlCellText(rec, withWho){
 
 /* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
    cell, blank so timeline.js can draw it and give it the filled cell's own width. */
-const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
   const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
@@ -354,7 +398,23 @@ function timelineModel(){
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
-  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
+  /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
+     more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
+     gesture in a row), and the birth is credited to the newborn, who has no choices row of its own yet.
+     Following `liveGestures().now` would then light nothing, or the wrong row, for exactly the beat
+     that gesture draws. The turn itself is what the timeline's rows and the act card both key on, so
+     that is what stays lit until the next god decides.
+     An age-end beat is the exception: `unmake` and `backstop` (gods.js, called from `ageEnd`) run after
+     every god in the age has already had its turn, and neither writes a `choices` row. On that beat the
+     newest gesture this age is `unmade` or `backstop`, and no turn is on stage, so nothing should light:
+     lighting the last turn would name an act that already finished earlier in the same age, while the
+     map is drawing the age-end act instead. */
+  const thisAge = creation.choices.filter(c => c.age === age);
+  const last = thisAge.length ? thisAge[thisAge.length - 1] : null;
+  const nowGesture = liveGestures().now;
+  const atAgeEnd = !!nowGesture && (nowGesture.kind === 'unmade' || nowGesture.kind === 'backstop');
+  const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
@@ -377,7 +437,7 @@ function timelineModel(){
   const gate = creation.gate;
   const gateCells = [];
   for (let a = from; a <= to; a++){
-    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
   return { shown: true, folded: false, from, to, now, rows, marks: [] };

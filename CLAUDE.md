@@ -7,7 +7,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `src/sim/index.js`: the manifest. `source()` joins the files for the page. `load()` runs them in Node for the tests.
 - `src/sim/recipes.js`: crafts as data. Add a recipe, get a goal.
 - `src/sim/snapshot.js`: the whole world as plain JSON. `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`. The door's `load` act calls `loadSnapshot`.
-- `src/ui/`: the canvas interface. Reads state, draws, handles tools. Never changes the rules. Plain scripts in one scope like `src/sim/`, joined by `src/ui/index.js`. `derive.js` and `keys.js` have no DOM and are tested in `tests/ui.js`, though `derive.js` calls `setFocus` from `actions.js`, so a test that drives it must load `actions` too. View state changes in `actions.js`, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`.
+- `src/ui/`: the canvas interface. Reads state, draws, handles tools. Never changes the rules. Plain scripts in one scope like `src/sim/`, joined by `src/ui/index.js`. `derive.js` and `keys.js` have no DOM and are tested in `tests/ui.js`, though `derive.js` calls `setFocus` from `actions.js`, so a test that drives it must load `actions` too. View state changes in `actions.js`, with four recorded exceptions: the window drag handler in `windows.js`, the palette own list state in `dialogs.js`, the cursor and hover set by the pointer handlers in `main.js`, and the beat clock (`acc`, `ui.playing`, `beatsLastFrame`) driven by the frame loop in `main.js`. `ui.chronFilter` is written directly in `main.js` too. `ui.focus` is not an exception: `setFocus` in `actions.js` is its one writer, and every file but `actions.js` calls it.
 - `src/page.template.html`: the page shell. `__SIM__` and `__UI__` are replaced by `build.js`.
 - `dist/hearth-sim.html`: the built single file, and the release. Every push to `dev` publishes it to GitHub Pages at https://earchibald.github.io/hamlet-dev/ by `.github/workflows/pages.yml`, which rebuilds it and copies it to `index.html` at the site root. So a merge into `dev` is a release to the public site, with no further step. It is no longer published as a Claude artifact. Keep it working. Run `node build.js` after every change to `src/`.
 - `tests/soak.js`: six seeds for 70 days, with assertions and a golden record. Run it after every change to the core. If the numbers moved and the move is what you meant, bless them with `UPDATE_GOLDEN=1 node tests/soak.js`.
@@ -42,6 +42,14 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - Naming moves no being and no item, adds no thought, and changes no need; only `chronicle` and `chronicleLines` may move for naming work.
 - A rule never reads a name's text to decide anything. It reads data tables instead.
 - Text a player reads, and developer documentation, goes through a review panel before it lands. Dispatch three or more Sonnet reviewers on the text alone. Each one judges three things: does it sound human, is it plain English, is it readable. Rewrite on their findings. This applies to every element of gameplay, not only to a batch of new phrases.
+
+- Execute a plan with subagent-driven development. A fresh implementer per task, a task review after
+  each, and a broad review of the whole branch at the end. Do not ask which mode to use, and do not
+  execute a plan inline: the per-task review is what caught the two Criticals in Become E1 task 4 and
+  the four production changes made to satisfy bad tests in E2 task 3.
+- Name a file by its absolute worktree path in chat, in a report, in a review finding, in a PR body,
+  and in a message to another session. A bare relative path opens the primary clone, which is the
+  wrong copy. Inside these documents, repo-relative paths are correct and stay.
 
 ## Rules of the split
 - Files in `src/sim/` are not ES modules. They share one scope. Do not add `import` or `export`.

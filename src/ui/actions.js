@@ -12,9 +12,18 @@ function setTool(id, sticky = false){
    A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
    every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
 function setFocus(v){ ui.focus = v; }
-function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
-function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
+/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+   loop, since they change only when the era or the ladder changes, not every frame. */
+function relabelSpeeds(labels, key){
+  document.querySelectorAll('#speeds .btn').forEach(b => {
+    const label = labels[Number(b.dataset[key])];
+    if (label !== undefined) b.firstChild.textContent = label;
+  });
+}
+function setSpeed(s){ speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
+function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
@@ -49,6 +58,9 @@ function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Mat
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
+   to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
+const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
 /* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
@@ -251,14 +263,17 @@ function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return;
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
-  step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
-  slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
-  faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
+  /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
+  faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
-  speedStep(i){ ACTIONS.speed(SPEEDS[clamp(i, 0, SPEEDS.length - 1)]); },
+  speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
+  hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
@@ -304,6 +319,36 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
+     slice about what the player experiences must be reachable by a player. The turn card waits.
+     The seed is the caller's: the start dialog's close handler reads the box once and hands it in here,
+     so a typed seed is kept, the same way makeWorld leaves newWorld's seed to that one reader. Alt+G
+     is the same button pressed by keyboard: with no seed given yet, it only closes the dialog as 'take',
+     which reaches this again through that same close handler, seed in hand. */
+  takeGod(seed){
+    if (seed === undefined){ $('start').close('take'); return; }
+    newWorld(seed);
+    /* The first god is born at the first age, which a step opens, not startCreation. Take one here so
+       there is a god to take; ageBegin only, never ageDecide, so the turn card still waits and no act
+       runs on its own. The god picture is drawn on the gods' own stream, as every age's is: calling
+       ageBegin here consumes exactly what the first step would have consumed, and agePos is set, so
+       that step goes on to ageDecide and never begins the age twice.
+       Known gap, for whoever builds god-era replay: this one call does not pass the door and is not in
+       the door log. A log replayed onto a fresh startCreation has no record that an age was begun
+       before the become act, and the damage is not one failed lookup. nextId (core.js) is a single
+       counter for beings, camps, regions, boundaries, items and caves alike, so a replay that skips
+       this call hands every later thing an id one below the id the log recorded: the become finds no
+       god, and every id-bearing act after it resolves against the wrong thing. God-era replay is not
+       built today (replayGod selects by tick and runDays starts after settle), so nothing depends on
+       it yet. The fix is a door act that begins the ages, so god-making and the take happen inside one
+       logged act; door.js is not this branch's to change. */
+    withGodRng(() => ageBegin());
+    const g = gods()[0];
+    const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });
+    say(answer);
+    setPaused(true);
+    renderUI(true);
+  },
   saveWorld(){ saveWorld(); },
   loadWorldFile(){ loadWorldFile(); },
   continueWorld(){ continueWorld(); },

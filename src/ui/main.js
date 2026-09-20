@@ -7,9 +7,15 @@ function frame(now){
   if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-      if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
       else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
+  }
+  /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
+     full tier whatever the pace says: Step is the reading mode, and the pace buttons govern running. */
+  if (ui.playing && !anyDialogOpen()){
+    acc = clamp(acc + dt / BEAT_MS, 0, 1);
+    if (acc >= 1) ui.playing = false;
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
   try {
@@ -38,7 +44,7 @@ function initUI(){
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
-  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(b.dataset.speed)); });
+  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(inAges() ? b.dataset.pace : b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);
@@ -49,14 +55,21 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
+     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
+     typed seed survives Take a god the same way it already does Make world. */
   $('start').addEventListener('close', () => {
-    setFocus('map'); const make = $('start').returnValue === 'make'; $('start').returnValue = '';
-    if (make) newWorld($('seed').value.trim() || randomSeed());
+    setFocus('map'); const rv = $('start').returnValue; $('start').returnValue = '';
+    if (rv === 'make' || rv === 'take'){
+      const seed = $('seed').value.trim() || randomSeed();
+      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+    }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
+  $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
   document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });
@@ -83,7 +96,18 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
-  wcv.addEventListener('pointermove', e => { if (inAges()){ const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 }; tipTarget = { field: [c.x, c.y] }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return; } whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => {
+    if (inAges()){
+      const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 };
+      /* Within the mark's own halo (see drawMark's 34-unit ring) a hover reads the act; past it, the
+         country under the pointer stands as it always has. */
+      const p = worldPixelFrom(e), { now, before } = liveGestures();
+      const onMark = [now, before].find(rec => rec && rec.to !== null && rec.to !== undefined && Math.hypot(p.x - tileSpot(rec.to).x, p.y - tileSpot(rec.to).y) <= 34);
+      tipTarget = onMark ? { act: onMark } : { field: [c.x, c.y] };
+      tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return;
+    }
+    whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip();
+  });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => {
     if (inAges()){ const c = tileFromWorld(e); openGodAt(c.x, c.y); return; }

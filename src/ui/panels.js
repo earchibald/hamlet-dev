@@ -126,12 +126,27 @@ function chipFootLine(chip){
   const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('<span class="muted">·</span>');
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
+/* An act's card, in the same table an inspected region already shows: a muted head, then its rows as
+   label and value. Every string came from the simulation, so it passes through esc. Used for the hover
+   on a mark and, through actFootLine, for the timeline cell that opens the same act. */
+function actCardHTML(card){
+  const rows = card.rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.value)}</td></tr>`).join('');
+  return `<div class="muted" style="margin:1px 0 5px">${esc(card.head)}</div><table class="kv">${rows}</table>`;
+}
+/* The act's card, as one line for the foot: the head, then its rows as label and value. */
+function actFootLine(card){
+  const rows = card.rows.map(r => `<span class="chiprow">${esc(r.label)}: ${esc(r.value)}</span>`).join('<span class="muted">·</span>');
+  return `<span class="chiphead">${esc(card.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${esc(cursorPhrase())}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${esc(ui.note.text)}</span>`; return; }
   ui.note = null;
-  const chip = footChip();
+  /* The chip's own age still plays: the same act has a gesture, and its card is the one the mark on the
+     field shows. An older chip keeps no gesture (see actCardForChip), so the chip's own matrix stands. */
+  const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
+  const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }

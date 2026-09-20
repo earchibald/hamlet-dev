@@ -13,11 +13,13 @@ function tlCell(c){
     s.className = 'cell' + (c.blank ? ' blank' : '');
     s.textContent = c.text;
     if (c.text) s.title = c.text;
+    s.classList.toggle('playing', !!c.playing);
     return s;
   }
   const b = document.createElement('button');
   b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
   b.dataset.chip = c.chip; b.textContent = c.text; b.title = c.text;
+  b.classList.toggle('playing', !!c.playing);
   return b;
 }
 function drawTimeline(){
