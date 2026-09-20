@@ -2,8 +2,9 @@
 /* Search runs over all levels. A tile's index is idx3(x, y, z). Neighbours come from steps(): the four beside,
    up from a slope, down onto one. Visited tiles are marked with a generation counter, never cleared. */
 let bfsPrev, bfsSeen, bfsGen = 0; const bfsOut = [];
+let reachSeen, reachGen = 0;
 /* The search buffers cover every level of the world. startWorld sizes them once the options are set. */
-function allocSearch(){ bfsPrev = new Int32Array(NZ * W * H); bfsSeen = new Uint32Array(NZ * W * H); bfsGen = 0; }
+function allocSearch(){ bfsPrev = new Int32Array(NZ * W * H); bfsSeen = new Uint32Array(NZ * W * H); bfsGen = 0; reachSeen = new Uint32Array(NZ * W * H); reachGen = 0; }
 const unpack = i => { const z = ((i / (W * H)) | 0) + ZMIN, r = i - (z - ZMIN) * W * H, x = r % W; return [x, (r - x) / W, z]; };
 function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
   if (goal(sx, sy, sz)) return [];
@@ -27,13 +28,13 @@ function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
   return null;
 }
 function reachable(sx, sy, sz, cap = 4000){
-  const s = idx3(sx, sy, sz); const seen = new Set([s]); const q = [s]; const out = [];
+  const s = idx3(sx, sy, sz); const seen = reachSeen, gen = ++reachGen; seen[s] = gen; const q = [s]; const out = [];
   for (let head = 0; head < q.length && head < cap; head++){
     const c = q[head]; const cz = ((c / (W * H)) | 0) + ZMIN, cr = c - (cz - ZMIN) * W * H, cx = cr % W, cy = (cr - cx) / W;
     const st = steps(cx, cy, cz, out);
-    for (let k = 0; k < st.length; k += 3){ const ni = idx3(st[k], st[k + 1], st[k + 2]); if (seen.has(ni)) continue; seen.add(ni); q.push(ni); }
+    for (let k = 0; k < st.length; k += 3){ const ni = idx3(st[k], st[k + 1], st[k + 2]); if (seen[ni] === gen) continue; seen[ni] = gen; q.push(ni); }
   }
-  return seen;
+  return new Set(q);
 }
 /* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
 function pathToStop(a, tx, ty, within, tz = 0){
