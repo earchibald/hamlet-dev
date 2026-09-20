@@ -85,12 +85,52 @@ test('the old-age literal is not below the floor the life table gives', () => {
   assert.ok(LH.adult < LH.old && LH.old < LH.life, `the life table is out of order: adult ${LH.adult}, old ${LH.old}, life ${LH.life}`);
 });
 
+/* The lint below reads the soak's source, so it must not read prose as code. tests/soak.js is
+   written almost entirely in block comments, and the practice in this project is to write the reason
+   beside the rule. So the most natural comment anyone could add to that file is an explanation of
+   why the single guard was wrong, quoting `DAYS >= DEFAULT_DAYS`. A lint that goes red on that
+   comment gets the comment deleted, not the lint fixed.
+
+   So whole block-comment spans go first, then each line comment to the end of its line. A
+   line-prefix filter is not enough: the second line of a block comment begins with prose, not with a
+   marker. Strings are left alone, because a string is code. The span regex would eat code if
+   tests/soak.js ever held a comment marker inside a string literal. It holds none today, and the
+   test below names the file's first and last lines of code so a runaway strip is caught. */
+function stripComments(src){
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
+
+/* The lint's own stripper, on a fixture. A lint is only as good as what it reads, and the first cut
+   of this one read every continuation line of a block comment as code (the coordinator's gate found
+   it). Nothing held that regex in place, so this test does. */
+test('the lint reads prose as prose, wherever the comment marker sits', () => {
+  const prose = [
+    '/* A note on one line: DAYS >= DEFAULT_DAYS was the old guard. */',
+    '/* A note whose marker is on the line above,',
+    '   so this line begins with prose: DAYS >= DEFAULT_DAYS. */',
+    'const n = 1; // and a trailing note: DAYS >= DEFAULT_DAYS'
+  ].join('\n');
+  assert.doesNotMatch(stripComments(prose), /DAYS\s*>=\s*DEFAULT_DAYS/,
+    'the stripper left a banned pattern behind, so the lint would go red on a comment that explains the defect it guards against');
+  assert.match(stripComments(prose), /const n = 1;/, 'the stripper ate the code beside a trailing comment');
+});
+
+/* The other way the stripper can fail, and the quieter one. A span-eating regex that ran away would
+   leave nothing to lint, and a lint with nothing to read passes. So the landmarks are named: the
+   soak's first line of code and its last must both survive the strip. */
+test('the lint still has the soak to read after the strip', () => {
+  const code = stripComments(fs.readFileSync(path.join(__dirname, 'soak.js'), 'utf8'));
+  assert.match(code, /const DEFAULT_SEEDS = \[/, 'the strip ate the top of tests/soak.js');
+  assert.match(code, /test\('write the golden record'/, 'the strip ate the bottom of tests/soak.js');
+  assert.doesNotMatch(code, /\/\*|\*\//, 'a comment marker survived the strip, so a comment survived with it');
+});
+
 /* The guards are only worth testing if the soak uses them. This reads the soak's own source, the way
    tests/clock.js lints the rules for bare time literals. Nothing else here would catch the day the
    soak went back to one guard. */
 test('the soak gates each claim with its own guard and not with DEFAULT_DAYS', () => {
   const src = fs.readFileSync(path.join(__dirname, 'soak.js'), 'utf8');
-  const code = src.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  const code = stripComments(src);
   assert.match(code, /require\('\.\/lib\/claims'\)/, 'tests/soak.js no longer loads the claim guards');
   assert.match(code, /skip: seasonClaimSkip\(DAYS\)/, 'the season claim is not gated by seasonClaimSkip');
   assert.match(code, /skip: oldAgeClaimSkip\(DAYS\)/, 'the old-age claim is not gated by oldAgeClaimSkip');
