@@ -193,8 +193,10 @@ function drawField(){
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
   if (key !== fieldKey){
     /* The field last drawn becomes the field the new one fades in over. A new world, a thrown-back valley,
-       and a frame that ran two or more beats have nothing to fade from, so they snap. */
-    fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || creation.gestures.length > fieldGestures + 1;
+       and a frame that ran two or more beats have nothing to fade from, so they snap. The beat count is
+       the frame loop's, not a guess from the gesture count: one decision can write two gestures, and
+       that is still one beat with one act to draw. */
+    fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
     fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
@@ -206,7 +208,11 @@ function drawField(){
   const recs = creation.gestureAge === age ? creation.gestures : [];
   const now = recs.length ? recs[recs.length - 1] : null;
   const before = recs.length > 1 ? recs[recs.length - 2] : null;
-  const figures = f < 1 && (tier === 'full' || tier === 'figure');
+  /* A world holding still after its beat still shows the act it just played. `f` is 1 there, so the
+     cross-fade and the walk are over, but the mark, the word and the caption are what the player stopped
+     to read: Step is the reading mode, and erasing the act at the end of its own beat left the face on
+     screen for the last 150 ms of it and nothing afterwards. */
+  const figures = (f < 1 || still) && (tier === 'full' || tier === 'figure');
 
   /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
   const skip = new Set();

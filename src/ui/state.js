@@ -33,6 +33,10 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
+   single act to fade from. Counting gestures cannot stand in for this: one decision can write two
+   gestures — a split that also gives birth — and that is one beat, with an act to draw. */
+let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */

@@ -19,7 +19,7 @@ const KEYMAP = [
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
   { key: 'Tab',        shift: true, focus: 'any', action: 'focusPrev', label: 'Previous panel' },
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
-  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
+  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one act', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
   { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
