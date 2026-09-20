@@ -41,8 +41,15 @@ TASKS.walkTo = { type: 'travel', begin: () => false,
   stops: [(a, t) => goTo(a, t, t.args.at[0], t.args.at[1], t.args.within, t.args.at[2] || 0) || 'done'] };
 function runTask(a){
   const t = a.task; a.status = t.label;
-  if (t.wait > 0){ t.wait--; return; }
+  /* A wait was a countdown, one off a tick. It is the tick the wait is over on now, so the being names
+     it as its next act and nothing is stepped in between. A wait must still be sat out: a being roused
+     early by the proximity pass, or looked at on the body beat, does not have its wait cut short. */
+  if (t.wait > 0){ t.waitUntil = tick + t.wait; t.wait = 0; }
+  if (t.waitUntil > tick) return;
   if (t.path.length){
+    /* Walking is not working. `worked` is the tick work was last put into a job, and it moves with the
+       walk so that a long walk to the work tile is not credited as work done on arrival. */
+    t.worked = tick;
     /* A tick is one world second and a tile is a stride, so walking is one tile a tick and a run is
        two. `stride` is the species' walking speed in tiles a tick; `fast` is the run.
        In the dark a person feels their way at half speed. That was a flag on the being that flipped
@@ -106,10 +113,18 @@ function workKind({ label, amount, skill, effect, type = 'work' }){
       return { label: `Walking to ${of(label, args).toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: args.at, within: 1 };
     },
     stops: [(a, t) => {
-      const at = t.args.at, r = goTo(a, t, at[0], at[1], 1); if (r) return r;
+      /* `worked` is the tick this job last had work put into it. A worker that names the tick its job
+         ends is not looked at on every tick of it, so when it is looked at it puts in the work of the
+         stretch that passed and not of one tick. `runTask` moves `worked` with every step of the walk,
+         so the walk to the work tile is never credited as work. */
+      const at = t.args.at, r = goTo(a, t, at[0], at[1], 1); if (r){ t.worked = tick; return r; }
       const l = of(label, t.args), n = of(amount, t.args);
-      t.progress += workSpeed(a, of(skill, t.args) || skillOfLabel(l)); t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
-      if (t.progress < n) return 'continue';
+      const speed = workSpeed(a, of(skill, t.args) || skillOfLabel(l));
+      const ran = t.worked === undefined ? 1 : Math.max(1, tick - t.worked);
+      t.worked = tick;
+      t.progress += speed * ran; t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
+      /* The job names the tick it finishes on, so the worker is not woken on every tick of it. */
+      if (t.progress < n){ t.due = tick + Math.ceil((n - t.progress) / speed); return 'continue'; }
       /* Only a job that finished a structure names the ground. The test is the work tile itself,
          read before the effect and again after: bare before and built after means this job raised
          it. Feeding a fire, cooking at one, or checking a snare works at a structure that already

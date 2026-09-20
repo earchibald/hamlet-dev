@@ -285,8 +285,9 @@ function learnName(thing, a, what){
   return true;
 }
 /* Only a person reads marks, and only while there are marks left to read. Both tests are one
-   comparison each, because this runs for every awake person on every tick. What is learned, and
-   the tick it is learned on, are the same as they would be without them. */
+   comparison each. This used to run for every awake person on every tick; since G4 task 3 it runs when
+   a person acts, which for a walker is still every tick and for a person at a job is once a world
+   minute. A person who has not moved has no new mark to read. */
 function learnNamesHere(a){
   if (!lore || !lore.unknown || a.species !== 'human') return;
   const t = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null; if (!t) return;

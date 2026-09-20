@@ -79,9 +79,12 @@ const dayOfYear = (d = dayOf()) => ((d - 1) % YEAR_DAYS) + 1;
 const yearOf = (d = dayOf()) => Math.floor((d - 1) / YEAR_DAYS) + 1;
 const seasonOf = (d = dayOf()) => { let n = dayOfYear(d); for (let i = 0; i < 4; i++){ if (n <= SEASON_LENGTHS[i]) return SEASONS[i]; n -= SEASON_LENGTHS[i]; } return SEASONS[3]; };
 const isWinter = (d = dayOf()) => seasonOf(d) === 'winter';
-const hourOf = () => ((tick % DAY) / DAY) * 24;
-const dayOf = () => Math.floor(tick / DAY) + 1;
-const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
+const hourOf = (t = tick) => ((t % DAY) / DAY) * 24;
+const dayOf = (t = tick) => Math.floor(t / DAY) + 1;
+/* Night falls at 20:00 and lifts at 06:00. `CLOCK.night` holds the two hours as ticks into the day,
+   because a rule that computes a being's state over a stretch of ticks has to know the tick the
+   stretch breaks on and cannot ask an hour. */
+const isNight = (t = tick) => { const s = t % DAY; return s >= CLOCK.night.falls || s < CLOCK.night.lifts; };
 
 /* Every duration and every rate that is not a row of a species, a life, or a recipe. Rules read
    this table by name. No rule holds a bare tick count. */
@@ -148,7 +151,11 @@ const CLOCK = {
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
     cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
+    body: mins(1),              // the longest a being's body goes unread. See `catchUp` in beings.js.
   },
+  /* When night falls and when it lifts, as ticks into the day. `isNight` reads them, and so does the
+     stretch machinery in beings.js, which needs the tick and not the hour. */
+  night: { falls: hours(20), lifts: hours(6) },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
@@ -275,6 +282,7 @@ const CLOCK = {
     axeMade: ticks(1500), axeCut: ticks(3000),
     pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
     clothes: ticks(1500), garden: ticks(1500),
+    woken: mins(30),   // roused from sleep by something near. Written in world units: a new value never takes a marker.
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };

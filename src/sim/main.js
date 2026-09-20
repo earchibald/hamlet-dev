@@ -43,6 +43,8 @@ function poke(a){
   /* A sleeping god is a being in the list like any other, and a nudge would startle it awake and set it wandering.
      What wakes a god is its own rule, and it is not built yet (the spec's section 5). Until then the door refuses. */
   if (a.species === 'god') return `${a.name} sleeps on, ${a.epithet}. A nudge from above does not wake a god.`;
+  /* A nudge that wakes a sleeper changes which way rest runs, so the body is brought up to date on this tick before the flag turns. */
+  catchUp(a); if (!a.alive) return `${a.name} does not stir.`;
   if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + CLOCK.limit.poked; addThought(a, 'poked', 'Felt a nudge from above', 2, CLOCK.thought.poked); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
   failTask(a); a.asleep = false; a.task = null; startTask(a, 'flee') || startTask(a, 'wander'); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
@@ -70,6 +72,18 @@ function step(oneAct){
   if (pending) return 'The turn is yours.';
   if (era === 'gods') return ageStep(oneAct);
   tick++; updateWorld(); camp = camps[0];
-  for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
+  /* Danger first, on every tick, for the beings that are not acting on this one. It only brings an act
+     forward; the act itself is below. See `senseBeings` in beings.js. */
+  senseBeings();
+  /* A being acts on the tick it named, and not on every tick. `updateBeing` brings its body up to date
+     before it does anything, so a being skipped for a minute of world time is a being whose day is
+     computed rather than stepped, not one whose day did not happen. */
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false || a.next > tick) continue;
+    updateBeing(a);
+    /* `nextAct` and the body beat are both at least one tick, so the soonest next act is the next
+       tick and no floor is needed here. */
+    if (a.alive) a.next = tick + Math.min(CLOCK.every.body, nextAct(a));
+  }
   if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }

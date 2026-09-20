@@ -317,6 +317,10 @@ const NOT_SAVED = {
   chronicleWritten: 'a count for the test harness, not world state',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
+  threatSources: "the tick's people, foxes and wolves, for threatsFor; rebuilt on the next call",
+  threatSourcesAt: 'the tick that list was built on',
+  threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
+  threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
