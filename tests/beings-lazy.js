@@ -333,8 +333,14 @@ test('the old-age roll runs once a world day', () => {
 
 /* The budget. A wall time is a property of the machine, so the load average is printed beside it and
    the assertion stands down on a busy machine rather than teach the reader to re-run a red gate.
-   PR 31 removed this repository's one wall-clock assertion for exactly that reason. */
-test('a world day at day 3 costs under five seconds', () => {
+   PR 31 removed this repository's one wall-clock assertion for exactly that reason.
+ *
+ * Standing down is a skip and not a pass. The load average and the wall seconds rise together, so the
+ * guard stands down in exactly the condition that would make the assertion bite. A bare `return` had
+ * printed a green tick and a suite count of 0 skipped, and the task 3 review set the budget to
+ * 0.0001 s and still got 13 pass, 0 fail, 0 skipped. So the suite's own numbers must say when the
+ * budget went unmeasured, and the skip names the load average that caused it. */
+test('a world day at day 3 costs under five seconds', ctx => {
   const api = load();
   api.startWorld('r');
   const god = i => { for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 }); };
@@ -346,9 +352,6 @@ test('a world day at day 3 costs under five seconds', () => {
   }
   const load1m = os.loadavg()[0];
   console.log(`    day 3 on seed r: ${secs.toFixed(2)} s, one-minute load average ${load1m.toFixed(2)}`);
-  if (load1m > 2){
-    console.log(`    the budget is not asserted at a load average of ${load1m.toFixed(2)}: run it again on a quiet machine`);
-    return;
-  }
-  assert.ok(secs < 5, `a world day at day 3 took ${secs.toFixed(2)} s, and the budget is 5 s`);
+  if (load1m > 2) return ctx.skip(`the budget went unmeasured at a one-minute load average of ${load1m.toFixed(2)}, which is over 2; the day took ${secs.toFixed(2)} s. Run it again on a quiet machine.`);
+  assert.ok(secs < 5, `a world day at day 3 took ${secs.toFixed(2)} s at a one-minute load average of ${load1m.toFixed(2)}, and the budget is 5 s`);
 });
