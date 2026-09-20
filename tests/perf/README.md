@@ -74,6 +74,8 @@ minutes apart if other jobs are running.
 ### The CPU profile
 
 `--profile` runs the world once more under `node:inspector`'s CPU profiler.
+It takes two profiles. PLAY covers the ticks only. CREATION covers `startWorld` only.
+World creation runs once and is costly, so one profile of both would mix its functions into the shares of daily play.
 It prints the top 25 functions by SELF time (time in the function's own
 lines). It prints the top 15 by INCLUSIVE time (the function plus everything
 it calls). Each line names a file and a line number you can open.
