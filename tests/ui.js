@@ -862,15 +862,24 @@ test('the hurry asks before it skips, and declining leaves the creation where it
   assert.equal(go, undefined, 'the doing of it is not on a key: it is the dialog button');
 });
 
-test('a creation watched age by age is the creation that startWorld runs', () => {
-  const a = sim.load(), b = sim.load();
+test('a creation watched age by age, or act by act, is the creation that startWorld runs', () => {
+  const a = sim.load(), b = sim.load(), c = sim.load();
   a.startWorld('gamma');
   b.startCreation('gamma', {}); let n = 0; while (b.era === 'gods' && n++ < 1000) b.step();
+  /* Act by act is E3's unit and the thing the whole branch rests on: the pace decides when a step
+     happens and never what it does. Only the age-by-age unit was held here, which is the unit E3
+     replaced, so the invariant was pinned at the one granularity the view no longer uses. */
+  c.startCreation('gamma', {}); let m = 0; while (c.era === 'gods' && m++ < 5000) c.step(true);
   assert.equal(b.era, 'days');
+  assert.equal(c.era, 'days');
   assert.deepEqual(b.legends.map(e => e.text), a.legends.map(e => e.text));
-  const pa = a.firstPerson(), pb = b.firstPerson();
+  assert.deepEqual(c.legends.map(e => e.text), a.legends.map(e => e.text), 'act by act tells the same story');
+  const pa = a.firstPerson(), pb = b.firstPerson(), pc = c.firstPerson();
   assert.deepEqual([pb.x, pb.y, pb.name], [pa.x, pa.y, pa.name]);
+  assert.deepEqual([pc.x, pc.y, pc.name], [pa.x, pa.y, pa.name], 'act by act settles the same valley');
   assert.equal(b.tick, a.tick);
+  assert.equal(c.tick, a.tick, 'act by act lands on the same tick');
+  assert.equal(c.creation.ages, a.creation.ages, 'and on the same count of ages');
 });
 
 const PAL = { 'field-none': '#808080', 'field-wet': '#0000ff', 'field-dry': '#ffff00', 'field-hot': '#ff0000', 'field-cold': '#00ffff', 'field-above': '#ffffff', 'field-below': '#000000', 'field-light': '#ffffff', 'field-dark': '#000000', 'field-still': '#00ff00', 'field-moving': '#ff00ff' };
@@ -1450,38 +1459,51 @@ test('the act card names the act, its place in the age, and what the god weighed
   assert.ok(card.rows.length >= 2);
 });
 
-test('the act card withholds the weighed row for a record the player made', () => {
+test('the act card shows what a god weighed, on the record the engine actually writes', () => {
+  /* What this used to assert, and why it was worth nothing. It hand-built `{ ...gestures[0],
+     byPlayer: true }` and checked that the weighed row was withheld. No gesture record carries
+     `byPlayer`: `gesture()` in gods.js never writes it, and the field exists on exactly one shape in the
+     codebase, the `creation.choices` row. actCard is only ever handed a gesture — from the hover, and
+     from actCardForChip's `creation.gestures.find(...)`. So the old test asserted a branch on a field
+     that is never present, on a record the engine cannot produce, and it passed for that reason. It read
+     as coverage and was not. The guard stays as cheap insurance and is filed; this pins what is true. */
   const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'actCard']);
-  api.startWorld('gamma');
-  api.step(true);
-  /* The record carries a real weighed block. With `weighed: null` the row is absent either way, and the
-     test would pass with the byPlayer guard deleted — it would agree with the fault it exists to catch. */
-  const weighed = { opts: [{ type: 'split', region: 0, score: 4 }], picked: 'split' };
-  const rec = { ...api.creation.gestures[0], byPlayer: true, weighed };
+  api.startCreation('gamma', {});
+  let rec = null;
+  for (let k = 0; k < 60 && api.era === 'gods' && !rec; k++){
+    api.step(true);
+    rec = api.creation.gestures.find(g => g.weighed && g.weighed.opts && g.weighed.opts.length) || null;
+  }
+  assert.ok(rec, 'the creation wrote a gesture carrying what its god weighed');
+  assert.equal(rec.byPlayer, undefined, 'a gesture record carries no byPlayer field at all');
   const card = api.actCard(rec);
-  assert.equal(card.rows.some(r => r.label === 'weighed'), false,
-    'the taken row cannot be derived for a player record until a later slice stores it');
-  /* The control. The same record the engine made shows the row, so the line above is the guard talking. */
-  const mine = api.actCard({ ...rec, byPlayer: false });
-  assert.equal(mine.rows.some(r => r.label === 'weighed'), true,
-    'an act the engine decided still shows what it weighed');
+  const row = card.rows.find(r => r.label === 'weighed');
+  assert.ok(row, 'the card shows the weighed row for an act the engine decided');
+  for (const o of rec.weighed.opts) assert.ok(row.value.includes(o.type), `the weighed row names ${o.type}`);
 });
 
 /* A canvas that draws nothing and keeps the list of what it was asked to draw. */
 function recordCtx(){
   const calls = [];
-  const note = name => (...a) => { calls.push(name); return a; };
-  const c = { calls, measureText: () => ({ width: 40 }) };
+  /* The words the canvas was asked to draw, so a test can name the one it means. Only drawMark writes
+     an act's word, so the word is the one unambiguous sign that the act's face reached the field. */
+  const texts = [];
+  const note = name => (...a) => { calls.push(name); if (name === 'fillText' || name === 'strokeText') texts.push(String(a[0])); return a; };
+  const c = { calls, texts, measureText: () => ({ width: 40 }) };
   for (const k of ['setTransform', 'clearRect', 'fillRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'scale', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = note(k);
   for (const k of ['fillStyle', 'strokeStyle', 'globalAlpha', 'lineWidth', 'font', 'textAlign', 'textBaseline']) Object.defineProperty(c, k, { set(v){ /* ink is not drawing */ }, get(){ return ''; } });
   return c;
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
-function fieldRig(seed, ages){
-  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', ...TWEENS], {
-    setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; }',
+function fieldRig(seed, ages, perBeat){
+  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+    setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
     setAcc: '(v) => { acc = v; }',
+    /* The world stopped between beats, which is what Step leaves behind. */
+    setStill: '(p) => { paused = p; ui.playing = false; }',
+    /* What the frame loop reports it ran. The field snaps on two or more. */
+    setBeats: '(n) => { beatsLastFrame = n; }',
   });
   const P = {};
   for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'bg', 'map-halo', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
@@ -1490,13 +1512,63 @@ function fieldRig(seed, ages){
   global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => recordCtx() }), querySelector: () => null };
   global.Path2D = function(d){ this.d = d; };
   api.startCreation(seed);
-  for (let k = 0; k < ages && api.era === 'gods'; k++) api.step();
+  /* Age by age by default, because that is the unit the older field tests were written against. Beat by
+     beat when the test is about one act, which is E3's unit. */
+  const one = () => perBeat ? api.step(true) : api.step();
+  for (let k = 0; k < ages && api.era === 'gods'; k++) one();
   api.setUp({ wctx, ocv, octx, P });
   /* One draw fills the cache, and one age follows it, so the next draw has a field to fade from. That is
      what a running page does: the first age of a world snaps, and every age after it tweens. */
-  api.drawField(); api.step();
+  api.drawField(); one();
   return { api, wctx };
 }
+
+test('a beat that writes two gestures still draws its act: the split that wakes a god', () => {
+  /* One decision can write two gestures — a god splits a country and a new god wakes in the half it made.
+     That is one beat with one act to draw. The field used to snap on it, because the rule that says "a
+     frame ran two or more beats" was written as "the gesture count rose by more than one". The player
+     lost the mark, the word and the caption on the one beat that shows the pantheon growing, while the
+     timeline lit that act's cell: the stage went blank and the record said something was on it. */
+  const { api, wctx } = fieldRig('gamma', 2, true);
+  let wrote = 0;
+  for (let k = 0; k < 300 && api.era === 'gods' && wrote < 2; k++){
+    const ageBefore = api.creation.gestureAge, n0 = api.creation.gestures.length;
+    api.setBeats(1);
+    api.step(true);
+    wrote = api.creation.gestureAge === ageBefore ? api.creation.gestures.length - n0 : 0;
+    if (wrote < 2) api.drawField();
+  }
+  assert.ok(wrote >= 2, 'the creation reached a beat that wrote two gestures in one age');
+  const recs = api.creation.gestures, now = recs[recs.length - 1];
+  const word = api.markFor(now.kind, now.value).word.toUpperCase();
+  /* Past TWEEN.word, which is where drawMark starts writing the word at all. */
+  api.setAcc(0.9);
+  wctx.texts.length = 0;
+  api.drawField();
+  assert.ok(wctx.texts.includes(word), `the act on stage draws its word, ${word}`);
+});
+
+test('the act still shows after its beat ends, because a world holding still is a world being read', () => {
+  /* Step plays one beat and then holds. The act's face used to be drawn only while the beat was in
+     motion, so the word appeared at 85 per cent of the beat and was erased at 100: on screen for about
+     150 ms, and gone for as long as the player looked at it. Step is the reading mode; it was the mode
+     that showed the act for the shortest time. */
+  const { api, wctx } = fieldRig('gamma', 3, true);
+  api.setBeats(1);
+  api.step(true);
+  const recs = api.creation.gestures, now = recs[recs.length - 1];
+  const word = api.markFor(now.kind, now.value).word.toUpperCase();
+  api.setAcc(0.9);
+  wctx.texts.length = 0;
+  api.drawField();
+  assert.ok(wctx.texts.includes(word), 'the act draws its word while its beat runs');
+  /* The beat is over and the world is paused: exactly what the player is looking at after pressing `.` */
+  api.setStill(true);
+  api.setAcc(1);
+  wctx.texts.length = 0;
+  api.drawField();
+  assert.ok(wctx.texts.includes(word), 'the act still draws its word once the world holds still');
+});
 
 test('the field draws every gesture kind, including the five no seed makes, and touches no rule', () => {
   const { api, wctx } = fieldRig('r', 6);
@@ -1550,34 +1622,40 @@ test('a gesture with a line and a decision draws more than one without them', ()
   assert.ok(said > plain, 'a line that was written prints no caption');
   const weighed = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
   assert.ok(weighed > plain, 'a decision shows no intent cue at the slow tier');
-  /* The cue is the first thing dropped as the pace rises. */
-  api.setPace(4);
+  /* The cue is the first thing dropped as the pace rises. Pace 2 is the top of the ages' own ladder:
+     a 500 ms beat, the `figure` tier, where the cue is gone and the act's face is not. Driving this at
+     a pace off PACES put the whole gesture layer below `walk`, so the assertion held because nothing
+     drew at all, and it would have held just as well if the cue had leaked into `figure`. */
+  api.setPace(api.PACES[api.PACES.length - 1]);
   const fast = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
   const fastPlain = count({ ...head, kind: 'claim' });
   assert.equal(fast, fastPlain, 'the intent cue still draws below the slow tier');
 });
 
-test('at the fastest pace the field is the picture it was, and no gesture draws', () => {
-  const { api, wctx } = fieldRig('x', 6);
-  const r = api.liveRegions()[0], g = api.gods()[0];
-  const rec = { kind: 'claim', god: g.id, age: api.age, from: r.tiles[0], to: r.tiles[1], said: null, weighed: null, region: r.id, pole: g.pole };
-  api.setPace(64); api.setAcc(0.5);
-  api.creation.gestures.length = 0;
-  wctx.calls.length = 0; api.drawField();
-  const quiet = wctx.calls.join(',');
-  api.creation.gestures.push(rec);
-  wctx.calls.length = 0; api.drawField();
-  assert.equal(wctx.calls.join(','), quiet, 'a gesture drew something at the fastest pace');
-  /* One image, not two: at this pace there is no cross-fade. */
-  assert.equal(wctx.calls.filter(c => c === 'drawImage').length, 1);
-  /* At the slowest pace the same age draws the field as it was, and the new one over it. */
+test('every pace the player can reach draws the act on stage, and the slow ones cross-fade', () => {
+  /* PACES spans 4000 ms down to 500 ms, which is the `full` tier and the `figure` tier. The `walk` and
+     `none` tiers are below the ages' own ladder and no player reaches them, so a test that drove pace 64
+     was describing a state the game cannot be in — and asserting the opposite of what the ages do. */
+  const { api, wctx } = fieldRig('gamma', 3, true);
+  api.setBeats(1);
+  api.step(true);
+  const recs = api.creation.gestures, now = recs[recs.length - 1];
+  const word = api.markFor(now.kind, now.value).word.toUpperCase();
+  for (const p of api.PACES){
+    api.setPace(p); api.setAcc(0.9);
+    wctx.texts.length = 0;
+    api.drawField();
+    assert.ok(wctx.texts.includes(word), `the act draws its word at pace ${p}`);
+  }
+  /* The cross-fade is the one thing the top of the ladder gives up: 500 ms is still the figure tier, so
+     the act draws, but the field it came from no longer fades under it. */
   api.setPace(1); api.setAcc(0.5);
   wctx.calls.length = 0; api.drawField();
   assert.ok(wctx.calls.filter(c => c === 'drawImage').length >= 2, 'no cross-fade at the slow pace');
-  /* A frame that ran two or more ages has nothing to fade from, so it snaps. */
-  api.step(); api.step(); api.setAcc(0.5);
+  /* A frame that ran two or more beats has nothing to fade from, so it snaps. */
+  api.setBeats(2); api.step(true); api.setAcc(0.5);
   wctx.calls.length = 0; api.drawField();
-  assert.equal(wctx.calls.filter(c => c === 'drawImage').length, 1, 'a frame that ran two ages faded');
+  assert.equal(wctx.calls.filter(c => c === 'drawImage').length, 1, 'a frame that ran two beats faded');
 });
 
 test('a god stands on a tile of a live country, so its star is drawn on the ground it holds', () => {
