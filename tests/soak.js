@@ -34,11 +34,16 @@ const KNOWN_DEATHS = {};
    still fails. */
 const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0, grown: 0 };
 
-/* The other end of the life table: a child born in the run who lived to `LIFE.human.adult`.
-   Measured on the six default seeds at 70 days: r 2, x 1, alpha 3, beta 6, gamma 3, delta 3,
-   18 together, out of 37 born. A per-seed floor of 1 rests on seed x's single child, and `born`
-   is the same swinging variable the comment above describes, so the claim is floored across the
-   six seeds together, at about a third of the measured sum, as the far country counters are. */
+/* The other end of the life table: a child born in the run who is alive at the end and past
+   'young'. Measured on the six default seeds at 70 days: r 2, x 1, alpha 3, beta 6, gamma 3,
+   delta 3, 18 together, out of 37 born. A per-seed floor of 1 rests on seed x's single child, and
+   `born` is the same swinging variable the comment above describes, so the claim is floored across
+   the six seeds together, at about a third of the measured sum.
+
+   The reason for summing is margin, not reachability. Beta alone made 6, so a single seed can carry
+   the whole summed floor. That is unlike `FAR_FLOOR` below, where a seed may genuinely never send
+   anyone to a cave in 70 days and the sum is the only way to make a claim at all. Here the sum only
+   buys room for the swing in `born`. */
 const GROWN_FLOOR = 6;
 
 /* The far country counters. A single seed may never send anyone to a cave, a den or a bench in 70 days,
@@ -71,14 +76,54 @@ for (const seed of SEEDS){
        because `ageDays()` measures from the live tick and goes on counting after the death. A human
        with parents was born inside the run; everyone else walked into the valley already grown, at
        an age between `adult` and `old` (src/sim/beings.js, makeBeing). The day counts are read from
-       LIFE, never copied, so the numbers follow the table when it moves to real units. */
+       LIFE, never copied, so the numbers follow the table when it moves to real units.
+
+       `diedAt` is stamped in `die()` (src/sim/beings.js:65) and nowhere else, so `lastAge` is NaN
+       for a being taken off the board another way. Three paths do that today: the snared rabbit
+       (beings.js:330), the deer in the pitfall (beings.js:338) and an unmade god (gods.js:467).
+       All three are non-human, so no number here is touched. A human killed down a path like
+       those would answer NaN to every comparison below and drop out of `grown` and `pastSpan`
+       with no error at all, so a fourth such path needs `diedAt` with it. */
     const LH = api.LIFE.human;
     const lastAge = b => ((b.alive ? api.tick : b.diedAt) - b.born) / api.DAY;
     const bornHere = api.beings.filter(b => b.species === 'human' && b.parents);
-    const grown = bornHere.filter(b => lastAge(b) >= LH.adult);
+    /* `grown` asks `stage()`, the function every rule in the sim consults, rather than recomputing
+       the age against `LIFE.human.adult`. An assertion on the arithmetic would hold while `stage()`
+       was frozen at 'young', which is one of the mechanisms the claim below names. `stage()` reads
+       the live tick, so it is asked only of a being still alive: for a dead child it would answer
+       for the age that child would have been, and a run that killed every child would still count
+       them as grown. */
+    const grown = bornHere.filter(b => b.alive && api.stage(b) !== 'young');
     const pastSpan = api.beings.filter(b => b.species === 'human' && lastAge(b) > LH.life);
     const oldestHuman = Math.max(0, ...api.beings.filter(b => b.species === 'human').map(lastAge));
-    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them reached adult; ${pastSpan.length} passed the span, ${counts.oldAge} died of old age; oldest ${oldestHuman.toFixed(1)} days`);
+    /* Human old-age deaths, counted by tag and not by text. `counts.oldAge` in tests/lib/run.js is
+       a substring count over every chronicle line, and a gnome's death line is `A gnome died of old
+       age.` (src/sim/beings.js:83), so a gnome feeds it. `counts.oldAge` itself is left as it is:
+       the golden record holds it.
+
+       Read why this count is human-only, because it is not what it looks like. The tag does NOT
+       name a species. `die()` is handed `warm ? 'old' : 'oldCold'` for every species that passes
+       its span (beings.js:374), and a gnome is never `warm`, so a gnome's death is an 'oldCold'
+       death. What separates them is one line: the human branch calls `log(text, [a], 'death', tag)`
+       (beings.js:69) and the gnome branch calls `log(text, [], 'death')` (beings.js:83) with no
+       tag argument at all. A death EVENT carries a tag only because the gnome line forgets to pass
+       one. Add a tag to beings.js:83 and this count silently takes gnomes back in.
+
+       The event has nothing better to filter on. `log()` builds `{ tick, when, text, kind, tag,
+       camp }` (src/sim/core.js:181) and the `who` array it is given feeds only `a.history` and
+       `a.deeds`, so no being id and no species reaches the chronicle line. A run's events were
+       enumerated to check it: the fields are age, camp, kind, nameKnown, names, tag, text, tick,
+       when. So the count rests on the tag, and the assertion below carries a guard against the day
+       beings.js:83 changes. */
+    const humanOldAge = events.filter(e => e.kind === 'death' && (e.tag === 'old' || e.tag === 'oldCold')).length;
+    /* The guard's other half, read off the beings, where the species IS named. The old-age roll
+       fires at `ageDays(a) > LIFE[a.species].life` and `diedAt` is that same tick, so every human
+       killed by the roll is a dead human whose last age passed the span. The count can only be the
+       larger of the two. It is one-directional on purpose: a human who passes the span and is then
+       killed by something else lifts this number and not the tag count, and that death is the
+       sibling claim's business, not this one's. */
+    const humanOldDead = api.beings.filter(b => b.species === 'human' && !b.alive && lastAge(b) > LH.life).length;
+    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them alive and grown up; ${pastSpan.length} passed the span, ${humanOldAge} people died of old age (${counts.oldAge} lines of old age all told, gnomes among them); oldest ${oldestHuman.toFixed(1)} days`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
       const c = api.camps[0];
@@ -148,6 +193,18 @@ for (const seed of SEEDS){
        LIFE[a.species].life`, behind `CLOCK.rate.oldAgeDeath` divided by hardiness
        (src/sim/beings.js), and nothing else in the sim ends a life of its own accord.
 
+       The count is human-only, and it is a tag count for that reason. The roll runs for every
+       species, so a gnome dying of old age writes `A gnome died of old age.` and joins any count
+       made by matching the text. With `counts.oldAge` in the assertion, the claim stayed green
+       with the roll switched off for humans alone, and the diagnostic reported two human old-age
+       deaths where there were none. `LIFE.gnome.life` is 110 days and a gnome starts the run about
+       35 days old, so it is only arithmetic that keeps a gnome under the span at 70 days; DAYS=90
+       opens it. A future mourning line that logged a dead elder's full name would open it another
+       way: `FATE_EPITHETS.oldCold` is the string 'who died of old age' (src/sim/names.js:766),
+       which reaches no sim path today because `fullName()` is read only in src/ui/. A tag count
+       closes both, and see `humanOldAge` above for why it is human-only, which is not the reason a
+       reader expects.
+
        Measured on the six default seeds at 70 days: 12, 6, 5, 15, 6, 8 old-age deaths, out of 14,
        6, 7, 16, 7, 8 people who passed the span. Every seed reaches it several times over, so the
        claim is made per seed and not summed.
@@ -158,7 +215,8 @@ for (const seed of SEEDS){
        LIFE. A guard of `DAYS >= LIFE.human.life - LIFE.human.old` would switch the claim off on a
        table change, which is the change it is here to report. */
     await t.test('somebody dies of old age', { skip: !longEnough && `${DAYS} days: this claim is made on runs of ${DEFAULT_DAYS} days or more` }, () => {
-      assert.ok(counts.oldAge >= 1, `nobody died of old age in ${DAYS} days, though ${pastSpan.length} people passed LIFE.human.life (${LH.life} days) and the oldest reached ${oldestHuman.toFixed(1)}. The rule below, that a death which is not old age is a bug, has nothing to filter until this fires.`);
+      assert.ok(humanOldAge >= 1, `no person died of old age in ${DAYS} days, though ${pastSpan.length} people passed LIFE.human.life (${LH.life} days) and the oldest reached ${oldestHuman.toFixed(1)}. The rule below, that a death which is not old age is a bug, has nothing to filter until this fires.`);
+      assert.ok(humanOldAge <= humanOldDead, `${humanOldAge} death lines carry an old-age tag, but only ${humanOldDead} people are dead and past the span. A tagged old-age death that is nobody's means the tag is no longer a person's alone: src/sim/beings.js:83 logs a gnome's death, and the count above is human-only only while that line passes no tag.`);
     });
     await t.test('at most one person a seed dies in a den', () => {
       const d = denDeaths(events); if (d.length) t.diagnostic(`${seed}: den deaths: ${d.join('; ')}`);
@@ -215,11 +273,13 @@ test('the six camps together grow', { skip: !isDefault && 'not the default run' 
    start of the passage: nothing said a child ever grew up, so the whole young-to-adult transition
    was unnamed, and a change that killed every child, or froze `stage()` at 'young', would leave the
    soak green (issue #94). `stage()` writes no chronicle line when it turns, so the claim is read off
-   the beings at the end instead of counted from the events. Summed across the six seeds, for the
-   reason GROWN_FLOOR gives. */
+   the beings at the end instead of counted from the events, and it asks `stage()` itself rather
+   than recomputing the age: an age comparison would hold while `stage()` was frozen, which is one
+   of the two mechanisms named here. Summed across the six seeds, for the reason GROWN_FLOOR
+   gives. */
 test('a child born in the run grows up', { skip: !isDefault && 'not the default run' }, t => {
-  t.diagnostic(`children who reached adult across ${SEEDS.join(', ')}: ${sums.grown} of ${sums.born} born`);
-  assert.ok(sums.grown >= GROWN_FLOOR, `${sums.grown} of ${sums.born} children reached LIFE.human.adult (want >= ${GROWN_FLOOR}; 18 were measured). A birth that never grows up leaves every rule that reads a being's stage untested on its far side.`);
+  t.diagnostic(`children born in the run who are alive and past 'young' across ${SEEDS.join(', ')}: ${sums.grown} of ${sums.born} born`);
+  assert.ok(sums.grown >= GROWN_FLOOR, `${sums.grown} of ${sums.born} children are alive at the end and past 'young' by stage() (want >= ${GROWN_FLOOR}). A birth that never grows up leaves every rule that reads a being's stage untested on its far side.`);
 });
 
 test('the far countries are reached', { skip: !isDefault && 'not the default run' }, t => {
