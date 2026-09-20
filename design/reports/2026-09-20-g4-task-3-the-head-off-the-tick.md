@@ -13,6 +13,7 @@ Task 3's report. Branch `tiers-g4`, worktree `/Users/earchibald/Worktrees/hamlet
 | `node --test tests/clock.js` | 21 pass, 0 fail |
 | `node --test tests/tasks.js` | 24 pass, 0 fail |
 | `node --test tests/beings-lazy.js` | 13 pass, 0 fail (new file) |
+| `SLOW=1 node --test tests/snapshot.js` | 38 pass, 11 fail — **and identically so on the source before task 3.** See "The snapshot suite". |
 | `tests/soak-golden.json` | untouched. sha256 `edac9b13…c434269d` before and after. |
 
 ## What was built
@@ -252,6 +253,28 @@ world minute after the tick it happened on. `catchUp` breaks on the tick hp reac
 being there, but the global `tick` is the later one, so the chronicle line and `diedAt` carry it. Task 4
 wants an exact horizon anyway and should sharpen this with it.
 
+## The snapshot suite: red, and red before this task too
+
+The task's gate list names `node --test tests/snapshot.js`. The file is suspended by task 1, so it
+reports one skip. I ran it under `SLOW=1`: **38 pass, 11 fail.**
+
+Then I ran the control, because a red gate with no baseline says nothing. I checked out the source as
+it stood at `f8c7c71`, the commit before this task, rebuilt, and ran the same file the same way:
+**38 pass, 11 fail, the same eleven test names.** Task 3 neither broke it nor fixed it.
+
+The cause is task 1's finding, written up under "What is switched off" in its handoff: the four oracle
+cases save at 12,400, 30,300 and 20,000 *raw steps*, and those counts were never converted. On this
+branch 12,400 steps is 0.14 of a world day, not 12.4 days, so the worlds never get far enough to hold
+what the tests need. The first failure says so in as many words — "this world was meant to have a
+pitfall" — and the oracle's own diagnostic reads "0 walking, 25 at work, 1 camps, 3 lines after the
+save". **These are preconditions that stopped arising, which is the fault class this branch keeps
+meeting, and it is task 4's to fix when it restores the file.**
+
+**So the snapshot gate that actually ran for this task is the soak's oracle**: seed `x` saved on day
+1.5, loaded into a fresh sim, telling the same story to day 3. It is green, and every field this task
+adds — `seen`, `next`, `waitUntil`, `due`, `worked`, and a thought's `until` — crosses that save. It
+covers 1.5 world days where `tests/snapshot.js` was written to cover twelve.
+
 ## The check a change cannot run on itself
 
 **What state does this change have that its tests never enter?**
@@ -342,11 +365,11 @@ them will need to restart them; nothing was lost but the servers.
    `tests/ui.js:124`, `:165`, `:169`, `:177` and `tests/names.js:710` are the same shape and also
    suspended. I did not change them, because an unverified edit to a suspended test is worse than a
    note.
-3. **`tests/snapshot.js` was never run green on this branch by this task.** It is suspended, and both
-   attempts to run it under `SLOW=1` were killed by my own edits to `src/`. The snapshot gate that did
-   run is the soak's oracle: seed `x` saved on day 1.5, loaded into a fresh sim, telling the same story
-   to day 3, with `seen`, `next`, `waitUntil`, `due`, `worked` and `until` all crossing the save. Task 4
-   restores the file and owes it a run.
+3. **`tests/snapshot.js` is red on this branch and was red before this task**: 38 pass, 11 fail, the
+   same eleven names on both sides of task 3, measured rather than assumed. Its four oracle spans are
+   raw old-tick step counts, so its worlds never reach the state its assertions need. Task 4 restores
+   the file and must convert those four spans in the same breath, or it will restore an oracle weaker
+   than the soak's while reading as a restored gate.
 4. **The horizon task 4 needs is already half-written.** `beats[k].next` from task 2 and `a.next` from
    this task are the two halves. `senseBeings` is the predicate that forbids a jump, read the other way
    round: a tick on which it finds anything is a tick the engine cannot skip. It is written so that
