@@ -159,7 +159,7 @@ const LAND_WORDS = [
 ];
 /* The kinds a meaning suits: `water`, `hill`, `cave`, `grove`, `ford`, the five `nameTheLand`
    names. A phrase that says nothing about the shape of the place suits all five. Approved
-   wording and kind tags, in `.superpowers/sdd/land-word-kinds.md`; read those, do not re-derive. */
+   wording and kind tags, in `design/land-word-kinds.md`; read those, do not re-derive. */
 const LAND_WORD_KINDS = {
   'the sleeping hill': ['hill'], 'where the water turns': ['water', 'ford'], 'the pines that watch': ['grove'],
   'the stone that does not move': ['hill', 'cave'], 'the cold spring': ['water', 'cave'],
