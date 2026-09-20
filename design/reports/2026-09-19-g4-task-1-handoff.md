@@ -370,12 +370,56 @@ assertions at their original measured values. It runs seven of them. The remaini
 satisfied by the data the gate provides, and an assertion that cannot pass on the data it is given is
 not a gate: it is a red line that teaches the next reader to skip past red.
 
-**This report does not fix it**, because the floors are the user's and patcher's after the standing
-ruling, and because a fix here is one line that should be ruled rather than slipped in. The
-recommendation, sent to dev-coordinator: give those two assertions a precondition, so they skip with
-a reason unless the run actually holds the six seeds — *"needs the six seeds; this run has r"*. That
-rescales no number and widens no suspension. It makes the assertion state what data it needs, which
-is the thing it is currently silent about.
+**Ruled by patcher, who holds the floors, and now done.** The two assertions are guarded on
+`!LONG || SEEDS.join() !== DEFAULT_SEEDS.join()` — **both** conditions, because they need seventy
+days *and* the six seeds. The message says which is missing: *"needs the six seeds; this run has r"*.
+
+**It is a dropped guard restored, not a new precondition.** On dev these floors carried a data-shape
+question and this branch swapped it for a duration question. Both belong. `!isDefault` is the wrong
+way to write it here, because `isDefault` already contains `!LONG`: using it would skip these under
+`LONG=1` as well, which is today's broken state reached by another road.
+
+**patcher's sentence, which is the one to carry:**
+
+> Under `LONG=1` the gate runs seven of the nine suspended assertions. The two that skip are the
+> cross-seed sums, and on this branch there is no run in which they are evaluated on six seeds over
+> seventy days — the default soak is three days and skips them, and the long gate is one seed. A
+> uniform sag across every seed is therefore caught by nothing during G4. It is covered by a single
+> six-seed seventy-day run, owed before the PR opens and recorded in its body.
+
+That run is now a checkbox on task 11, with the floors written into it: `sums.humans` and `sums.born`
+against 180 and 15, the four far-country sums against 2, 1, 5, 1, and dev's measured 255, 37 and
+8, 5, 15, 4 beside them. It runs as late as possible, for coverage rather than for cheapness.
+
+### What the three-day default actually gates, measured
+
+patcher flagged this and it is worse than "thin". Read from `tests/soak-working.json` rather than
+reasoned about:
+
+| seed | r | x | alpha | beta | gamma | delta |
+|---|---|---|---|---|---|---|
+| alive at day 3 | 2 | 3 | 3 | 2 | 3 | 2 |
+| born | 0 | 0 | 0 | 0 | 0 | 0 |
+| deaths | none | none | none | none | none | none |
+
+Fifteen people across all six seeds. **No births anywhere and no deaths anywhere.** So *"nobody dies
+of anything but old age"* is not nearly vacuous, it is **exactly vacuous**: it asserts a property of
+an empty set on every seed, and it passes. **That is worse than a skip, because a passing test reads
+as coverage and a skipped one announces itself.** The den deaths, the walk home, and the lit-fire
+chronicle sit in the same position to varying degrees.
+
+What the three-day run does gate is the working record — the fingerprint and its 62 counters — and
+that nothing throws. That is a very sensitive change **detector**: one one-line fault has been seen
+to move 21 of 33 counters. What it cannot do is say which direction is wrong. **Detection without
+discrimination**, which is this report's own finding arriving in our own scaffolding for the third
+time in one day. The numbers are now in the header of `tests/soak.js`, because a number in a comment
+can be checked and can go stale loudly, and "this is a smoke test" cannot.
+
+**And the gap that remains, named here so it is not discovered at the merge.** `LONG=1` runs seed `r`
+**only**. Every duration-dependent *per-seed* assertion — deaths, den deaths, cut-off, the lit fire —
+is covered on `r` and on no other seed for the whole of G4. A fault that kills people only on
+`gamma`'s stream is caught by nothing until the six-seed run. This is not a request for more runs. It
+is a request that the sentence exist.
 
 **And the cost of ruling 2 is four times what was assumed.** 67 minutes, not 17. The average is 57
 seconds a world day across the seventy, against the 15 s measured at days 1 to 3. The cost tracks

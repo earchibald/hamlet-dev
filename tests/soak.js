@@ -1,12 +1,41 @@
-// The soak: six seeds for 70 days, with assertions.
-//   node tests/soak.js                     full run, about 15 seconds a seed
+// The soak: six seeds for THREE world days by default, with assertions.
+//   node tests/soak.js                     the default run, six seeds, three world days
+//   LONG=1 node tests/soak.js              seed r, seventy world days, about 67 minutes
+//   LONG=1 SEEDS=r,x,alpha,beta,gamma,delta node tests/soak.js   the six-seed seventy-day run
 //   SEEDS=r DAYS=10 node tests/soak.js     a quick run
-//   UPDATE_GOLDEN=1 node tests/soak.js     bless new numbers after a rule change
+//   UPDATE_GOLDEN=1 node tests/soak.js     rewrite the WORKING record after an intended change
 //
-// The golden record (tests/soak-golden.json) holds a fingerprint of each
+// WHAT THE DEFAULT RUN ACTUALLY GATES, measured rather than assumed. At three
+// world days each seed holds 2 to 3 people, no births and no deaths:
+//
+//   r 2   x 3   alpha 3   beta 2   gamma 3   delta 2      born 0   deaths {} on every seed
+//
+// So every assertion here that needs a population or a death is suspended or
+// VACUOUS. "nobody dies of anything but old age" asserts a property of an
+// empty set and passes, which is worse than a skip: a skip announces itself
+// and a vacuous pass reads as coverage. The same is true to varying degrees of
+// the den deaths, the walk home, and the lit-fire chronicle.
+//
+// What this run really gates is the working record -- the fingerprint and its
+// 62 counters -- and that nothing throws. That is a very sensitive change
+// DETECTOR: one one-line fault has been seen to move 21 of 33 counters. What it
+// cannot do is say which direction is wrong. Detection without discrimination.
+//
+// The seventy-day gate is LONG=1 on seed r. The six-seed sums are owed once,
+// as late as possible, before the G4 pull request opens.
+//
+// THE GAP THAT REMAINS, so it is not discovered at the merge: LONG=1 runs seed
+// r ONLY. Every duration-dependent PER-SEED assertion -- deaths, den deaths,
+// cut-off, the lit fire -- is therefore covered on r and on no other seed for
+// the whole of G4. A fault that kills people only on gamma's stream is caught
+// by nothing until the six-seed seventy-day run.
+//
+// The BLESSED record (tests/soak-golden.json) holds a fingerprint of each
 // seed's run. Any change to the rules changes it. That is the point: after a
 // change to the core, look at the printed numbers, decide the change is what
-// you meant, then bless it. The record is only checked on the default run.
+// you meant, then bless it. During G4 the comparison is against the WORKING
+// record (tests/soak-working.json), which a task may rewrite and must say so in
+// its report. No task writes the blessed one; the user blesses at task 11.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -159,14 +188,35 @@ test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells
 /* SUSPENDED, pending G4 task 4. Both floors were measured over seventy days and nothing like them
    happens in three. The numbers are left in the assertion rather than lowered to fit: a floor
    guessed at the new length would be a floor nobody measured, which reads as a gate and is not one.
-   Task 4 reports what a long run costs once the skip works, and the user rules on where these sit. */
-test('the six camps together grow', { skip: !LONG && 'suspended: measured over 70 days. LONG=1 runs it' }, t => {
+   Task 4 reports what a long run costs once the skip works, and the user rules on where these sit.
+
+   These two are SUMS ACROSS THE SIX SEEDS, so they need two things and not one: seventy days AND the
+   six seeds. `LONG=1` gives the days and sets SEEDS to `['r']` alone, so under it these floors were
+   being compared against one seed's counts and could not pass whatever the world did. `repaid >= 5`
+   is gnome borrowing, and seed `r` ends seventy days with two gnomes and nothing borrowed, so that
+   one is unreachable on `r` by construction.
+
+   This is a DROPPED GUARD RESTORED, not a new precondition. On dev these carried a data-shape
+   question and this branch swapped it for a duration question. Both belong. Note that `!isDefault`
+   is the wrong way to write it here, because `isDefault` already contains `!LONG`: using it would
+   skip these under LONG as well, which is the broken state reached by another road.
+
+   Run them with: LONG=1 SEEDS=r,x,alpha,beta,gamma,delta node tests/soak.js
+   That run is OWED ONCE before the G4 pull request opens, as late as possible, after the last task
+   that can move population. A red there is a finding to diagnose, never a number to update, and it
+   is the only place in G4 where these two floors are evaluated at all. */
+const SIX_SEEDS = SEEDS.join() === DEFAULT_SEEDS.join();
+const SUM_SKIP = LONG && SIX_SEEDS ? false
+  : !LONG ? 'suspended: measured over 70 days on six seeds. LONG=1 SEEDS=r,x,alpha,beta,gamma,delta runs it'
+  : `needs the six seeds; this run has ${SEEDS.join(', ')}`;
+test('the six camps together grow', { skip: SUM_SKIP }, t => {
   t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
   assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
 });
 
-/* SUSPENDED for the same reason: nobody walks to a far country in three days. */
-test('the far countries are reached', { skip: !LONG && 'suspended: measured over 70 days. LONG=1 runs it' }, t => {
+/* SUSPENDED for the same two reasons: nobody walks to a far country in three days, and these are
+   sums across the six seeds. */
+test('the far countries are reached', { skip: SUM_SKIP }, t => {
   t.diagnostic(`far country sums across ${SEEDS.join(', ')}: ` + Object.keys(FAR_FLOOR).map(k => `${k} ${sums[k]}`).join(', '));
   for (const k in FAR_FLOOR) assert.ok(sums[k] >= FAR_FLOOR[k], `sum of ${k} ${sums[k]} (want >= ${FAR_FLOOR[k]})`);
 });
