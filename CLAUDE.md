@@ -14,6 +14,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/lib/run.js`: the shared runner. The script god, the event collector, the counters, and the fingerprint.
 - `tests/terrain.js`: the levels, slopes, and hills. Fast. Run it with the soak.
 - `tests/crafts.js`: each recipe through the real offers. Fast.
+- `tests/garden.js`: gardenLives against the old whole-map scan, for a hand-built garden and for a real run. Fast.
 - `tests/names.js`: the name record, the two streams, the old tongue, the namer, who names what and when, epithets and fate, and the layout guard against a moved being or item. Fast.
 - `tests/ui.js`: the view model in both eras, the stages, the key map, every button has a key, the field colours, the mark rows, and that a watched creation equals an unwatched one. Run it after every change to `src/ui/`.
 - `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
