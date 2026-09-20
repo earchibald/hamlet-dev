@@ -74,6 +74,28 @@ function runDays(seed, days, onTick, god = scriptGod, opts = {}){
   return { api, events: c.events };
 }
 
+/* ---------- setting the clock ----------
+   Ruling 8 of plan G4, in the user's words: "we can set the date directly if we need to." A test may
+   jump the world to a date rather than pay the days to reach it. This is the one function that does
+   it. It lives here and never in `src/sim/`, because a rule reachable only through a back door in the
+   product is a rule the product can lose without a sound.
+
+   It writes two things and no others: the world's tick, and on every being the tick its body was last
+   brought up to. The second write is the point, and it is why this function had to exist before task
+   10. Since G4 task 3 a being's needs, warmth and hp are worked out from the time that has passed
+   since `seen`, so a clock shoved ten days forward would charge every being ten days of hunger it was
+   never alive for, and a wolf sent to midday would arrive starving. A jumped clock means the world
+   arrives at that date as it stood. That is what a test setting a date is asking for.
+
+   A test that uses this proves a rule runs at that date. It does not prove the date is reachable by
+   playing, and the suite owes a run that arrives by simulating. See the plan's "What ruling 8
+   obliges". */
+function setClock(api, at){
+  api.tick = at;
+  for (const b of api.beings) b.seen = at;
+  return at;
+}
+
 const OLD_AGE = /died of old age|old and warm/;
 const DEN_DEATH = /was killed in a den by/;
 const deaths = events => events.filter(e => e.kind === 'death');
@@ -169,4 +191,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, collect, runOn, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, setClock, runDays, collect, runOn, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };

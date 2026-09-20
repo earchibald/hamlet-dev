@@ -39,7 +39,10 @@ test('the executor runs a record to its end', () => {
   const api = load(); api.startWorld('r');
   const a = api.firstPerson(); api.failTask(a); a.needs.rest = 10;
   api.startTask(a, 'rest');
-  for (let k = 0; k < api.CLOCK.task.doze + 2 && a.task; k++) api.runTask(a);
+  /* The tick moves with each call. A wait used to be a countdown the executor took one off per call;
+     since G4 task 3 it is the tick the wait is over on, so a driver that never moves the clock is a
+     doze that never ends. */
+  for (let k = 0; k < api.CLOCK.task.doze + 2 && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null); assert.equal(a.needs.rest, 50);
 });
 

@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const { setClock } = require('./lib/run.js');   /* the one function that sets the date: see tests/lib/run.js */
 
 /* A camp that has come far enough to craft: site, lit pit, three-day hearth, the axe, and a person standing by the stash. */
 function readyCamp(seed = 'r'){
@@ -127,10 +128,14 @@ test('hide clothes go to the coldest person and keep them warmer', () => {
   doOffer(api, a, 'sew hide clothes');
   assert.equal(a.clothes, true); assert.equal(c.stash.hide, 0);
   assert.equal(api.goalState(goal(api, 'clothes')).s, 'idle', 'everyone is clothed');
-  api.tick = api.ticks(60 * 1000 + 100); /* a winter night */
+  /* One tick of a winter night, and no more: `setClock` puts the world a tick short of the date and
+     brings every being's body with it, so neither reading below is charged for the jump. See
+     tests/lib/run.js and G4 task 3. */
+  setClock(api, api.ticks(60 * 1000 + 100) - 1); /* a winter night */
   const bare = api.beings.find(b => b.species === 'human' && b !== a) || api.makeBeing('human', a.x, a.y, 'Test', 0);
   if (!api.beings.includes(bare)) api.beings.push(bare);
   bare.camp = c; bare.clothes = false; bare.needs.warmth = 60; a.needs.warmth = 60; bare.x = a.x; bare.y = a.y; bare.z = 0; bare.traits.hardiness = a.traits.hardiness; bare.homeless = false; bare.asleep = false; a.asleep = false; bare.born = a.born;
+  api.tick = api.tick + 1;
   api.updateBeing(a); api.updateBeing(bare);
   assert.ok(60 - a.needs.warmth < 60 - bare.needs.warmth, `clothed loss ${60 - a.needs.warmth} should be less than bare ${60 - bare.needs.warmth}`);
 });

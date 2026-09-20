@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+const { setClock } = require('./lib/run.js');   /* the one function that sets the date: see tests/lib/run.js */
 /* The dark's slow factor, read from the table rather than written as a 2 in the assertions below. */
 const CLOCK_DARK = api => api.CLOCK.dark.slower;
 
@@ -380,7 +381,14 @@ test('no rain falls under rock, and the ground below stays mild', () => {
      day 274, so the same intent is day 300. The day number was an encoding of "winter" and the
      encoding changed, so it is rewritten rather than converted. A tenth of the way into the day is
      02:24, which is night under either calendar. */
-  api.tick = 300 * api.DAY + api.DAY / 10; api.weather.storm = true; api.weather.until = api.tick + api.mins(10);
+  /* The clock is set through `setClock`, which also brings every being's body to the new date. Since
+     G4 task 3 a being's warmth is worked out from the time since it was last looked at, so a person
+     dropped into day 300 without that would be charged three hundred days of cold here and the two
+     readings below would measure the jump instead of the night. The clock is set one tick short and
+     moved on a tick for each reading, because one tick of a winter night is what this measures.
+     `inside` and `probe` are the same person: the test resets the warmth and reads the loss twice. */
+  setClock(api, 300 * api.DAY + api.DAY / 10 - 1); api.weather.storm = true; api.weather.until = api.tick + api.mins(10);
+  api.tick = api.tick + 1;
   assert.ok(api.isWinter(), 'the test means a winter night');
   const inside = api.firstPerson(); inside.x = x0 + 1; inside.y = y0; inside.z = -1; inside.asleep = false; inside.needs.warmth = 50; inside.thoughts = [];
   api.updateBeing(inside);
@@ -388,6 +396,7 @@ test('no rain falls under rock, and the ground below stays mild', () => {
   assert.ok(!inside.thoughts.some(t => t.key === 'dry'), 'no rain, and no thought of it, below ground');
   const under = 50 - inside.needs.warmth;
   const probe = api.firstPerson(); probe.x = x0 - 1; probe.y = y0; probe.z = 0; probe.needs.warmth = 50; probe.thoughts = []; probe.task = null;
+  api.tick = api.tick + 1;
   api.updateBeing(probe);
   const above = 50 - probe.needs.warmth;
   assert.ok(under < above, `underground loss ${under} should be less than a winter night's ${above}`);
