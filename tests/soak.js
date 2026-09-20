@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const { load } = require('../src/sim');
 const { DAY, runDays, collect, runOn, countEvents, fingerprint, oddDeaths, denDeaths, cutOff, campLine, logGod, replayGod } = require('./lib/run');
+/* One guard per claim, each with its own number, neither read off DEFAULT_DAYS. See tests/lib/claims.js. */
+const { seasonClaimSkip, oldAgeClaimSkip } = require('./lib/claims');
 
 const DEFAULT_SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'], DEFAULT_DAYS = 70;
 const SEEDS = process.env.SEEDS ? process.env.SEEDS.split(',') : DEFAULT_SEEDS;
@@ -173,9 +175,11 @@ for (const seed of SEEDS){
        and `SEEDS=r DAYS=70` is the common quick check, which is exactly where a calendar change
        would otherwise slip past. The guard does not read the calendar either. A guard of
        `DAYS * DAY >= years(1)` would switch the claim off on the very change it is here to report:
-       a year of 1460 days is not crossed by 70, so the claim would skip instead of failing. */
-    const longEnough = DAYS >= DEFAULT_DAYS;
-    await t.test('the run visits every season', { skip: !longEnough && `${DAYS} days: this claim is made on runs of ${DEFAULT_DAYS} days or more, a year being ${api.years(1) / api.DAY} days` }, () => {
+       a year of 1460 days is not crossed by 70, so the claim would skip instead of failing.
+
+       The guard is `SEASON_CLAIM_DAYS`, one year, in tests/lib/claims.js. It is this claim's own
+       number, not the soak's run length: a 40-day run visits every season and makes the claim. */
+    await t.test('the run visits every season', { skip: seasonClaimSkip(DAYS) }, () => {
       const missing = api.SEASONS.filter(s => !seasonsSeen.has(s));
       assert.deepEqual(missing, [], `the ${DAYS}-day run never reached ${missing.join(', ')}. It saw ${[...seasonsSeen].join(', ') || 'no season at all'}. A season nobody reaches leaves every rule that reads it dead.`);
       /* The order too, tolerant of where the year starts. `seasonsSeen` is a Set in first-sight
@@ -235,8 +239,11 @@ for (const seed of SEEDS){
        the seed: a newcomer walks in between `adult` and `old` days old, so 70 days carries the
        older ones past a span of `life` whatever the valley looks like. The guard does not read
        LIFE. A guard of `DAYS >= LIFE.human.life - LIFE.human.old` would switch the claim off on a
-       table change, which is the change it is here to report. */
-    await t.test('somebody dies of old age', { skip: !longEnough && `${DAYS} days: this claim is made on runs of ${DEFAULT_DAYS} days or more` }, () => {
+       table change, which is the change it is here to report.
+
+       The guard is `OLD_AGE_CLAIM_DAYS` in tests/lib/claims.js, a measured floor of 70 days. It is a
+       separate number from the season claim's above, which needs a year and no more. */
+    await t.test('somebody dies of old age', { skip: oldAgeClaimSkip(DAYS) }, () => {
       assert.ok(humanOldAge >= 1, `no person died of old age in ${DAYS} days, though ${pastSpan.length} people passed LIFE.human.life (${LH.life} days) and the oldest reached ${oldestHuman.toFixed(1)}. The rule below, that a death which is not old age is a bug, has nothing to filter until this fires.`);
       assert.ok(humanOldAge <= humanOldDead, `${humanOldAge} death lines carry an old-age tag, but only ${humanOldDead} people are dead and past the span. A tagged old-age death that is nobody's means the tag is no longer a person's alone: src/sim/beings.js:83 logs a gnome's death, and the count above is human-only only while that line passes no tag.`);
     });
