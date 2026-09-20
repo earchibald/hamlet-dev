@@ -843,14 +843,19 @@ test('the beat clock: a tab that slept owes at most eight beats and drops the re
 });
 
 test('the tier reads the beat length, and every pace on the ladder lands where the design says', () => {
-  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatTier', 'BEAT_MS', 'PACES']);
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatTier', 'BEAT_MS', 'PACES', 'TWEEN']);
   const tierAt = p => api.beatTier(api.BEAT_MS / p);
   assert.equal(tierAt(0.25), 'full', 'a quarter speed beat is four seconds');
   assert.equal(tierAt(0.5), 'full');
   assert.equal(tierAt(1), 'full', 'single speed is the readable default and draws everything');
   assert.equal(tierAt(2), 'figure', 'double speed drops the intent cue and keeps the figure');
-  assert.equal(api.beatTier(200), 'walk');
-  assert.equal(api.beatTier(50), 'none');
+  /* The ladder must cover the paces. beatTier ends in a catch-all return, so a pace off the bottom no
+     longer snaps: it draws a beat too short for the figure and the caption, and nothing says so. This is
+     the check that says so. The lowest pace that still passes is 3.333. */
+  for (const p of api.PACES){
+    const ms = api.BEAT_MS / p;
+    assert.ok(ms >= api.TWEEN.figure, `pace ${p} buys a beat of ${ms} ms, under the ${api.TWEEN.figure} ms the figure tier needs`);
+  }
 });
 
 test('H hurries the ages from any focus', () => {
@@ -1389,16 +1394,11 @@ test('a folded stage names its idle goals, and says nothing more when it is unfo
 
 const TWEENS = ['beatTier', 'pointAt', 'lineSoFar', 'TWEEN', 'BEAT_MS', 'PACES'];
 
-test('the tiers of the tween come off the length in milliseconds, in order down the pace ladder', () => {
+test('the tier of the tween comes off the length in milliseconds, at the one boundary left', () => {
   const api = loadUI(['state', 'derive'], TWEENS);
-  /* Each tier holds from its own length up to the next. */
+  /* The one boundary left: full holds from its own length up, and everything under it is figure. */
   assert.equal(api.beatTier(api.TWEEN.full), 'full');
   assert.equal(api.beatTier(api.TWEEN.full - 1), 'figure');
-  assert.equal(api.beatTier(api.TWEEN.figure), 'figure');
-  assert.equal(api.beatTier(api.TWEEN.figure - 1), 'walk');
-  assert.equal(api.beatTier(api.TWEEN.walk), 'walk');
-  assert.equal(api.beatTier(api.TWEEN.walk - 1), 'none');
-  assert.equal(api.beatTier(0), 'none');
 });
 
 test('a walk and a stroke give their ends, and a gesture with no anchor draws nothing', () => {

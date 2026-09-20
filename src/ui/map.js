@@ -202,7 +202,7 @@ function drawField(){
     fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
   }
   const still = beatStill(anyDialogOpen());
-  const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
+  const f = fieldJump || still ? 1 : clamp(acc, 0, 1);
   /* One beat is one act, so one gesture draws. The act before it fades over this beat, so a player who
      looked away for one act can still see what they missed. */
   const recs = creation.gestureAge === age ? creation.gestures : [];
@@ -250,7 +250,7 @@ function drawField(){
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
   const moving = new Map();
-  if (f < 1 && tier !== 'none' && now){
+  if (f < 1 && now){
     const s = f;
     if (s > 0){
       const p = walkPoint(now, s);

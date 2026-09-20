@@ -24,10 +24,10 @@ let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', wor
 const BEAT_MS = 1000;
 const PACES = [0.25, 0.5, 1, 2];
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
-   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue,
+   full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
    durations, and they stay out of src/sim/. */
-const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, draw: 0.6, word: 0.85 };
+const TWEEN = { full: 1000, figure: 300, cue: 0.25, draw: 0.6, word: 0.85 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
