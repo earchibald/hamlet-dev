@@ -304,6 +304,7 @@ const NOT_SAVED = {
   ZMIN: 'derived from options', ZMAX: 'derived from options', ZOFF: 'derived from options', NZ: 'derived from options',
   world: 'derived: levels[ZOFF]', itemGrid: 'derived from items', regionOf: 'derived from field.regions',
   bfsPrev: 'search scratch', bfsSeen: 'search scratch', bfsGen: 'search scratch',
+  reachSeen: 'search scratch', reachGen: 'search scratch',
   deciding: 'lives inside one god act', saidFrom: 'lives inside one god act', settleNow: 'lives inside one age step',
   replayHead: 'derived from the seed and the options', tileCheckImpl: 'a test seam',
   SNAP_IX: 'scratch, lives inside one snapshot',
