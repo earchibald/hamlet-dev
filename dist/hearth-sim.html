@@ -7546,8 +7546,17 @@ for (const t of TOOLS){
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
-   The label names both ladders, since the same row serves the ages and the days. */
-SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Pace ${PACE_LABEL[PACES[i]]} \u00b7 Speed ${SPEED_LABEL[v]}`, button: `speed${v}` }));
+   The label names both ladders, since the same row serves the ages and the days.
+   The two ladders are meant to be the same length, and tests/ui.js asserts it. When they differ, a
+   row past the end of PACES has no pace to name. It then names the speed alone, because
+   `PACE_LABEL[undefined]` is `undefined`, and the row printed the words `Pace undefined` to the
+   player. This file runs while the page loads, so it does not throw on a short ladder: a throw here
+   blanks the page, which is worse than a row that names one ladder. */
+SPEEDS.forEach((v, i) => {
+  const paceLabel = PACE_LABEL[PACES[i]];
+  const label = paceLabel === undefined ? `Speed ${SPEED_LABEL[v]}` : `Pace ${paceLabel} \u00b7 Speed ${SPEED_LABEL[v]}`;
+  KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label, button: `speed${v}` });
+});
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
