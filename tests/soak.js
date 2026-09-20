@@ -32,7 +32,14 @@ const KNOWN_DEATHS = {};
    `alive` per seed instead (a seed that actually collapses), and the sum of `humans` and `born`
    across all six seeds together, so a change that halves every population (as fishing once did)
    still fails. */
-const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0 };
+const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0, grown: 0 };
+
+/* The other end of the life table: a child born in the run who lived to `LIFE.human.adult`.
+   Measured on the six default seeds at 70 days: r 2, x 1, alpha 3, beta 6, gamma 3, delta 3,
+   18 together, out of 37 born. A per-seed floor of 1 rests on seed x's single child, and `born`
+   is the same swinging variable the comment above describes, so the claim is floored across the
+   six seeds together, at about a third of the measured sum, as the far country counters are. */
+const GROWN_FLOOR = 6;
 
 /* The far country counters. A single seed may never send anyone to a cave, a den or a bench in 70 days,
    because the dens, caves and burrows sit in their makers' countries now. So each is floored across the six
@@ -60,6 +67,18 @@ for (const seed of SEEDS){
     t.diagnostic(`${seed}: creation ages ${api.creation.ages}, discards ${api.creation.discards}, made ${Object.keys(api.creation.made).sort().join(',')}`);
     t.diagnostic(`${seed}: seasons visited: ${[...seasonsSeen].join(', ') || 'none'}`);
     t.diagnostic(`${seed}: far country reach: densCleared ${counts.densCleared}, searched ${counts.searched}, finds ${counts.finds}, borrowed ${counts.borrowed}, repaid ${counts.repaid}, benches ${counts.benches}`);
+    /* The life table, read off the beings at the end. A dead being's last age comes from `diedAt`,
+       because `ageDays()` measures from the live tick and goes on counting after the death. A human
+       with parents was born inside the run; everyone else walked into the valley already grown, at
+       an age between `adult` and `old` (src/sim/beings.js, makeBeing). The day counts are read from
+       LIFE, never copied, so the numbers follow the table when it moves to real units. */
+    const LH = api.LIFE.human;
+    const lastAge = b => ((b.alive ? api.tick : b.diedAt) - b.born) / api.DAY;
+    const bornHere = api.beings.filter(b => b.species === 'human' && b.parents);
+    const grown = bornHere.filter(b => lastAge(b) >= LH.adult);
+    const pastSpan = api.beings.filter(b => b.species === 'human' && lastAge(b) > LH.life);
+    const oldestHuman = Math.max(0, ...api.beings.filter(b => b.species === 'human').map(lastAge));
+    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them reached adult; ${pastSpan.length} passed the span, ${counts.oldAge} died of old age; oldest ${oldestHuman.toFixed(1)} days`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
       const c = api.camps[0];
@@ -84,7 +103,7 @@ for (const seed of SEEDS){
     });
     /* The sums feed two claims that only the default run makes, so they are gathered outside the
        guarded test below, which does not run on a short run. */
-    sums.humans += counts.humans; sums.born += counts.born;
+    sums.humans += counts.humans; sums.born += counts.born; sums.grown += grown.length;
     for (const k in FAR_FLOOR) sums[k] += counts[k];
     /* Every season, not just winter. The soak floors outcomes, and an outcome can hold while the
        mechanism behind it never fires: a year long enough to swallow the run leaves every
@@ -121,6 +140,25 @@ for (const seed of SEEDS){
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
+    });
+    /* The soak's headline rule is that any death which is not old age is a bug. That rule filters
+       the deaths by cause, and a filter agrees with an empty set: if old-age death stopped firing
+       altogether, `oddDeaths` would stay empty and every seed would still be green (issue #94). So
+       the mechanism answers for itself. Old age is rolled in one place, at `ageDays(a) >
+       LIFE[a.species].life`, behind `CLOCK.rate.oldAgeDeath` divided by hardiness
+       (src/sim/beings.js), and nothing else in the sim ends a life of its own accord.
+
+       Measured on the six default seeds at 70 days: 12, 6, 5, 15, 6, 8 old-age deaths, out of 14,
+       6, 7, 16, 7, 8 people who passed the span. Every seed reaches it several times over, so the
+       claim is made per seed and not summed.
+
+       Guarded on the day count alone, like the season claim above, because it does not depend on
+       the seed: a newcomer walks in between `adult` and `old` days old, so 70 days carries the
+       older ones past a span of `life` whatever the valley looks like. The guard does not read
+       LIFE. A guard of `DAYS >= LIFE.human.life - LIFE.human.old` would switch the claim off on a
+       table change, which is the change it is here to report. */
+    await t.test('somebody dies of old age', { skip: !longEnough && `${DAYS} days: this claim is made on runs of ${DEFAULT_DAYS} days or more` }, () => {
+      assert.ok(counts.oldAge >= 1, `nobody died of old age in ${DAYS} days, though ${pastSpan.length} people passed LIFE.human.life (${LH.life} days) and the oldest reached ${oldestHuman.toFixed(1)}. The rule below, that a death which is not old age is a bug, has nothing to filter until this fires.`);
     });
     await t.test('at most one person a seed dies in a den', () => {
       const d = denDeaths(events); if (d.length) t.diagnostic(`${seed}: den deaths: ${d.join('; ')}`);
@@ -171,6 +209,17 @@ test(`seed ${SAVE_SEED} saved on day ${SAVE_DAY}, loaded into a fresh sim, tells
 test('the six camps together grow', { skip: !isDefault && 'not the default run' }, t => {
   t.diagnostic(`sums across ${SEEDS.join(', ')}: humans ${sums.humans}, born ${sums.born}`);
   assert.ok(sums.humans >= 180 && sums.born >= 15, `sum of humans ${sums.humans} (want >= 180), sum of born ${sums.born} (want >= 15)`);
+});
+
+/* The young end of the life table. `born >= 1` is already floored per seed, but a birth is only the
+   start of the passage: nothing said a child ever grew up, so the whole young-to-adult transition
+   was unnamed, and a change that killed every child, or froze `stage()` at 'young', would leave the
+   soak green (issue #94). `stage()` writes no chronicle line when it turns, so the claim is read off
+   the beings at the end instead of counted from the events. Summed across the six seeds, for the
+   reason GROWN_FLOOR gives. */
+test('a child born in the run grows up', { skip: !isDefault && 'not the default run' }, t => {
+  t.diagnostic(`children who reached adult across ${SEEDS.join(', ')}: ${sums.grown} of ${sums.born} born`);
+  assert.ok(sums.grown >= GROWN_FLOOR, `${sums.grown} of ${sums.born} children reached LIFE.human.adult (want >= ${GROWN_FLOOR}; 18 were measured). A birth that never grows up leaves every rule that reads a being's stage untested on its far side.`);
 });
 
 test('the far countries are reached', { skip: !isDefault && 'not the default run' }, t => {
