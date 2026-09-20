@@ -877,9 +877,8 @@ test('after settle the view model is the day-era one again', () => {
 });
 
 test('the beat clock: a frame owes as many beats as its time buys, and carries the rest', () => {
-  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue', 'beatTier', 'BEAT_MS', 'PACES']);
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue', 'beatTier', 'BEAT_MS']);
   assert.equal(api.BEAT_MS, 1000);
-  assert.deepEqual(api.PACES, [0.25, 0.5, 1, 2]);
   assert.deepEqual(api.beatsDue(0, 1000, 1), { n: 1, acc: 0 });
   assert.deepEqual(api.beatsDue(0, 500, 1), { n: 0, acc: 0.5 });
   assert.deepEqual(api.beatsDue(0.5, 500, 1), { n: 1, acc: 0 });
@@ -1402,12 +1401,25 @@ test('a focus left on the band does not outlive the settle, and [ changes the le
 
 /* The feedback pass, round three. */
 test('each speed button has a direct key, Shift with its place on the ladder, from every focus', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS']);
-  assert.deepEqual(api.SPEEDS, [1, 4, 16, 64]);
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS', 'PACES']);
   const html = fs.readFileSync('src/page.template.html', 'utf8');
+  /* One key row carries both labels: keys.js:102 walks SPEEDS and reads `PACE_LABEL[PACES[i]]` at the
+     same place. So the two ladders must be the same length, and the harm runs both ways. A rung of
+     SPEEDS past the end of PACES has no pace to name. A rung of PACES past the end of SPEEDS gets no
+     key row at all, because the walk is over SPEEDS.
+     PACE_LABEL is a plain object, so the missing lookup gives undefined and the row reads
+     "Pace undefined · Speed 256×". It does not throw. It ships.
+     The template test near the top of this file fails on a ladder grown without its button, but it
+     cannot see this: a fifth button carrying data-speed and no data-pace would pass it. Nothing
+     states the relation itself. This assertion states it. */
+  assert.equal(api.SPEEDS.length, api.PACES.length, 'the ladders must be the same length, because keys.js:102 gives one key row the pace and the speed at the same place');
+  /* The test's own limit: it types the shifted digits it has characters for. A rung past the end of
+     this string reaches keyAction as an undefined key, and the test throws instead of failing. */
+  const SHIFTED = '!@#$';
+  assert.ok(api.SPEEDS.length <= SHIFTED.length, `SPEEDS has ${api.SPEEDS.length} rungs, and this test knows the shifted character for only ${SHIFTED.length} digits (${SHIFTED})`);
   api.SPEEDS.forEach((v, i) => {
     for (const focus of ['map', 'drawer:goals', 'window:2']){
-      assert.deepEqual(keyHit(api, { key: '!@#$'[i], code: `Digit${i + 1}`, shiftKey: true, ctrlKey: false, altKey: false, metaKey: false }, focus), { action: 'speedStep', arg: i }, `Shift+${i + 1} from ${focus}`);
+      assert.deepEqual(keyHit(api, { key: SHIFTED[i], code: `Digit${i + 1}`, shiftKey: true, ctrlKey: false, altKey: false, metaKey: false }, focus), { action: 'speedStep', arg: i }, `Shift+${i + 1} from ${focus}`);
     }
     const row = api.KEYMAP.find(k => k.action === 'speedStep' && k.arg === i);
     assert.equal(row.button, `speed${v}`); assert.equal(api.keyName(row), `Shift+${i + 1}`);
