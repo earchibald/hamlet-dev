@@ -183,10 +183,10 @@ function sleepingValley(seed, at){
   return w;
 }
 /* Both sides need the identical arrangement, so it is built twice from the same recipe. */
-function bothWays(seed, at, ticks, fix){
+function bothWays(seed, at, ticks, fix, god){
   const a = sleepingValley(seed, at), b = sleepingValley(seed, at);
   if (fix){ fix(a.api); fix(b.api); }
-  stepOn(a, ticks, () => {}); skipOn(b, ticks, () => {});
+  stepOn(a, ticks, god ? god() : () => {}); skipOn(b, ticks, god ? god() : () => {});
   return { a, b };
 }
 const NIGHT = api => 3 * api.DAY + api.CLOCK.night.falls + 600;
@@ -329,6 +329,46 @@ test('a wolf within reach of a sleeper is never jumped over, and its absence is'
   const a = sleepingValley('r', at); wolfAt(a.api, 2); stepOn(a, n, () => {});
   sameStory(a, near, 'a wolf beside a sleeper');
 });
+/* A FIRE LIT THROUGH THE DOOR BETWEEN TWO MOVES. This is the case the proximity pass cannot supply on
+   its own: the pass looks at beings, and a tile the player sets alight is not a being. `inject` lands
+   between one move and the next, after the horizon for that move was worked out, so a horizon that
+   read only the pass's answer would show the fire to a sleeper a world minute late. `nextEvent` reads
+   `fireCount` instead, which is a count the engine already keeps.
+   The god lights the same tile on the same tick in both runs, and says the tick it wants so the
+   skipped run is handed control there. */
+const burnableNear = api => {
+  const h = api.humans()[0];
+  for (let r = 1; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++){
+    const t = api.hasTile(h.x + dx, h.y + dy, 0) ? api.tileAt(h.x + dx, h.y + dy, 0) : null;
+    if (t && t.fire === 0 && (t.feature === 'tree' || t.ground === 'grass')) return t;
+  }
+  return null;
+};
+test('a fire lit through the door between two moves is not jumped over', t => {
+  const api0 = load(), start = NIGHT(api0), at = start + 130;
+  const god = () => { let done = false;
+    const g = api => {
+      if (done || api.tick < at) return;
+      done = true;
+      const t = burnableNear(api);
+      assert.ok(t, 'nothing beside the sleeper would burn, so the case cannot be arranged');
+      assert.match(String(api.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: 0 })), /burning|Lightning/);
+    };
+    g.wants = () => (done ? Infinity : at);
+    return g;
+  };
+  const { a, b } = bothWays('r', start, 600, null, god);
+  const after = b.jumps.filter(([f, to]) => f >= at && to <= at + 60);
+  t.diagnostic(`lit at tick ${at}; jumps inside the minute after it: ${after.length}; ` +
+    `sleeper awake: stepped ${!a.api.humans()[0].asleep}, skipped ${!b.api.humans()[0].asleep}`);
+  assert.ok(b.jumps.length > 0, 'the engine never jumped at all, so this case did not run');
+  assert.ok(a.api.fireCount > 0 || a.events.some(e => /burning/.test(e.text)), 'nothing caught, so the case did not run');
+  assert.ok(b.api.pins.fire > 0, 'the horizon never once read the fire, so the pin is not what stopped the jumps');
+  assert.equal(after.length, 0, 'the engine jumped through the minute after a tile was set alight');
+  assert.equal(b.api.humans()[0].asleep, a.api.humans()[0].asleep);
+  sameStory(a, b, 'a fire lit through the door');
+});
+
 test('a wolf that walks is on the tick anyway, so it cannot be jumped over at any distance', t => {
   const api0 = load(), at = NIGHT(api0), n = 600;
   const w = sleepingValley('r', at);

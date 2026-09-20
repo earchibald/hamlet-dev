@@ -169,6 +169,15 @@ function nextEvent(){
   const beat = tick + CLOCK.every.cellular - (tick % CLOCK.every.cellular);
   /* The next tick, and why. The hazard is asked first because ruling 6 owns it; a being's act is
      asked second because it is this engine's own coupling and not the world's. */
+  /* A BURNING TILE PINS THE HORIZON WHATEVER THE PASS FOUND, which is the plan's precondition read
+     strictly and not the pass's answer read narrowly. The pass only looks at beings that are not
+     acting, and a fire can be lit by something the pass never saw: `inject` at the door lights a tile
+     between two moves, and the horizon was worked out before it. A stepped run shows that fire to a
+     sleeper three tiles off on the next tick; a horizon that did not hear about it would show it a
+     world minute later, and the two runs would differ over a fire the player lit. `fireCount` is a
+     count the engine already keeps, so this is one integer read. Fire is episodic on these seeds --
+     the soak's six hold no burning tile at all -- so it is not a standing cost. */
+  if (fireCount > 0){ pins.fire++; pins.next++; return tick + 1; }
   if (pinAt === tick){ pins[pinMask === 1 ? 'fire' : pinMask === 2 ? 'hunter' : pinMask === 3 ? 'both' : 'none']++; pins.next++; return tick + 1; }
   if (acted === tick){ pins.acted++; pins.next++; return tick + 1; }
   let t = beat, why = 'beat';
