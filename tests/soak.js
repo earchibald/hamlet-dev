@@ -105,7 +105,7 @@ for (const seed of SEEDS){
     const stranded = [];
     /* `seasonOf()` reads the tick and draws no random number, so watching it cannot move the stream. */
     const seasonsSeen = new Set();
-    const { api, events } = runDays(seed, DAYS, (api, i) => { seasonsSeen.add(api.seasonOf()); if (api.tick % 1000 === 0) stranded.push(...cutOff(api)); });
+    const { api, events } = runDays(seed, DAYS, (api, i) => { seasonsSeen.add(api.seasonOf()); if (api.tick % api.DAY === 0) stranded.push(...cutOff(api)); });
     const counts = countEvents(api, events), fp = fingerprint(api, events);
     t.diagnostic(`${seed}: ${Date.now() - t0} ms, ${events.length} chronicle lines`);
     t.diagnostic(api.camps.map(c => campLine(api, c)).join(' | '));
@@ -121,9 +121,9 @@ for (const seed of SEEDS){
        an age between `adult` and `old` (src/sim/beings.js, makeBeing). The day counts are read from
        LIFE, never copied, so the numbers follow the table when it moves to real units.
 
-       `diedAt` is stamped in `die()` (src/sim/beings.js:65) and nowhere else, so `lastAge` is NaN
+       `diedAt` is stamped in `die()` (src/sim/beings.js:76) and nowhere else, so `lastAge` is NaN
        for a being taken off the board another way. Three paths do that today: the snared rabbit
-       (beings.js:330), the deer in the pitfall (beings.js:338) and an unmade god (gods.js:467).
+       (beings.js:369), the deer in the pitfall (beings.js:377) and an unmade god (gods.js:467).
        All three are non-human, so no number here is touched. A human killed down a path like
        those would answer NaN to every comparison below. It drops out of `grown` and `pastSpan`
        in silence. It does not leave quietly, though: `oldestHuman` spreads the NaN through
@@ -143,25 +143,25 @@ for (const seed of SEEDS){
     const oldestHuman = Math.max(0, ...api.beings.filter(b => b.species === 'human').map(lastAge));
     /* Human old-age deaths, counted by tag and not by text. `counts.oldAge` in tests/lib/run.js is
        a substring count over every chronicle line, and a gnome's death line is `A gnome died of old
-       age.` (src/sim/beings.js:83), so a gnome feeds it. `counts.oldAge` itself is left as it is:
+       age.` (src/sim/beings.js:94), so a gnome feeds it. `counts.oldAge` itself is left as it is:
        the golden record holds it.
 
        Read why this count is human-only, because it is not what it looks like. The tag does NOT
        name a species. `die()` is handed `warm ? 'old' : 'oldCold'` for every species that passes
-       its span (beings.js:374), and a gnome is never `warm`, so a gnome's death is an 'oldCold'
+       its span (beings.js:510), and a gnome is never `warm`, so a gnome's death is an 'oldCold'
        death. What separates them is one line: the human branch calls `log(text, [a], 'death', tag)`
-       (beings.js:69) and the gnome branch calls `log(text, [], 'death')` (beings.js:83) with no
+       (beings.js:80) and the gnome branch calls `log(text, [], 'death')` (beings.js:94) with no
        tag argument at all. A death EVENT carries a tag only because the gnome line forgets to pass
-       one. Add a tag to beings.js:83 and this count silently takes gnomes back in.
+       one. Add a tag to beings.js:94 and this count silently takes gnomes back in.
 
        The event has nothing better to filter on. `log()` builds `{ tick, when, text, kind, tag,
        camp }` (src/sim/core.js:181) and the `who` array it is given feeds only `a.history` and
        `a.deeds`, so no being id and no species reaches the chronicle line. A run's events were
        enumerated to check it: the fields are age, camp, kind, nameKnown, names, tag, text, tick,
        when. So the count rests on the tag, and the assertion below carries a guard against the day
-       beings.js:83 changes.
+       beings.js:94 changes.
 
-       That guard is dormant at `DEFAULT_DAYS`. A tag added to beings.js:83 leaves all six seeds
+       That guard is dormant at `DEFAULT_DAYS`. A tag added to beings.js:94 leaves all six seeds
        green at 70 days, and turns all six red at 90 days. The arithmetic behind the two numbers is
        written out at the old-age claim below. Read the guard as a tripwire for a longer run, not
        as a check the default soak performs. */
@@ -255,28 +255,28 @@ for (const seed of SEEDS){
        altogether, `oddDeaths` would stay empty and every seed would still be green (issue #94). So
        the mechanism answers for itself. Old age is rolled in one place, at `ageDays(a) >
        LIFE[a.species].life`, behind `CLOCK.rate.oldAgeDeath` divided by hardiness
-       (src/sim/beings.js:371). Other causes end a life a few lines further down, where hp at or
-       below zero kills by fire, thirst, hunger or cold (beings.js:378). The one place is the old-age
+       (src/sim/beings.js:507). Other causes end a life a few lines further down, where hp at or
+       below zero kills by fire, thirst, hunger or cold (beings.js:490). The one place is the old-age
        roll, and that is all this claim needs.
 
        The count is human-only, and it is a tag count for that reason. `counts.oldAge` is a
-       substring match over the whole chronicle: `ev` at tests/lib/run.js:81, summed at :93. The
+       substring match over the whole chronicle: `ev` at tests/lib/run.js:126, summed at :138. The
        gnome branch of `die()` writes `A gnome died of old age.` into that same chronicle
-       (beings.js:83), so the text match would count a gnome's death as a person's. It reads
+       (beings.js:94), so the text match would count a gnome's death as a person's. It reads
        species-exact today for one reason only. `LIFE.gnome.life` is 110 days
        (src/sim/species.js:2), a gnome walks in between 20 and 35 days old (beings.js:12), and 70
        days cannot carry it past the span. Raise DAYS to about 90, or lower that 110, and the text
-       count takes gnomes in. Of the five species branches in `die()`, only human (:69) and gnome
-       (:83) put `cause` into a chronicle line, so the gnome is the single contaminant.
+       count takes gnomes in. Of the five species branches in `die()`, only human (:80) and gnome
+       (:94) put `cause` into a chronicle line, so the gnome is the single contaminant.
 
        Two plants measured it, on seed r unless stated. Drop the `tag` argument from the human line
-       at beings.js:69: the tag count falls to 0 while `counts.oldAge` holds at 12, so the tag
-       reading goes red where the text reading stays green. Add a tag to beings.js:83 instead: all
+       at beings.js:80: the tag count falls to 0 while `counts.oldAge` holds at 12, so the tag
+       reading goes red where the text reading stays green. Add a tag to beings.js:94 instead: all
        six seeds stay green at 70 days, and all six go red at 90. That second pair is the dormancy
        above, arriving, and it is the same fact the `humanOldAge` guard note records.
 
        A future mourning line that logged a dead elder's full name would open the text count another
-       way: `FATE_EPITHETS.oldCold` is the string 'who died of old age' (src/sim/names.js:766),
+       way: `FATE_EPITHETS.oldCold` is the string 'who died of old age' (src/sim/names.js:767),
        which reaches no sim path today because `fullName()` is read only in src/ui/. A tag count
        closes both, and see `humanOldAge` above for why it is human-only, which is not the reason a
        reader expects.
@@ -294,11 +294,11 @@ for (const seed of SEEDS){
        The guard is `OLD_AGE_CLAIM_DAYS` in tests/lib/claims.js, 70 days. It is a separate number
        from the season claim's above, which needs a year. On dev that 70 was a measured floor. On
        this branch it is a lower bound that nobody has re-measured at the 86,400-tick day, and
-       claims.js says so at length. G4 task 4 owes the measurement, and no run this branch affords
-       makes the claim meanwhile. */
+       claims.js says so at length. G4 task 4 owes the measurement. `LONG=1` sets DAYS to 70 and so
+       still makes the claim; the default three-day run skips it. */
     await t.test('somebody dies of old age', { skip: oldAgeClaimSkip(DAYS) }, () => {
       assert.ok(humanOldAge >= 1, `no person died of old age in ${DAYS} days, though ${pastSpan.length} people passed LIFE.human.life (${LH.life} days) and the oldest reached ${oldestHuman.toFixed(1)}. The rule below, that a death which is not old age is a bug, has nothing to filter until this fires.`);
-      assert.ok(humanOldAge <= humanOldDead, `${humanOldAge} death lines carry an old-age tag, but only ${humanOldDead} people are dead and past the span. A tagged old-age death that is nobody's means the tag is no longer a person's alone: src/sim/beings.js:83 logs a gnome's death, and the count above is human-only only while that line passes no tag.`);
+      assert.ok(humanOldAge <= humanOldDead, `${humanOldAge} death lines carry an old-age tag, but only ${humanOldDead} people are dead and past the span. A tagged old-age death that is nobody's means the tag is no longer a person's alone: src/sim/beings.js:94 logs a gnome's death, and the count above is human-only only while that line passes no tag.`);
     });
     await t.test('at most one person a seed dies in a den', () => {
       const d = denDeaths(events); if (d.length) t.diagnostic(`${seed}: den deaths: ${d.join('; ')}`);
