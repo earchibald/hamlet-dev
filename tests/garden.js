@@ -1,9 +1,15 @@
 // Garden liveness: gardenLives() must give the same answer as the old whole-map scan,
 // in every case, because PLACES.garden.spot picks a new spot with gardenSpot(), which calls
-// rng(). A different boolean there moves the random stream and the whole story. Fast.
+// rng(). A different boolean there moves the random stream and the whole story. The hand-built cases
+// are fast; the two real runs are behind LONG=1, and say below what they cost.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
+/* The day comes from the sim, through the shared runner, and is never written down here. A second
+   copy of a constant in a test is not a check on the first: it agrees with whatever it was last set
+   to. This file held `const DAY = 1000`, and when G4 made the world day 86,400 ticks the two real
+   runs below asked for fifteen days and ran four world hours. */
+const { DAY } = require('./lib/run');
 
 /* The old predicate, kept here so the test does not trust the code it is checking. */
 const oldLives = (api, c) => !!(c.garden && api.world.some(t => t.garden === c && t.feature === 'bush'));
@@ -82,11 +88,18 @@ test('a garden at the map edge: no throw, and both predicates agree', () => {
 });
 
 /* A real run: seeds r and x, with the script god that lights each camp's pit, run long enough for a
-   garden to be planted (day 8-10 on these two seeds) and a few days past it, comparing the old scan
-   and the new helper for every camp. Checking every tick over many days is too slow for a fast test,
-   since the old predicate alone reads the whole map; N = 25 keeps 40 checks a day, enough to catch a
-   garden planted mid-run or a bush burned by lightning, while 15 days keeps the two seeds together
-   under about 8 seconds. */
+   garden to be planted and a few days past it, comparing the old scan and the new helper for every
+   camp. Checking every tick over many days is too slow, since the old predicate alone reads the whole
+   map, so the run checks forty times a day: enough to catch a garden planted mid-run or a bush burned
+   by lightning. Forty a day is the number this file was written with; it was `N = 25` when a day was
+   1,000 ticks, and it is `DAY / 40` now, so the cadence is the one that was chosen and not the
+   integer that expressed it.
+
+   The fifteen days are the ones that were chosen too. Measured on this branch with the script god
+   above: seed r plants its first garden at tick 479,634, which is day 5.55, and seed x at tick
+   547,692, day 6.34. Fifteen days holds both plantings and more than eight days past the later one.
+   Before the conversion the loop ran 15,000 ticks, 0.17 of a world day, and neither seed reached a
+   garden at all: the vacuity guard below was the only thing still speaking. */
 function scriptGod(api, i){
   for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 });
 }
@@ -98,10 +111,17 @@ function checkAllCamps(api, seed, tick){
   api.camp = api.camps[0];
 }
 
+const DAYS = 15, CHECKS_A_DAY = 40, N = Math.round(DAY / CHECKS_A_DAY);
+/* Fifteen world days of two seeds costs more than a fast test may take, and the answer is the flag,
+   never a smaller day count: a run cut to fit the clock keeps the green and drops the claim.
+   MEASURED_SECS is what the two runs took together on the branch, at the load average named. */
+const MEASURED_SECS = 133;
+const TOO_LONG = process.env.LONG ? false
+  : `${DAYS} world days on each of two seeds: ${MEASURED_SECS} s together, measured on this branch with \`time LONG=1 node --test tests/garden.js\` on an 18-core Mac at one-minute load average 8.3. LONG=1 runs it. The hand-built cases above run every time.`;
+
 for (const seed of ['r', 'x']){
-  test(`real run, seed ${seed}: gardenLives matches the whole-map scan for every camp, every 25 ticks over 15 days`, () => {
+  test(`real run, seed ${seed}: gardenLives matches the whole-map scan for every camp, ${CHECKS_A_DAY} times a day over ${DAYS} days`, { skip: TOO_LONG }, () => {
     const api = load(); api.startWorld(seed);
-    const N = 25, DAYS = 15, DAY = 1000;
     let sawGarden = false;
     for (let i = 0; i < DAYS * DAY; i++){
       api.step(); scriptGod(api, i);

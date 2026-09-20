@@ -1,11 +1,14 @@
-// Stalk: the wolf's lone-person pick. Fast: hand-built cases, then a real run.
+// Stalk: the wolf's lone-person pick. The hand-built cases are fast; the two real runs are fifteen
+// world days each and take 115 s together, which is inside the budget, so the file carries no flag.
 // The point of this file is equivalence, not behaviour: the old expression called
 // api.humans() once per candidate; the fix calls it once. Both must pick the same
 // people, in the same order, every time.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const { runDays, scriptGod } = require('./lib/run');
+/* DAY comes from the sim through the runner. This file wrote `DAYS * 1000`, dev's day, and after G4
+   made the day 86,400 ticks that loop ran 0.17 of a world day while still reporting fifteen. */
+const { runDays, scriptGod, DAY } = require('./lib/run');
 
 /* The old expression, written out here rather than borrowed from the sim, so a slip in the
    extraction shows up as a mismatch. Calls api.humans() itself, once per candidate, the way
@@ -106,25 +109,51 @@ test('a person more than 30 away from the wolf is not lone', () => {
 
 /* A real run, with the script god as the soak uses it. Seeds r and x never have a god make wolves
    (checked with api.wasMade('wolf')), so this uses alpha and beta instead, the next two soak seeds,
-   both of which do. Every N ticks, every wolf's pick is checked against the old expression, computed
-   fresh on the same api at the same instant. 15 days x 2 seeds, checked every 100 ticks, runs in a
-   couple of seconds and still crosses several births and deaths, which is what a broken cache needs
-   to be caught by. */
+   both of which do. Every CHECK_EVERY ticks, every wolf's pick is checked against the old expression,
+   computed fresh on the same api at the same instant.
+
+   What the run must cross is a changing cast, because a cached humans() list is caught by nothing
+   else. Measured on this branch, with the script god above:
+
+     ticks              alpha                       beta
+     15,000 (0.17 day)  0 deaths, 0 births, cast never changed
+     15 days            74 deaths, 1 birth          66 deaths, 0 births
+                        cast changed 9 times        cast changed 10 times
+
+   The first row is what this file did after the merge, with `DAYS * 1000` in the loop: the stated
+   mechanism was not exercised at all, and the test was green. A death here is any being's, counted by
+   a live-id set taken each tick; none of these deaths reaches the chronicle as a `death` line, which
+   is why the guard below counts the cast and not the log. Births stay rare at this length, so the
+   guard asks for a cast that moves, which is the claim that matters, and not for a birth. */
 const CHECK_EVERY = 100;
 const DAYS = 15;
+/* Fifteen world days of two seeds cost 115 s together, measured on this branch with
+   `time LONG=1 node --test tests/stalk.js` on an 18-core Mac at one-minute load average 11.1, with
+   three other runs of the sim on the machine. That is inside the 120 s a restored file may take, so
+   this one stays in the fast suite and behind no flag. garden.js and itemgrid.js, which are not
+   inside it, carry a LONG=1 gate instead. Neither file's day count was cut to buy the difference. */
 for (const seed of ['alpha', 'beta']){
-  test(`seed ${seed}: the wolf's pick matches the old expression through a real run`, () => {
+  test(`seed ${seed}: the wolf's pick matches the old expression through a real run of ${DAYS} days`, t => {
     const api = load();
     api.startWorld(seed);
-    let checks = 0;
-    for (let i = 0; i < DAYS * 1000; i++){
+    let checks = 0, castChanges = 0, was = null;
+    const cast = () => api.beings.filter(b => b.alive && b.species === 'human').map(b => b.id).join(',');
+    for (let i = 0; i < DAYS * DAY; i++){
       api.step(); scriptGod(api, i);
       if (i % CHECK_EVERY !== 0) continue;
+      const now = cast();
+      if (was !== null && now !== was) castChanges++;
+      was = now;
       for (const w of api.beings.filter(b => b.alive && b.species === 'wolf')){
         assertSame(api, w, `seed ${seed} tick ${api.tick} wolf ${w.id}`);
         checks++;
       }
     }
+    t.diagnostic(`seed ${seed}: ${checks} wolf picks checked, the cast of people changed ${castChanges} times`);
     assert.ok(checks > 0, `seed ${seed} never had a live wolf to check`);
+    /* The vacuity guard. A cached list of people is only wrong once the people change, so a run that
+       crossed no change checked the fix against a world it could not have broken. Both seeds change
+       the cast nine or ten times in fifteen days, and neither changes it once in 15,000 ticks. */
+    assert.ok(castChanges > 0, `seed ${seed}: the cast of people never changed in ${DAYS} days, so a stale humans() cache could not have shown; ${checks} picks were compared against an unchanging world`);
   });
 }
