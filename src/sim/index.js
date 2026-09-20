@@ -33,7 +33,7 @@ const API = `return {
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, DAY, SEASON_DAYS, TPS, ticks, strides, tickRate, strideRate, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor,
-  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, stashAdd,
+  RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, rebuildItemGrid, stashAdd,
   TASKS, startTask, setTask, taskStop, goTo, workKind,
   runTask, updateBeing, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,
   pathToStop, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
@@ -68,7 +68,7 @@ const API = `return {
      so a harness that started late can say so rather than report a short run as a whole one. */
   get chronicleWritten(){ return chronicleWritten; },
   watchChronicle(a){ chronicleSink = a; return chronicleWritten; },
-  get items(){ return items; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
+  get items(){ return items; }, get itemGrid(){ return itemGrid; }, get world(){ return world; }, get levels(){ return levels; }, get raised(){ return raised; }, get hills(){ return hills; }, get caves(){ return caves; },
   get sectors(){ return sectors; },
   get tick(){ return tick; }, set tick(v){ tick = v; }, get fireCount(){ return fireCount; }, get weather(){ return weather; },
   get nextId(){ return nextId; }, get doomAt(){ return doomAt; },

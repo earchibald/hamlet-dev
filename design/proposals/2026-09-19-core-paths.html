@@ -145,7 +145,7 @@ button{ font:inherit; font-weight:500; color:var(--ground); background:var(--riv
 <p>None of these needs a new language or a new structure. Each one is a task or two. One term first: a typed array is a fixed block of plain numbers, such as <code>Int32Array</code>, and it is smaller and faster to read than a list of objects. The first six should leave the golden record unchanged, because they change no random draw and no choice. Nobody has run the soak to confirm that yet.</p>
 <div class="scroll"><table>
 <tr><th>Change</th><th>Game situation</th><th>Golden</th></tr>
-<tr><td>Clear one grid cell when an item goes, not the whole grid.</td><td>Picking up anything.</td><td>Should hold</td></tr>
+<tr><td>The grid keeps only the first item on each tile. On a removal, put the next item on that tile into the slot, instead of rebuilding the whole grid.</td><td>Picking up anything.</td><td>Should hold</td></tr>
 <tr><td>Work out each goal's state once per decision, not twice.</td><td>Every decision by every person.</td><td>Should hold</td></tr>
 <tr><td>Keep "this camp has a garden" on the camp. Today the check reads all 33,600 surface tiles.</td><td>A camp that could plant a garden.</td><td>Should hold</td></tr>
 <tr><td>Lift a repeated <code>humans()</code> call out of the wolf's stalking test.</td><td>A wolf picks a lone person at night.</td><td>Should hold</td></tr>
