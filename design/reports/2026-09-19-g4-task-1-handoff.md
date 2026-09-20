@@ -324,6 +324,68 @@ everything here was re-measured rather than carried forward.
 
 **Every failure converted above was a test counting in old ticks. Not one was a fault in the rules.**
 
+Final state of the whole suite, run file by file at `99ead34`:
+
+| | |
+|---|---|
+| passing | **326** |
+| failing | **0** |
+| suspended | **6 files**, listed below |
+
+### `LONG=1`, run because task 1 is the task that most needs it
+
+Ruling 2 makes `LONG=1` on seed `r` a gate at every task. Task 1 was committed before the ruling
+reached this session, and the right answer was not to treat the gate as starting at task 2: the
+ruling exists **because of** what task 1 did, and everything from task 2 on stands on this
+foundation. Run at `99ead34`. Seed `r`, 70 world days.
+
+| | |
+|---|---|
+| passing | 13 |
+| failing | **2** |
+| skipped | 3 |
+| wall clock | **67 minutes**, not the 17 the ruling assumed |
+| chronicle lines | 372,157 |
+| alive at day 70 | 135, of 162 ever |
+| deaths | 21 "died in their sleep, old and warm by the fire", 6 "died of old age" |
+
+**The gate that matters passed. Every death in seventy days was old age.** After two berry-class
+regressions inside this one task, that is the number worth having, and it is the one the three-day
+soak cannot reach.
+
+**The two failures are structural and are not a regression.** Both are cross-seed sum floors:
+
+```
+sum of humans 162 (want >= 180), sum of born 20 (want >= 15)
+sum of repaid 0 (want >= 5)
+```
+
+`SEEDS` under `LONG=1` is `['r']` — **one seed**. Both floors were measured as sums **across six
+seeds** over 70 days. A six-seed sum compared against one seed's counts cannot pass, whatever the
+world does. `born 20 >= 15` passed; `humans 162 >= 180` failed on a floor that six seeds set; and
+`repaid` is gnome borrowing, which seed `r` never does at all — it ends with 2 gnomes, 0 borrowed.
+
+So **ruling 2 is not quite true as written.** `LONG=1` on one seed does not run all nine suspended
+assertions at their original measured values. It runs seven of them. The remaining two cannot be
+satisfied by the data the gate provides, and an assertion that cannot pass on the data it is given is
+not a gate: it is a red line that teaches the next reader to skip past red.
+
+**This report does not fix it**, because the floors are the user's and patcher's after the standing
+ruling, and because a fix here is one line that should be ruled rather than slipped in. The
+recommendation, sent to dev-coordinator: give those two assertions a precondition, so they skip with
+a reason unless the run actually holds the six seeds — *"needs the six seeds; this run has r"*. That
+rescales no number and widens no suspension. It makes the assertion state what data it needs, which
+is the thing it is currently silent about.
+
+**And the cost of ruling 2 is four times what was assumed.** 67 minutes, not 17. The average is 57
+seconds a world day across the seventy, against the 15 s measured at days 1 to 3. The cost tracks
+beings alive — 86 at day 3, 135 at day 70 — so it climbs as the valley fills. A gate people skip
+stops being a gate, which is ruling 2's own argument, and an hour a task is a different proposition
+from a quarter of one. That is dev-coordinator's and the user's to weigh, with the number now
+measured rather than estimated.
+
+
+
 ### What is switched off, in one place
 
 The user approved this shape through dev-coordinator: **cut nothing.** These six files are suspended
@@ -348,12 +410,31 @@ skip message gives the reason and the flag: *"this file asks for N world days an
 about 15 s on this branch, not dev's 0.31 s. SLOW=1 runs it. Task 4 restores it."* That sentence is
 the difference between a suspension and a quiet deletion.
 
-**One gate moved and did not go.** The plan names the snapshot oracle, `tests/snapshot.js`, as one of
-the three gates standing in for the golden between task 1 and the bless. Suspending that file does
-not remove the oracle: it also runs inside `tests/soak.js` as *"seed x saved on day 1.5, loaded into
-a fresh sim, tells the same story to day 3"*, and the soak runs at every task's gate. This is stated
-rather than left to be noticed, because a gate that quietly has one fewer leg is the fault this whole
-report is about.
+**One gate moved, did not go, and is thinner. Here is by how much.** The plan names the snapshot
+oracle, `tests/snapshot.js`, as one of the three gates standing in for the golden between task 1 and
+the bless. Suspending that file does not remove the oracle: it also runs inside `tests/soak.js` as
+*"seed x saved on day 1.5, loaded into a fresh sim, tells the same story to day 3"*. The gate
+relocates in kind. It does not relocate in span, and the difference is the part worth writing down.
+
+`tests/snapshot.js`'s oracle runs four cases, saving at 12,400, 12,400, 30,300 and 20,000 steps and
+running on for 2,000 to 8,000 more. **On dev those were 12 to 30 world days before the save.** The
+soak's oracle saves at 1.5 world days and runs to 3. A snapshot fault that needs time to show —
+something rebuilt lazily, a counter that drifts, a field written only on a season's turn — is
+invisible in 1.5 days and would have been caught in twelve. **That leg is thinner by about an order
+of magnitude, not merely moved.**
+
+**And a fifth bare old-tick count, found while checking that claim.** Those four spans are raw step
+counts and **were never converted**. On this branch 12,400 steps is 0.14 of a world day, not 12.4
+days. So the oracle in `tests/snapshot.js` is, right now, weaker than the soak's — the thing that
+replaced it covers more world time than it does. Restoring the file at task 4 without converting
+those four numbers would restore an oracle far weaker than dev's while reading as a restored gate.
+Task 4's checkbox says so.
+
+**Which run carries the oracle.** The soak's oracle is gated `skip: !isDefault`, and `isDefault`
+requires `!LONG`, so **it does not run under `LONG=1`**. The long run and the oracle never run in the
+same invocation. "The soak runs at every gate" is therefore not enough on its own: it is the
+**default three-day soak** that carries the oracle, and the `LONG=1` run that carries the 70-day
+assertions. Both are gates, and they cover different things.
 
 ### The tests left red, named
 
@@ -372,10 +453,22 @@ once a night, so the run never reached one and the world named nothing. The span
 
 That is four separate places where a bare old-tick count survived into this branch: `tests/lib/run.js`,
 two in `tests/door.js`, and this one — plus the thirty-one in the files converted above. Each was
-found by looking, none by a rule. **There is no lint for this**, because a bare tick count is a
-number and a number survives any rebasing, which is finding 1 restated. The only thing that finds
-them is a test that asserts the world did something, and the only reason this one was caught is that
-the file's three version tests were run individually rather than left inside a suspended file.
+found by looking, none by a rule — and a fifth, the snapshot oracle's four spans, is recorded under
+"What is switched off" and owed to task 4.
+
+**This is the most portable thing task 1 produced, so it is stated plainly.** A bare tick count is a
+number. A number survives any rebasing intact. No lint can tell a duration from a magic constant,
+because at the point the lint looks they are the same token. **Only a test that asserts the world DID
+something can find one.** That is finding 1 restated, it is finding 2 and finding 5 restated, and it
+is the floors report's finding arriving in a fifth place: a threshold on a standing quantity asks "is
+there still enough", and after a rule stops firing the honest answer is "yes, for now".
+
+**And this one was found by luck, which is worth more in the report than the fix is.** The three
+version tests were run individually, outside the cap, only because they were what owed item 1
+changed. Had they been left inside `tests/snapshot.js` they would have been suspended twenty minutes
+later and the fault would have gone to dev behind a green suite, exactly as the other two of its
+class did. Nothing in the process caught it. The next one of these will not be caught by being more
+careful.
 
 ### The working record moved, deliberately
 

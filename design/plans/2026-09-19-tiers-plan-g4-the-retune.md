@@ -418,6 +418,12 @@ This task answers ruling 2. It is also the task whose numbers decide the floors,
   and report each one's pass count and seconds. A file that still cannot finish is a finding for the
   user with a measured number behind it, not a file to cut. Until this box is ticked, `npm run fast`
   is not the gate it reads as.
+- [ ] **Convert the snapshot oracle's four spans when `tests/snapshot.js` comes back.** `CASES` in
+  that file saves at 12,400, 12,400, 30,300 and 20,000 steps, which were 12 to 30 world days on dev
+  and are 0.14 to 0.35 of a world day now. They are bare old-tick counts and were never converted.
+  Restoring the file without converting them restores an oracle weaker than the three-day soak's,
+  while reading as a restored gate. The plan names this oracle as one of the three standing in for
+  the golden, so it must come back at its real span or the gate is a gate in name.
 - [ ] Gates as task 1, plus `tests/skip.js`. Commit.
 
 ### Task 5: Work, sleep, and needs in world time
