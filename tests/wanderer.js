@@ -16,7 +16,10 @@ const { runDays, DAY } = require('./lib/run');
    measured on this branch and more as each valley fills. No day count was lowered: the runs are the
    runs, behind LONG=1. Task 1's suspension message already carried the 493; the plan's own table said
    48, which was a helper's day count read once rather than summed. */
-const LONG = !!process.env.LONG;
+/* SLOW=1 runs these too, because that is the flag task 1 wrote into every suspension message and
+   into the commands people have in their notes. A documented command that silently runs nothing is
+   worse than no command. */
+const LONG = !!(process.env.LONG || process.env.SLOW);
 if (!LONG){
   test('the fifteen runs of tests/wanderer.js are behind LONG=1', { skip: 'behind LONG=1: 493 world days across fifteen runs, at least 1,479 s at the 3.0 s a world day measured on this branch, and more as each valley fills. LONG=1 runs it. No day count was lowered.' }, () => {});
   return;

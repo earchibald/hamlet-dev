@@ -22,7 +22,10 @@ const { DAY, runDays, collect, runOn, fingerprint } = require('./lib/run.js');
    that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
    a floor and it is labelled as one. The measurements and the machine's load averages are in
    design/reports/2026-09-20-g4-task-4-the-skip.md. */
-const LONG = !!process.env.LONG;
+/* SLOW=1 runs these too, because that is the flag task 1 wrote into every suspension message and
+   into the commands people have in their notes. A documented command that silently runs nothing is
+   worse than no command. */
+const LONG = !!(process.env.LONG || process.env.SLOW);
 const slow = days => LONG ? false
   : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
 
