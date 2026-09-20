@@ -424,7 +424,14 @@ const secCenter = s => [s.sx * LW + (LW >> 1), s.sy * LH + (LH >> 1)];
 function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = rint(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 /* World state */
-let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+let /** @type {Tile[]} */ world, /** @type {Tile[][]} */ levels, /** @type {Tile[]} */ raised,
+  /** @type {Hill[]} */ hills, /** @type {Cave[]} */ caves, /** @type {Sector[]} */ sectors,
+  /** @type {Being[]} */ beings, /** @type {GroundItem[]} */ items, /** @type {(GroundItem|null)[]} */ itemGrid,
+  /** @type {ChronicleLine[]} */ chronicle, /** @type {CorpseMarker[]} */ corpses,
+  /** @type {number} */ tick, /** @type {number} */ nextId, /** @type {number} */ fireCount, /** @type {string} */ seedText,
+  /** @type {Camp[]} */ camps, /** @type {Camp|null} */ camp, /** @type {{[goalId:string]: number}} */ goalPriority,
+  /** @type {string[]} */ namePool, /** @type {Map<any,any>} */ resCache,
+  /** @type {{storm:boolean,until:number,next:number}} */ weather, /** @type {Grove[]} */ groves;
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;
@@ -1702,6 +1709,7 @@ const GROWS = { forest: true, meadow: true, wetland: true, rocky: false, river: 
 function poleShare(pole){ let n = 0, all = 0; for (const r of liveRegions()){ all += r.area; if (hasPole(r, pole)) n += r.area; } return all ? n / all : 0; }
 
 /* ---------- tiles, loose items, resource counts, generation, plants ---------- */
+/** @returns {Tile} */
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
@@ -1736,6 +1744,7 @@ function tileFuel(t){
 function rebuildItemGrid(){ itemGrid = new Array(NZ * W * H).fill(null); for (const it of items){ const i = idx3(it.x, it.y, it.z); if (!itemGrid[i]) itemGrid[i] = it; } }
 function addItem(kind, x, y, z = 0){ const it = { id: nextId++, kind, x, y, z, reservedBy: null, born: tick }; items.push(it); const i = idx3(x, y, z); if (!itemGrid[i]) itemGrid[i] = it; return it; }
 function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); const i = idx3(it.x, it.y, it.z); if (itemGrid[i] === it) itemGrid[i] = items.find(o => o.x === it.x && o.y === it.y && o.z === it.z) || null; }
+/** @returns {GroundItem|null} */
 const itemAt = (x, y, z = 0) => itemGrid[idx3(x, y, z)];
 
 function nearestFire(x, y, r, z = 0){
@@ -2511,7 +2520,9 @@ function makeCamp(name){
   c.names = []; c.namedAt = 0; c.founder = null; c.villageNamed = 0;
   camps.push(c); return c;
 }
+/** @returns {Being[]} */
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
+/** @returns {Camp|null} */
 const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r).sort((p, q) => nearAt(a, ...p.site) - nearAt(a, ...q.site))[0] || null;
 
 function stashAdd(kind, n){
@@ -3432,6 +3443,7 @@ function makeBeing(species, x, y, name, hue){
   if (species === 'gnome') b.den = null;
   return b;
 }
+/** @returns {Being|undefined} */
 const beingById = id => beings.find(b => b.id === id);
 const humans = () => beings.filter(b => b.species === 'human' && b.alive);
 /* The first person of the world. The gods come into being before the people, so beings[0] is a god. */

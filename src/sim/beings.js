@@ -27,6 +27,7 @@ function makeBeing(species, x, y, name, hue){
   if (species === 'gnome') b.den = null;
   return b;
 }
+/** @returns {Being|undefined} */
 const beingById = id => beings.find(b => b.id === id);
 const humans = () => beings.filter(b => b.species === 'human' && b.alive);
 /* The first person of the world. The gods come into being before the people, so beings[0] is a god. */
