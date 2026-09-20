@@ -306,14 +306,55 @@ test('every template button prints a key, and every keyed button id is in the te
    `Number(b.dataset.speed)` to `ACTIONS.speed`. So this test reads the template too. A test that
    walked `PACES` and `SPEEDS` again would agree with the constants and never see the template drift
    away from them, which is how `data-pace="4"` could set an unknown pace with a green suite. */
-test('every data-pace and data-speed in the template is a rung of its ladder, and every rung has a button', () => {
+/* The scan is per button, not per attribute. One handler reads `data-pace` in the ages and
+   `data-speed` after, on the same click, so carrying both is a property of each button. Two flat
+   lists of attribute values cannot state it: a fifth button with `data-speed` and no `data-pace`
+   leaves both lists complete, and the button is dead in the ages. */
+/* The scan is also per place. src/ui/main.js binds the click to the #speeds span, so a button with
+   both attributes outside that span is dead in both eras. Read the span, then check that no element
+   anywhere else in the template carries either attribute. */
+test('every speed button sits in #speeds and carries both attributes, each is a rung of its ladder, and every rung has a button', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS']);
   const html = fs.readFileSync('src/page.template.html', 'utf8');
-  for (const [attr, name, rungs] of [['pace', 'PACES', api.PACES], ['speed', 'SPEEDS', api.SPEEDS]]){
-    const found = [...html.matchAll(new RegExp(`data-${attr}="([^"]*)"`, 'g'))].map(m => Number(m[1]));
-    assert.ok(found.length, `the template holds no data-${attr} attribute, so this test reads nothing`);
-    for (const v of found) assert.ok(rungs.includes(v), `the template holds data-${attr}="${v}", which is not on ${name} (${rungs.join(', ')}); a click on that button would set it`);
+  const ladders = [['pace', 'PACES', api.PACES], ['speed', 'SPEEDS', api.SPEEDS]];
+  const open = html.match(/<span\b[^>]*\bid="speeds"[^>]*>/);
+  assert.ok(open, 'the template holds no <span id="speeds">; src/ui/main.js binds the speed click to that span, so this test reads nothing');
+  /* Walk to the matching close tag, counting depth. A non-greedy match would stop at a nested
+     </span> and call the buttons after it outsiders, which names the wrong fault. */
+  const from = open.index;
+  let depth = 0, to = -1;
+  for (const m of html.slice(from).matchAll(/<span\b[^>]*>|<\/span>/g)){
+    depth += m[0] === '</span>' ? -1 : 1;
+    if (depth === 0){ to = from + m.index + m[0].length; break; }
+  }
+  assert.ok(to > from, 'the template never closes <span id="speeds">, so this test cannot tell which buttons sit in it');
+  const inner = html.slice(from + open[0].length, to - '</span>'.length);
+  for (const [attr] of ladders){
+    for (const m of html.matchAll(new RegExp(`<[a-zA-Z][^>]*\\bdata-${attr}="[^"]*"[^>]*>`, 'g'))){
+      const tag = m[0], id = (tag.match(/\bid="([^"]+)"/) || [, tag])[1];
+      assert.ok(m.index >= from && m.index < to, `#${id} carries data-${attr} outside <span id="speeds">; src/ui/main.js binds the speed click to that span, so a click on this element sets no speed in either era`);
+    }
+  }
+  const buttons = [...inner.matchAll(/<button\b[^>]*>/g)].map(m => m[0]).filter(b => /\bdata-(pace|speed)="/.test(b));
+  assert.ok(buttons.length, 'the template holds no speed button, so this test reads nothing');
+  const value = (b, attr) => { const m = b.match(new RegExp(`\\bdata-${attr}="([^"]*)"`)); return m ? Number(m[1]) : undefined; };
+  for (const b of buttons){
+    const id = (b.match(/\bid="([^"]+)"/) || [, b])[1];
+    for (const [attr, name, rungs] of ladders){
+      const v = value(b, attr);
+      assert.ok(v !== undefined, `button #${id} carries no data-${attr}; one handler reads data-pace in the ages and data-speed after, so this button is dead in one era`);
+      assert.ok(rungs.includes(v), `button #${id} carries data-${attr}="${v}", which is not on ${name} (${rungs.join(', ')}); a click on it would set that value`);
+    }
+  }
+  for (const [attr, name, rungs] of ladders){
+    const found = buttons.map(b => value(b, attr));
     for (const r of rungs) assert.ok(found.includes(r), `${name} holds ${r}, which no data-${attr} button in the template can reach`);
+  }
+  /* The handler takes the nearest `[data-speed]` ancestor, which need not be a button. Count the
+     attributes inside the span too, so one moved onto another element there is not left unread. */
+  for (const [attr] of ladders){
+    const all = [...inner.matchAll(new RegExp(`\\bdata-${attr}="`, 'g'))].length;
+    assert.equal(all, buttons.length, `<span id="speeds"> holds ${all} data-${attr} attributes and ${buttons.length} speed buttons; this test reads the buttons, so an attribute on another element goes unchecked`);
   }
 });
 
