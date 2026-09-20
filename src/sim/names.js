@@ -542,10 +542,20 @@ function eventCandidates(c, kind = 'event', line){
 function nameEvents(c){
   if (!c.site) return;
   const by = namerFor(c.site); if (!by) return;
+  /* `chronicle` is newest first (`log` unshifts). Naming in that order would name the newer of
+     two same-day, same-tag lines before the older one, and the listed-order rule (finding 3)
+     would then hand the night that happened LATER the first phrase. So the walk below still
+     stops at the same one-day boundary, for the same reason as before, but it only collects
+     the unnamed lines it accepts; the collected lines are then named oldest first, so the
+     night that happened first always gets first pick of its tag's phrases. */
+  const due = [];
   for (const e of chronicle.slice()){
     if (tick - e.tick > DAY) break;
     if (e.names || !isEventLine(e, c)) continue;
-    const rec = nameThing(e, 'event', by, c.site);
+    due.push(e);
+  }
+  for (let i = due.length - 1; i >= 0; i--){
+    const rec = nameThing(due[i], 'event', by, c.site);
     if (rec) log(`They will call it ${rec.text}.`, campHumans(), 'major');
   }
 }

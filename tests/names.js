@@ -692,24 +692,28 @@ test('two events of different tags on one day each take a phrase from their own 
   assert.equal(birthLine.names[0].text, birthPhrases[0], 'the birth line did not take its own listed first phrase');
 });
 
-/* Two events of the SAME tag on one day still take that tag's first and second phrase, in that
-   order, by the order the lines were written (finding 3's listed-order rule), even now that
-   eventCandidates is scoped to the line it names. */
-test('two events of the same tag on one day take that tag\'s phrases in written order', () => {
+/* Two events of the SAME tag on one day still take that tag's first and second phrase, in the
+   order the nights HAPPENED (finding 3's listed-order rule), even now that eventCandidates is
+   scoped to the line it names. Both lines are logged BEFORE nameEvents ever runs, so both sit
+   in the unnamed pool together -- this is the actual same-day race, not two separate passes.
+   `chronicle` is newest first, so if nameEvents named lines in chronicle order it would name
+   the second (newer) line before the first (older) one and hand it phrases[0], the mistake
+   finding 3c fixes. This failed against the code before that fix: the second (newer) wolf
+   line took phrases[0] and the first (older) line took phrases[1]. */
+test('two events of the same tag on one day take that tag\'s phrases in the order the nights happened', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   const phrases = api.EVENT_NAMES.wolf.phrases;
   api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
   const first = api.chronicle[0];
-  api.nameEvents(c);
-  assert.ok(first.names && first.names.length, 'the first wolf line was not named');
-  assert.equal(first.names[0].text, phrases[0], `the first wolf line took "${first.names[0].text}", not phrases[0]`);
-
   api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
   const second = api.chronicle[0];
+  assert.notEqual(first, second, 'the two lines are the same line');
   api.nameEvents(c);
+  assert.ok(first.names && first.names.length, 'the first wolf line was not named');
   assert.ok(second.names && second.names.length, 'the second wolf line was not named');
-  assert.equal(second.names[0].text, phrases[1], `the second wolf line took "${second.names[0].text}", not phrases[1]`);
+  assert.equal(first.names[0].text, phrases[0], `the first (older) wolf line took "${first.names[0].text}", not phrases[0]`);
+  assert.equal(second.names[0].text, phrases[1], `the second (newer) wolf line took "${second.names[0].text}", not phrases[1]`);
 });
 
 test('a night is never named after a place', () => {
