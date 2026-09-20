@@ -94,13 +94,15 @@ function beatStill(dialogOpen){ return dialogOpen || (paused && !ui.playing); }
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
 /* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run
-   time, so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
-   caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
+   time, so no tier names a pace. A full beat draws everything; a shorter one drops the intent cue and
+   keeps the act's figure, its caption and the cross-fade. Two lower tiers, a walk-only one and a snap,
+   stood below these. No pace on PACES could reach them, so they went, and the branches that read them
+   went with them. tests/ui.js holds the ladder to the paces: every pace must buy at least TWEEN.figure
+   milliseconds. Add a pace that cannot, and that test fails rather than the field quietly drawing a
+   figure it has no time for. */
 function beatTier(ms){
   if (ms >= TWEEN.full) return 'full';
-  if (ms >= TWEEN.figure) return 'figure';
-  if (ms >= TWEEN.walk) return 'walk';
-  return 'none';
+  return 'figure';
 }
 /* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
    is nowhere to draw, and with no `from` the star is already where it belongs. */
