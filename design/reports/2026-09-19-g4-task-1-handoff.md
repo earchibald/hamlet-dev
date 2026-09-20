@@ -54,7 +54,7 @@ times less, which no per-field default can rescue.
 **The soak is six seeds for three world days**, with the 70-day run behind `LONG=1` on one seed, and
 answers to `tests/soak-working.json`. `tests/soak-golden.json` is untouched and no task writes it.
 
-## The six findings worth carrying
+## The findings worth carrying
 
 ### 1. The rates had to convert, or the world would have broken silently
 
@@ -176,6 +176,45 @@ scope rather than taking my word for it and found that **none of the eleven per-
 `strayLightning`, `rotCarcasses`, `groveTick`, `denTick`, `gnomeTick`, `spawnWildlife`, `godsTick`.
 So a detector that watches task records cannot see the per-tick engine at all. The shape that caught
 this one generalises and a table lint does not: **call the rule and ask whether it still happens.**
+
+### 5b. A number that was correctly two things at once, and the detector that read clean
+
+The third fault of the berry class in this task, and a **sub-species of its own**, named here because
+the first two do not describe it. Finding 2 was a value that went fractional. Finding 5 was a value
+converted that should not have been. This one is different: **`strikeFuel: ticks(240)` was correct as
+a fuel stock and correct as a tick count at the same time**, because `fire.burn` is `tickRate(1)` —
+exactly one fuel a tick. Both readings agreed, so nothing in the source could say which one the
+constant was.
+
+The rebasing broke a **coincidence**, not a value. `burn` correctly became a rate a tick and divided;
+converting the stock as well multiplied the burn time by 86.4. A lightning fire lasted **20.74 world
+days against dev's 0.24**, and the whole-number rule from finding 2 passed the whole time, because
+20,736 is a whole number of ticks.
+
+**No marker can flag a number whose two meanings agree.** The general form is worth carrying: *a unit
+rate makes two quantities numerically identical and hides which one a constant is.* That gives a
+cheap positive check rather than a search for the next one by disbelief — sweep the table for every
+rate of exactly 1 and look at what it drains. Run here with a control, and the answer is small:
+
+| rate of exactly 1 | its stock | state |
+|---|---|---|
+| `fire.burn = tickRate(1)` | `strikeFuel`, and tile fuel from `FEATURES`, `GROUND`, `ITEMS` | fixed; the data-table fuels were never converted, because the rebasing only ever touched `CLOCK` |
+
+**One unit rate in the whole table, and its only converted stock is the one that broke.** There is no
+fourth instance of this sub-species.
+
+### 5c. The detector was broken and read as clean, and only the control said so
+
+This belongs beside the fault because it is the more portable half. Sweeping for stocks that read
+`CLOCK`, my first search returned **zero**. There is a matching line at `src/sim/main.js:37`. The
+search was broken in the argument layer and its silence read exactly like cleanliness — and it would
+have ended the sweep, because a sweep that finds nothing is a sweep that feels finished.
+
+It was caught by running a **positive control**: asking the detector to find a thing known to exist
+before believing it about things that might not. The finding is not "there was a bug". It is that
+**a detector that reads clean has said nothing until a control has been run through it**, and that a
+load-bearing absence must be confirmed by a different KIND of method — here a Node scan of the source
+rather than a second search.
 
 ### 6. The suite's cost is one number, and it is the number task 4 exists to move
 
