@@ -3,10 +3,14 @@
    the same way it treats the files in src/sim/. It adds no runtime code: it only names the
    shapes that tsc uses to check src/sim/*.js under tsconfig.sim.json.
 
-   Each interface keeps an index signature. The records in src/sim/ gain fields by species,
-   by task, and by era (see beings.js, camps.js, world.js), so a closed interface would fail
-   on every one of those legal, conditional fields. The named fields are the ones every
-   record of that kind carries; the index signature covers the rest. */
+   No interface here carries a catch-all index signature. A catch-all hid every misspelt
+   field: `beings[0].hungerr` and `tileAt(1,2,0).featur` both passed with one in place, and
+   only removing it made tsc report them. cooldown keeps its index signature, named and
+   explained where it is declared, because it is genuinely a map from any task name to a
+   tick: nothing enumerates the task names ahead of time.
+
+   A field whose own shape is a further record (grove, den) is typed `any`, named here so a
+   later pass can give it a real shape; see the comment at each. */
 
 /** A creature: a human, a god, a fox, a wolf, a gnome, or a sprite. Built by makeBeing() in beings.js. */
 interface Being {
@@ -26,22 +30,68 @@ interface Being {
   traits: { [trait: string]: number };
   skills: { [skill: string]: number };
   xp: { [skill: string]: number };
-  thoughts: any[];
+  thoughts: Thought[];
   opinions: { [beingId: string]: number };
   rel: { [beingId: string]: string };
-  task: any;
+  task: Task | null;
   carrying: { kind: string; count: number } | null;
   status: string;
   asleep: boolean;
-  cooldown: { [key: string]: number };
-  history: any[];
+  /* A task name to the tick its cooldown ends (a.cooldown['strike sparks'] = tick + ...).
+     The task table grows over time (tasks.js, species.js, and fae.js all add kinds), so no
+     closed list of keys is honest here. This is the one index signature this file keeps. */
+  cooldown: { [taskName: string]: number };
+  history: ChronicleLine[];
   lastChoice: any;
   lastHurt: any;
   homeless: boolean;
   pokedUntil: number;
-  camp: any;
+  camp: Camp | null;
   deeds: { [tag: string]: number };
-  [key: string]: any;
+
+  /* human only (beings.js) */
+  clothes?: boolean;
+
+  /* sprite only (beings.js, fae.js, world.js): the hollow it belongs to, when it has not
+     swarmed, and where and until when it is raiding when it has. grove itself (anger,
+     swarmUntil, sector, lastBirth, x, y, mark, id) is not modelled here. */
+  grove?: any;
+  returnAt?: number;
+  target?: any;
+
+  /* fox, wolf, gnome only (beings.js, species.js, world.js): the cave record it dens in,
+     or the one it was driven from. A cave (kind, hill, owner, cleared, exit, bench,
+     holding, disturbed, disturbedBy, story, from, lastBirth) is not modelled here. */
+  den?: any;
+  oldDen?: any;
+  digAgain?: number;
+
+  /* god only (gods.js): its pole, the region it holds, and where it stands. */
+  pole?: string;
+  contrast?: string;
+  epithet?: string;
+  acted?: number;
+  at?: number | null;
+  region?: number | null;
+}
+
+/** One thought on a.thoughts: a labelled mood swing that decays over `left` ticks. addThought() in beings.js. */
+interface Thought {
+  key: string;
+  text: string;
+  value: number;
+  left: number;
+}
+
+/** One line of the chronicle, as log() in core.js builds it, and the last forty of which a.history keeps. */
+interface ChronicleLine {
+  tick: number;
+  when: any;
+  text: string;
+  kind: string;
+  tag: string | null;
+  camp: number | null;
+  age?: number;
 }
 
 /** One tile of the world. Built by makeTile() in world.js, from TILE_DEFAULTS in core.js. */
@@ -61,17 +111,52 @@ interface Tile {
   water: any;
   pond: any;
   ford: any;
-  [key: string]: any;
+  /* Set once, in paintGround() (world.js), to the id of the region the tile was painted in. */
+  country?: number | null;
 }
 
 /** A camp: a hearth, its people's stash, and its buildings. Built by makeCamp() in camps.js. */
 interface Camp {
   id: number;
-  founder: number;
+  name: string;
+  site: [number, number] | null;
+  target: [number, number] | null;
+  pit: [number, number] | null;
+  stashTile: [number, number] | null;
   stash: { [item: string]: number };
+  rot: { cooked: number[]; berries: number[] };
+  fae: { known: boolean; favor: number; grudges: { [beingId: string]: number }; blightUntil: number; lastPrank: number };
+  gnomes: { known: boolean };
+  stone: any;
+  ward: any;
   tools: { [tool: string]: number };
+  shelter: any;
+  rack: any;
+  storehouse: any;
+  workshop: any;
+  kiln: any;
+  garden: any;
   huts: any[];
-  [key: string]: any;
+  village: boolean;
+  snares: any[];
+  pitfalls: any[];
+  litTicks: number;
+  streak: number;
+  bestStreak: number;
+  everLit: boolean;
+  outSince: number;
+  nextArrival: number;
+  siteReason: string;
+  coals: number;
+  rotLogged: number;
+  wolfLogged: number;
+  guardLogged: number;
+  fished: number;
+  founded: number;
+  names: any[];
+  namedAt: number;
+  founder: number | null;
+  villageNamed: number;
 }
 
 /** A task record on a being: what it is doing, and how far it has gotten. */
@@ -81,21 +166,22 @@ interface Task {
   progress?: number;
   path?: any;
   args?: any;
-  [key: string]: any;
+  started?: number;
+  key?: string;
+  target?: any;
+  within?: number;
 }
 
 /** An item carried, stashed, or dropped: a kind and a count, plus whatever else that kind tracks. */
 interface Item {
   kind: string;
   count: number;
-  [key: string]: any;
 }
 
 /** An event handed to inject() at the door: door.js. */
 interface DoorEvent {
   act: string;
   source: string;
-  [key: string]: any;
 }
 
 /** The spec workKind() in tasks.js turns into a task kind. skill is read at run time with
