@@ -509,11 +509,16 @@ const isEventLine = (e, c) => !!e.tag && !!EVENT_NAMES[e.tag] && EVENT_KINDS.inc
 /* The camp's own events of the last `eventMemory`, worth 20 and 3 a day of freshness. */
 /* What a camp's recent events offer. Each phrase is a night's name ("the Night of the Wolf"), so
    only an event may take one. A place takes the joined word ("Wolfhill"), which reads as a place. */
-function eventCandidates(c, kind = 'event'){
+function eventCandidates(c, kind = 'event', line){
   const out = [];
   if (!c) return out;
   const memoryDays = CLOCK.names.eventMemory / DAY;
   for (const e of chronicle){
+    /* `line` is the one event line being named. When it is given, no other event line is a
+       candidate: a birth's pool never sees the fire's phrases or the wolf's, so a sibling
+       event's recency can never outscore the line's own tag. The place path never passes
+       `line`, so a place still sees every recent event and takes the joined word. */
+    if (line && e !== line) continue;
     const sinceDays = (tick - e.tick) / DAY;
     if (sinceDays > memoryDays) continue;
     if (!isEventLine(e, c)) continue;
@@ -600,7 +605,7 @@ function namerFor(place){
    table has no text left the night keeps no name. */
 function nameThing(thing, kind, by, place, extra = []){
   const pool = kind === 'valley' ? extra
-    : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event')]
+    : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event', thing)]
     : [...extra, ...candidatesFor(kind, by, place)];
   const scored = scoreCandidates(pool, by, thing, kind);
   const top = scored[0];

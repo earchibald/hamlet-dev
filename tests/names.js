@@ -663,6 +663,55 @@ test('a night takes its tag\'s phrases in listed order: fire', () => {
   ]);
 });
 
+/* Finding 3b: eventCandidates used to walk every event line of the camp when naming one of them,
+   so a fresher sibling of a DIFFERENT tag could outscore the line's own tag and give it the
+   sibling's phrase. Constructed, not hunted from a seed: an older 'found' line and a fresher
+   'birth' line in the same camp on the same day. nameEvents names the fresher one (birth) first,
+   which correctly takes its own phrases[0]; the older 'found' line is named second, and on the
+   old code its pool still held birth's next candidate (phrases[1], since phrases[0] was just
+   taken) at birth's higher recency, which beat found's own phrases[0]. This fails against the
+   code as it stood before finding 3b. */
+test('two events of different tags on one day each take a phrase from their own tag', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('Some families leave the camp.', [a], 'major', 'found');
+  const foundLine = api.chronicle[0];
+  foundLine.tick = api.tick - 500;
+  api.log('A baby is born to someone.', [a], 'major', 'birth');
+  const birthLine = api.chronicle[0];
+  assert.notEqual(foundLine, birthLine, 'the two lines are the same line');
+  api.nameEvents(c);
+  assert.ok(birthLine.names && birthLine.names.length, 'the birth line was not named');
+  assert.ok(foundLine.names && foundLine.names.length, 'the found line was not named');
+  const foundPhrases = api.EVENT_NAMES.found.phrases, birthPhrases = api.EVENT_NAMES.birth.phrases;
+  assert.ok(foundPhrases.includes(foundLine.names[0].text),
+    `the found line took "${foundLine.names[0].text}", not one of its own tag's phrases`);
+  assert.ok(birthPhrases.includes(birthLine.names[0].text),
+    `the birth line took "${birthLine.names[0].text}", not one of its own tag's phrases`);
+  assert.equal(foundLine.names[0].text, foundPhrases[0], 'the found line did not take its own listed first phrase');
+  assert.equal(birthLine.names[0].text, birthPhrases[0], 'the birth line did not take its own listed first phrase');
+});
+
+/* Two events of the SAME tag on one day still take that tag's first and second phrase, in that
+   order, by the order the lines were written (finding 3's listed-order rule), even now that
+   eventCandidates is scoped to the line it names. */
+test('two events of the same tag on one day take that tag\'s phrases in written order', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const phrases = api.EVENT_NAMES.wolf.phrases;
+  api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
+  const first = api.chronicle[0];
+  api.nameEvents(c);
+  assert.ok(first.names && first.names.length, 'the first wolf line was not named');
+  assert.equal(first.names[0].text, phrases[0], `the first wolf line took "${first.names[0].text}", not phrases[0]`);
+
+  api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
+  const second = api.chronicle[0];
+  api.nameEvents(c);
+  assert.ok(second.names && second.names.length, 'the second wolf line was not named');
+  assert.equal(second.names[0].text, phrases[1], `the second wolf line took "${second.names[0].text}", not phrases[1]`);
+});
+
 test('a night is never named after a place', () => {
   const { events } = run70(), api = run70world();
   const named = events.filter(e => e.names && e.names.length);
