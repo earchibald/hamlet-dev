@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleDetection": "legacy",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/sim/**/*.js",
+    "types/sim/**/*.d.ts",
+    "types/probe/**/*.js"
+  ],
+  "exclude": [
+    "src/sim/index.js"
+  ]
+}

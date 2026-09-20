@@ -88,6 +88,7 @@ const skillOfLabel = label => /cook|smok|butcher/i.test(label) ? 'cook' : /knap|
 /* A job done at one place: walk to args.at, work until the progress reaches the amount, and then the
    effect lands. label, amount, and skill are values, or functions of args for a job whose record says
    them. The kind declares work and effect, so another executor can do the same job without the strides. */
+/** @type {(spec: WorkKindSpec) => any} */
 function workKind({ label, amount, skill, effect, type = 'work' }){
   const of = (v, args) => typeof v === 'function' ? v(args) : v;
   return { type, work: { amount, skill }, effect,

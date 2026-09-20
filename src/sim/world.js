@@ -1,7 +1,9 @@
 /* ---------- tiles, loose items, resource counts, generation, plants ---------- */
+/** @returns {Tile} */
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
+/** @returns {Tile} */
 function makeTile(x, y, z, ground){ return { x, y, z, ground, ...TILE_DEFAULTS }; }
 /* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
 function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); const old = levels[z + ZOFF][idx(x, y)]; levels[z + ZOFF][idx(x, y)] = t; if (z !== 0){ if (old){ const k = raised.indexOf(old); if (k >= 0) raised[k] = t; else raised.push(t); } else raised.push(t); } return t; }
@@ -32,6 +34,7 @@ function tileFuel(t){
 function rebuildItemGrid(){ itemGrid = new Array(NZ * W * H).fill(null); for (const it of items){ const i = idx3(it.x, it.y, it.z); if (!itemGrid[i]) itemGrid[i] = it; } }
 function addItem(kind, x, y, z = 0){ const it = { id: nextId++, kind, x, y, z, reservedBy: null, born: tick }; items.push(it); const i = idx3(x, y, z); if (!itemGrid[i]) itemGrid[i] = it; return it; }
 function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); const i = idx3(it.x, it.y, it.z); if (itemGrid[i] === it) itemGrid[i] = items.find(o => o.x === it.x && o.y === it.y && o.z === it.z) || null; }
+/** @returns {GroundItem|null} */
 const itemAt = (x, y, z = 0) => itemGrid[idx3(x, y, z)];
 
 function nearestFire(x, y, r, z = 0){
