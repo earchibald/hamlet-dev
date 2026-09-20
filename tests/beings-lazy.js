@@ -291,6 +291,72 @@ test('work put in after a walk back is one tick of work, and not the walk', ctx 
     `the first tick of work after the walk back put in ${gains[0]} where a tick of work is ${gains[1]}: the walk was credited as work`);
 });
 
+/* The kept threat list, and the three keys that say when it must be built again. The list is load
+   bearing: task 3 misses its budget without it, because `threatsFor` runs for every being on every
+   tick and the list turns a walk of seventy into a walk of three to eight.
+ *
+ * Nothing in the suite saw the list go wrong. The task 3 review deleted the tick key in a copy and got
+ * `tests/beings-lazy.js` 13 pass, 0 fail and the full six-seed soak 65 pass, 0 fail with every working
+ * record green. A stale list here is a wolf nobody saw, so each key now has a check that reds when
+ * that key alone is gone.
+ *
+ * The oracle is the filter the cache stands in for: `beings.filter(b => b.species === 'human' ||
+ * SPECIES[b.species].hunter)`, written out here so a change to the predicate must be made twice.
+ *
+ * Why each key is needed, and what breaks without it:
+ *   `beings.length`   a being pushed inside a tick joins the valley without the tick moving and
+ *                     without the array being replaced. Births, litters and arrivals all push. Without
+ *                     this key the new wolf is invisible to every threat read until the next tick.
+ *   `beings`          the prune at `src/sim/main.js`, the settle, and a loaded save all replace the
+ *                     array rather than splice it, and a load can land on the same tick with the same
+ *                     count. Without this key the list holds records that are no longer in the valley,
+ *                     so a threat read answers about a world that no longer exists.
+ *   the tick          the backstop for every other change to the contents of `beings` that keeps both
+ *                     the array and its length — a member replaced in place, a species reassigned.
+ *                     The review found no production path of that shape today, and that is worth
+ *                     holding rather than trusting: without this key such a change is never corrected
+ *                     at all, and the list can be a whole world day stale. */
+const sourcesOracle = api => api.beings.filter(b => b.species === 'human' || api.SPECIES[b.species].hunter);
+
+test('a being pushed inside a tick joins the kept threat list', () => {
+  const { api, a } = world();
+  const at = api.tick;
+  assert.deepEqual(api.sourcesNow(), sourcesOracle(api), 'the warm list should match the filter');
+  const w = api.makeBeing('wolf', a.x + 3, a.y, null, 0);
+  api.beings.push(w);
+  assert.equal(api.tick, at, 'the tick has not moved');
+  assert.ok(api.sourcesNow().includes(w), 'a wolf pushed inside the tick is not in the kept list');
+  assert.deepEqual(api.sourcesNow(), sourcesOracle(api));
+});
+
+test('a load replaces the beings array, and the kept threat list goes with it', () => {
+  const { api } = world();
+  const at = api.tick, n = api.beings.length;
+  const old = api.sourcesNow();
+  assert.ok(old.length > 0, 'the valley holds a threat source to begin with');
+  api.loadSnapshot(api.takeSnapshot());
+  assert.equal(api.tick, at, 'the load lands on the same tick');
+  assert.equal(api.beings.length, n, 'the load lands on the same count');
+  for (const b of api.sourcesNow()) assert.ok(api.beings.includes(b), `the kept list holds a ${b.species} the valley does not`);
+  assert.deepEqual(api.sourcesNow(), sourcesOracle(api));
+});
+
+test('the tick rebuilds the kept threat list when nothing else can', () => {
+  const { api, a } = world();
+  assert.deepEqual(api.sourcesNow(), sourcesOracle(api), 'the warm list should match the filter');
+  /* A member replaced in place: the array is the same array and it is the same length, so neither of
+     the other two keys can see the change. Only the tick moving on rebuilds the list. */
+  const i = api.beings.findIndex(b => b !== a && !(b.species === 'human' || api.SPECIES[b.species].hunter));
+  assert.ok(i >= 0, 'the valley holds a being that is no threat source');
+  const w = api.makeBeing('wolf', a.x + 3, a.y, null, 0);
+  const was = api.beings.length;
+  api.beings[i] = w;
+  assert.equal(api.beings.length, was, 'the array is the same length');
+  api.tick = api.tick + 1;
+  assert.ok(api.sourcesNow().includes(w), 'the tick moved on and the kept list was not built again');
+  assert.deepEqual(api.sourcesNow(), sourcesOracle(api));
+});
+
 /* The two counters the budget rests on. `seen` is the tick a being's body was last brought up to,
    and `next` is the tick it acts again. Both are ticks on a saved record, so a load must bring them
    back or a loaded world would replay a day of body time or skip one. */
