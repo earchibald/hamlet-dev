@@ -1,0 +1,526 @@
+<title>Hearth Core Paths</title>
+<!-- A proposal, 2026-09-19. Published as a Claude artifact, which wraps this file in its own html, head, and body.
+     Opened straight from the repo it still renders. Footnotes are numbered by the script at the end. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#eef1ec; --panel:#f8faf6; --ink:#1d2a2b; --ink2:#4c5b5a; --rule:#cfd8d1;
+  --river:#1f6f78; --ember:#a8480f; --ok:#2f6b3a;
+  --s1:#2a78d6; --s2:#eb6834;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --ground:#141a1a; --panel:#1b2323; --ink:#dde5e1; --ink2:#9fb0ac; --rule:#2f3b3a;
+  --river:#6fc0c9; --ember:#e59257; --ok:#7dc48a;
+  --s1:#3987e5; --s2:#d95926;
+}}
+:root[data-theme="dark"]{
+  --ground:#141a1a; --panel:#1b2323; --ink:#dde5e1; --ink2:#9fb0ac; --rule:#2f3b3a;
+  --river:#6fc0c9; --ember:#e59257; --ok:#7dc48a;
+  --s1:#3987e5; --s2:#d95926;
+}
+body{ background:var(--ground); color:var(--ink); font:16px/1.6 "IBM Plex Sans",system-ui,sans-serif; padding-inline:16px; padding-block:24px 64px; }
+main{ max-width:46rem; margin-inline:auto; display:flex; flex-direction:column; gap:1.1rem; }
+h1{ font-size:1.9rem; line-height:1.2; font-weight:600; margin:0; text-wrap:balance; }
+h2{ font-size:1.35rem; font-weight:600; margin:2.2rem 0 0; padding-top:1rem; border-top:1px solid var(--rule); text-wrap:balance; }
+h3{ font-size:1.05rem; font-weight:600; margin:1rem 0 0; }
+.box h3{ margin:0; }
+p,ul,ol{ margin:0; } li{ margin-block:.25rem; }
+a{ color:var(--river); } a:focus-visible,button:focus-visible,input:focus-visible{ outline:2px solid var(--river); outline-offset:2px; }
+code,.mono{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.88em; }
+.lede,.small{ color:var(--ink2); } .small{ font-size:.85rem; }
+.scroll{ overflow-x:auto; }
+table{ border-collapse:collapse; width:100%; font-size:.92rem; }
+th,td{ text-align:left; vertical-align:top; padding:.45rem .6rem; border-bottom:1px solid var(--rule); }
+th{ font-weight:600; color:var(--ink2); font-size:.8rem; letter-spacing:.04em; text-transform:uppercase; }
+td.n{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+nav{ display:flex; flex-wrap:wrap; gap:.3rem .9rem; font-size:.88rem; }
+.box{ background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:1rem; display:flex; flex-direction:column; gap:.8rem; }
+.note{ border-left:3px solid var(--ember); padding:.1rem 0 .1rem .8rem; color:var(--ink2); font-size:.93rem; display:flex; flex-direction:column; gap:.4rem; }
+details{ border:1px solid var(--rule); border-radius:6px; background:var(--panel); }
+summary{ cursor:pointer; padding:.6rem .9rem; font-weight:500; }
+details[open] summary{ border-bottom:1px solid var(--rule); }
+details > .scroll, details > p, details > ol{ margin:.8rem .9rem; }
+.pick{ color:var(--ok); font-weight:600; }
+.tag{ font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink2); }
+sup a.fn{ text-decoration:none; font-size:.75rem; padding:0 1px; }
+fieldset{ border:0; padding:0; margin:0; display:flex; flex-direction:column; gap:.3rem; }
+legend{ font-weight:600; padding:0; margin-bottom:.2rem; }
+label.opt{ display:flex; gap:.5rem; align-items:baseline; }
+.sliders{ display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr)); gap:.8rem; }
+.sliders label{ display:flex; flex-direction:column; gap:.2rem; font-size:.9rem; }
+input[type=range]{ width:100%; accent-color:var(--river); }
+button{ font:inherit; font-weight:500; color:var(--ground); background:var(--river); border:0; border-radius:4px; padding:.45rem .9rem; cursor:pointer; align-self:flex-start; }
+.bars{ display:flex; flex-direction:column; gap:.35rem; font-size:.88rem; }
+.bar{ display:grid; grid-template-columns:minmax(7rem,11rem) 1fr 3.6rem; gap:.5rem; align-items:center; }
+.bar i{ display:block; height:.7rem; border-radius:0 4px 4px 0; background:var(--s1); min-width:2px; }
+.bar b{ font-weight:400; font-variant-numeric:tabular-nums; text-align:right; }
+.track{ background:color-mix(in srgb,var(--rule) 50%,transparent); border-radius:0 4px 4px 0; }
+.pair{ display:grid; grid-template-columns:repeat(auto-fit,minmax(17rem,1fr)); gap:1.2rem; }
+.work td i{ display:inline-block; height:.6rem; border-radius:0 3px 3px 0; vertical-align:middle; margin-right:.4rem; min-width:2px; }
+.work td i.now{ background:var(--s2); } .work td i.then{ background:var(--s1); }
+#refs{ font-size:.88rem; padding-left:1.6rem; } #refs li{ margin-block:.4rem; overflow-wrap:anywhere; }
+#refs .back a{ text-decoration:none; margin-left:.25rem; }
+:target{ background:color-mix(in srgb,var(--s2) 25%,transparent); }
+@media (prefers-reduced-motion:no-preference){ html{ scroll-behavior:smooth; } }
+</style>
+
+<main>
+<p class="tag">Hearth · proposal · 19 September 2026</p>
+<h1>Where the core goes next</h1>
+<p class="lede">You asked whether Hearth should stay a web product, and whether the core should move to a faster typed language. You also asked what should change in the model as the world grows. The answers are in the first table. The rest is the evidence: measurements from <code>dev</code>, and sources that are numbered and listed at the end.</p>
+
+<nav aria-label="Sections">
+<a href="#answer">The answer</a><a href="#time">Where the time goes</a><a href="#growth">What growth does</a><a href="#fixes">Fix first</a><a href="#model">Change the model</a><a href="#port">A port</a><a href="#engines">Godot and other game engines</a><a href="#choose">Try a path</a><a href="#order">The order of work</a><a href="#unknown">What we do not know</a><a href="#refs-h">References</a>
+</nav>
+
+<h2 id="answer">The answer</h2>
+<div class="scroll"><table>
+<tr><th>Question</th><th>Answer</th><th>Main reason</th></tr>
+<tr><td>Stay a web product?</td><td><span class="pick">Yes.</span> Keep the single HTML file as the release. Add a desktop build later as a second front end.</td><td>Every game engine we looked at, Godot included, gives up the single file and the Node tests. Nothing we measured needs one.</td></tr>
+<tr><td>Port the core to a fast typed language?</td><td><span class="pick">Not yet.</span> Add type checks to the JavaScript now. Later, port the path search alone to Rust if it is still the top cost.</td><td>The slow parts are slow because of how they search, not because of JavaScript. A port would copy the same searches into a new language.</td></tr>
+<tr><td>What should change in the model?</td><td><span class="pick">Six changes, listed below.</span> The ones that matter most: indexes end the whole-world scans, a scheduler ends the visit to every being every tick, and land nobody is on runs at the day tier.</td><td>The scheduler and the sleeping land are already your plans G5 and H. They matter more than any language choice.</td></tr>
+</table></div>
+<p>Current features are treated as essential but not sacred. Where an option would change a written rule of the project, it says so. The two steps that would need the golden blessed again say so as well.</p>
+
+<h2 id="time">Three quarters of the time goes to the beings, and much of that is path search</h2>
+<p>Two agents profiled the same run on <code>dev</code>: seed <code>r</code>, the default world, no page, Node only. One used <code>node --cpu-prof</code> for 70 game days. The other used <code>node --prof</code> for 40.</p>
+<p class="note">Both ran on an Apple M5 Max while other sessions ran soaks. The load average was about 10, which means about ten jobs wanted a processor at any moment. Shares of time and ratios hold up under that. Absolute times do not. Where this page gives one, it says so.</p>
+<p>A profile gives two numbers for a function. One counts the function and everything it calls. The other counts only the function's own lines. The left panel shows the first number, and the right panel shows the second.</p>
+
+<div class="pair">
+<div class="box"><p class="tag">Share of all time, counting everything the function calls · <span class="mono">--cpu-prof</span></p>
+<div class="bars" id="barsA"></div></div>
+<div class="box"><p class="tag">Share of time in the function's own lines · both tools</p>
+<div class="scroll"><table>
+<tr><th>Function</th><th>cpu-prof</th><th>prof</th></tr>
+<tr><td><code>updateBeing</code></td><td class="n">15.7%</td><td class="n">2.1%</td></tr>
+<tr><td><code>bfs</code> (path search)</td><td class="n">10.6%</td><td class="n">2.7%</td></tr>
+<tr><td><code>steps</code> (neighbours of a tile)</td><td class="n">6.0%</td><td class="n">11.1%</td></tr>
+<tr><td><code>passable</code></td><td class="n">5.2%</td><td class="n">not listed</td></tr>
+<tr><td><code>threatsFor</code></td><td class="n">4.7%</td><td class="n">5.5%</td></tr>
+<tr><td><code>pitfallSite</code></td><td class="n">2.8%</td><td class="n">4.6%</td></tr>
+<tr><td><code>growPlants</code></td><td class="n">2.6%</td><td class="n">2.3%</td></tr>
+<tr><td>Garbage collection</td><td class="n">4.9%</td><td class="n">0.7%</td></tr>
+</table></div></div>
+</div>
+<p>The two tools agree on which functions are hot. They disagree on the shares. <code>--prof</code> put 55% of its samples in a block it could not name, so its numbers are the weaker set. The bars show where it goes. Updating the beings is 75.2% of the run. Choosing a task is 41.7%. Path search is 30.4%, and that figure counts <code>bfs</code> with everything it calls: <code>steps</code>, <code>passable</code>, and each search's own test of a tile.</p>
+
+<h3>Four hot spots, as the game sees them</h3>
+<div class="scroll"><table>
+<tr><th>In the game</th><th>In the code</th><th>What happens</th><th>Evidence</th></tr>
+<tr><td>Someone picks up a stick.</td><td><code>removeItem</code>, <code>src/sim/world.js:34</code></td><td>The core throws away its item grid and builds a new one: 168,000 slots, then every item again.</td><td>Measured: 2.0% of run time at default size. 15.0% at nine times the area. The number of calls stayed the same.</td></tr>
+<tr><td>Someone thinks about digging clay.</td><td><code>TASKS.digClay.begin</code>, <code>src/sim/tasks.js:229</code></td><td>A path search of up to 3,000 tiles runs just to learn whether the job is possible. It runs again at the next decision.</td><td>16.9% of all time, counting the searches it starts. That is over half of the 30.4% that all path search takes. The other profile also put it at about half.</td></tr>
+<tr><td>A rabbit checks whether a wolf is near.</td><td><code>threatsFor</code>, <code>src/sim/beings.js:243</code></td><td>It looks at every being in the valley, then at 81 tiles for fire.</td><td>4.7% and 5.5%. Read from the code: the cost grows with the square of the number of beings.</td></tr>
+<tr><td>The camp asks where a deer pit could go.</td><td><code>pitfallSite</code>, <code>src/sim/tasks.js:310</code></td><td>It scans about 1,860 tiles around the camp. Each person asks again at each decision.</td><td>2.8% and 4.6%.</td></tr>
+</table></div>
+<p>The hamlet-mythos session ran one more test and calls its result provisional. Moving six per-tile systems (plants, fire, weather, lightning, rot, groves) to a once-a-minute beat bought no speed: 1.00× in a paired run. Those six are at most 0.4% of run time, so there is nothing to win by making them faster.</p>
+
+<h2 id="growth">The average tick follows the people. The worst tick follows the map, in the one case we measured.</h2>
+<p>The area will grow, and so will the number of beings. The number of ticks grows most: plan G4 moves a day from 1,000 ticks to 86,400. The G spec sets a budget of one world day in under 5 seconds in Node. That is about 58 microseconds a tick.</p>
+<p>On the loaded machine, <code>dev</code> ran at 100 to 200 microseconds a tick with about 80 beings, 27 of them people. A <code>dev</code> tick and a G4 tick are different units of world time, so this is a rough yardstick only. We do not have a fair number for G4. Its branch is mid-change, and its own session asked us not to quote one.</p>
+<div class="scroll"><table>
+<tr><th>What grew (measured on <code>dev</code>)</th><th>Average tick</th><th>Worst tick</th><th>Save file</th></tr>
+<tr><td>Area ×4</td><td class="n">+16% in one run, +26% in the other</td><td class="n">10 ms → 48 ms</td><td class="n">3.5 MB → 14.7 MB</td></tr>
+<tr><td>Area ×9</td><td class="n">+46%</td><td class="n">not measured</td><td class="n">30.3 MB</td></tr>
+<tr><td>People, from 1–5 to 26–35</td><td class="n">×3.4</td><td class="n">not measured</td><td class="n">not measured</td></tr>
+</table></div>
+<p class="small">The worst-tick times are absolute and come from the loaded machine, so read them as rough. The save sizes do not depend on load.</p>
+<p>From a handful of people to about thirty, the average tick came to cost 3.4 times as much. Nine times the land made it cost about 1.5 times as much (46% more). So for the average tick, people matter more than land. The worst tick and the save file grew with the land. We did not measure either against more people.</p>
+
+<div class="box" id="work">
+<h3>Count the work yourself</h3>
+<p>Set how much bigger the world gets. The table counts how many things the core touches for one event, today and after the fix in the next section. The counts come from the code and are exact. They are not times.</p>
+<div class="sliders">
+<label for="ax">Area: <span id="axv"></span><input id="ax" type="range" min="1" max="16" step="1" value="1"></label>
+<label for="bx">Beings: <span id="bxv"></span><input id="bx" type="range" min="1" max="20" step="1" value="1"></label>
+</div>
+<div class="scroll"><table class="work"><thead><tr><th>One event</th><th>Touched today</th><th>After the fix</th></tr></thead><tbody id="workRows"></tbody></table></div>
+<p class="small">Bars use a log scale, so each step to the right is ten times more. The "after" count for the wolf check assumes beings are spread evenly over the map.</p>
+<p>The button below times two of these events on your device. With today's 80 beings, sorting beings by sector is no faster than looking at all of them. Move the beings slider up and the two times part.</p>
+<button id="bench" type="button">Time two of these in this browser</button>
+<div id="benchOut" class="scroll" aria-live="polite"></div>
+</div>
+
+<h2 id="fixes">Eight small fixes come first, and six should leave the golden alone</h2>
+<p>None of these needs a new language or a new structure. Each one is a task or two. One term first: a typed array is a fixed block of plain numbers, such as <code>Int32Array</code>, and it is smaller and faster to read than a list of objects. The first six should leave the golden record unchanged, because they change no random draw and no choice. Nobody has run the soak to confirm that yet.</p>
+<div class="scroll"><table>
+<tr><th>Change</th><th>Game situation</th><th>Golden</th></tr>
+<tr><td>Clear one grid cell when an item goes, not the whole grid.</td><td>Picking up anything.</td><td>Should hold</td></tr>
+<tr><td>Work out each goal's state once per decision, not twice.</td><td>Every decision by every person.</td><td>Should hold</td></tr>
+<tr><td>Keep "this camp has a garden" on the camp. Today the check reads all 33,600 surface tiles.</td><td>A camp that could plant a garden.</td><td>Should hold</td></tr>
+<tr><td>Lift a repeated <code>humans()</code> call out of the wolf's stalking test.</td><td>A wolf picks a lone person at night.</td><td>Should hold</td></tr>
+<tr><td>Keep the list of living people between ticks. Rebuild it on a birth, a death, or a move of camp.</td><td>Every chronicle line and every fireside talk.</td><td>Should hold</td></tr>
+<tr><td>Use a typed array, not a <code>Set</code>, for the "can I reach it" flood fill.</td><td>Founding a camp. A wanderer arriving. Each boulder at world creation.</td><td>Should hold</td></tr>
+<tr><td>Remember the nearest clay bank and deer pit site for a while.</td><td>Clay and deer pits.</td><td>Will move. Needs your word to bless.</td></tr>
+<tr><td>Make plant growth samples scale with the map. Today it is 60 tiles a tick at any size.</td><td>By the arithmetic, a map ten times larger gives each tile a tenth of the growth: 60 samples spread over ten times the tiles. Not tested.</td><td>Holds at default size if tuned to match</td></tr>
+</table></div>
+
+<h2 id="model">Six changes to the model, in the order we would make them</h2>
+
+<h3>1. Type checks on the JavaScript we have</h3>
+<p>TypeScript can check plain <code>.js</code> files. It reads the types from JSDoc comments, which are notes above a function that name each argument's type. There is no build step and no output.<sup><a class="fn" data-k="checkjs"></a></sup> It treats files that share one scope as scripts, which is what <code>src/sim/</code> is.<sup><a class="fn" data-k="tsmodules"></a></sup> It would catch wrong argument counts, misspelt fields, and a tile field that one file adds and another never expects. It breaks no project rule. Note that TypeScript 7 is faster at checking only. It does not make the game run faster.<sup><a class="fn" data-k="ts7"></a></sup></p>
+<p class="note">A stronger option is real ES modules, joined by a bundler into the same single file. That gives a true map of what depends on what. It also breaks a written rule: "Files in <code>src/sim/</code> are not ES modules." We do not propose it without your word.</p>
+
+<h3>2. Indexes in place of scans</h3>
+<div class="scroll"><table>
+<tr><th>Index</th><th>Replaces</th><th>Rule it must keep</th></tr>
+<tr><td>Beings by sector, updated when one moves.</td><td>"Look at every being" in threat checks, hunts, and stalking.</td><td>The index only filters. Loops that draw random numbers still run in <code>beings</code> order.</td></tr>
+<tr><td>A number for each connected area of walkable ground.</td><td>The whole-world search that runs when a near search fails.</td><td>Renumber when a tile opens or closes: a tree falls, a sapling grows, fire passes.</td></tr>
+<tr><td>A separate list for dead people.</td><td><code>beings</code> never drops a human, so every scan grows for as long as a world is played.</td><td>Names, lineage, and corpses still read the dead. The snapshot tables change.</td></tr>
+</table></div>
+<p>Your notes forbid one path shortcut. A step-by-step heuristic once "walked into dead ends around lakes for weeks." Area numbers are not that. They answer "can I get there at all" before any search starts.</p>
+<p>Two shipped games use them. RimWorld's colonists once searched the whole map for a route that did not exist.<sup><a class="fn" data-k="rimworld"></a></sup> The fix was to number every connected area, and to skip the search when the two numbers differ. Dwarf Fortress does the same on top of its A* search.<sup><a class="fn" data-k="df"></a></sup></p>
+
+<h3>3. Pass the camp as an argument</h3>
+<p><code>camp</code> is a global. At the start of each being's turn, <code>updateBeing</code> sets it to that being's camp. About 450 lines in <code>src/sim/</code> then read it without saying so. That count is every line that names <code>camp</code> alone and does not assign it. The G3 notes already call it "a hidden input of every stride." It blocks a Web Worker, a port, and the day tier alike, because no function says what it reads. The fix touches every file but changes no behaviour. The golden holds or the fix is wrong.</p>
+
+<h3>4. A scheduler in place of a visit every tick</h3>
+<p>Today every living being runs every tick, and only its task work waits for its stride. Plan G5 already describes the replacement: "A queue holds every individual by the time its task ends." A sleeping person then costs nothing for eight hours. At 86,400 ticks a day this matters more than anything else on this page.</p>
+<p>Factorio does this with sleeping machines and a list of wake-up requests, applied in a fixed order so that replays still match.<sup><a class="fn" data-k="fff364"></a></sup> RimWorld runs slow-changing things every 250 or 2,000 ticks.<sup><a class="fn" data-k="rimtime"></a></sup> The draw order changes, so the golden is blessed again, once.</p>
+
+<h3>5. Land that sleeps</h3>
+<p>The G spec says H "can paint a country into tiles when someone first goes there." Go one step further. A country nobody is in keeps its tiles and runs at the day tier. A country with people in it runs at the tick tier. Minecraft does this by distance from the player.<sup><a class="fn" data-k="minecraft"></a></sup> Your rule "the land stays true" fits it: a tile is always a real tile, and only the step size changes.</p>
+<p>The save needs the same care. At nine times the area it was 30.3 MB, and the page writes it to the browser every world day. Most of that is lists of tiles per country, including countries that were split and no longer exist.</p>
+
+<h3>6. Chronicle lines as records, with the sentence made at the edge</h3>
+<p>A rule would write <code>{ what: 'mauled', who: 12, by: 40 }</code>. The page would turn that into a sentence. The watch list in the G spec needs this anyway. The golden would then compare events, not wording. It is also what makes a later port practical, because the namer and the sentences can stay in JavaScript.</p>
+
+<h2 id="port">A port: not yet, and then only the path search</h2>
+<p>WebAssembly is the format that lets a browser run code compiled from Rust or C++. It wins on tight loops over plain numbers, with few calls across the boundary to JavaScript. Most of Hearth's time goes to a different kind of work: reading tables, scoring offers, making objects, building sentences. The one part that fits is path search. It is all integers, it already uses typed arrays, and it is near the top of both profiles.</p>
+<details><summary>What three ports and one benchmark study found about WebAssembly</summary>
+<div class="scroll"><table>
+<tr><th>Case</th><th>Result</th></tr>
+<tr><td>Mozilla moved the hot loop of its source-map parser from JavaScript to Rust.<sup><a class="fn" data-k="sourcemap"></a></sup></td><td>Up to 5.89 times faster. It was a tight loop over numbers, and little data crossed between the two languages.</td></tr>
+<tr><td>Figma runs a C++ core as WebAssembly.<sup><a class="fn" data-k="figma"></a></sup></td><td>Load time fell by three times against asm.js, an older way to run compiled code in a browser.</td></tr>
+<tr><td>Zaplib bet a company on moving slow JavaScript to Rust bit by bit.<sup><a class="fn" data-k="zaplib"></a></sup></td><td>A real port "only ended up being 5% faster." They shut down and wrote that "there are usually simpler ways to find performance improvements."</td></tr>
+<tr><td>A study ran SPEC, a standard set of test programs, as WebAssembly.<sup><a class="fn" data-k="jangda"></a></sup></td><td>45% to 55% slower than native code on average. So the ceiling is lower than "as fast as Rust".</td></tr>
+</table></div>
+</details>
+
+<h3>A port cannot match the golden, and should not try</h3>
+<p>A change inside JavaScript should keep the golden exactly. A port cannot, because some maths gives different last digits in another language. Hold a port to two other tests. It must replay its own log to the same story. Over many seeds, it must agree with the JavaScript core within stated limits. The G spec tests the day tier the same way: "The fine tier is the measure."</p>
+<details><summary>Which pieces give the same result in Rust, and which do not</summary>
+<div class="scroll"><table>
+<tr><th>Piece</th><th>Same result in Rust?</th></tr>
+<tr><td>The random generator (<code>mulberry32</code>, 32-bit integer maths)</td><td>Yes, exactly.</td></tr>
+<tr><td>Add, subtract, multiply, divide on doubles</td><td>Yes. WebAssembly fixes all of this except the exact bits of a NaN, the "not a number" result of sums like 0 ÷ 0.<sup><a class="fn" data-k="wasmnum"></a></sup></td></tr>
+<tr><td><code>Math.pow</code>, used by <code>rollFor</code></td><td>No promise. Even two browsers can differ in the last digit.<sup><a class="fn" data-k="mathchg"></a></sup><sup><a class="fn" data-k="gaffer"></a></sup></td></tr>
+<tr><td><code>Math.round</code> on a negative half</td><td>No. JavaScript rounds −2.5 to −2. Rust rounds it to −3.</td></tr>
+<tr><td>Sorting with ties</td><td>Yes, if the port always uses a stable sort.</td></tr>
+<tr><td>Numbers printed inside chronicle text</td><td>Risky. The golden compares the text.</td></tr>
+</table></div>
+</details>
+
+<h3>If we port, port the path search and nothing else</h3>
+<ol>
+<li>Move what a search reads into typed arrays: ground, feature, fire, and one "can walk" byte per tile. This is JavaScript work and the golden must hold.</li>
+<li>Write <code>steps</code>, <code>bfs</code>, and <code>reachable</code> in Rust. They read the same memory, so nothing is copied. They use no floating point, so they can match the JavaScript exactly.</li>
+<li>Run both on every soak and stop at the first tick where they differ.</li>
+<li>Put the compiled Rust path search inside the HTML as text. <code>WebAssembly.instantiate</code> accepts bytes directly, so the release stays one file.<sup><a class="fn" data-k="wasminst"></a></sup></li>
+</ol>
+<p>Do this only if path search is still the top cost after the area numbers are in. It may not be.</p>
+<p>Rust is the language we would pick. Its first web tooling group closed in 2025, and new maintainers took over the main tool.<sup><a class="fn" data-k="rustwasm"></a></sup> Rust also compiles to native code, which a desktop build or Godot could use.</p>
+<div class="scroll"><table>
+<tr><th>Passed over</th><th>Why</th></tr>
+<tr><td>Zig<sup><a class="fn" data-k="zig"></a></sup></td><td>Smaller files than Rust, but not yet at version 1.</td></tr>
+<tr><td>AssemblyScript</td><td>Builds for the web only, so a desktop build could not share it.</td></tr>
+<tr><td>C++</td><td>A heavier toolchain, and no memory safety.</td></tr>
+<tr><td>Go</td><td>Carries its own garbage collector into the browser.</td></tr>
+</table></div>
+<p>The project already has what a port needs. There is one way in (<code>inject</code>). The whole state saves as plain data, and <code>REFS</code> lists every link between records. A task is a plain record. Every rule reads a table. <code>tests/door.js</code> and the save-load-run-on test in <code>tests/snapshot.js</code> would run against a ported core almost as they are.</p>
+
+<h2 id="engines">No game engine is needed, and each one costs the single file</h2>
+<p>We weighed game engines for a free and open source project, with the web valued and iPad notable but not critical. Godot is the best of them, and it still does not pay for itself here. Godot cannot run a JavaScript core, so the core would be rewritten in GDScript, which is interpreted, or in Rust. The people who maintain Rust for Godot call its web export "experimental".<sup><a class="fn" data-k="gdextweb"></a></sup> Either way the single file and the Node tests go.</p>
+<h3>Godot</h3>
+<details><summary>Nine sourced facts about Godot, and what each means for Hearth</summary>
+<div class="scroll"><table>
+<tr><th>Fact</th><th>Effect on Hearth</th></tr>
+<tr><td>MIT licence, run by a foundation. Exports to Windows, macOS, Linux, Android, iOS, and the web. Consoles through a paid third party.<sup><a class="fn" data-k="godotlic"></a></sup><sup><a class="fn" data-k="godotfeat"></a></sup><sup><a class="fn" data-k="godotcons"></a></sup></td><td>Fits a free and open project.</td></tr>
+<tr><td>Web export needs WebAssembly and WebGL 2. The docs say "Safari has several issues with WebGL 2.0 support that other browsers don't have."<sup><a class="fn" data-k="godotweb"></a></sup></td><td>Today's page uses Canvas 2D and has no such problem.</td></tr>
+<tr><td>A web export is an HTML file, a script, a WebAssembly file, and a data pack.<sup><a class="fn" data-k="godotweb"></a></sup></td><td>The single-file release ends. GitHub Pages can still host it. We found no official figure for the download size.</td></tr>
+<tr><td>C# projects "currently cannot be exported to the web."<sup><a class="fn" data-k="godotweb"></a></sup> A prototype exists, with no date.<sup><a class="fn" data-k="godotcs"></a></sup></td><td>C# is out for as long as the web matters to us.</td></tr>
+<tr><td>A Rust core on the web: "Web support in godot-rust is experimental and should be understood as such."<sup><a class="fn" data-k="gdextweb"></a></sup></td><td>The fast typed core and the web export do not fit together well yet.</td></tr>
+<tr><td>GDScript is interpreted. Its docs promise "optimized opcodes" for typed code and call a just-in-time compiler "planned". A just-in-time compiler is what makes browser JavaScript fast. The docs give no speed figure.<sup><a class="fn" data-k="gdscript"></a></sup></td><td>Our own reading, not a sourced fact: a core in GDScript would run slower than today's JavaScript, because browsers compile JavaScript and Godot does not compile GDScript.</td></tr>
+<tr><td>Seeded random numbers repeat.<sup><a class="fn" data-k="godotrng"></a></sup> Godot runs without a window, from the command line.<sup><a class="fn" data-k="godotcli"></a></sup></td><td>Replay would survive. Tests would move from Node to a third-party test add-on.</td></tr>
+<tr><td>Tile map coordinates are 16-bit.<sup><a class="fn" data-k="tilemap"></a></sup> Within version 4, minor releases keep compatibility.<sup><a class="fn" data-k="godotmig"></a></sup></td><td>32,767 tiles a side is plenty. Upgrades are low risk.</td></tr>
+<tr><td>Dome Keeper shipped on Godot and went to consoles.<sup><a class="fn" data-k="domekeeper"></a></sup> Slay the Spire 2 moved to Godot after two years in Unity.<sup><a class="fn" data-k="sts2"></a></sup></td><td>Godot ships real games. We found no shipped colony simulation of the Dwarf Fortress kind on it.</td></tr>
+</table></div>
+</details>
+<p><strong>Xogot</strong> is the Godot editor for iPad and iPhone, built on Godot 4.4.<sup><a class="fn" data-k="xogot"></a></sup> It is a tool for making games, not a way to deliver one: App Store builds still go through desktop Godot.<sup><a class="fn" data-k="xogotios"></a></sup> It runs GDScript only. Its own docs say it "does not include support for C#, nor other compiled languages, including Swift and Rust."<sup><a class="fn" data-k="xogotdiff"></a></sup> An iPad player can already open today's page in Safari, so none of this changes the answer.</p>
+
+<h3>Other game engines a free project could use</h3>
+<p>PixiJS is a drawing library, not a game engine, and it keeps the single file. Every game engine below gives it up. Agents write most of this code from a terminal, and a toolchain of plain text files lets them keep doing that.</p>
+<details><summary>Eight options compared: licence, language, web build, and cost to us</summary>
+<div class="scroll"><table>
+<tr><th>Option</th><th>Licence</th><th>Core language</th><th>Web</th><th>What it costs us</th></tr>
+<tr><td>Stay as we are</td><td>our own</td><td>JavaScript</td><td>native, one file</td><td>Nothing.</td></tr>
+<tr><td>PixiJS for drawing only<sup><a class="fn" data-k="pixi"></a></sup></td><td>MIT</td><td>JavaScript</td><td>native, can be inlined</td><td>One dependency. Useful only if drawing becomes the slow part. We have not measured drawing.</td></tr>
+<tr><td>Bevy<sup><a class="fn" data-k="bevy"></a></sup></td><td>MIT or Apache</td><td>Rust</td><td>several files. Minimal builds from 450 KB compressed, examples far larger.<sup><a class="fn" data-k="bevysize"></a></sup></td><td>Every release so far breaks its API, each with a migration guide. Systems run in parallel, so their order must be pinned by hand for replays to match.<sup><a class="fn" data-k="bevyorder"></a></sup></td></tr>
+<tr><td>macroquad<sup><a class="fn" data-k="macroquad"></a></sup></td><td>MIT or Apache</td><td>Rust</td><td>several files</td><td>Small and simple. We would rebuild every panel by hand.</td></tr>
+<tr><td>libGDX<sup><a class="fn" data-k="libgdx"></a></sup></td><td>Apache 2</td><td>Java or Kotlin</td><td>several files</td><td>Proven for this kind of game: Mindustry and Unciv are both free and built on it.<sup><a class="fn" data-k="arc"></a></sup> A whole new toolchain.</td></tr>
+<tr><td>LÖVE</td><td>zlib</td><td>Lua</td><td>slower on the web, where it loses its compiler<sup><a class="fn" data-k="lovejs"></a></sup></td><td>Slower on the platform we care about most.</td></tr>
+<tr><td>Defold</td><td>not open source by the usual definition<sup><a class="fn" data-k="defold"></a></sup></td><td>Lua</td><td>yes</td><td>Fails the licence test.</td></tr>
+<tr><td>Unity, Unreal, GameMaker</td><td>proprietary<sup><a class="fn" data-k="unreal"></a></sup></td><td></td><td></td><td>A contributor could not build the game with free tools. Out.</td></tr>
+</table></div>
+</details>
+
+<h3>If a desktop build is wanted</h3>
+<p>The cheapest route wraps the same HTML file. Tauri 2 is free, MIT or Apache, and builds for Windows, macOS, Linux, iOS, and Android.<sup><a class="fn" data-k="tauri"></a></sup> itch.io hosts HTML games as they are.<sup><a class="fn" data-k="itch"></a></sup> Steam affects the choice of licence. Valve warns that the Steamworks SDK "is incompatible with some open source licenses."<sup><a class="fn" data-k="steam"></a></sup> A licence that requires all linked code to be open, such as the GPL, may conflict with it. A permissive one such as MIT does not.</p>
+<p>The better long-term shape is one core with more than one front end. Step 3 and step 6 of the model changes lead there whether or not anything is ever ported.</p>
+<pre class="mermaid">
+flowchart TD
+  C["The core<br/>inject · step · snapshot · tables"]
+  C --> W["Web page<br/>one HTML file on GitHub Pages"]
+  C --> D["Desktop build<br/>a wrapper now, a game engine later if wanted"]
+  T["Tests in Node<br/>soak · door · snapshot"] --> C
+</pre>
+<p>Before that split can happen, the page has to stop reading the core's variables directly. It names the core's saved variables about 380 times today, on about 260 lines, and writes one of them (<code>camp</code>). A Web Worker needs the same separation.<sup><a class="fn" data-k="worker"></a></sup> GitHub Pages cannot send the headers that shared memory between threads requires, so a worker would exchange messages with the page.<sup><a class="fn" data-k="ghheaders"></a></sup><sup><a class="fn" data-k="transfer"></a></sup></p>
+
+<h2 id="choose">Try a path</h2>
+<div class="box">
+<p>Pick an answer to each question. The page says what you keep, what you lose, and what it costs. Our pick is marked. The options we advise against stay in the list, so you can see what each would cost.</p>
+<div class="pair">
+<fieldset><legend>Platform</legend>
+<label class="opt"><input type="radio" name="q1" id="q1a" value="web" checked> <span>Web, one file <span class="pick">· our pick</span></span></label>
+<label class="opt"><input type="radio" name="q1" id="q1b" value="wrap"> <span>Web, plus a wrapped desktop build</span></label>
+<label class="opt"><input type="radio" name="q1" id="q1c" value="godot"> <span>Move to Godot <span class="small">· weighed, not recommended</span></span></label>
+<label class="opt"><input type="radio" name="q1" id="q1d" value="bevy"> <span>Move to a Rust game engine <span class="small">· weighed, not recommended</span></span></label>
+</fieldset>
+<fieldset><legend>Core language</legend>
+<label class="opt"><input type="radio" name="q2" id="q2a" value="js"> <span>JavaScript as it is</span></label>
+<label class="opt"><input type="radio" name="q2" id="q2b" value="typed" checked> <span>JavaScript with type checks <span class="pick">· our pick</span></span></label>
+<label class="opt"><input type="radio" name="q2" id="q2c" value="kernel"> <span>Rust for path search only</span></label>
+<label class="opt"><input type="radio" name="q2" id="q2d" value="rust"> <span>Rust for the whole core <span class="small">· weighed, not recommended</span></span></label>
+</fieldset>
+<fieldset><legend>Model</legend>
+<label class="opt"><input type="radio" name="q3" id="q3a" value="fix"> <span>Small fixes only</span></label>
+<label class="opt"><input type="radio" name="q3" id="q3b" value="index"> <span>Fixes and indexes</span></label>
+<label class="opt"><input type="radio" name="q3" id="q3c" value="sched" checked> <span>Through to the scheduler and sleeping land <span class="pick">· our pick</span></span></label>
+</fieldset>
+</div>
+<div id="verdict" aria-live="polite"></div>
+</div>
+
+<h2 id="order">Eight steps, each with a gate, and you can stop after any</h2>
+<p>Each step stands on its own and ends at a gate. You can stop after any of them.</p>
+<div class="scroll"><table>
+<tr><th>Step</th><th>Work</th><th>Size</th><th>Gate</th></tr>
+<tr><td class="n">1</td><td>Measure on a quiet machine. Profile the page as well as Node. Add a soak at four times the area.</td><td>Small</td><td>Numbers with the machine and its load written beside them.</td></tr>
+<tr><td class="n">2</td><td>The six fixes that should not move the golden.</td><td>Small</td><td>Golden unchanged. Item removal is a smaller share at nine times the area.</td></tr>
+<tr><td class="n">3</td><td>Model change 1: type checks with <code>tsc --checkJs</code>.</td><td>Small</td><td>A new fast test. No change to the build.</td></tr>
+<tr><td class="n">4</td><td>Model change 2: the three indexes.</td><td>Medium</td><td>Golden unchanged for the first two. The soak finds nobody cut off.</td></tr>
+<tr><td class="n">5</td><td>Model change 3: the camp as an argument.</td><td>Medium</td><td>Golden unchanged.</td></tr>
+<tr><td class="n">6</td><td>Model changes 4 and 6: the scheduler (G5), and chronicle lines as records.</td><td>Large</td><td>Golden blessed once, on your word. A world day within the spec's 5 second budget.</td></tr>
+<tr><td class="n">7</td><td>Model change 5: land that sleeps (H), and a smaller save.</td><td>Large</td><td>A map ten times the area plays, and saves in a few megabytes.</td></tr>
+<tr><td class="n">8</td><td>Decide again on the Rust path search, a worker, and a desktop build.</td><td></td><td>The profile from step 1, run again.</td></tr>
+</table></div>
+<p>Sizes are agent work under the project's usual method. Small is one or two tasks. Medium is one plan. Large is a program of plans, like G.</p>
+<p>The standard warning about rewrites is Joel Spolsky's: a rewrite from scratch is "the single worst strategic mistake that any software company can make."<sup><a class="fn" data-k="spolsky"></a></sup> Step 8, if it happens, takes the other road: replace one piece at a time behind a boundary that stays fixed.<sup><a class="fn" data-k="strangler"></a></sup></p>
+
+<h2 id="unknown">What we do not know</h2>
+<ul>
+<li>How long drawing takes in the browser. Every number here is from Node. The map redraw loops over every surface tile, and it may become the limit before the core does.</li>
+<li>Clean timings. The machine was busy all evening.</li>
+<li>Whether the six "should hold" fixes do leave the golden alone. Nobody has run them.</li>
+<li>What a G4 tick costs. The branch runs every decision every tick on purpose, until its task 3 sets a pace.</li>
+<li>How much faster a Rust path search would be. We have no measurement, only the pattern from other projects.</li>
+<li>How big a Godot web download is for a game like this one.</li>
+</ul>
+<p>One more thing will move these numbers. How fast beings walk under G4 is still open between you and the hamlet-mythos session. It changes how much path search a day holds, so step 1 should be run again once it is settled.</p>
+
+<h2 id="refs-h">References</h2>
+<p class="small">A number in the text jumps here. An arrow here jumps back to each place the source is used. "Secondary" means we read a report of the source, not the source itself.</p>
+<ol id="refs"></ol>
+<noscript><p>The reference list is built by a script. Turn scripts on to see it.</p></noscript>
+</main>
+
+<script>
+(function(){
+/* el('td', {class:'n'}, 'text', node) builds a node. No markup strings are parsed anywhere on this page. */
+function el(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) { if (k === 'style') e.style.cssText = attrs[k]; else e.setAttribute(k, attrs[k]); }
+  for (const c of kids) if (c != null) e.append(c);
+  return e;
+}
+const row = (cells, tag = 'td') => el('tr', null, ...cells.map(c => c instanceof Node ? c : el(tag, null, c)));
+
+const REFS = {
+  rimworld:['Ludeon Studios, "Reachability at last" (2013)','https://ludeon.com/blog/2013/07/reachability-at-last/'],
+  df:['Stack Overflow Blog, "700,000 lines of code, 20 years, and one developer: How Dwarf Fortress is built" (2021)','https://stackoverflow.blog/2021/12/31/700000-lines-of-code-20-years-and-one-developer-how-dwarf-fortress-is-built/'],
+  fff364:['Factorio, "Friday Facts #364"','https://factorio.com/blog/post/fff-364'],
+  rimtime:['RimWorld Wiki, "Time". Secondary: a community wiki, not a statement by the developer.','https://rimworldwiki.com/wiki/Time'],
+  minecraft:['Minecraft Wiki, "Simulation distance"','https://minecraft.wiki/w/Simulation_distance'],
+  checkjs:['TypeScript Handbook, "Type Checking JavaScript Files"','https://www.typescriptlang.org/docs/handbook/type-checking-javascript-files.html'],
+  tsmodules:['TypeScript Handbook, "Modules" (scripts and modules)','https://www.typescriptlang.org/docs/handbook/2/modules.html'],
+  ts7:['"TypeScript 7 is here". Secondary summary of the native compiler.','https://morello.dev/blog/typescript-7-is-here'],
+  sourcemap:['Mozilla Hacks, "Oxidizing Source Maps with Rust and WebAssembly" (2018)','https://hacks.mozilla.org/2018/01/oxidizing-source-maps-with-rust-and-webassembly/'],
+  figma:['Evan Wallace, "WebAssembly cut Figma\'s load time by 3x" (2017)','https://madebyevan.com/figma/webassembly-cut-figmas-load-time-by-3x/'],
+  zaplib:['Zaplib, "Zaplib post-mortem" (2022)','https://zaplib.com/docs/blog_post_mortem.html'],
+  jangda:['Jangda and others, "Not So Fast: Analyzing the Performance of WebAssembly vs. Native Code", USENIX ATC 2019','https://www.usenix.org/conference/atc19/presentation/jangda'],
+  wasmnum:['WebAssembly Specification, "Numerics"','https://webassembly.github.io/spec/core/exec/numerics.html'],
+  mathchg:['Tom MacWright, "Math keeps changing" (2020)','https://macwright.com/2020/02/14/math-keeps-changing.html'],
+  gaffer:['Glenn Fiedler, "Floating Point Determinism"','https://gafferongames.com/post/floating_point_determinism/'],
+  wasminst:['MDN, "WebAssembly.instantiate()"','https://developer.mozilla.org/en-US/docs/WebAssembly/Reference/JavaScript_interface/instantiate_static'],
+  rustwasm:['Inside Rust Blog, "Sunsetting the rustwasm GitHub org" (2025)','https://blog.rust-lang.org/inside-rust/2025/07/21/sunsetting-the-rustwasm-github-org'],
+  zig:['"WebAssembly with Zig". Secondary.','https://0xkiire.com/wasm-with-zig/'],
+  godotlic:['Godot Engine, "License"','https://godotengine.org/license/'],
+  godotfeat:['Godot Docs, "List of features"','https://docs.godotengine.org/en/stable/about/list_of_features.html'],
+  godotcons:['Godot Engine, "Console support"','https://godotengine.org/consoles/'],
+  godotweb:['Godot Docs, "Exporting for the Web"','https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html'],
+  godotcs:['Godot Engine, "Live from GodotCon Boston: Web .NET prototype"','https://godotengine.org/article/live-from-godotcon-boston-web-dotnet-prototype/'],
+  gdextweb:['The godot-rust book, "Export to Web"','https://godot-rust.github.io/book/toolchain/export-web.html'],
+  gdscript:['Godot Docs source, "Static typing in GDScript"','https://github.com/godotengine/godot-docs/blob/master/tutorials/scripting/gdscript/static_typing.rst'],
+  godotrng:['Godot Docs, "RandomNumberGenerator"','https://docs.godotengine.org/en/stable/classes/class_randomnumbergenerator.html'],
+  godotcli:['Godot Docs, "Command line tutorial"','https://docs.godotengine.org/en/stable/tutorials/editor/command_line_tutorial.html'],
+  tilemap:['Godot Docs, "TileMapLayer"','https://docs.godotengine.org/en/stable/classes/class_tilemaplayer.html'],
+  godotmig:['Godot Docs, "Migrating to a new version"','https://docs.godotengine.org/en/stable/tutorials/migrating/index.html'],
+  domekeeper:['Godot Engine showcase, "Dome Keeper"','https://godotengine.org/showcase/dome-keeper/'],
+  sts2:['PC Gamer, "Slay the Spire 2 ditched Unity for open-source engine Godot after over 2 years of development". Secondary.','https://www.pcgamer.com/games/card-games/slay-the-spire-2-ditched-unity-for-open-source-engine-godot-after-2-years-of-development/'],
+  xogot:['Xogot documentation (source repository)','https://github.com/xibbon/XogotDocs'],
+  xogotios:['Xogot, "Xogot for iPad and iPhone"','https://xogot.com/ios/'],
+  xogotdiff:['Xogot documentation, "Differences from Godot: iPad and iPhone"','https://docs.xogot.com/'],
+  pixi:['PixiJS, "PixiJS v8 Launches!"','https://pixijs.com/blog/pixi-v8-launches'],
+  bevy:['Bevy, "Bevy 0.19" release notes (June 2026)','https://bevy.org/news/bevy-0-19/'],
+  bevysize:['Bevy issue #3978, "Wasm file size"','https://github.com/bevyengine/bevy/issues/3978'],
+  bevyorder:['Unofficial Bevy Cheat Book, "System Order of Execution"','https://bevy-cheatbook.github.io/programming/system-order.html'],
+  macroquad:['macroquad documentation','https://docs.rs/macroquad/latest/macroquad/'],
+  libgdx:['libGDX, "libGDX 1.12.0" release notes','https://libgdx.com/news/2023/07/gdx-1-12'],
+  arc:['Anuken, "Arc", the framework under Mindustry','https://github.com/Anuken/Arc'],
+  lovejs:['love.js, LÖVE for the web','https://github.com/2dengine/love.js'],
+  defold:['Defold, "Defold License"','https://defold.com/license/'],
+  unreal:['Epic Games, "Unreal Engine End User License Agreement"','https://www.unrealengine.com/eula/unreal'],
+  tauri:['Tauri, "Tauri 2.0 Stable Release" (2024)','https://v2.tauri.app/blog/tauri-20/'],
+  itch:['itch.io, "Uploading HTML5 games"','https://itch.io/docs/creators/html5'],
+  steam:['Steamworks, "Distributing Open Source Applications on Steam"','https://partner.steamgames.com/doc/sdk/uploading/distributing_opensource'],
+  worker:['MDN, "Worker() constructor"','https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker'],
+  ghheaders:['GitHub Community discussion #13309, custom headers on GitHub Pages','https://github.com/orgs/community/discussions/13309'],
+  transfer:['MDN, "Transferable objects"','https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects'],
+  spolsky:['Joel Spolsky, "Things You Should Never Do, Part I" (2000)','https://www.joelonsoftware.com/2000/04/06/things-you-should-never-do-part-i/'],
+  strangler:['Martin Fowler, "Strangler Fig Application"','https://martinfowler.com/bliki/StranglerFigApplication.html']
+};
+
+/* Footnotes. Number each source by first use, link forward, and link back from the list to every use. */
+const order = [], uses = {};
+document.querySelectorAll('a.fn').forEach(a => {
+  const k = a.dataset.k; if (!REFS[k]) { a.textContent = '[?]'; return; }
+  if (!(k in uses)) { uses[k] = 0; order.push(k); }
+  const n = order.indexOf(k) + 1, i = uses[k]++;
+  a.id = 'u-' + k + '-' + i; a.href = '#n-' + k; a.textContent = '[' + n + ']';
+  a.setAttribute('aria-label', 'Reference ' + n);
+});
+const ol = document.getElementById('refs');
+order.forEach(k => {
+  const [t, u] = REFS[k];
+  const back = el('span', { class: 'back' });
+  for (let i = 0; i < uses[k]; i++) back.append(el('a', { href: '#u-' + k + '-' + i, 'aria-label': 'Back to the text' }, '↩' + (uses[k] > 1 ? String.fromCharCode(97 + i) : '')));
+  ol.append(el('li', { id: 'n-' + k }, t + ' ', el('a', { href: u, rel: 'noopener' }, u), back));
+});
+
+/* Bars: one series, one hue, the value printed beside each bar. */
+const A = [['step (one tick)',92.7],['updateBeing',75.2],['chooseTask',41.7],['bfs (path search)',30.4],['startTask',29.8],['digClay.begin',16.9]];
+document.getElementById('barsA').replaceChildren(...A.map(([n, v]) =>
+  el('div', { class: 'bar', title: n + ': ' + v + '% of all sampled time' },
+    el('span', { class: 'mono' }, n), el('span', { class: 'track' }, el('i', { style: 'width:' + v + '%' })), el('b', null, v + '%'))));
+
+/* Work counter: exact counts read from the code. */
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const ax = document.getElementById('ax'), bx = document.getElementById('bx');
+function work(){
+  const a = +ax.value, b = +bx.value;
+  document.getElementById('axv').textContent = a + '× today (' + fmt(33600 * a) + ' surface tiles)';
+  document.getElementById('bxv').textContent = b + '× today (about ' + fmt(80 * b) + ' beings)';
+  const rows = [
+    ['Someone picks up a stick', 168000 * a, 1, 'grid slots rewritten'],
+    ['A rabbit checks for wolves', 80 * b, Math.max(1, 80 * b * 9 / (60 * a)), 'beings looked at'],
+    ['The camp asks if it has a garden', 33600 * a, 1, 'tiles read'],
+    ['A near search fails, so the whole world is searched', 168000 * a, 60 * a + 1120, 'tiles visited at most']
+  ];
+  const w = n => Math.max(2, Math.log10(Math.max(1, n)) / 7 * 100);
+  const cell = (n, cls, unit) => el('td', { class: 'n', title: fmt(n) + ' ' + unit }, el('i', { class: cls, style: 'width:' + w(n) + 'px' }), fmt(n));
+  document.getElementById('workRows').replaceChildren(...rows.map(r =>
+    el('tr', null, el('td', null, r[0], el('br'), el('span', { class: 'small' }, r[3])), cell(r[1], 'now', r[3]), cell(r[2], 'then', r[3]))));
+}
+ax.addEventListener('input', work); bx.addEventListener('input', work); work();
+
+/* Two small timings in the reader's own browser. */
+document.getElementById('bench').addEventListener('click', () => {
+  const a = +ax.value, b = +bx.value, out = document.getElementById('benchOut');
+  out.replaceChildren(el('p', null, 'Running…'));
+  setTimeout(() => {
+    const N = 168000 * a, IT = 6475 * a, R = 40;
+    const items = []; for (let i = 0; i < IT; i++) items.push({ at: (Math.random() * N) | 0 });
+    let grid, t0 = performance.now();
+    for (let r = 0; r < R; r++) { items.pop(); grid = new Array(N).fill(null); for (const it of items) if (!grid[it.at]) grid[it.at] = it; }
+    const whole = (performance.now() - t0) / R;
+    t0 = performance.now();
+    for (let r = 0; r < R; r++) { const it = items.pop(); if (grid[it.at] === it) grid[it.at] = null; }
+    const one = (performance.now() - t0) / R;
+    const B = 80 * b, W = 280 * Math.sqrt(a), H = 120 * Math.sqrt(a), S = 28;
+    const bs = []; for (let i = 0; i < B; i++) bs.push({ x: Math.random() * W, y: Math.random() * H });
+    const close = (p, q) => p !== q && Math.abs(p.x - q.x) + Math.abs(p.y - q.y) < 12;
+    t0 = performance.now(); let c1 = 0;
+    for (let r = 0; r < 20; r++) for (const p of bs) for (const q of bs) if (close(p, q)) c1++;
+    const all = (performance.now() - t0) / 20;
+    t0 = performance.now(); let c2 = 0;
+    for (let r = 0; r < 20; r++) {
+      const cols = Math.ceil(W / S) + 2, bk = new Map();
+      for (const p of bs) { const k = (((p.y / S) | 0) + 1) * cols + ((p.x / S) | 0) + 1; let l = bk.get(k); if (!l) bk.set(k, l = []); l.push(p); }
+      for (const p of bs) { const cx = ((p.x / S) | 0) + 1, cy = ((p.y / S) | 0) + 1;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const l = bk.get((cy + dy) * cols + cx + dx); if (l) for (const q of l) if (close(p, q)) c2++; } }
+    }
+    const buck = (performance.now() - t0) / 20;
+    const f = v => v < 0.01 ? 'under 0.01 ms' : v.toFixed(2) + ' ms';
+    const num = v => el('td', { class: 'n' }, f(v));
+    out.replaceChildren(
+      el('table', null,
+        row(['Measured here, at area ' + a + '× and beings ' + b + '×', "Today's way", 'The fix'], 'th'),
+        row([el('td', null, 'Remove one item'), num(whole), num(one)]),
+        row([el('td', null, 'Every being checks who is near, once'), num(all), num(buck)])),
+      el('p', { class: 'small', style: 'margin-top:.5rem' },
+        'These are small copies of the two patterns, not the game\'s code. Both ways found ' +
+        (c1 === c2 ? 'the same neighbours' : 'different neighbours, which would be a bug in this test') +
+        '. Your times depend on your device.'));
+  }, 30);
+});
+
+/* Path picker. */
+const P = {
+  web:{t:'Web, one file',keep:'The single HTML file, GitHub Pages, and the Node tests.',lose:'Nothing.',cost:'None.'},
+  wrap:{t:'Web, plus a wrapped desktop build',keep:'Everything the web path keeps. The desktop build wraps the same file.',lose:'Nothing on the web. There is one more build to test.',cost:'Small. Read the Steam note before you choose a licence.'},
+  godot:{t:'Move to Godot',keep:'The design, the tables, the door log, and the save format.',lose:'The single file. The Node tests. All 2,509 lines of the page code, which would be rebuilt as Godot scenes.',cost:'Large.'},
+  bevy:{t:'Move to a Rust game engine',keep:'The design and the data tables.',lose:'The single file, the Node tests, all the page code, and a stable API: Bevy has changed its API at every release so far.',cost:'Largest. The core and the page are both rewritten.'}
+};
+const L = {
+  js:{t:'JavaScript as it is',note:'No cost. Mistakes in field names and arguments are still found only when a test runs.'},
+  typed:{t:'JavaScript with type checks',note:'Small. Adds one fast test. Changes nothing in the build or the release.'},
+  kernel:{t:'Rust for path search only',note:'Medium. The tile data moves into typed arrays first. The Rust path search uses integers only, so it can match today\'s paths exactly. It fits inside the single file.'},
+  rust:{t:'Rust for the whole core',note:'Largest. The golden cannot be matched, so it is replaced by a replay test and a many-seed comparison. The namer and the sentences should stay in JavaScript.'}
+};
+const M = {
+  fix:{t:'Small fixes only',note:'Removes today\'s waste. It does not change how cost grows with more people or more ticks.'},
+  index:{t:'Fixes and indexes',note:'More people and more land become affordable at the tick tier. Every being still runs every tick.'},
+  sched:{t:'Through to the scheduler and sleeping land',note:'The only option here that meets 86,400 ticks a day and a much larger map together. It is your plans G5 and H.'}
+};
+function verdict(){
+  const q = n => document.querySelector('input[name=' + n + ']:checked').value;
+  const p = q('q1'), l = q('q2'), m = q('q3'), warn = [];
+  const jsCore = l === 'js' || l === 'typed';
+  if (p === 'godot' && jsCore) warn.push('Godot cannot run a JavaScript core. The core would be rewritten in GDScript, which we expect to be slower than today (our reading, not a sourced fact), or in Rust.');
+  if (p === 'bevy' && jsCore) warn.push('A Rust game engine cannot run a JavaScript core. This choice means a whole-core port.');
+  if (p === 'godot' && !jsCore) warn.push('The godot-rust project calls its own web export "experimental". A Rust core would also not run inside Xogot on an iPad.');
+  if ((p === 'web' || p === 'wrap') && l === 'rust') warn.push('Do the scheduler first. It changes the shape of the core, and a port made before it would be made twice.');
+  if (!jsCore && m === 'fix') warn.push('A port that keeps today\'s whole-world scans copies the slow part into a faster language.');
+  const wide = text => el('td', { colspan: '3' }, text);
+  const kids = [el('div', { class: 'scroll' }, el('table', null,
+    row(['Choice', 'Keep', 'Lose', 'Cost'], 'th'),
+    row([P[p].t, P[p].keep, P[p].lose, P[p].cost]),
+    row([el('td', null, L[l].t), wide(L[l].note)]),
+    row([el('td', null, M[m].t), wide(M[m].note)])))];
+  if (warn.length) kids.push(el('div', { class: 'note', style: 'margin-top:.8rem' }, ...warn.map(w => el('p', null, w))));
+  if (p === 'web' && l === 'typed' && m === 'sched') kids.push(el('p', { class: 'pick', style: 'margin-top:.8rem' }, 'This is the path we recommend.'));
+  document.getElementById('verdict').replaceChildren(...kids);
+}
+document.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', verdict)); verdict();
+})();
+</script>
