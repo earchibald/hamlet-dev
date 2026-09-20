@@ -11,6 +11,17 @@ const { runDays, DAY } = require('./lib/run');
    its day count, its measured seconds and the flag in its own skip message. A file behind a
    flag is still a test; a file with a smaller day count is not the same test. */
 
+/* EVERY TEST IN THIS FILE IS A LONG RUN, so the flag is on the file and not on the tests one by one.
+   The fifteen runs are 493 world days between them, which is at least 1,479 s at the 3.0 s a world day
+   measured on this branch and more as each valley fills. No day count was lowered: the runs are the
+   runs, behind LONG=1. Task 1's suspension message already carried the 493; the plan's own table said
+   48, which was a helper's day count read once rather than summed. */
+const LONG = !!process.env.LONG;
+if (!LONG){
+  test('the fifteen runs of tests/wanderer.js are behind LONG=1', { skip: 'behind LONG=1: 493 world days across fifteen runs, at least 1,479 s at the 3.0 s a world day measured on this branch, and more as each valley fills. LONG=1 runs it. No day count was lowered.' }, () => {});
+  return;
+}
+
 
 /* Read the meaning, not the sentence: the line says the last person is dead. The rest of it may be reworded. */
 const EMPTY = /last person in the valley is dead/;

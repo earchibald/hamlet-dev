@@ -11,6 +11,19 @@ const sim = require('../src/sim');
    its day count, its measured seconds and the flag in its own skip message. A file behind a
    flag is still a test; a file with a smaller day count is not the same test. */
 
+/* ---------- the runs that cost more than a hundred and twenty seconds ----------
+   G4 task 4's floors rule: a restored run over the plan's hundred and twenty seconds lives behind
+   LONG=1 permanently, with a public skip that states its day count, its seconds and the flag. NO DAY
+   COUNT WAS LOWERED. A file with a smaller day count is not the same test, and a run shortened to fit
+   a budget is a deleted claim with a green tick on it.
+   The seconds are `days` times the 3.0 s a world day measured on this branch at low population. A run
+   that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
+   a floor and it is labelled as one. The measurements and the machine's load averages are in
+   design/reports/2026-09-20-g4-task-4-the-skip.md. */
+const LONG = !!process.env.LONG;
+const slow = days => LONG ? false
+  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
+
 const ui = require('../src/ui');
 
 /* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into.
@@ -59,7 +72,7 @@ test('every goal has a stage from STAGES, and a prerequisite names a goal that e
   assert.deepEqual(api.STAGES.map(s => s.id), ['fire', 'food', 'tools', 'shelter', 'crafts', 'sprites', 'settlement']);
 });
 
-test('at the start only the fire stage is reached; by day 25 of seed r the ladder is open to crafts', () => {
+test('at the start only the fire stage is reached; by day 25 of seed r the ladder is open to crafts', { skip: slow(25) }, () => {
   const fresh = loadUI(['state'], ['STAGES', 'stageReached']); fresh.startWorld('r'); fresh.camp = fresh.camps[0];
   assert.equal(fresh.stageReached('fire'), true);
   assert.equal(fresh.stageReached('tools'), false);
@@ -77,7 +90,7 @@ function day21(){
   api.camp = api.camps[0]; return api;
 }
 
-test('gauges: the hearth reads days of wood, food reads meals against the aim, water waits for the waterskin', () => {
+test('gauges: the hearth reads days of wood, food reads meals against the aim, water waits for the waterskin', { skip: slow(21) }, () => {
   const api = day21(); const g = api.gauges();
   assert.ok(g.hearth, 'a lit pit has a hearth gauge');
   assert.match(g.hearth.text, /days? of wood|out|cold/);
@@ -89,7 +102,7 @@ test('gauges: the hearth reads days of wood, food reads meals against the aim, w
   assert.equal(fresh.gauges().hearth, null, 'no pit, no hearth gauge');
 });
 
-test('alerts: a cold person raises a cold chip, a mute hides it, and chips are numbered from one', () => {
+test('alerts: a cold person raises a cold chip, a mute hides it, and chips are numbered from one', { skip: slow(21) }, () => {
   const api = day21(); const a = api.campHumans()[0];
   a.needs.warmth = 20; api.notePulses();
   const cold = api.alerts().find(x => x.type === 'cold');
@@ -103,7 +116,7 @@ test('alerts: a cold person raises a cold chip, a mute hides it, and chips are n
   assert.ok(api.alerts().some(x => x.type === 'cold'));
 });
 
-test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', () => {
+test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', { skip: slow(21) }, () => {
   const api = day21();
   api.notePulses();
   const before = api.alerts().filter(x => x.type === 'event').length;
@@ -132,7 +145,7 @@ test('a legend of the ages is never a chip', () => {
   assert.equal(new Set(labels).size, labels.length, 'the same chip twice');
 });
 
-test('stages: only reached stages show, done goals fold, and a blocked goal shows only after its prerequisite', () => {
+test('stages: only reached stages show, done goals fold, and a blocked goal shows only after its prerequisite', { skip: slow(21) }, () => {
   const api = day21(); const st = api.stages(false);
   assert.ok(st.length >= 4 && st.length <= 7);
   assert.equal(st[0].id, 'fire');
@@ -143,7 +156,7 @@ test('stages: only reached stages show, done goals fold, and a blocked goal show
   assert.deepEqual(fresh.stages(false).map(s => s.id), ['fire']);
 });
 
-test('people rows put trouble first, and the camp summary lists the stash as pairs', () => {
+test('people rows put trouble first, and the camp summary lists the stash as pairs', { skip: slow(21) }, () => {
   const api = day21(); const rows = api.peopleRows();
   assert.ok(rows.length >= 1);
   rows[rows.length - 1].a.needs.food = 10;
@@ -249,13 +262,13 @@ test('esc covers four characters, not the single quote, and no attribute in src/
   }
 });
 
-test('the view key changes when the world does, and holds still when nothing does', () => {
+test('the view key changes when the world does, and holds still when nothing does', { skip: slow(21) }, () => {
   const api = day21(); const k1 = api.viewKey();
   assert.equal(api.viewKey(), k1, 'two calls with no step between give the same key');
   for (let i = 0; i < 300; i++) api.step(); assert.notEqual(api.viewKey(), k1);
 });
 
-test('stages: every idle goal folds, a recipe or one written by hand, and the stage counts them', () => {
+test('stages: every idle goal folds, a recipe or one written by hand, and the stage counts them', { skip: slow(21) }, () => {
   const api = day21();
   api.camp.tools.rod = true; api.camp.stash.fish = 4;
   const byId = {}; for (const s of api.stages(false)) for (const x of s.goals) byId[x.g.id] = x;
@@ -1369,7 +1382,7 @@ test('the ladders differ by era: a quarter, a half, single and double in the age
   assert.deepEqual(api.ladder(), api.SPEEDS, 'the days run on the speed ladder');
 });
 
-test('a folded stage names its idle goals, and says nothing more when it is unfolded or has none', () => {
+test('a folded stage names its idle goals, and says nothing more when it is unfolded or has none', { skip: slow(21) }, () => {
   const api = loadUI(['state', 'derive'], [...DERIVE, 'foldLine']);
   const late = day21(); late.camp.tools.rod = true; late.camp.stash.fish = 4;
   const st = late.stages(false);

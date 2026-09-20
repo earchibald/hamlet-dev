@@ -11,6 +11,19 @@ const { runDays } = require('./lib/run');
    its day count, its measured seconds and the flag in its own skip message. A file behind a
    flag is still a test; a file with a smaller day count is not the same test. */
 
+/* ---------- the runs that cost more than a hundred and twenty seconds ----------
+   G4 task 4's floors rule: a restored run over the plan's hundred and twenty seconds lives behind
+   LONG=1 permanently, with a public skip that states its day count, its seconds and the flag. NO DAY
+   COUNT WAS LOWERED. A file with a smaller day count is not the same test, and a run shortened to fit
+   a budget is a deleted claim with a green tick on it.
+   The seconds are `days` times the 3.0 s a world day measured on this branch at low population. A run
+   that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
+   a floor and it is labelled as one. The measurements and the machine's load averages are in
+   design/reports/2026-09-20-g4-task-4-the-skip.md. */
+const LONG = !!process.env.LONG;
+const slow = days => LONG ? false
+  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
+
 
 test('every world begins with its creation, and the first person stands in the start country', () => {
   const api = load(); api.startWorld('r');
@@ -247,7 +260,7 @@ test('a short creation loses nothing to the cap and says nothing of it', () => {
 
 /* Nothing the gods did not make wanders in. The day era refills the wild with rabbits, deer, foxes and wolves,
    but only with the species the making marks name. Seed r's gods made no wolf; seed alpha's did. */
-test('a species the gods never made never wanders in, and one they made may', () => {
+test('a species the gods never made never wanders in, and one they made may', { skip: slow(50) }, () => {
   const bare = settled('r');
   assert.ok(!bare.creation.made.wolf, 'seed r made wolves after all; pick another seed');
   const { api } = runDays('r', 25);

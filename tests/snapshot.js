@@ -13,6 +13,19 @@ const { DAY, runDays, collect, runOn, fingerprint } = require('./lib/run.js');
    its day count, its measured seconds and the flag in its own skip message. A file behind a
    flag is still a test; a file with a smaller day count is not the same test. */
 
+/* ---------- the runs that cost more than a hundred and twenty seconds ----------
+   G4 task 4's floors rule: a restored run over the plan's hundred and twenty seconds lives behind
+   LONG=1 permanently, with a public skip that states its day count, its seconds and the flag. NO DAY
+   COUNT WAS LOWERED. A file with a smaller day count is not the same test, and a run shortened to fit
+   a budget is a deleted claim with a green tick on it.
+   The seconds are `days` times the 3.0 s a world day measured on this branch at low population. A run
+   that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
+   a floor and it is labelled as one. The measurements and the machine's load averages are in
+   design/reports/2026-09-20-g4-task-4-the-skip.md. */
+const LONG = !!process.env.LONG;
+const slow = days => LONG ? false
+  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
+
 
 test('a stream gives the numbers it gave before', () => {
   const api = load(); const f = api.mulberry32(12345);
@@ -29,12 +42,12 @@ test('a stream set back to a position gives the same numbers again', () => {
 /* A world with history in it: lit fires, snares, dens, a grove, perhaps a second camp. Run once, shared. */
 let late; const lateWorld = () => late || (late = runDays('r', 40).api);
 
-test('a snapshot goes through JSON whole', () => {
+test('a snapshot goes through JSON whole', { skip: slow(40) }, () => {
   const api = lateWorld(), snap = api.takeSnapshot();
   const text = JSON.stringify(snap); assert.deepStrictEqual(JSON.parse(text), snap);   // fails on an undefined field, which JSON drops
   assert.equal(snap.version, api.SNAPSHOT_VERSION);
 });
-test('a snapshot holds no number JSON cannot hold, no undefined, and no function', () => {
+test('a snapshot holds no number JSON cannot hold, no undefined, and no function', { skip: slow(40) }, () => {
   const bad = []; const walk = (v, p) => {
     if (typeof v === 'number' && !Number.isFinite(v)) bad.push(p);
     else if (v === undefined || typeof v === 'function') bad.push(p);
@@ -43,18 +56,18 @@ test('a snapshot holds no number JSON cannot hold, no undefined, and no function
   };
   walk(lateWorld().takeSnapshot(), 'snap'); assert.deepEqual(bad.slice(0, 5), []);
 });
-test('taking a snapshot changes nothing and draws nothing', () => {
+test('taking a snapshot changes nothing and draws nothing', { skip: slow(40) }, () => {
   const api = lateWorld(), a = JSON.stringify(api.takeSnapshot()), b = JSON.stringify(api.takeSnapshot());
   assert.equal(a, b);
 });
-test('REFS names every field that points at a record', () => {
+test('REFS names every field that points at a record', { skip: slow(40) }, () => {
   assert.deepEqual(lateWorld().unnamedRefs().slice(0, 10), []);
 });
-test('a snapshot is small enough to keep', () => {
+test('a snapshot is small enough to keep', { skip: slow(40) }, () => {
   const n = JSON.stringify(lateWorld().takeSnapshot()).length;
   assert.ok(n < 6e6, `a day-40 snapshot of seed r is ${n} characters`);
 });
-test('a snapshot is taken only once the world is made', () => {
+test('a snapshot is taken only once the world is made', { skip: slow(40) }, () => {
   const api = load(); api.startWorld('r'); api.beginCreation();
   assert.equal(api.era, 'gods');
   assert.throws(() => api.takeSnapshot(), /only once the world is made/);
@@ -64,10 +77,10 @@ test('a snapshot is taken only once the world is made', () => {
 const through = snap => JSON.parse(JSON.stringify(snap));
 let loaded; const loadedWorld = () => { if (!loaded){ loaded = load(); assert.equal(loaded.loadSnapshot(through(lateWorld().takeSnapshot())), null); } return loaded; };
 
-test('a loaded world gives the snapshot it was loaded from', () => {
+test('a loaded world gives the snapshot it was loaded from', { skip: slow(40) }, () => {
   assert.deepStrictEqual(through(loadedWorld().takeSnapshot()), through(lateWorld().takeSnapshot()));
 });
-test('a loaded world has its records joined as the saved one had', () => {
+test('a loaded world has its records joined as the saved one had', { skip: slow(40) }, () => {
   const api = loadedWorld(), was = lateWorld();
   for (const c of api.camps){
     for (const s of c.snares) assert.equal(api.world[s.y * api.W + s.x].struct.snare, s);
@@ -107,7 +120,7 @@ test('a forged x on a saved tile loads, and the tile keeps the x its index gives
   const t = api.levels[api.ZOFF][i];
   assert.equal(t.x, realX); assert.equal(t.y, (i - realX) / was.W); assert.equal(t.z, 0);
 });
-test('a loaded world has its derived state', () => {
+test('a loaded world has its derived state', { skip: slow(40) }, () => {
   const api = loadedWorld(), was = lateWorld();
   assert.equal(api.tick, was.tick); assert.equal(api.W, was.W); assert.equal(api.world, api.levels[api.ZOFF]);
   assert.equal(api.field.byId.size, was.field.byId.size);
@@ -115,7 +128,7 @@ test('a loaded world has its derived state', () => {
 });
 /* The round trip cannot see a field the encoder drops as a default, because a loaded record that lacks
    it encodes the same way. The rules would read undefined. So compare the keys, in order, record by record. */
-test('a loaded record has the same keys, in the same order, as the record it came from', () => {
+test('a loaded record has the same keys, in the same order, as the record it came from', { skip: slow(40) }, () => {
   const api = loadedWorld(), was = lateWorld();
   const keys = r => Object.keys(r).join(',');
   const pairs = [['tile', api.levels.flat(), was.levels.flat()], ['being', api.beings, was.beings], ['camp', api.camps, was.camps],
@@ -135,7 +148,7 @@ test('a loaded record has the same keys, in the same order, as the record it cam
   assert.ok(withStruct > 0 && withCave > 0, 'this world was meant to have a built tile and a cave tile');
 });
 /* A world where the plain numbers are not all zero. A save carries them, so a load gives them back. */
-test('a loaded world gives back every plain number the save holds', () => {
+test('a loaded world gives back every plain number the save holds', { skip: slow(40) }, () => {
   const api = load(), good = through(lateWorld().takeSnapshot());
   /* goalPriority, gestureFallbacks, and corpses are empty in this world, so each is given a value here. */
   const marked = { ...good, nextId: good.nextId + 7, fireCount: 3, wanderAt: 9001, doomAt: 8002, age: 5, pulseAge: 2,
@@ -145,7 +158,7 @@ test('a loaded world gives back every plain number the save holds', () => {
   for (const k of ['tick', 'nextId', 'fireCount', 'wanderAt', 'doomAt', 'age', 'pulseAge', 'rng', 'godRng', 'seed']) assert.equal(back[k], marked[k], k);
   for (const k of ['namePool', 'weather', 'resCache', 'startRegion', 'doorLog', 'gestureFallbacks', 'godNamePool', 'goalPriority', 'corpses']) assert.deepEqual(back[k], marked[k], k);
 });
-test('a save that cannot be read is refused and the world stays as it was', () => {
+test('a save that cannot be read is refused and the world stays as it was', { skip: slow(40) }, () => {
   const api = load(); api.startWorld('x'); const before = JSON.stringify(api.takeSnapshot());
   const good = through(lateWorld().takeSnapshot());
   for (const bad of [null, {}, 'text', { ...good, version: 99 }, { ...good, era: 'gods' }, { ...good, options: { sw: -1 } }, { ...good, beings: [{ ...good.beings[0], camp: 9999 }] }, { ...good, caves: 'no' }]){
@@ -212,7 +225,7 @@ const CASES = [
   ['alpha', d(20), d(3), SMALL], // a small valley with snares and pitfalls in the ground, and two camps
 ];
 for (const [seed, N, M, opts] of CASES)
-  test(`seed ${seed}: saved on world day ${(N / DAY).toFixed(2)}, loaded, and run on ${(M / DAY).toFixed(2)} days, the story is the straight run's`, t => {
+  test(`seed ${seed}: saved on world day ${(N / DAY).toFixed(2)}, loaded, and run on ${(M / DAY).toFixed(2)} days, the story is the straight run's`, { skip: slow(Math.round((N + 2 * M) / DAY)) }, t => {
     const o = oracle(seed, N, M, opts);
     t.diagnostic(`${seed}: ${o.midTask} walking, ${o.working} at work, ${o.a.camps.length} camps, ${o.after.length} lines after the save`);
     sameStory(o);
@@ -230,7 +243,7 @@ function lightTheWoods(a, ca, N){
   runOn(a, N, d(0.06), ca);   // long enough for the fire to spread, short enough that it still burns
   return N + 60;
 }
-test('a world saved while the woods burn runs on as the straight run does', t => {
+test('a world saved while the woods burn runs on as the straight run does', { skip: slow(12) }, t => {
   const o = oracle('r', d(6), d(3), SMALL, lightTheWoods);
   const alight = lv => lv.filter(t => t && t.fire > 0).length;
   const offSurface = o.snap.levels.reduce((n, lv, i) => n + (i === o.a.ZOFF ? 0 : alight(lv)), 0);
@@ -243,7 +256,7 @@ test('a world saved while the woods burn runs on as the straight run does', t =>
 /* A wolf den dug after the load. digDen reads startRegion through rimExits, and startRegion is a Set
    of about thirty thousand numbers that the save carries whole. A world that digs no den after the
    load would never touch it. This small valley clears a den at tick 4994 and digs a new one at 7994. */
-test('a world that digs a wolf den after the load runs on as the straight run does', t => {
+test('a world that digs a wolf den after the load runs on as the straight run does', { skip: slow(11) }, t => {
   const o = oracle('r', d(6), d(2.5), SMALL);
   const dug = o.loaded.filter(e => /dug a new den/.test(e.text));
   t.diagnostic(`${o.denless} wolves were den-less at the save; after the load: ${dug.map(e => e.text).join(' ')}`);
@@ -254,7 +267,7 @@ test('a world that digs a wolf den after the load runs on as the straight run do
 
 /* A late save of a world of the default size. The three cases above are early or small, so a grown
    valley with a gnome burrow holding a thing and two camps went untested. */
-test('a grown valley of the default size, saved late, runs on as the straight run does', t => {
+test('a grown valley of the default size, saved late, runs on as the straight run does', { skip: slow(18.8) }, t => {
   const o = oracle('beta', d(13.779), d(2.5), {});
   /* The preconditions are read off the save, not off the world after it ran on: a burrow gives up
      what it holds, and a camp is founded later. */
@@ -457,7 +470,7 @@ test('a world saved before anybody living has named a thing round-trips whole', 
    What this test is about is not the number: it is that the decoder tolerates a save missing fields
    added after it was written. That policy did not change with the version, so the test follows the
    version up rather than being deleted with it. */
-test('a save written before the names loads, and the world starts its names afresh', () => {
+test('a save written before the names loads, and the world starts its names afresh', { skip: slow(40) }, () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   for (const k of ['nrng', 'lore', 'tongue', 'valley', 'river', 'stillWater', 'ponds', 'fords']) delete old[k];
   for (const lv of old.levels) for (const t of lv){ if (!t) continue; delete t.water; delete t.pond; delete t.ford; }
@@ -537,7 +550,7 @@ test('an unwatched creation leaves the guard nothing to say either', () => {
   const plain = load(); plain.startWorld('gamma');
   assert.deepEqual(plain.unnamedRefs(), []);
 });
-test('a save carries who the player is and whether they have been told', () => {
+test('a save carries who the player is and whether they have been told', { skip: slow(40) }, () => {
   const api = load(), good = through(lateWorld().takeSnapshot());
   const marked = { ...good, inhabited: { id: 7, mode: 'become' }, inhabitedTold: true };
   assert.equal(api.loadSnapshot(marked), null);
@@ -550,7 +563,7 @@ test('a save carries who the player is and whether they have been told', () => {
 /* The versioning policy: a field added after the current version is read as optional, with the value
    a world that never had it holds. The version does not rise for a new field, so a rebuilt page does
    not refuse every autosave. It rises only when a saved field changes meaning, as `tick` did in G4. */
-test('a save written before Become loads, and the player is nobody', () => {
+test('a save written before Become loads, and the player is nobody', { skip: slow(40) }, () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   delete old.inhabited; delete old.inhabitedTold; delete old.strayGroves;
   assert.equal(old.version, api.SNAPSHOT_VERSION);
@@ -558,7 +571,7 @@ test('a save written before Become loads, and the player is nobody', () => {
   assert.equal(api.inhabited, null);
   assert.equal(api.inhabitedTold, false);
 });
-test('a load while a god\'s turn is open leaves no turn standing, and the world steps', () => {
+test('a load while a god\'s turn is open leaves no turn standing, and the world steps', { skip: slow(40) }, () => {
   const api = load(); api.startCreation('gamma', {});
   api.step();
   const g = api.awakeGods()[0];
@@ -661,7 +674,7 @@ test('a save that would kill the page a step later is refused, and the world sta
 /* A version 1 save is refused, and this is the test that says so. G4 task 1 made a tick 86.4 world
    seconds, so a version 1 save holds a tick and every stamp beside it meaning 86.4 times less. No
    per-field default rescues that, so the save is refused whole rather than read wrong. */
-test('the version refusal names both versions, and a version that is no number says so plainly', () => {
+test('the version refusal names both versions, and a version that is no number says so plainly', { skip: slow(40) }, () => {
   const api = load(), good = through(lateWorld().takeSnapshot());
   assert.equal(api.SNAPSHOT_VERSION, 2);
   assert.equal(api.loadSnapshot({ ...good, version: 1 }), 'This save is version 1. This world reads version 2.');
@@ -669,7 +682,7 @@ test('the version refusal names both versions, and a version that is no number s
   assert.equal(api.loadSnapshot({ ...good, version: '2' }), 'This file is not a save this world can read.');
   assert.equal(api.loadSnapshot({ ...good, version: null }), 'This file is not a save this world can read.');
 });
-test('a refused load keeps the reason it threw, and a load that lands clears it', () => {
+test('a refused load keeps the reason it threw, and a load that lands clears it', { skip: slow(40) }, () => {
   const api = load(); api.startWorld('x', { sw: 8, sh: 5 });
   const good = through(lateWorld().takeSnapshot());
   assert.equal(api.loadSnapshot({ ...good, caves: 'no' }), 'This save cannot be read.');
