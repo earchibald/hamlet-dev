@@ -1,6 +1,7 @@
 function takeName(){ if (!namePool.length) namePool = shuffle(NAMES); return namePool.pop(); }
 
 /* ---------- beings ---------- */
+/** @returns {Being} */
 function makeBeing(species, x, y, name, hue){
   const r = () => Math.round(rng() * 100) / 100;
   const sp = SPECIES[species];

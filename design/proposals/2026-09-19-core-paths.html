@@ -158,7 +158,7 @@ button{ font:inherit; font-weight:500; color:var(--ground); background:var(--riv
 <h2 id="model">Six changes to the model, in the order we would make them</h2>
 
 <h3>1. Type checks on the JavaScript we have</h3>
-<p>TypeScript can check plain <code>.js</code> files. It reads the types from JSDoc comments, which are notes above a function that name each argument's type. There is no build step and no output.<sup><a class="fn" data-k="checkjs"></a></sup> It treats files that share one scope as scripts, which is what <code>src/sim/</code> is.<sup><a class="fn" data-k="tsmodules"></a></sup> It would catch wrong argument counts, misspelt fields, and a tile field that one file adds and another never expects. It breaks no project rule. Note that TypeScript 7 is faster at checking only. It does not make the game run faster.<sup><a class="fn" data-k="ts7"></a></sup></p>
+<p>TypeScript can check plain <code>.js</code> files. It reads the types from JSDoc comments, which are notes above a function that name each argument's type. There is no build step and no output.<sup><a class="fn" data-k="checkjs"></a></sup> It treats files that share one scope as scripts, which is what <code>src/sim/</code> is.<sup><a class="fn" data-k="tsmodules"></a></sup> It would catch wrong argument counts, misspelt fields, and a tile field that one file adds and another never expects. It breaks no project rule. Note that TypeScript 7 is faster at checking only. It does not make the game run faster.<sup><a class="fn" data-k="ts7"></a></sup> It adds TypeScript as a dev dependency, the first dependency this project has. The released file stays self-contained.</p>
 <p class="note">A stronger option is real ES modules, joined by a bundler into the same single file. That gives a true map of what depends on what. It also breaks a written rule: "Files in <code>src/sim/</code> are not ES modules." We do not propose it without your word.</p>
 
 <h3>2. Indexes in place of scans</h3>
@@ -307,7 +307,7 @@ flowchart TD
 <tr><th>Step</th><th>Work</th><th>Size</th><th>Gate</th></tr>
 <tr><td class="n">1</td><td>Measure on a quiet machine. Profile the page as well as Node. Add a soak at four times the area.</td><td>Small</td><td>Numbers with the machine and its load written beside them.</td></tr>
 <tr><td class="n">2</td><td>The six fixes that should not move the golden.</td><td>Small</td><td>Golden unchanged. Item removal is a smaller share at nine times the area.</td></tr>
-<tr><td class="n">3</td><td>Model change 1: type checks with <code>tsc --checkJs</code>.</td><td>Small</td><td>A new fast test. No change to the build.</td></tr>
+<tr><td class="n">3</td><td>Model change 1: type checks with <code>tsc --checkJs</code>.</td><td>Small</td><td>A new fast test. No change to the build. One dev dependency, the project's first.</td></tr>
 <tr><td class="n">4</td><td>Model change 2: the three indexes.</td><td>Medium</td><td>Golden unchanged for the first two. The soak finds nobody cut off.</td></tr>
 <tr><td class="n">5</td><td>Model change 3: the camp as an argument.</td><td>Medium</td><td>Golden unchanged.</td></tr>
 <tr><td class="n">6</td><td>Model changes 4 and 6: the scheduler (G5), and chronicle lines as records.</td><td>Large</td><td>Golden blessed once, on your word. A world day within the spec's 5 second budget.</td></tr>

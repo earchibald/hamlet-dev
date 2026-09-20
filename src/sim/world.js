@@ -2,6 +2,7 @@
 const tileAt = (x, y, z = 0) => levels[z + ZOFF][idx(x, y)];
 const hasTile = (x, y, z) => inb(x, y) && z >= ZMIN && z <= ZMAX && levels[z + ZOFF][idx(x, y)] !== null;
 const sectorOfTile = t => sectors[secIdx(...Object.values(secOf(t.x, t.y)))];
+/** @returns {Tile} */
 function makeTile(x, y, z, ground){ return { x, y, z, ground, ...TILE_DEFAULTS }; }
 /* Put a tile on a level. Tiles off the surface are also listed in `raised`, so per-tick loops can find them without scanning empty levels. */
 function placeTile(x, y, z, ground){ const t = makeTile(x, y, z, ground); const old = levels[z + ZOFF][idx(x, y)]; levels[z + ZOFF][idx(x, y)] = t; if (z !== 0){ if (old){ const k = raised.indexOf(old); if (k >= 0) raised[k] = t; else raised.push(t); } else raised.push(t); } return t; }
