@@ -44,13 +44,6 @@ const FAR_FLOOR = { searched: 2, finds: 1, repaid: 5, benches: 1 };
 /* gamma's camp is capped by beds until one snare catch brings the hide for a hut (design/notes.md, Known weak spots); its floor is lower so an unrelated stream shift does not go red. */
 const ALIVE_FLOOR = { gamma: 6 };
 
-/* The four seasons the default run must visit. The soak floors outcomes, and an outcome can hold
-   while the mechanism behind it never fires: a year long enough to swallow a 70-day run leaves
-   every `seasonOf()` and `isWinter()` read site dead, with no failing test and no diff (issue #94).
-   So the run records the season at each step and answers for all four by name. A claim that only
-   winter was reached would pass a calendar that had lost summer and autumn. */
-const SEASONS_WANTED = ['spring', 'summer', 'autumn', 'winter'];
-
 for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
     const t0 = Date.now();
@@ -93,15 +86,36 @@ for (const seed of SEEDS){
        guarded test below, which does not run on a short run. */
     sums.humans += counts.humans; sums.born += counts.born;
     for (const k in FAR_FLOOR) sums[k] += counts[k];
+    /* Every season, not just winter. The soak floors outcomes, and an outcome can hold while the
+       mechanism behind it never fires: a year long enough to swallow the run leaves every
+       `seasonOf()` and `isWinter()` read site dead, with no failing test and no diff (issue #94).
+       A claim that winter was reached would pass a calendar that had lost summer and autumn, so
+       every season is named, and the message names the ones that went missing.
+
+       The seasons are read from `api.SEASONS`, not copied here: a fifth season added to the table
+       must widen this claim, not leave the soak asserting four for ever.
+
+       Guarded on the day count alone, not on `isDefault`. The claim does not depend on the seed,
+       and `SEEDS=r DAYS=70` is the common quick check, which is exactly where a calendar change
+       would otherwise slip past. The guard does not read the calendar either. A guard of
+       `DAYS * DAY >= years(1)` would switch the claim off on the very change it is here to report:
+       a year of 1460 days is not crossed by 70, so the claim would skip instead of failing. */
+    const longEnough = DAYS >= DEFAULT_DAYS;
+    await t.test('the run visits every season', { skip: !longEnough && `${DAYS} days: this claim is made on runs of ${DEFAULT_DAYS} days or more, a year being ${api.years(1) / api.DAY} days` }, () => {
+      const missing = api.SEASONS.filter(s => !seasonsSeen.has(s));
+      assert.deepEqual(missing, [], `the ${DAYS}-day run never reached ${missing.join(', ')}. It saw ${[...seasonsSeen].join(', ') || 'no season at all'}. A season nobody reaches leaves every rule that reads it dead.`);
+      /* The order too, tolerant of where the year starts. `seasonsSeen` is a Set in first-sight
+         order, so it reads spring, summer, autumn, winter only because every seed begins at tick
+         293, which is day 1. A world-gen change that moved the start tick would rotate that list,
+         and a fixed sequence would go red for the wrong reason. So the claim is that the seasons
+         arrive in `SEASONS` order from wherever the run begins. */
+      const seen = [...seasonsSeen], from = api.SEASONS.indexOf(seen[0]);
+      const inOrder = api.SEASONS.map((_, i) => api.SEASONS[(from + i) % api.SEASONS.length]);
+      assert.deepEqual(seen, inOrder, `the seasons arrived as ${seen.join(', ')}, which is not ${api.SEASONS.join(', ')} read round from ${seen[0]}`);
+    });
     /* The floors are measured on 70 days. A shorter run cannot reach them, and a floor invented to
        fit ten days would be a number nobody has measured. So the claim is not made, and the skip
        says so, as the golden record and the two sum tests already do. */
-    /* Guarded like the floors below: a DAYS=10 run cannot reach four seasons, so the claim is not
-       made and the skip says so. */
-    await t.test('the run visits all four seasons', { skip: !isDefault && 'not the default run' }, () => {
-      const missing = SEASONS_WANTED.filter(s => !seasonsSeen.has(s));
-      assert.deepEqual(missing, [], `the ${DAYS}-day run never reached ${missing.join(', ')}. It saw ${[...seasonsSeen].join(', ') || 'no season at all'}. A season nobody reaches leaves every rule that reads it dead.`);
-    });
     await t.test('the camps grow', { skip: !isDefault && 'not the default run' }, () => {
       assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day ${DAYS}, ${counts.born} born`);
     });

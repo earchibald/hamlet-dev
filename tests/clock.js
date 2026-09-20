@@ -23,22 +23,18 @@ test('the unit helpers turn world units into ticks', () => {
 /* The calendar against plain numbers, not against itself. `years(1) === SEASON_DAYS * 4 * DAY` above
    is an identity between two constants: it passes whatever the year length is, so it cannot report a
    calendar that changed (issue #94, the shape of #80). The literals below are the calendar the rules
-   and the tests are tuned for: an 8-day season and a 32-day year, which a 70-day soak crosses, so the
-   soak reaches all four seasons. Change the calendar and this goes red, which is the point: a year the
-   soak cannot cross leaves every `seasonOf()` and `isWinter()` read site dead, with no failing test.
-   Bless a new number here only with the season claim in tests/soak.js still green. */
+   and the tests are tuned for: an 8-day season and a 32-day year. Change the calendar and this goes
+   red, which is the point: a year too long for the soak to cross leaves every `seasonOf()` and
+   `isWinter()` read site dead, with no failing test.
+
+   The soak's run length is not restated here. `tests/soak.js` owns `DEFAULT_DAYS`, and its 'the run
+   visits every season' test observes the crossing directly, on the real run, rather than computing it
+   from a copy of the number. Bless a new number here only with that claim still green. */
 test('a season is 8 days and a year is 32, in plain numbers', () => {
   const api = load();
   assert.equal(api.SEASON_DAYS, 8);
   assert.equal(api.years(1), 32000);
   assert.equal(api.years(1) / api.DAY, 32);
-});
-
-/* The consequence of the numbers above, stated on its own so it reports on its own. The soak runs 70
-   days. A year longer than that leaves three seasons unreachable and about thirty read sites dead. */
-test('the soak default of 70 days crosses a whole year', () => {
-  const api = load();
-  assert.ok(70 * api.DAY >= api.years(1), `a 70-day run covers ${(70 * api.DAY / api.years(1)).toFixed(2)} of a year, so it cannot reach all four seasons`);
 });
 
 test('the legacy markers return their argument unchanged', () => {
