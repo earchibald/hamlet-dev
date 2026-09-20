@@ -20,6 +20,27 @@ test('the unit helpers turn world units into ticks', () => {
   assert.equal(api.years(1), api.SEASON_DAYS * 4 * api.DAY);
 });
 
+/* The calendar against plain numbers, not against itself. `years(1) === SEASON_DAYS * 4 * DAY` above
+   is an identity between two constants: it passes whatever the year length is, so it cannot report a
+   calendar that changed (issue #94, the shape of #80). The literals below are the calendar the rules
+   and the tests are tuned for: an 8-day season and a 32-day year, which a 70-day soak crosses, so the
+   soak reaches all four seasons. Change the calendar and this goes red, which is the point: a year the
+   soak cannot cross leaves every `seasonOf()` and `isWinter()` read site dead, with no failing test.
+   Bless a new number here only with the season claim in tests/soak.js still green. */
+test('a season is 8 days and a year is 32, in plain numbers', () => {
+  const api = load();
+  assert.equal(api.SEASON_DAYS, 8);
+  assert.equal(api.years(1), 32000);
+  assert.equal(api.years(1) / api.DAY, 32);
+});
+
+/* The consequence of the numbers above, stated on its own so it reports on its own. The soak runs 70
+   days. A year longer than that leaves three seasons unreachable and about thirty read sites dead. */
+test('the soak default of 70 days crosses a whole year', () => {
+  const api = load();
+  assert.ok(70 * api.DAY >= api.years(1), `a 70-day run covers ${(70 * api.DAY / api.years(1)).toFixed(2)} of a year, so it cannot reach all four seasons`);
+});
+
 test('the legacy markers return their argument unchanged', () => {
   const api = load();
   for (const f of [api.ticks, api.strides, api.tickRate, api.strideRate]){ assert.equal(f(0.0006), 0.0006); assert.equal(f(3000), 3000); }

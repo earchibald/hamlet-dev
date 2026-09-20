@@ -44,11 +44,20 @@ const FAR_FLOOR = { searched: 2, finds: 1, repaid: 5, benches: 1 };
 /* gamma's camp is capped by beds until one snare catch brings the hide for a hut (design/notes.md, Known weak spots); its floor is lower so an unrelated stream shift does not go red. */
 const ALIVE_FLOOR = { gamma: 6 };
 
+/* The four seasons the default run must visit. The soak floors outcomes, and an outcome can hold
+   while the mechanism behind it never fires: a year long enough to swallow a 70-day run leaves
+   every `seasonOf()` and `isWinter()` read site dead, with no failing test and no diff (issue #94).
+   So the run records the season at each step and answers for all four by name. A claim that only
+   winter was reached would pass a calendar that had lost summer and autumn. */
+const SEASONS_WANTED = ['spring', 'summer', 'autumn', 'winter'];
+
 for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
     const t0 = Date.now();
     const stranded = [];
-    const { api, events } = runDays(seed, DAYS, (api, i) => { if (api.tick % 1000 === 0) stranded.push(...cutOff(api)); });
+    /* `seasonOf()` reads the tick and draws no random number, so watching it cannot move the stream. */
+    const seasonsSeen = new Set();
+    const { api, events } = runDays(seed, DAYS, (api, i) => { seasonsSeen.add(api.seasonOf()); if (api.tick % 1000 === 0) stranded.push(...cutOff(api)); });
     const counts = countEvents(api, events), fp = fingerprint(api, events);
     t.diagnostic(`${seed}: ${Date.now() - t0} ms, ${events.length} chronicle lines`);
     t.diagnostic(api.camps.map(c => campLine(api, c)).join(' | '));
@@ -56,6 +65,7 @@ for (const seed of SEEDS){
     /* The creation, and the counters the countries swallowed. The dens, caves and burrows now sit in their own
        countries, and a camp may never reach them in 70 days. Printed, not asserted: see the plan-3 report. */
     t.diagnostic(`${seed}: creation ages ${api.creation.ages}, discards ${api.creation.discards}, made ${Object.keys(api.creation.made).sort().join(',')}`);
+    t.diagnostic(`${seed}: seasons visited: ${[...seasonsSeen].join(', ') || 'none'}`);
     t.diagnostic(`${seed}: far country reach: densCleared ${counts.densCleared}, searched ${counts.searched}, finds ${counts.finds}, borrowed ${counts.borrowed}, repaid ${counts.repaid}, benches ${counts.benches}`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
@@ -86,6 +96,12 @@ for (const seed of SEEDS){
     /* The floors are measured on 70 days. A shorter run cannot reach them, and a floor invented to
        fit ten days would be a number nobody has measured. So the claim is not made, and the skip
        says so, as the golden record and the two sum tests already do. */
+    /* Guarded like the floors below: a DAYS=10 run cannot reach four seasons, so the claim is not
+       made and the skip says so. */
+    await t.test('the run visits all four seasons', { skip: !isDefault && 'not the default run' }, () => {
+      const missing = SEASONS_WANTED.filter(s => !seasonsSeen.has(s));
+      assert.deepEqual(missing, [], `the ${DAYS}-day run never reached ${missing.join(', ')}. It saw ${[...seasonsSeen].join(', ') || 'no season at all'}. A season nobody reaches leaves every rule that reads it dead.`);
+    });
     await t.test('the camps grow', { skip: !isDefault && 'not the default run' }, () => {
       assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day ${DAYS}, ${counts.born} born`);
     });
