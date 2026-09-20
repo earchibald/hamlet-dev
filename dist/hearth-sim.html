@@ -65,6 +65,8 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
    lines up. The folded row is one stream in age order and keeps its own natural width. */
 #timeline .lane.fixed .cell{flex:none;width:84px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #timeline .cell.blank{cursor:default;border-color:transparent}
+/* The cell playing right now: the same act the map is drawing this beat. */
+#timeline .cell.playing{background:var(--map-god);color:var(--accent-ink);border-color:var(--map-god)}
 #timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
 .strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
@@ -202,7 +204,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
-      <span id="speeds"><button class="btn" id="speed1" data-speed="1">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64">64×<kbd>Shift+4</kbd></button></span>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1" data-pace="0.25">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4" data-pace="0.5">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16" data-pace="1">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64" data-pace="2">64×<kbd>Shift+4</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
@@ -233,9 +235,15 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
+</dialog>
+<dialog id="hurry">
+  <h2>Hurry to the valley?</h2>
+  <p>The rest of the creation happens at once. You will see the valley it made, and none of the making.</p>
+  <p class="muted" id="hurryLeft"></p>
+  <p><button class="btn" type="button" id="hurryGo">Hurry<kbd>Enter</kbd></button> <button class="btn" type="button" id="hurryStay">Stay and watch<kbd>Esc</kbd></button></p>
 </dialog>
 <!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
 <input type="file" id="loadFile" accept=".json,application/json" hidden>
@@ -6767,23 +6775,30 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
-/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
-   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
-/* How many world ticks the page draws in one real second at speed 1. A tick is one world second,
-   so this is how much faster than life the valley runs when it is watched at the slowest speed.
+/* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
+   so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the
-   interface's: it never passes the door, and the same seed reaches the same world at any speed. */
+   interface's: it never passes the door, and the same seed reaches the same world at any pace. */
 const TICKS_A_SECOND = 60;
-const AGE_MS = 2000;
-/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
-   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
-   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
-const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
+/* The ages. pace is the speed of the gods era: a quarter, a half, single, or double. It is not saved; a
+   new world starts at single. lastEra is the era the last frame saw, so the frame can see the flip at
+   settle. */
+const BEAT_MS = 1000;
+const PACES = [0.25, 0.5, 1, 2];
+/* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue,
+   draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
+   durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, draw: 0.6, word: 0.85 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
-let ocv2, octx2, fieldAge = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
+   single act to fade from. Counting gestures cannot stand in for this: one decision can write two
+   gestures — a split that also gives birth — and that is one beat, with an act to draw. */
+let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -6815,10 +6830,15 @@ const ui = {
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
+  playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
+/* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
+   page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
+const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
@@ -6850,9 +6870,23 @@ const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
+/* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
+   of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
+function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
+function captionFor(rec){
+  return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
+}
+/* The one or two gestures drawn this beat: the act on stage, and the act before it while it fades.
+   Mirrors the pair drawField reads in map.js, so a hover on the mark finds the same act the mark shows.
+   `creation.gestures` holds only the age now playing; an age that has moved on keeps none of them. */
+function liveGestures(){
+  const recs = creation.gestureAge === age ? creation.gestures : [];
+  return { now: recs.length ? recs[recs.length - 1] : null, before: recs.length > 1 ? recs[recs.length - 2] : null };
+}
 /* The live region a god stands in. The sim's settleHome does the same walk and moves the god; this one only looks. */
 function standsIn(g){
   let r = g.region === null || g.region === undefined ? null : regionById(g.region);
@@ -6872,36 +6906,66 @@ function countryLine(r){
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
   return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
 }
+/* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
+   both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
+   the player made: decideGod marks every option it tried, so the taken row is the first unfailed row and
+   is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
+   row. E3 does not store the row a player took; a later slice does.
+   No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
+   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a country's "Country" row. */
+function actCard(rec){
+  const m = markFor(rec.kind, rec.value);
+  const g = beingById(rec.god);
+  const said = captionFor(rec);
+  const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
+  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const r = regionById(rec.region !== undefined ? rec.region : rec.near);
+  if (r) rows.push({ label: 'where', value: countryLine(r) });
+  if (rec.weighed && !rec.byPlayer){
+    rows.push({ label: 'weighed', value: rec.weighed.opts.map(o => `${o.type} ${Math.round(o.score)}`).join(' · ') });
+  }
+  return { head, rows };
+}
+/* The act behind a timeline chip, `age:god`, for the foot to show the same card a hover would. Only the
+   age now playing keeps its gestures (see liveGestures), so a chip from an earlier age finds none here;
+   the foot falls back to the chip's own matrix in that case. */
+function actCardForChip(key){
+  if (!key) return null;
+  const [a, id] = String(key).split(':').map(Number);
+  if (creation.gestureAge !== a) return null;
+  const rec = creation.gestures.find(x => x.age === a && x.god === id);
+  return rec ? actCard(rec) : null;
+}
 /* The gods, in the shape peopleRows gives, so the People drawer can list them. The bar is the god's rest. */
 function godRows(){
   return gods().map(g => ({ a: g, m: g.needs.rest, trouble: g.status === 'awake' && g.needs.calm < 20,
     status: g.status === 'dead' ? 'Unmade' : g.status === 'asleep' ? 'Asleep' : g.task ? `Awake: ${g.task.type}` : g.lastChoice && g.lastChoice.picked ? `Awake: ${g.lastChoice.picked}` : 'Awake' }));
 }
 
-/* How many ages a frame owes. acc is the part of an age carried from the last frame. At most eight in a frame. */
-function agesDue(acc, dt, pace){
-  const a = acc + dt * pace / AGE_MS, n = Math.floor(a);
+/* How many beats a frame owes. acc is the part of a beat carried from the last frame. At most eight in a
+   frame: more than that is a tab that slept, and a slept tab snaps rather than replaying in fast forward. */
+function beatsDue(acc, dt, pace){
+  const a = acc + dt * pace / BEAT_MS, n = Math.floor(a);
   return n > 8 ? { n: 8, acc: 0 } : { n, acc: a - n };
 }
 
-/* ---- the ages in motion ---- The pure parts of the tween. map.js draws; these four say what to draw.
+/* Whether the drawing holds at the end of its beat instead of playing. A world the player paused between
+   beats holds, so nothing sits half drawn. A world the player stepped plays its beat and then holds, which
+   is the whole of what Step is for. A dialog holds everything. */
+function beatStill(dialogOpen){ return dialogOpen || (paused && !ui.playing); }
+
+/* ---- the act in motion ---- The pure parts of the tween. map.js draws; these three say what to draw.
    They read no state but TWEEN and the field's width, so tests/ui.js runs them in Node. */
 
-/* What a tween of this many milliseconds is worth drawing. The length is AGE_MS / pace, read at run time,
-   so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
+/* What a beat of this many milliseconds is worth drawing. The length is BEAT_MS / pace, read at run
+   time, so no tier names a pace. The intent cue goes first as the pace rises, then the act's figure and its
    caption, then the walk and the cross-fade. Below the last tier the field snaps, as it did before. */
-function tweenTier(ms){
+function beatTier(ms){
   if (ms >= TWEEN.full) return 'full';
   if (ms >= TWEEN.figure) return 'figure';
   if (ms >= TWEEN.walk) return 'walk';
   return 'none';
-}
-/* The slice of the tween that gesture i of n runs in. The starts are spread over TWEEN.stagger of the
-   tween, in the order ageStep ran the gods, and every slice ends with the tween. So the gestures overlap,
-   the order is the chronicle's order, and the last one still finishes. */
-function gestureSlice(i, n, f){
-  const start = n > 1 ? (i / n) * TWEEN.stagger : 0;
-  return clamp((f - start) / (1 - start), 0, 1);
 }
 /* A point on the walk between two tiles, in tile coordinates. Either end may be null: with no `to` there
    is nowhere to draw, and with no `from` the star is already where it belongs. */
@@ -7195,7 +7259,7 @@ function tlCellText(rec, withWho){
 
 /* A placeholder for an age a row has nothing to show for. It carries the same shape as a filled
    cell, blank so timeline.js can draw it and give it the filled cell's own width. */
-const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true });
+const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
   const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
@@ -7203,7 +7267,23 @@ function timelineModel(){
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
-  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false });
+  /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
+     more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
+     gesture in a row), and the birth is credited to the newborn, who has no choices row of its own yet.
+     Following `liveGestures().now` would then light nothing, or the wrong row, for exactly the beat
+     that gesture draws. The turn itself is what the timeline's rows and the act card both key on, so
+     that is what stays lit until the next god decides.
+     An age-end beat is the exception: `unmake` and `backstop` (gods.js, called from `ageEnd`) run after
+     every god in the age has already had its turn, and neither writes a `choices` row. On that beat the
+     newest gesture this age is `unmade` or `backstop`, and no turn is on stage, so nothing should light:
+     lighting the last turn would name an act that already finished earlier in the same age, while the
+     map is drawing the age-end act instead. */
+  const thisAge = creation.choices.filter(c => c.age === age);
+  const last = thisAge.length ? thisAge[thisAge.length - 1] : null;
+  const nowGesture = liveGestures().now;
+  const atAgeEnd = !!nowGesture && (nowGesture.kind === 'unmade' || nowGesture.kind === 'backstop');
+  const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
+  const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
     return { shown: true, folded: true, from, to, now, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
@@ -7226,7 +7306,7 @@ function timelineModel(){
   const gate = creation.gate;
   const gateCells = [];
   for (let a = from; a <= to; a++){
-    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false });
+    gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
   return { shown: true, folded: false, from, to, now, rows, marks: [] };
@@ -7437,9 +7517,9 @@ const KEYMAP = [
   { key: 'Tab',        focus: 'any',    action: 'focusNext',   label: 'Next panel' },
   { key: 'Tab',        shift: true, focus: 'any', action: 'focusPrev', label: 'Previous panel' },
   { key: ' ',          focus: 'any',    action: 'pause',       label: 'Pause or resume', button: 'pause' },
-  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one age', button: 'stepBtn' },
+  { key: '.',          focus: 'any',    action: 'step',        label: 'Step one tick, or one act', button: 'stepBtn' },
   { key: '>',          shift: true, focus: 'any', action: 'hour', label: 'Step one hour', button: 'hourBtn' },
-  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry the ages to the valley', button: 'hurryBtn' },
+  { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
   { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
@@ -7496,6 +7576,7 @@ const KEYMAP = [
   { key: 'o',          ctrl: true, focus: 'any', action: 'loadWorldFile', label: 'Load world from a file' },
   /* The start dialog's own key. A plain letter goes into the seed box, so Continue takes Alt. */
   { key: 'c',          alt: true, focus: 'dialog:start', action: 'continueWorld', label: 'Continue the last world', button: 'continueBtn' },
+  { key: 'g',          alt: true, focus: 'dialog:start', action: 'takeGod', label: 'Take a god', button: 'takeGod' },
   { key: 'g',          focus: 'any',    action: 'chord',       label: 'Goals by stage', button: 'chordBtn' },
   /* The search box is an input, not a button, so it prints its key in its placeholder. Esc inside it
      clears the query, then leaves it; that branch is in the keydown guard, which an input never passes. */
@@ -7514,8 +7595,9 @@ for (const t of TOOLS){
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
 KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
-/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows. */
-SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Speed ${v}\u00d7`, button: `speed${v}` }));
+/* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
+   The label names both ladders, since the same row serves the ages and the days. */
+SPEEDS.forEach((v, i) => KEYMAP.push({ key: String(i + 1), shift: true, focus: 'any', action: 'speedStep', arg: i, label: `Pace ${PACE_LABEL[PACES[i]]} \u00b7 Speed ${SPEED_LABEL[v]}`, button: `speed${v}` }));
 for (const d of DRAWERS) KEYMAP.push({ key: d.key, focus: 'map', action: 'drawer', arg: d.id, label: `Toggle ${d.label}`, button: `tab-${d.id}` });
 for (let n = 1; n <= 9; n++) KEYMAP.push({ key: String(n), focus: 'drawer', action: 'rowPick', arg: n, label: `Row ${n}` });
 for (let n = 1; n <= 9; n++){
@@ -7627,6 +7709,34 @@ function getAutosave(){
   })).catch(() => null);
 }
 
+/* The face of an act. Every mark is drawn in a 48-unit box, one weight, round caps, in the palette's own
+   ink over a disc of the map's background. They are strokes, never sprites and never emoji: the map draws
+   sprites for people and creatures, and a god's act is not a thing on the ground but something done to it.
+   Pairs read against each other — raise and dig are one chevron flipped, hide and show one circle closed
+   and radiating. The word is not a training wheel: eighteen marks is more than anyone learns at once. */
+const MARKS = {
+  split:    { word: 'parts',   paths: ['M10 38 L38 10', 'M6 16 A18 18 0 0 1 22 6', 'M26 42 A18 18 0 0 0 42 32'] },
+  claim:    { word: 'claims',  paths: ['M24 6 A18 18 0 1 1 23.9 6', 'M24 16 A8 8 0 1 1 23.9 16'] },
+  make:     { word: 'makes',   paths: ['M8 40 L40 40', 'M24 40 L24 18', 'M24 22 L15 13', 'M24 22 L33 13'] },
+  raise:    { word: 'raises',  paths: ['M8 38 L40 38', 'M12 28 L24 12 L36 28'] },
+  dig:      { word: 'digs',    paths: ['M8 12 L40 12', 'M12 22 L24 38 L36 22'] },
+  flow:     { word: 'flows',   paths: ['M6 28 C14 14 20 42 28 28 C32 21 36 18 42 20', 'M36 14 L42 20 L36 26'] },
+  pool:     { word: 'pools',   paths: ['M10 14 L10 26 A14 12 0 0 0 38 26 L38 14', 'M16 30 C20 26 22 34 26 30 C29 27 31 31 34 29'] },
+  burn:     { word: 'burns',   paths: ['M24 6 C33 18 38 24 38 30 A14 14 0 0 1 10 30 C10 22 18 18 24 6 Z', 'M24 25 C28 31 29 32 29 34 A5 5 0 0 1 19 34 C19 31 21 30 24 25 Z'] },
+  freeze:   { word: 'freezes', paths: ['M24 7 L24 41', 'M9 15.5 L39 32.5', 'M39 15.5 L9 32.5', 'M24 14 L19 10', 'M24 14 L29 10', 'M24 34 L19 38', 'M24 34 L29 38'] },
+  hide:     { word: 'hides',   paths: ['M24 12 A15 15 0 1 1 23.9 12', 'M5 31 L43 21'] },
+  show:     { word: 'shows',   paths: ['M24 17 A7 7 0 1 1 23.9 17', 'M24 3 L24 8', 'M24 40 L24 45', 'M3 24 L8 24', 'M40 24 L45 24', 'M9.5 9.5 L13 13', 'M35 35 L38.5 38.5', 'M38.5 9.5 L35 13', 'M13 35 L9.5 38.5'] },
+  battle:   { word: 'wars',    paths: ['M11 11 L37 37', 'M37 11 L11 37', 'M9 9 L15 9', 'M9 9 L9 15', 'M39 39 L33 39', 'M39 39 L39 33'] },
+  twist:    { word: 'twists',  paths: ['M10 38 C10 24 38 25 38 13 C38 5 28 5 26 13 C24 23 34 27 38 31'] },
+  mingle:   { word: 'mingles', paths: ['M18 24 A11 11 0 1 1 17.9 24', 'M30 24 A11 11 0 1 1 29.9 24'] },
+  sleep:    { word: 'sleeps',  paths: ['M8 26 A16 16 0 0 1 40 26', 'M14 33 L18 29', 'M24 36 L24 30', 'M34 33 L30 29'] },
+  born:     { word: 'wakes',   paths: ['M24 14 A10 10 0 1 1 23.9 14', 'M24 1 L24 7', 'M24 41 L24 47', 'M1 24 L7 24', 'M41 24 L47 24', 'M7.5 7.5 L12 12', 'M36 36 L40.5 40.5', 'M40.5 7.5 L36 12', 'M12 36 L7.5 40.5'] },
+  unmade:   { word: 'unmade',  paths: ['M24 6 A18 18 0 1 0 39 33', 'M31 40 L44 27', 'M31 27 L44 40'] },
+  backstop: { word: 'the world holds', paths: ['M16 8 L8 8 L8 40 L16 40', 'M32 8 L40 8 L40 40 L32 40', 'M24 18 L24 30'] },
+};
+/* A wash is the act it carries: a freeze, a hiding, or a showing. */
+function markFor(kind, value){ return MARKS[kind === 'wash' ? value : kind] || null; }
+
 /* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
 
 function readPalette(){
@@ -7634,7 +7744,9 @@ function readPalette(){
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
   fieldKey = '';
-  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
+  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim();
+  P.bg = cs.getPropertyValue('--bg').trim(); P['map-halo'] = cs.getPropertyValue('--map-halo').trim();
+  worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
 /* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
@@ -7762,6 +7874,33 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
+   appears under it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. */
+function drawMark(rec, f, alpha){
+  const m = markFor(rec.kind, rec.value); if (!m) return;
+  const q = tileSpot(rec.to); if (!q) return;
+  const d = clamp((f - TWEEN.cue) / (TWEEN.draw - TWEEN.cue), 0, 1);
+  if (d <= 0) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
+  wctx.globalAlpha = alpha;
+  wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
+  wctx.strokeStyle = P['field-line']; wctx.lineWidth = 4.3; wctx.lineCap = 'round'; wctx.lineJoin = 'round';
+  const n = Math.ceil(d * m.paths.length);
+  for (let i = 0; i < n; i++) wctx.stroke(new Path2D(m.paths[i]));
+  wctx.restore();
+  if (f < TWEEN.word) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
+  wctx.textAlign = 'center';
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.restore();
+}
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
    stay whole, and it is trimmed only when even two rows will not hold it. */
 function drawCaption(text, p){
@@ -7785,32 +7924,40 @@ function drawCaption(text, p){
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
 function drawField(){
-  const span = AGE_MS / pace, tier = tweenTier(span);
-  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
+     running. A running beat reads the ladder. */
+  const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
   if (key !== fieldKey){
     /* The field last drawn becomes the field the new one fades in over. A new world, a thrown-back valley,
-       and a frame that ran two or more ages have nothing to fade from, so they snap. */
-    fieldJump = !fieldKey || creation.discards !== fieldDiscards || age !== fieldAge + 1;
+       and a frame that ran two or more beats have nothing to fade from, so they snap. The beat count is
+       the frame loop's, not a guess from the gesture count: one decision can write two gestures, and
+       that is still one beat with one act to draw. */
+    fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
   }
-  /* A paused world and a world behind a dialog hold still, so the tween holds at its end and nothing sits
-     half drawn. The two fastest tiers, and a jump, are the same case. */
-  const still = paused || anyDialogOpen();
+  const still = beatStill(anyDialogOpen());
   const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
+  /* One beat is one act, so one gesture draws. The act before it fades over this beat, so a player who
+     looked away for one act can still see what they missed. */
   const recs = creation.gestureAge === age ? creation.gestures : [];
-  const slices = recs.map((rec, i) => gestureSlice(i, recs.length, f));
-  const figures = f < 1 && (tier === 'full' || tier === 'figure');
+  const now = recs.length ? recs[recs.length - 1] : null;
+  const before = recs.length > 1 ? recs[recs.length - 2] : null;
+  /* A world holding still after its beat still shows the act it just played. `f` is 1 there, so the
+     cross-fade and the walk are over, but the mark, the word and the caption are what the player stopped
+     to read: Step is the reading mode, and erasing the act at the end of its own beat left the face on
+     screen for the last 150 ms of it and nothing afterwards. */
+  const figures = (f < 1 || still) && (tier === 'full' || tier === 'figure');
 
   /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
   const skip = new Set();
-  if (figures) recs.forEach((rec, i) => {
-    if (rec.kind !== 'split' || slices[i] >= 1) return;
-    const b = boundaries.find(q => q.a === rec.near && q.b === rec.far); if (b) skip.add(b.id);
-  });
+  if (figures && now && now.kind === 'split' && f < 1){
+    const b = boundaries.find(q => q.a === now.near && q.b === now.far); if (b) skip.add(b.id);
+  }
   const skipKey = [...skip].sort().join(',');
   if (skipKey !== fieldSkip){ drawFieldCache(skip); fieldSkip = skipKey; }
 
@@ -7820,39 +7967,44 @@ function drawField(){
 
   /* The intent cue: what the god weighed before it acted, at the slow tier and in the first part of the
      gesture's own slice. It replays a decision already taken; it does not ask the rules to look ahead. */
-  if (tier === 'full' && f < 1) recs.forEach((rec, i) => {
-    const s = slices[i]; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
-    const fade = (1 - s / TWEEN.cue) * 0.7;
-    for (const o of rec.weighed.opts){
+  if (tier === 'full' && f < 1 && now && now.weighed && f > 0 && f < TWEEN.cue){
+    const fade = (1 - f / TWEEN.cue) * 0.7;
+    for (const o of now.weighed.opts){
       const r = regionById(o.region); if (!r) continue;
-      wctx.globalAlpha = o.type === rec.weighed.picked ? fade : fade * 0.45;
+      wctx.globalAlpha = o.type === now.weighed.picked ? fade : fade * 0.45;
       wctx.strokeStyle = P.select; wctx.lineWidth = 2;
       wctx.strokeRect(r.bbox.x0 * WS + 1, r.bbox.y0 * WS + 1, (r.bbox.x1 - r.bbox.x0 + 1) * WS - 2, (r.bbox.y1 - r.bbox.y0 + 1) * WS - 2);
     }
     wctx.globalAlpha = 1;
-    const g = beingById(rec.god), p = tileSpot(rec.from === null ? rec.to : rec.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(rec.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
-  });
+    const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+  }
 
-  /* The act's own figure, one per gesture, each in its own slice. */
-  if (figures) recs.forEach((rec, i) => { if (slices[i] > 0) drawGesture(rec, slices[i]); });
+  /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
+     this beat, at the same fraction, so a look-away never simply erases what happened. */
+  if (figures){
+    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; drawMark(before, 1, 1 - f); }
+    if (now && f > 0){ drawGesture(now, f); drawMark(now, f, 1); }
+  }
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
   const moving = new Map();
-  if (f < 1 && tier !== 'none') recs.forEach((rec, i) => {
-    const s = slices[i]; if (s <= 0) return;
-    const p = walkPoint(rec, s);
-    const beaten = rec.kind === 'battle' && rec.loser === rec.god;
-    if (p) moving.set(rec.god, { p, end: rec.to,
-      alpha: rec.kind === 'born' ? s : rec.kind === 'unmade' ? 1 - s : rec.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
-    /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
-       never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
-    if ((rec.kind === 'battle' || rec.kind === 'mingle') && rec.otherFrom !== null && rec.otherFrom !== undefined){
-      const back = s < 0.5 ? pointAt(rec.otherFrom, rec.to, s * 2) : pointAt(rec.to, rec.otherFrom, s * 2 - 1);
-      const lost = rec.kind === 'battle' && rec.loser === rec.other;
-      if (back) moving.set(rec.other, { p: back, end: rec.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+  if (f < 1 && tier !== 'none' && now){
+    const s = f;
+    if (s > 0){
+      const p = walkPoint(now, s);
+      const beaten = now.kind === 'battle' && now.loser === now.god;
+      if (p) moving.set(now.god, { p, end: now.to,
+        alpha: now.kind === 'born' ? s : now.kind === 'unmade' ? 1 - s : now.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
+      /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
+         never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
+      if ((now.kind === 'battle' || now.kind === 'mingle') && now.otherFrom !== null && now.otherFrom !== undefined){
+        const back = s < 0.5 ? pointAt(now.otherFrom, now.to, s * 2) : pointAt(now.to, now.otherFrom, s * 2 - 1);
+        const lost = now.kind === 'battle' && now.loser === now.other;
+        if (back) moving.set(now.other, { p: back, end: now.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+      }
     }
-  });
+  }
   const spots = [];
   for (const g of gods()){
     const m = moving.get(g.id);
@@ -7875,11 +8027,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
-  if (figures){
-    const said = recs.filter((rec, i) => rec.said !== null && rec.said !== undefined && legends[rec.said] && slices[i] > 0);
-    const pick = said.slice().reverse().find(rec => legends[rec.said].kind === 'major') || said[said.length - 1];
-    if (pick) drawCaption(legends[pick.said].text, tileSpot(pick.to));
+  /* One caption at a time: the line the act on stage wrote. */
+  if (figures && now && f > 0){
+    const text = captionFor(now);
+    if (text) drawCaption(text, tileSpot(now.to));
   }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
@@ -8046,11 +8197,13 @@ function tlCell(c){
     s.className = 'cell' + (c.blank ? ' blank' : '');
     s.textContent = c.text;
     if (c.text) s.title = c.text;
+    s.classList.toggle('playing', !!c.playing);
     return s;
   }
   const b = document.createElement('button');
   b.className = 'cell' + (c.major ? ' major' : '') + (ui.timelineChip === c.chip ? ' open' : '');
   b.dataset.chip = c.chip; b.textContent = c.text; b.title = c.text;
+  b.classList.toggle('playing', !!c.playing);
   return b;
 }
 function drawTimeline(){
@@ -8206,8 +8359,11 @@ function renderTip(){
   const tip = $('tip');
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
-  /* The tile, not the region id: a split makes that id a parent, and the card would go stale. */
-  const body = tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
+  /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
+     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     hover on the mark reads the act and not the ground it changed. */
+  const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
+    : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
     : tipTarget.being ? inspectBeing(beingById(tipTarget.being))
     /* sectorSummary is one plain sentence, not markup of its own, so it is escaped whole here,
        at the one place it becomes the tip's innerHTML. Nothing inside it escapes itself first. */
@@ -8452,13 +8608,28 @@ function chipFootLine(chip){
   const rows = chip.rows.map(r => `<span class="chiprow${r.failed ? ' failed' : r.taken ? ' taken' : ''}">${esc(r.type)} ${r.score}${r.failed ? ' — the ground refused it' : r.taken ? ' — taken' : ''}</span>`).join('<span class="muted">·</span>');
   return `<span class="chiphead">${esc(chip.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
 }
+/* An act's card, in the same table an inspected region already shows: a muted head, then its rows as
+   label and value. Every string came from the simulation, so it passes through esc. Used for the hover
+   on a mark and, through actFootLine, for the timeline cell that opens the same act. */
+function actCardHTML(card){
+  const rows = card.rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.value)}</td></tr>`).join('');
+  return `<div class="muted" style="margin:1px 0 5px">${esc(card.head)}</div><table class="kv">${rows}</table>`;
+}
+/* The act's card, as one line for the foot: the head, then its rows as label and value. */
+function actFootLine(card){
+  const rows = card.rows.map(r => `<span class="chiprow">${esc(r.label)}: ${esc(r.value)}</span>`).join('<span class="muted">·</span>');
+  return `<span class="chiphead">${esc(card.head)}</span>${rows ? '<span class="chiprows">' + rows + '</span>' : ''}`;
+}
 function renderFoot(){
   const phrase = `<span class="muted">${esc(cursorPhrase())}</span>`;
   if (ui.note && uiNow() - ui.note.at < NOTE_MS){ $('foot').innerHTML = `${phrase}<span class="muted">·</span><span>${esc(ui.note.text)}</span>`; return; }
   ui.note = null;
-  const chip = footChip();
+  /* The chip's own age still plays: the same act has a gesture, and its card is the one the mark on the
+     field shows. An older chip keeps no gesture (see actCardForChip), so the chip's own matrix stands. */
+  const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
+  const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
@@ -8487,6 +8658,15 @@ function muteChoice(k){
   if (!muteFor) return;
   if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
+}
+/* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it
+   is open, as they hold behind any dialog. */
+function openHurry(){
+  closeDialogs();
+  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  ui.focus = 'dialog:hurry';
+  $('hurry').showModal();
+  $('hurryGo').focus();
 }
 function openHelp(){
   closeDialogs();
@@ -8540,9 +8720,18 @@ function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
-function setSpeed(s){ speed = s; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ pace = p; document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === p)); }
-function setPaused(p){ paused = p; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
+/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+   loop, since they change only when the era or the ladder changes, not every frame. */
+function relabelSpeeds(labels, key){
+  document.querySelectorAll('#speeds .btn').forEach(b => {
+    const label = labels[Number(b.dataset[key])];
+    if (label !== undefined) b.firstChild.textContent = label;
+  });
+}
+function setSpeed(s){ speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
+function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
@@ -8577,6 +8766,9 @@ function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Mat
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
+/* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
+   to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
+const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
 /* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
@@ -8779,14 +8971,17 @@ function setPriority(d){ const id = focusedDrawer(); if (id !== 'goals') return;
 function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = focusRing(); const i = Math.max(0, ring.indexOf(ui.focus)), j = (i + d + ring.length) % ring.length; ui.focus = ring[j]; renderUI(true); }
 const ACTIONS = {
   pause(){ setPaused(!paused); },
-  step(){ setPaused(true); step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one age.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
-  slower(){ ACTIONS.speedStep(Math.max(0, SPEEDS.indexOf(inAges() ? pace : speed) - 1)); },
-  faster(){ ACTIONS.speedStep(Math.min(SPEEDS.length - 1, SPEEDS.indexOf(inAges() ? pace : speed) + 1)); },
+  /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
+  faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
-  speedStep(i){ ACTIONS.speed(SPEEDS[clamp(i, 0, SPEEDS.length - 1)]); },
+  speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
-  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } runAges(); renderUI(true); },
+  hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
+  hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
@@ -8832,6 +9027,36 @@ const ACTIONS = {
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
   newWorld(){ openStart(); },
+  /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
+     slice about what the player experiences must be reachable by a player. The turn card waits.
+     The seed is the caller's: the start dialog's close handler reads the box once and hands it in here,
+     so a typed seed is kept, the same way makeWorld leaves newWorld's seed to that one reader. Alt+G
+     is the same button pressed by keyboard: with no seed given yet, it only closes the dialog as 'take',
+     which reaches this again through that same close handler, seed in hand. */
+  takeGod(seed){
+    if (seed === undefined){ $('start').close('take'); return; }
+    newWorld(seed);
+    /* The first god is born at the first age, which a step opens, not startCreation. Take one here so
+       there is a god to take; ageBegin only, never ageDecide, so the turn card still waits and no act
+       runs on its own. The god picture is drawn on the gods' own stream, as every age's is: calling
+       ageBegin here consumes exactly what the first step would have consumed, and agePos is set, so
+       that step goes on to ageDecide and never begins the age twice.
+       Known gap, for whoever builds god-era replay: this one call does not pass the door and is not in
+       the door log. A log replayed onto a fresh startCreation has no record that an age was begun
+       before the become act, and the damage is not one failed lookup. nextId (core.js) is a single
+       counter for beings, camps, regions, boundaries, items and caves alike, so a replay that skips
+       this call hands every later thing an id one below the id the log recorded: the become finds no
+       god, and every id-bearing act after it resolves against the wrong thing. God-era replay is not
+       built today (replayGod selects by tick and runDays starts after settle), so nothing depends on
+       it yet. The fix is a door act that begins the ages, so god-making and the take happen inside one
+       logged act; door.js is not this branch's to change. */
+    withGodRng(() => ageBegin());
+    const g = gods()[0];
+    const answer = inject({ source: 'player', act: 'become', id: g ? g.id : null, mode: 'become' });
+    say(answer);
+    setPaused(true);
+    renderUI(true);
+  },
   saveWorld(){ saveWorld(); },
   loadWorldFile(){ loadWorldFile(); },
   continueWorld(){ continueWorld(); },
@@ -8885,9 +9110,15 @@ function frame(now){
   if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
-      if (inAges()){ if (!anyDialogOpen()){ const d = agesDue(acc, dt, pace); acc = d.acc; for (let k = 0; k < d.n && inAges(); k++) step(); } }
+      if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
       else { acc += dt * TICKS_A_SECOND * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
     } catch (e){ onFault(e); }
+  }
+  /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
+     full tier whatever the pace says: Step is the reading mode, and the pace buttons govern running. */
+  if (ui.playing && !anyDialogOpen()){
+    acc = clamp(acc + dt / BEAT_MS, 0, 1);
+    if (acc >= 1) ui.playing = false;
   }
   /* Drawing and the rest can also throw. The next frame must still be queued, so it sits in a finally. */
   try {
@@ -8916,7 +9147,7 @@ function initUI(){
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
-  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(b.dataset.speed)); });
+  $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(inAges() ? b.dataset.pace : b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
   $('stepBtn').addEventListener('click', ACTIONS.step);
   $('hourBtn').addEventListener('click', ACTIONS.hour);
@@ -8927,14 +9158,21 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world button carries value="make". Esc closes the dialog with an empty returnValue and keeps the world. */
+  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
+     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
+     typed seed survives Take a god the same way it already does Make world. */
   $('start').addEventListener('close', () => {
-    ui.focus = 'map'; const make = $('start').returnValue === 'make'; $('start').returnValue = '';
-    if (make) newWorld($('seed').value.trim() || randomSeed());
+    ui.focus = 'map'; const rv = $('start').returnValue; $('start').returnValue = '';
+    if (rv === 'make' || rv === 'take'){
+      const seed = $('seed').value.trim() || randomSeed();
+      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+    }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
+  $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
   /* The chronicle's search box is built with its drawer section, which comes and goes, so the page listens for it. */
   document.addEventListener('input', e => { if (e.target && e.target.id === 'chronSearch') ACTIONS.setChronSearch(e.target.value); });
@@ -8961,7 +9199,18 @@ function initUI(){
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });
   cv.addEventListener('pointermove', e => { hover = cellFrom(e); cursor = { x: hover.x, y: hover.y, z: hover.z }; if (e.pointerType === 'mouse') tipForCell(hover, e); });
   cv.addEventListener('pointerleave', e => { hover = null; if (e.pointerType === 'mouse') hideTip(); });
-  wcv.addEventListener('pointermove', e => { if (inAges()){ const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 }; tipTarget = { field: [c.x, c.y] }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return; } whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); });
+  wcv.addEventListener('pointermove', e => {
+    if (inAges()){
+      const c = tileFromWorld(e); cursor = { x: c.x, y: c.y, z: 0 };
+      /* Within the mark's own halo (see drawMark's 34-unit ring) a hover reads the act; past it, the
+         country under the pointer stands as it always has. */
+      const p = worldPixelFrom(e), { now, before } = liveGestures();
+      const onMark = [now, before].find(rec => rec && rec.to !== null && rec.to !== undefined && Math.hypot(p.x - tileSpot(rec.to).x, p.y - tileSpot(rec.to).y) <= 34);
+      tipTarget = onMark ? { act: onMark } : { field: [c.x, c.y] };
+      tipAnchor = { x: e.clientX, y: e.clientY }; renderTip(); return;
+    }
+    whover = sectorFrom(e); const s = whover; cursor = { x: s.sx * LW + (LW >> 1), y: s.sy * LH + (LH >> 1), z: 0 }; tipTarget = { sector: s }; tipAnchor = { x: e.clientX, y: e.clientY }; renderTip();
+  });
   wcv.addEventListener('pointerleave', () => { whover = null; hideTip(); });
   wcv.addEventListener('pointerdown', e => {
     if (inAges()){ const c = tileFromWorld(e); openGodAt(c.x, c.y); return; }

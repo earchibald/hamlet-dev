@@ -18,23 +18,30 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
-/* The ages. pace is the speed of the gods era: 1, 4, 16, or 64 ages in AGE_MS. It is not saved; a new world starts at 1.
-   lastEra is the era the last frame saw, so the frame can see the flip at settle. */
-/* How many world ticks the page draws in one real second at speed 1. A tick is one world second,
-   so this is how much faster than life the valley runs when it is watched at the slowest speed.
+/* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
+   so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the
-   interface's: it never passes the door, and the same seed reaches the same world at any speed. */
+   interface's: it never passes the door, and the same seed reaches the same world at any pace. */
 const TICKS_A_SECOND = 60;
-const AGE_MS = 2000;
-/* The tween between two ages. It runs for AGE_MS / pace, read at run time, so no number here names a pace.
-   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue and
-   stagger are fractions of the tween itself. These are view durations, and they stay out of src/sim/. */
-const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, stagger: 1 / 3 };
+/* The ages. pace is the speed of the gods era: a quarter, a half, single, or double. It is not saved; a
+   new world starts at single. lastEra is the era the last frame saw, so the frame can see the flip at
+   settle. */
+const BEAT_MS = 1000;
+const PACES = [0.25, 0.5, 1, 2];
+/* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
+   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue,
+   draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
+   durations, and they stay out of src/sim/. */
+const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, draw: 0.6, word: 0.85 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
-let ocv2, octx2, fieldAge = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
+   single act to fade from. Counting gestures cannot stand in for this: one decision can write two
+   gestures — a split that also gives birth — and that is one beat, with an act to draw. */
+let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
@@ -66,10 +73,15 @@ const ui = {
   autosaveDay: 0,      /* the day the autosave slot last held. A new world starts at zero, so its first day writes. */
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
+  playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
 const SPEEDS = [1, 4, 16, 64];
+/* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
+   page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
+const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };

@@ -5,7 +5,9 @@ function readPalette(){
   for (const k of ['sprite','gnome','deer','wolf','rain','snow','grass','grass-fg','soil','sand','ash','ash-fg','water','water-fg','tree','bush','berry','reeds','boulder','boulder-fg','stick','rock','carcass','fire-bg','fire','fire2','pit','snare','stash','night','halo','select','rabbit','fox','god','corpse','grid','hill','hill-fg','stone','stone-fg']) P[k] = cs.getPropertyValue('--map-' + k).trim();
   for (const k of ['none','wet','dry','hot','cold','above','below','light','dark','still','moving','scar','line']) P['field-' + k] = cs.getPropertyValue('--field-' + k).trim();
   fieldKey = '';
-  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim(); worldDirty = 0;
+  P.agentL = cs.getPropertyValue('--agent-light').trim(); P.void = cs.getPropertyValue('--panel').trim();
+  P.bg = cs.getPropertyValue('--bg').trim(); P['map-halo'] = cs.getPropertyValue('--map-halo').trim();
+  worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
 /* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
@@ -133,6 +135,33 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
+   appears under it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. */
+function drawMark(rec, f, alpha){
+  const m = markFor(rec.kind, rec.value); if (!m) return;
+  const q = tileSpot(rec.to); if (!q) return;
+  const d = clamp((f - TWEEN.cue) / (TWEEN.draw - TWEEN.cue), 0, 1);
+  if (d <= 0) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
+  wctx.globalAlpha = alpha;
+  wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
+  wctx.strokeStyle = P['field-line']; wctx.lineWidth = 4.3; wctx.lineCap = 'round'; wctx.lineJoin = 'round';
+  const n = Math.ceil(d * m.paths.length);
+  for (let i = 0; i < n; i++) wctx.stroke(new Path2D(m.paths[i]));
+  wctx.restore();
+  if (f < TWEEN.word) return;
+  wctx.save();
+  wctx.globalAlpha = alpha;
+  wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
+  wctx.textAlign = 'center';
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  wctx.restore();
+}
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
    stay whole, and it is trimmed only when even two rows will not hold it. */
 function drawCaption(text, p){
@@ -156,32 +185,40 @@ function drawCaption(text, p){
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
 function drawField(){
-  const span = AGE_MS / pace, tier = tweenTier(span);
-  const key = [seedText, age, creation.discards, liveRegions().length].join(':');
+  /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
+     running. A running beat reads the ladder. */
+  const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
   if (key !== fieldKey){
     /* The field last drawn becomes the field the new one fades in over. A new world, a thrown-back valley,
-       and a frame that ran two or more ages have nothing to fade from, so they snap. */
-    fieldJump = !fieldKey || creation.discards !== fieldDiscards || age !== fieldAge + 1;
+       and a frame that ran two or more beats have nothing to fade from, so they snap. The beat count is
+       the frame loop's, not a guess from the gesture count: one decision can write two gestures, and
+       that is still one beat with one act to draw. */
+    fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
   }
-  /* A paused world and a world behind a dialog hold still, so the tween holds at its end and nothing sits
-     half drawn. The two fastest tiers, and a jump, are the same case. */
-  const still = paused || anyDialogOpen();
+  const still = beatStill(anyDialogOpen());
   const f = tier === 'none' || fieldJump || still ? 1 : clamp(acc, 0, 1);
+  /* One beat is one act, so one gesture draws. The act before it fades over this beat, so a player who
+     looked away for one act can still see what they missed. */
   const recs = creation.gestureAge === age ? creation.gestures : [];
-  const slices = recs.map((rec, i) => gestureSlice(i, recs.length, f));
-  const figures = f < 1 && (tier === 'full' || tier === 'figure');
+  const now = recs.length ? recs[recs.length - 1] : null;
+  const before = recs.length > 1 ? recs[recs.length - 2] : null;
+  /* A world holding still after its beat still shows the act it just played. `f` is 1 there, so the
+     cross-fade and the walk are over, but the mark, the word and the caption are what the player stopped
+     to read: Step is the reading mode, and erasing the act at the end of its own beat left the face on
+     screen for the last 150 ms of it and nothing afterwards. */
+  const figures = (f < 1 || still) && (tier === 'full' || tier === 'figure');
 
   /* A cut is stroked by its own gesture, so the cache holds it out until the stroke is done. */
   const skip = new Set();
-  if (figures) recs.forEach((rec, i) => {
-    if (rec.kind !== 'split' || slices[i] >= 1) return;
-    const b = boundaries.find(q => q.a === rec.near && q.b === rec.far); if (b) skip.add(b.id);
-  });
+  if (figures && now && now.kind === 'split' && f < 1){
+    const b = boundaries.find(q => q.a === now.near && q.b === now.far); if (b) skip.add(b.id);
+  }
   const skipKey = [...skip].sort().join(',');
   if (skipKey !== fieldSkip){ drawFieldCache(skip); fieldSkip = skipKey; }
 
@@ -191,39 +228,44 @@ function drawField(){
 
   /* The intent cue: what the god weighed before it acted, at the slow tier and in the first part of the
      gesture's own slice. It replays a decision already taken; it does not ask the rules to look ahead. */
-  if (tier === 'full' && f < 1) recs.forEach((rec, i) => {
-    const s = slices[i]; if (!rec.weighed || s <= 0 || s >= TWEEN.cue) return;
-    const fade = (1 - s / TWEEN.cue) * 0.7;
-    for (const o of rec.weighed.opts){
+  if (tier === 'full' && f < 1 && now && now.weighed && f > 0 && f < TWEEN.cue){
+    const fade = (1 - f / TWEEN.cue) * 0.7;
+    for (const o of now.weighed.opts){
       const r = regionById(o.region); if (!r) continue;
-      wctx.globalAlpha = o.type === rec.weighed.picked ? fade : fade * 0.45;
+      wctx.globalAlpha = o.type === now.weighed.picked ? fade : fade * 0.45;
       wctx.strokeStyle = P.select; wctx.lineWidth = 2;
       wctx.strokeRect(r.bbox.x0 * WS + 1, r.bbox.y0 * WS + 1, (r.bbox.x1 - r.bbox.x0 + 1) * WS - 2, (r.bbox.y1 - r.bbox.y0 + 1) * WS - 2);
     }
     wctx.globalAlpha = 1;
-    const g = beingById(rec.god), p = tileSpot(rec.from === null ? rec.to : rec.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(rec.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
-  });
+    const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+  }
 
-  /* The act's own figure, one per gesture, each in its own slice. */
-  if (figures) recs.forEach((rec, i) => { if (slices[i] > 0) drawGesture(rec, slices[i]); });
+  /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
+     this beat, at the same fraction, so a look-away never simply erases what happened. */
+  if (figures){
+    if (before && f < 1){ wctx.globalAlpha = 1 - f; drawGesture(before, 1); wctx.globalAlpha = 1; drawMark(before, 1, 1 - f); }
+    if (now && f > 0){ drawGesture(now, f); drawMark(now, f, 1); }
+  }
 
   /* Where every star stands. A god stands on its own anchor tile now, and a god with a gesture walks. */
   const moving = new Map();
-  if (f < 1 && tier !== 'none') recs.forEach((rec, i) => {
-    const s = slices[i]; if (s <= 0) return;
-    const p = walkPoint(rec, s);
-    const beaten = rec.kind === 'battle' && rec.loser === rec.god;
-    if (p) moving.set(rec.god, { p, end: rec.to,
-      alpha: rec.kind === 'born' ? s : rec.kind === 'unmade' ? 1 - s : rec.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
-    /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
-       never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
-    if ((rec.kind === 'battle' || rec.kind === 'mingle') && rec.otherFrom !== null && rec.otherFrom !== undefined){
-      const back = s < 0.5 ? pointAt(rec.otherFrom, rec.to, s * 2) : pointAt(rec.to, rec.otherFrom, s * 2 - 1);
-      const lost = rec.kind === 'battle' && rec.loser === rec.other;
-      if (back) moving.set(rec.other, { p: back, end: rec.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+  if (f < 1 && tier !== 'none' && now){
+    const s = f;
+    if (s > 0){
+      const p = walkPoint(now, s);
+      const beaten = now.kind === 'battle' && now.loser === now.god;
+      if (p) moving.set(now.god, { p, end: now.to,
+        alpha: now.kind === 'born' ? s : now.kind === 'unmade' ? 1 - s : now.kind === 'sleep' || beaten ? 1 - 0.45 * s : 1 });
+      /* The rival of a battle or a mingle meets at the anchor and goes back to its own country. Its anchor
+         never moved, so the star ends where the rules say it is. A beaten rival goes back faded. */
+      if ((now.kind === 'battle' || now.kind === 'mingle') && now.otherFrom !== null && now.otherFrom !== undefined){
+        const back = s < 0.5 ? pointAt(now.otherFrom, now.to, s * 2) : pointAt(now.to, now.otherFrom, s * 2 - 1);
+        const lost = now.kind === 'battle' && now.loser === now.other;
+        if (back) moving.set(now.other, { p: back, end: now.otherFrom, alpha: s < 0.5 || !lost ? 1 : 1 - 0.45 * (s * 2 - 1) });
+      }
     }
-  });
+  }
   const spots = [];
   for (const g of gods()){
     const m = moving.get(g.id);
@@ -246,11 +288,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the newest line of this age that is major, else the newest line there is. */
-  if (figures){
-    const said = recs.filter((rec, i) => rec.said !== null && rec.said !== undefined && legends[rec.said] && slices[i] > 0);
-    const pick = said.slice().reverse().find(rec => legends[rec.said].kind === 'major') || said[said.length - 1];
-    if (pick) drawCaption(legends[pick.said].text, tileSpot(pick.to));
+  /* One caption at a time: the line the act on stage wrote. */
+  if (figures && now && f > 0){
+    const text = captionFor(now);
+    if (text) drawCaption(text, tileSpot(now.to));
   }
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
