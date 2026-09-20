@@ -6,8 +6,9 @@ const path = require('path');
 const { load, FILES } = require('../src/sim/index.js');
 const { DAY, runDays, collect, runOn, fingerprint } = require('./lib/run.js');
 
-/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 because a world day
-   cost about fifteen seconds and the file asks for 40 world days, and the oracle spans below on top of them. Every day count is
+/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 on a cost of about
+   fifteen seconds a world day. THAT NUMBER WAS WRONG BY ABOUT FIVE TIMES: measured on this branch a
+   world day is 1.1 to 5.3 s across the six soak seeds, a mean of 2.9, at load 3.05. The file asks for 40 world days, and the oracle spans below on top of them. Every day count is
    exactly as task 1 left it: none was cut to fit the engine. The runs that still cost more
    than the plan's hundred and twenty seconds sit behind LONG=1 one by one, and each states
    its day count, its measured seconds and the flag in its own skip message. A file behind a
@@ -18,16 +19,20 @@ const { DAY, runDays, collect, runOn, fingerprint } = require('./lib/run.js');
    LONG=1 permanently, with a public skip that states its day count, its seconds and the flag. NO DAY
    COUNT WAS LOWERED. A file with a smaller day count is not the same test, and a run shortened to fit
    a budget is a deleted claim with a green tick on it.
-   The seconds are `days` times the 3.0 s a world day measured on this branch at low population. A run
-   that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
-   a floor and it is labelled as one. The measurements and the machine's load averages are in
+   THE SECONDS ARE MEASURED ON THIS BRANCH, and the fifteen seconds a world day that task 1's
+   suspension texts quoted is wrong by about five times. Measured on `tiers-g4` by `tests/skip.js`,
+   which runs three world days twice on each of the six soak seeds: 1.1 s a world day on `delta`,
+   2.3 on `x`, 2.4 on `alpha`, 2.9 on `beta`, 3.2 on `r` and 5.3 on `gamma`, a mean of 2.9, at a
+   one-minute load average of 3.05. A peer session reached 2.3 to 2.9 independently on another branch.
+   So `days * 2.9` is the figure below. It is a FLOOR: the rate rises with the population, and task 3
+   measured 18 s a world day at day 50 with 82 people. The load averages are in
    design/reports/2026-09-20-g4-task-4-the-skip.md. */
 /* SLOW=1 runs these too, because that is the flag task 1 wrote into every suspension message and
    into the commands people have in their notes. A documented command that silently runs nothing is
    worse than no command. */
 const LONG = !!(process.env.LONG || process.env.SLOW);
 const slow = days => LONG ? false
-  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
+  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 2.9)} s at the 2.9 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
 
 
 test('a stream gives the numbers it gave before', () => {
@@ -200,7 +205,18 @@ const d = n => Math.round(n * DAY);
 function oracle(seed, N, M, opts = {}, before = null){
   const a = load(); const ca = collect(a); a.startWorld(seed, opts);
   runOn(a, 0, N, ca);
-  const at = before ? before(a, ca, N) : N;
+  let at = before ? before(a, ca, N) : N;
+  /* ON TO A BUSY TICK, and `sameStory` is the one that asks for it: "nobody was walking and nobody was
+     at work at the save; pick another step". A save taken while the valley stands still exercises none
+     of the state a walk or a job holds, so the check is a precondition and not a claim.
+     It is here rather than at each case because the spans in this file were old-tick counts and their
+     real spans land wherever they land. Half a world day at most, a beat at a time, and the assertion
+     below still fails if the valley never gets busy: the device satisfies the precondition or it does
+     not, and it never lowers it. */
+  const busy = () => a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length) &&
+                     a.beings.some(b => b.alive && b.task && b.task.progress > 0);
+  const beat = a.CLOCK.every.cellular;
+  for (const end = at + d(0.5); at < end && !busy(); at += beat) runOn(a, at, beat, ca);
   const midTask = a.beings.filter(b => b.alive && b.task && b.task.path && b.task.path.length).length;
   const working = a.beings.filter(b => b.alive && b.task && b.task.progress > 0).length;
   const denless = a.beings.filter(b => b.alive && b.oldDen && !b.den).length;
@@ -301,19 +317,7 @@ function burnAHollow(a, ca, N){
   const beat = a.CLOCK.every.cellular;
   for (const end = at + d(0.8); at < end && !orphaned(); at += beat) runOn(a, at, beat, ca);
   assert.ok(orphaned(), 'the hollow never burned out under a living sprite, so the stray path went untested');
-  /* And on to a tick with the camp busy. `sameStory` asks that somebody be walking and somebody at
-     work at the save, in its own words "pick another step", because a save taken while the valley
-     stands still tests none of the state a walk or a job holds. The tick the hollow happens to burn
-     out on is not that tick. This runs on to the next one that is, a beat at a time, and fails rather
-     than shrugs if it never comes. */
-  for (const end = at + d(0.5); at < end; at += beat){
-    if (a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length) &&
-        a.beings.some(b => b.alive && b.task && b.task.progress > 0)) break;
-    runOn(a, at, beat, ca);
-  }
-  assert.ok(a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length),
-    'half a world day after the hollow burned out, nobody was walking');
-  return at;
+  return at;   /* `oracle` runs on to a busy tick from here. */
 }
 test('a world whose hollow pine burned out under its sprites saves, loads, and runs on', t => {
   const o = oracle('r', d(4), d(1.5), SMALL, burnAHollow);
@@ -360,16 +364,7 @@ function burnAndEmptyAGrove(a, ca, N){
   assert.ok(!a.beings.some(b => b.grove === stray), 'the dead sprites were meant to be pruned out of beings');
   assert.ok(!a.groves.includes(stray), 'the grove was meant to be in no list');
   assert.ok(a.nameOf(stray), 'the grove was meant to carry a name');
-  /* And on to a busy tick, for `burnAHollow`'s reason: `sameStory` wants somebody walking and somebody
-     at work at the save, and the tick the prune happens to fall on is not that tick. */
-  for (const end = at + d(0.5); at < end; at += beat){
-    if (a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length) &&
-        a.beings.some(b => b.alive && b.task && b.task.progress > 0)) break;
-    runOn(a, at, beat, ca);
-  }
-  assert.ok(a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length),
-    'half a world day after the grove emptied, nobody was walking');
-  return at;
+  return at;   /* `oracle` runs on to a busy tick from here. */
 }
 test('a named grove that no list and no being holds any more saves, loads, and keeps its text taken', t => {
   const o = oracle('r', d(4), d(1.2), SMALL, burnAndEmptyAGrove);

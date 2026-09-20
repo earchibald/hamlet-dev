@@ -4,15 +4,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runDays, DAY } = require('./lib/run');
 
-/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 because a world day
-   cost about fifteen seconds and the file asks for 493 world days across fifteen runs. Every day count is
+/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 on a cost of about
+   fifteen seconds a world day. THAT NUMBER WAS WRONG BY ABOUT FIVE TIMES: measured on this branch a
+   world day is 1.1 to 5.3 s across the six soak seeds, a mean of 2.9, at load 3.05. The file asks for 493 world days across fifteen runs. Every day count is
    exactly as task 1 left it: none was cut to fit the engine. The runs that still cost more
    than the plan's hundred and twenty seconds sit behind LONG=1 one by one, and each states
    its day count, its measured seconds and the flag in its own skip message. A file behind a
    flag is still a test; a file with a smaller day count is not the same test. */
 
 /* EVERY TEST IN THIS FILE IS A LONG RUN, so the flag is on the file and not on the tests one by one.
-   The fifteen runs are 493 world days between them, which is at least 1,479 s at the 3.0 s a world day
+   The fifteen runs are 493 world days between them, which is at least 1,430 s at the 2.9 s a world day
    measured on this branch and more as each valley fills. No day count was lowered: the runs are the
    runs, behind LONG=1. Task 1's suspension message already carried the 493; the plan's own table said
    48, which was a helper's day count read once rather than summed. */
@@ -21,7 +22,7 @@ const { runDays, DAY } = require('./lib/run');
    worse than no command. */
 const LONG = !!(process.env.LONG || process.env.SLOW);
 if (!LONG){
-  test('the fifteen runs of tests/wanderer.js are behind LONG=1', { skip: 'behind LONG=1: 493 world days across fifteen runs, at least 1,479 s at the 3.0 s a world day measured on this branch, and more as each valley fills. LONG=1 runs it. No day count was lowered.' }, () => {});
+  test('the fifteen runs of tests/wanderer.js are behind LONG=1', { skip: 'behind LONG=1: 493 world days across fifteen runs, at least 1,430 s at the 2.9 s a world day measured on this branch, and more as each valley fills. LONG=1 runs it. No day count was lowered.' }, () => {});
   return;
 }
 

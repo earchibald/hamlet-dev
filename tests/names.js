@@ -15,8 +15,9 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 because a world day
-   cost about fifteen seconds and the file asks for 202 world days, and 342 under SLOW=1. Every day count is
+/* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 on a cost of about
+   fifteen seconds a world day. THAT NUMBER WAS WRONG BY ABOUT FIVE TIMES: measured on this branch a
+   world day is 1.1 to 5.3 s across the six soak seeds, a mean of 2.9, at load 3.05. The file asks for 202 world days, and 342 under SLOW=1. Every day count is
    exactly as task 1 left it: none was cut to fit the engine. The runs that still cost more
    than the plan's hundred and twenty seconds sit behind LONG=1 one by one, and each states
    its day count, its measured seconds and the flag in its own skip message. A file behind a
@@ -27,16 +28,20 @@ const path = require('path');
    LONG=1 permanently, with a public skip that states its day count, its seconds and the flag. NO DAY
    COUNT WAS LOWERED. A file with a smaller day count is not the same test, and a run shortened to fit
    a budget is a deleted claim with a green tick on it.
-   The seconds are `days` times the 3.0 s a world day measured on this branch at low population. A run
-   that lets the valley fill costs more than that, up to 18 s a world day by day 50, so the figure is
-   a floor and it is labelled as one. The measurements and the machine's load averages are in
+   THE SECONDS ARE MEASURED ON THIS BRANCH, and the fifteen seconds a world day that task 1's
+   suspension texts quoted is wrong by about five times. Measured on `tiers-g4` by `tests/skip.js`,
+   which runs three world days twice on each of the six soak seeds: 1.1 s a world day on `delta`,
+   2.3 on `x`, 2.4 on `alpha`, 2.9 on `beta`, 3.2 on `r` and 5.3 on `gamma`, a mean of 2.9, at a
+   one-minute load average of 3.05. A peer session reached 2.3 to 2.9 independently on another branch.
+   So `days * 2.9` is the figure below. It is a FLOOR: the rate rises with the population, and task 3
+   measured 18 s a world day at day 50 with 82 people. The load averages are in
    design/reports/2026-09-20-g4-task-4-the-skip.md. */
 /* SLOW=1 runs these too, because that is the flag task 1 wrote into every suspension message and
    into the commands people have in their notes. A documented command that silently runs nothing is
    worse than no command. */
 const LONG = !!(process.env.LONG || process.env.SLOW);
 const slow = days => LONG ? false
-  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 3)} s at the 3.0 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
+  : `behind LONG=1: ${days} world days, at least ${Math.round(days * 2.9)} s at the 2.9 s a world day measured on this branch, and more as the valley fills. LONG=1 runs it. The day count is untouched.`;
 
 const { load } = require('../src/sim');
 const { runDays, fingerprint } = require('./lib/run');

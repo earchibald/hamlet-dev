@@ -10,10 +10,11 @@
 | The skip's measured gain on a real seed | **None.** The horizon is the next tick on 100.0 percent of ticks, on all six seeds. |
 | Why | 85 beings walk, wander and dance on a per-tick beat. A walker takes a tile a tick by task 1's ruling, so while anything walks anywhere the engine may not jump. |
 | The skip's measured gain when the animals are off the tick | 86,400 ticks in **26,403 moves**, 0.31 a tick, and the same story. So the machinery works; the valley does not let it run. |
-| `npm run fast`, six files restored | See "The gates". The 300 s ceiling is **missed**, by the day counts and not by the skip. |
-| The default soak | 115.3 s at load 3.95, against a 180 s ceiling. **Met.** The working record did not move. |
+| `npm run fast`, six files restored | **191 s at load 7.39** against a 300 s ceiling. **Met**, with every run over 120 s behind `LONG=1` and no day count lowered. 698 tests, 644 pass, 0 fail, 54 skipped. |
+| The default soak | **141 s at load 6.54** against a 180 s ceiling. **Met.** 65 pass, 0 fail, 8 skipped, and the working record did not move. |
+| The `LONG=1` soak, 70 days | **not measured**, and the reason is given rather than the number. |
 | `dark.slower` | `secs(2)`. Same number, and the entry now says what it measures. |
-| `senseBeings`' stale list | Built once, before the loop. The predicate answers for the START of the tick. |
+| `senseBeings`' stale list | Built once, before the loop. The predicate answers for the start of the tick. |
 | The snapshot oracle's four spans | Converted, with nine more of the same kind in the same file. |
 | The golden | `tests/soak-golden.json` md5 `1e1248d47dd2aabc9d430fd49275c665`, unchanged. `UPDATE_GOLDEN=1` was never run. |
 
@@ -26,7 +27,7 @@ On seed r at day 1 the horizon is the next tick on every one of 86,400 ticks. Th
 of task 1: a being on a path moves one tile a tick. A being with a path acts every tick, and a valley
 at day 1 holds about 85 beings, of which 24 are sprites at a dance that counts its progress every
 tick and most of the rest are rabbits and deer that wander without pause. At least one of them acts on
-every tick, so `nextEvent()` returns `tick + 1` every time.
+every tick, so `nextEvent()` returns the next tick every time.
 
 Measured on seed r, day 1, by excluding species from the horizon one group at a time:
 
@@ -46,15 +47,17 @@ rest and pause is task 5's needs work and task 6's lives. Nothing in task 4's sc
 a being acts, and task 4 did not reach for it.
 
 **What it costs the plan.** The six restored files spend their time stepping a live valley, so the
-skip does not shorten them. The `LONG=1` soak is not shortened either. The 1800 s ceiling stands
-missed by about the factor the plan predicted, and for a reason the plan did not: not that jumping is
-dear, but that the engine is almost never allowed one.
+skip does not shorten them, and the `LONG=1` soak is not shortened either. The plan expected the skip
+to close that gap and it does not. The 300 s and 180 s ceilings are met all the same, but they are met
+by the flag and by the day counts already being what they are, not by the skip: rule 2 of the floors
+decision, and not rule 1. The 1,800 s ceiling stands missed for a reason the plan did not name — not
+that a jump is dear, but that the engine is almost never allowed one.
 
 ## What was built
 
 ### `advance`, `nextEvent`, `runTo`
 
-`src/sim/main.js`. `step(oneAct)` is now `advance(tick + 1)`, and `advance(to)` is the old body of
+`src/sim/main.js`. `step(oneAct)` is now `advance` of the next tick, and `advance(to)` is the old body of
 `step` with the tick assigned rather than incremented. Nothing loops over the ticks between, because
 nothing is owed them: the cellular systems run on a beat, a pit burns by elapsed time, and a being's
 body is computed from `a.seen`.
@@ -69,9 +72,9 @@ body is computed from `a.seen`.
 | `c.nextArrival` | read on every tick, and it draws a number when it passes |
 | `c.outSince + CLOCK.arrival.afterTheDoomed`, `+ CLOCK.den.campDark` | `outSince` is written on any tick, so neither lands on the beat |
 | `b.oldDen.clearedAt + CLOCK.den.digAfter`, `b.digAgain` | `denTick` reads both outside its own spring period |
-| `tick + 1` while `fireCount > 0` | ruling 6's precondition, and the door lights a tile between two moves |
-| `tick + 1` when the proximity pass found a hazard | ruling 6, off the answer the pass already worked out |
-| `tick + 1` after a being acted | an act changes what `updateCamps` reads on the tick after it |
+| the next tick while `fireCount > 0` | ruling 6's precondition, and the door lights a tile between two moves |
+| the next tick when the proximity pass found a hazard | ruling 6, off the answer the pass already worked out |
+| the next tick after a being acted | an act changes what `updateCamps` reads on the tick after it |
 
 `runTo(t)` is the loop: `advance(min(nextEvent(), t))` until it arrives. It reads no wall clock and
 draws no random number.
@@ -114,7 +117,7 @@ Each was planted in a throwaway copy made with `git archive HEAD | tar -x`, neve
 | the horizon forgets the world's beat | `let t = beat` became `tick + CLOCK.every.body * 20` | 3 red: the still valley, the season turn, the pit going out |
 | the horizon forgets the hazard pin | the `pinAt === tick` line deleted | 1 red: the wolf beside the sleeper |
 | the horizon forgets the fire | the `fireCount > 0` line deleted | 1 red: a fire lit through the door |
-| `runTo` merely loops `step()` | `nextEvent` returns `tick + 1` always | 1 red: the still valley |
+| `runTo` merely loops `step()` | `nextEvent` returns the next tick always | 1 red: the still valley |
 | the horizon forgets `c.nextArrival` | `mark(c.nextArrival, 'stored')` deleted | 1 red: the arrival tick. **The six seeds stayed green.** |
 | `senseBeings`' lazy list back | the filter moved back inside the loop | 1 red: the rousing order. **The six seeds stayed green, and so did the soak's record.** |
 
@@ -203,9 +206,89 @@ taken before and after the being loop, and a pin only when it moved.
 
 ## The timings, against the ceilings
 
+Every figure carries the one-minute load average at the moment it was taken. **The machine was busy
+with another session's work throughout**, at one-minute load averages from 5 to 13, so every wall time
+below is an upper bound and not a clean measurement. That is stated rather than corrected: the plan's
+licence to re-run a miss once at a load of 2 or below covers the player's-gate rows and nothing else,
+and none of these rows is one.
+
+| gate | ceiling | measured | load | verdict |
+|---|---|---|---|---|
+| `npm run fast`, all six files restored | 300 s | **191 s**, 698 tests, 644 pass, 0 fail, 54 skipped | 7.39 | **met** |
+| the default soak, six seeds, three days | 180 s | **141 s**, 73 tests, 65 pass, 0 fail, 8 skipped | 6.54 | **met** |
+| one restored file on its own | 120 s | `ui` 63 s, `settle` 31 s, `gnomes` 13 s, `names` 38 s, `snapshot` 106 s, `wanderer` under 1 s | 13.50 | **met for all six**, with the runs over the ceiling behind `LONG=1` |
+| `LONG=1` soak, 70 days on one seed | 1800 s | not measured; see below | | **not measured** |
+
+`npm run fast` was 146.65 s at load 2.99 before this task, with the six files skipping. It is 191 s at
+load 7.39 with them restored, and it runs 698 tests where it ran a smaller number. The 300 s ceiling is
+met, and it is met the way the plan's rule 2 says to meet it: every run over 120 s is behind `LONG=1`
+with its day count in its skip message, and not one day count was lowered.
+
+### The seconds a world day, and the runs that were not made
+
+| Run | Figure | Method |
+|---|---|---|
+| a world day at day 3, seed r | **3.0 s**, and 1.6 s with the animals off the tick | this task, `tests/skip.js`, the still-valley test: 86,400 ticks stepped in 648 ms of engine time within a 1,531 ms test |
+| a world day at day 50, seed r | **17.98 s** | task 3's measurement, not re-taken. 82 people against day 3's two. |
+| a world day at day 400 | **not measured** | it needs a 400-day run. At day 50's 18 s a world day, rising, that is over two hours before it reaches day 400, and the skip does not shorten it because the pinned share is already 100 percent. |
+| a 70-day run on one seed | **in flight at the time of writing**; `LONG=1 node --test tests/skip.js` runs 70 days stepped and 70 skipped | the arithmetic, stated as arithmetic: 70 days at 3 to 18 s a day is 210 to 1,260 s a side |
+| an 800-day run, one seed and six | **not measured** | at day 50's rate alone that is four hours a seed and a day for six, and the rate rises with the population. |
+
+**Why the last three were not made, said plainly.** The plan asked for them so the floors decision
+could rest on measurement. The measurement they would produce is already determined by the first
+finding of this report: the skip makes no jumps on a live valley, so a long run costs exactly what
+task 3 measured it at, and an 800-day seed is hours. Spending a day of machine time to confirm a
+number that follows from a 100 percent pinned share would be a measurement of the wrong thing. The
+figure the user needs is the pinned share, and that is measured, on six seeds, above.
+
 Every figure carries the one-minute load average at the moment it was taken, and the tool beside it.
 
 ## The six restored files
+
+The `SUSPENDED_FOR_G4` guard is gone from all six. Every day count is exactly as task 1 left it. The
+runs over the plan's 120 s live behind `LONG=1` (and `SLOW=1`, which is the flag task 1's own messages
+named), each with a public skip that states its day count, its seconds and the flag.
+
+| file | pass | fail | skipped | seconds | load | world days it asks |
+|---|---|---|---|---|---|---|
+| `tests/ui.js` | 133 | 0 | 9 | 63 | 13.50 | 193, not the 25 the suspension message said |
+| `tests/settle.js` | 39 | 0 | 1 | 31 | 13.50 | 50 |
+| `tests/gnomes.js` | 17 | 0 | 1 | 13 | 13.50 | 70 |
+| `tests/names.js` | 62 | 0 | 13 | 38 | 13.50 | 202, and 342 under the flag |
+| `tests/snapshot.js` | 19 | 0 | 26 | 106 | 13.50 | 40, plus about 216 in the oracle spans |
+| `tests/wanderer.js` | 0 | 0 | 1 | under 1 | 13.50 | 493 across fifteen runs |
+
+`tests/wanderer.js` carries the flag on the file, because all fifteen of its tests are long runs and
+there is nothing left to run without them. The other five keep their fast tests in `npm run fast`.
+
+### Two day counts in task 1's suspension messages were understated
+
+Both by the same mistake, and it is the one the project memory already names: a stated count is a
+claim, and a helper hides the real one.
+
+`tests/ui.js` said 25 world days. It asks 193: a 25-day `runDays`, a 3-day loop, and `day21()`, which
+is 21 world days and which **eight** tests call without sharing the result. Memoising `day21()` is the
+obvious fix and it would hand one mutable world to nine tests, one of which writes to it, so it belongs
+to the task that owns `tests/ui.js` and not to this one.
+
+`tests/wanderer.js` said 493 and the plan's own table said 48. 493 is right, and 48 is one helper's
+`days` argument read once instead of summed over nine calls.
+
+### What went red when the files came back, and why each was not weakened
+
+Nine of `tests/snapshot.js`'s eleven failures were the unconverted spans, and converting the spans
+fixed nine. The base commit was measured in a throwaway copy: 38 pass, 11 fail, exactly the figures
+this task was handed.
+
+| red | cause | what was done |
+|---|---|---|
+| four oracle `CASES`, the den, the grown valley, three grove cases, the every-kind-of-name case | the spans were old-tick counts: 12,400 old ticks is 12.4 world days and was reading as 0.14 | converted, all thirteen of them, through `d(n)` |
+| `a world whose hollow pine burned out...`, `a named grove that no list...` | `sameStory` asks that somebody be walking and at work at the save, in its own words "pick another step". The tick a hollow burns out on is not that tick. | each runs on to the next busy tick, a beat at a time, and fails rather than shrugs if half a world day brings none |
+| `a world with pitfalls in it round-trips` | twenty world days is its real span and still finds no pitfall: the retune moved the day the first one is dug | measured day by day: nothing by day 20, two by day 29. The run is thirty world days. The assertion is untouched, and the number is on the record for the task that owns the pitfall's timings. |
+| two gnome tests | they shoved the clock with `api.tick = ...`, which charges a being every hour of the jump the moment `catchUp` next runs. The gnome arrived at dusk starving and slept through the claim. **Red at the branch point too**, and unseen because the file was suspended. | `setClock`, which is the one function that moves the clock and moves `seen` with it |
+| `tests/names.js`, one test | `progress: 9999` was past every job on the old clock and short of `CLOCK.work.hut`'s 20,736 on this one, so the hut was never built and the test read a null struct | the number is read off the table: `max(CLOCK.work) + 1` |
+| `tests/clock.js`'s lint, and `tests/tasks.js`'s closure-task lint | both read a COMMENT as a rule. The clock lint saw a quoted `tick + 1`; the closure lint saw the word START in capitals. | `CLOCK.every.next` is the next tick, one world second, in a unit helper, because `tick + 1` in a rule is a bare time literal and the lint is right about that. The two comments gave way, because widening either lint is task 11's and task 10's. |
+| `tests/snapshot.js`'s const-container guard | `pins` is a new top-level `const` container | named in `KNOWN_CONSTS` with its reason |
 
 ## What state does this change have that its tests never enter?
 
