@@ -79,10 +79,15 @@ for (const seed of SEEDS){
     await t.test('someone is alive at the end', () => {
       assert.ok(counts.alive > 0, `all ${counts.humans} people are dead`);
     });
-    await t.test('the camps grow', () => {
-      sums.humans += counts.humans; sums.born += counts.born;
-      for (const k in FAR_FLOOR) sums[k] += counts[k];
-      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day 70, ${counts.born} born`);
+    /* The sums feed two claims that only the default run makes, so they are gathered outside the
+       guarded test below, which does not run on a short run. */
+    sums.humans += counts.humans; sums.born += counts.born;
+    for (const k in FAR_FLOOR) sums[k] += counts[k];
+    /* The floors are measured on 70 days. A shorter run cannot reach them, and a floor invented to
+       fit ten days would be a number nobody has measured. So the claim is not made, and the skip
+       says so, as the golden record and the two sum tests already do. */
+    await t.test('the camps grow', { skip: !isDefault && 'not the default run' }, () => {
+      assert.ok(counts.alive >= (ALIVE_FLOOR[seed] || 8) && counts.born >= 1, `only ${counts.alive} alive at day ${DAYS}, ${counts.born} born`);
     });
     await t.test('nobody dies of anything but old age', { todo: KNOWN_DEATHS[seed] ? `known: ${KNOWN_DEATHS[seed].join(' ')}` : false }, () => {
       assert.deepEqual(oddDeaths(events), [], 'a death that is not old age is a bug until proven otherwise');
