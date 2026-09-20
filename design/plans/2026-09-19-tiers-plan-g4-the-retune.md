@@ -413,6 +413,114 @@ The floors that the three-day run cannot hold are **not** removed until task 4 h
 - [x] Budget test: a world day on seed `r` at day 3 in under 5 s. Report seconds for day 3 and, from the long run, day 50. **Day 3 met. It is a range and not one number: 2.99 to 3.40 s across six runs, at one-minute load averages from 2.62 to 4.36, against dev's 9.86 s. Method: the budget test's own harness in `tests/beings-lazy.js`, three world days on seed `r` in Node, the third day timed. The five are 3.05 s at load 4.36 and 3.33 s (the implementer), 3.40 s at load 3.86 (the task 3 review), and 2.99 s at load 2.62, 3.28 s at load 3.29 and 3.07 s at load 2.84 (the task 3 remediation). The budget is 5 s and every run meets it. The test asserts only at a one-minute load average of 2 or below and otherwise skips loudly, naming the load average, so each figure above is a measurement and not an assertion. Day 50 MISSED: 17.98 s, with 82 people against day 3's 2. Seconds a person a world day is flat from day 25 on, so the day-50 miss is the valley filling and not the body; the report says so and does not explain it away. The last 2.3 s of the day-3 win came from `threatsFor`, which ruling 6 runs for every being on every tick.**
 - [~] Gates as task 1, plus `tests/snapshot.js` green with the new fields. Commit. **The soak, `npm run fast`, `tests/clock.js` and `tests/tasks.js` are green; the working record was rewritten and what moved is explained. `tests/snapshot.js` is SUSPENDED by task 1 and was not run: the snapshot gate that ran is the soak's oracle, which carries every new field across a save. Task 4 owes the file a run.**
 
+## What the night of 2026-09-20 carried forward, and who owns each piece
+
+Task 3 landed, a review found one Critical, a remediation fixed it, and a trial merge ran the five
+suites this branch never had. Three peer sessions found faults in dev that only G4's clock exposes.
+Each item below has an owner. Nothing here is a suggestion.
+
+| item | owner |
+|---|---|
+| `dark.slower: 2`, a bare two-second period in `CLOCK` | task 4 |
+| `tests/garden.js:104`, `DAY = 1000` | the merge |
+| the soak's two claims red on dev's own guard (#113) | the merge, and never by lowering a literal |
+| six record fields no type declares | the merge |
+| three bare-return silent passes in the tests | task 10 |
+| whether to widen the `tests/clock.js` lint | this plan, below |
+| the working record re-taken after dev's reworded chronicle | task 11 |
+
+### The five absent suites are safe, and two of dev's numbers are not
+
+`garden.js`, `itemgrid.js`, `reachable.js`, `stalk.js` and `types.js` exist on dev and not here. They
+arrive only by merge, so they had never run against a 365-day year. Measured in a throwaway clone at
+`32f28b8` with dev at `55af5a0`: `itemgrid.js` 3/3, `reachable.js` 3/3, `stalk.js` 8/8. All three
+compare an optimised path against an older reference, so the retune did not change what the engine
+does. That is the strongest evidence the branch has produced.
+
+Two of dev's own numbers do not survive the merge, and the merge fixes them:
+
+`tests/garden.js:104` reads `const N = 25, DAYS = 15, DAY = 1000`. `DAY = 1000` is dev's day, so the
+real-run loop covers 0.17 of a G4 day. The divergence assertion at line 96 never fired once and only
+the vacuity control spoke. `gardenLives` is not implicated. Give it a G4-era day.
+
+`tests/soak.js` gates `the run visits every season` and `somebody dies of old age` on one
+`longEnough = DAYS >= DEFAULT_DAYS`. On this branch `DEFAULT_DAYS` is 3, so the guard reads `3 >= 3`
+and both claims run on three days of a 365-day year. Both go red. **They are resolved by naming the
+reason, never by touching the guard.** Issue #113 carries the fix: two literals, one per claim, each
+pinned by a literal claim in `tests/clock.js`, so neither can move without something else going red
+first. The season claim needs a year; the old-age claim needs about 70 days, which is a **measured**
+floor and not an arithmetic one — the subtraction says 24, and a task that corrects 70 to 24 makes
+the claim intermittent and the intermittent failure looks like a sim fault.
+
+A task that lowers a literal to fit the run has derived the guard from the run with one layer of
+indirection. That is the defect the issue exists to prevent.
+
+### The lint question this plan must answer
+
+`tests/clock.js` lints a bare time literal at a use site. It does not follow a definition. Two holes,
+each measured on this branch:
+
+- `src/sim/clock.js` is excluded from its own lint, twice, so a table entry may drop its helper.
+  `spoil: ticks(100)` written as `spoil: 8640` gives 22 pass, 0 fail. Written as `spoil: 60` it gives
+  21 pass, 1 fail. The **value** is pinned by a hand-written equality; the **form** is not checked.
+- A bare count returned from a function passes. `CLOCK.every.body` written as `return 60` gives 22
+  pass, 0 fail.
+
+The counts, so the decision is not taken blind. **10 of 294** `CLOCK` entries are not in a unit
+helper. **One is a genuine fault: `dark.slower: 2`**, a two-world-second period read as
+`tick % CLOCK.dark.slower`. Task 4 fixes that one. The other nine are legitimate — seven dimensionless
+chances whose beat carries the time, two god thoughts with their own comment. Outside `clock.js` there
+are **7** bare-literal returns, of which **3** are durations, all `return 1` in `nextAct` meaning the
+next tick. A blanket widening would report **1,291** literals against **338** `CLOCK.` reads at 292
+distinct paths, which is unusable.
+
+So the answer is not a wider lint. The answer is a check on the table's form only: every `CLOCK` entry
+is written in a unit helper unless it is named in a short list of dimensionless exceptions, and the
+list fails when it names an entry that no longer exists. Task 11 owns it, because it owns the markers
+and the table's final shape.
+
+### Six record fields no type declares
+
+This branch has **no `types/` directory, no tsconfig, no `npm run types` and no tsc**. So nothing here
+type-checks and `tests/types.js` cannot run until the merge. Dev's `types/sim/records.d.ts` declares
+none of six fields the retune added: `next` and `seen` on a Being, `until` on a Thought (while the
+dead `left` is still declared), and `worked`, `due` and `waitUntil` on a Task. The peer's four
+`TS2339` errors are the first of six. The merge declares all six and removes `left`.
+
+`npm run types` alone will not prove that fix. A lost annotation falls back to `any`, its errors
+vanish, and the run still reports zero. Only the probe half of `tests/types.js` sees that.
+
+### The gate gains a second half
+
+A plant proves an assertion fires. It says nothing about whether the test runs on the inputs it
+should, because a plant holds the inputs fixed and varies the code, while a guard is a function of the
+inputs. The two checks are disjoint, and a suite can hold a perfect plant record with half its claims
+unreachable. Dev's own `the run visits every season` skipped a 40-day run that had visited all four
+seasons, while every plant against it went red exactly as intended.
+
+**So every task from here proves both.** Plant a fault and watch the test go red. Then run the test at
+the boundary of its guard and confirm it is admitted on the smallest input that can satisfy the claim
+and skipped on the largest that cannot. Read the skip messages: the line that proves a guard had no
+reason to fire is often already in the output, and it is missed because it begins with a skip glyph
+rather than a failure.
+
+Three bare-return silent passes wait for task 10 — `tests/settle.js:47`, `tests/settle.js:57` and
+`tests/tasks.js:128` — plus an escape clause of the same family at `tests/settle.js:51`, where
+`ford > 0 || wet.every(b => b.tiles.length < 47)` is computed from the boundaries it measures.
+
+### The working record must be re-taken, and why
+
+Dev reworded a chronicle line. At the merge, seeds `x` and `gamma` fail `the run matches the golden
+record` and the day-1.5 snapshot oracle fails with them, three reds from one cause. Every diff names
+exactly one field, `chronicle`. `chronicleLines`, `beings`, `items`, `legends`, `tiles` and every
+counter are identical, and the report reads "counts that moved: none". So it is a rewording and not a
+change of events, and dev carries `design/approved-text.md` and the names-polish work while this
+branch's `tests/soak-working.json` predates it.
+
+That attribution was reached by elimination and the two chronicles were **not** diffed line by line.
+Treat it as strongly indicated and not proved. Task 11 re-takes the working record rather than argue
+the diff is benign.
+
 ### Task 4: The skip
 
 **Files:** `src/sim/main.js`, `src/sim/beings.js`, `src/sim/clock.js`, `src/sim/index.js`, `tests/skip.js` (new), `tests/soak.js`, `tests/lib/run.js`.
