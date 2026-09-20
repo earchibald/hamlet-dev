@@ -25,6 +25,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/settle.js`: the painters, the founding sites, the creatures, the bodies, and the tile check. Fast.
 - `tests/clock.js`: the unit helpers, the table's values, and a lint: no bare time literal in a rule. Fast.
 - `tests/tasks.js`: the table, the executor, that every task and offer is plain data, and that no file holds a closure task. Fast.
+- `tests/itemgrid.js`: after a removal, the item grid matches a full rebuild, slot for slot, including a stacked tile. Fast.
 - `tests/snapshot.js`: the streams, `REFS`, `takeSnapshot()`, `loadSnapshot(snap)`, the oracle (save mid-run, load, run on), and the guard that every top-level `let` or `var` is saved or listed with a reason, and every top-level `const` container is named or listed as frozen. Fast.
 - `npm run fast` runs them all.
 
