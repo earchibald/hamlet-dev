@@ -13,7 +13,7 @@ function assertGridMatchesRebuild(api, label){
   const after = api.itemGrid;
   assert.equal(after.length, before.length, `${label}: grid changed size`);
   for (let i = 0; i < after.length; i++){
-    assert.strictEqual(before[i], after[i], `${label}: slot ${i} does not match a full rebuild`);
+    if (before[i] !== after[i]) assert.strictEqual(before[i], after[i], `${label}: slot ${i} does not match a full rebuild`);
   }
 }
 
@@ -40,20 +40,14 @@ test('three items stacked on one tile: the slot follows array order as items are
   assertGridMatchesRebuild(api, 'after removing the last item on the tile');
 });
 
-/* A real run, two seeds, a few days. Checked whenever the item count changes, which covers
-   every removeItem call (and every bulk removal, which already rebuilds on its own and so
-   passes trivially). This does not intercept each removeItem call directly: internal code
-   calls the bare function, not api.removeItem, so there is no seam to hook without changing
-   src/sim. Checking on every count change is the honest substitute; it still fails hard
-   against the naive fix, because a shadowed item stays wrong until the next change is seen. */
+/* A real run, two seeds, a few days. Checked after every tick. A check on a changed item count
+   would miss a tick that removes one item and adds another. Internal code calls the bare
+   removeItem, not api.removeItem, so there is no seam to check after each call. A fault still
+   shows at the tick it happens, because the grid is compared before the rebuild replaces it. */
 for (const seed of ['r', 'x']) test(`seed ${seed}: the item grid matches a full rebuild through five days of play`, () => {
   const api = load(); api.startWorld(seed);
-  let last = api.items.length;
   for (let i = 0; i < 5000; i++){
     api.step(); scriptGod(api, i);
-    if (api.items.length !== last){
-      assertGridMatchesRebuild(api, `seed ${seed}, tick ${i}`);
-      last = api.items.length;
-    }
+    assertGridMatchesRebuild(api, `seed ${seed}, tick ${i}`);
   }
 });
