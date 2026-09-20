@@ -310,11 +310,32 @@ test('every template button prints a key, and every keyed button id is in the te
    `data-speed` after, on the same click, so carrying both is a property of each button. Two flat
    lists of attribute values cannot state it: a fifth button with `data-speed` and no `data-pace`
    leaves both lists complete, and the button is dead in the ages. */
-test('every speed button carries both attributes, each is a rung of its ladder, and every rung has a button', () => {
+/* The scan is also per place. src/ui/main.js binds the click to the #speeds span, so a button with
+   both attributes outside that span is dead in both eras. Read the span, then check that no element
+   anywhere else in the template carries either attribute. */
+test('every speed button sits in #speeds and carries both attributes, each is a rung of its ladder, and every rung has a button', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS']);
   const html = fs.readFileSync('src/page.template.html', 'utf8');
   const ladders = [['pace', 'PACES', api.PACES], ['speed', 'SPEEDS', api.SPEEDS]];
-  const buttons = [...html.matchAll(/<button\b[^>]*>/g)].map(m => m[0]).filter(b => /\bdata-(pace|speed)="/.test(b));
+  const open = html.match(/<span\b[^>]*\bid="speeds"[^>]*>/);
+  assert.ok(open, 'the template holds no <span id="speeds">; src/ui/main.js binds the speed click to that span, so this test reads nothing');
+  /* Walk to the matching close tag, counting depth. A non-greedy match would stop at a nested
+     </span> and call the buttons after it outsiders, which names the wrong fault. */
+  const from = open.index;
+  let depth = 0, to = -1;
+  for (const m of html.slice(from).matchAll(/<span\b[^>]*>|<\/span>/g)){
+    depth += m[0] === '</span>' ? -1 : 1;
+    if (depth === 0){ to = from + m.index + m[0].length; break; }
+  }
+  assert.ok(to > from, 'the template never closes <span id="speeds">, so this test cannot tell which buttons sit in it');
+  const inner = html.slice(from + open[0].length, to - '</span>'.length);
+  for (const [attr] of ladders){
+    for (const m of html.matchAll(new RegExp(`<[a-zA-Z][^>]*\\bdata-${attr}="[^"]*"[^>]*>`, 'g'))){
+      const tag = m[0], id = (tag.match(/\bid="([^"]+)"/) || [, tag])[1];
+      assert.ok(m.index >= from && m.index < to, `#${id} carries data-${attr} outside <span id="speeds">; src/ui/main.js binds the speed click to that span, so a click on this element sets no speed in either era`);
+    }
+  }
+  const buttons = [...inner.matchAll(/<button\b[^>]*>/g)].map(m => m[0]).filter(b => /\bdata-(pace|speed)="/.test(b));
   assert.ok(buttons.length, 'the template holds no speed button, so this test reads nothing');
   const value = (b, attr) => { const m = b.match(new RegExp(`\\bdata-${attr}="([^"]*)"`)); return m ? Number(m[1]) : undefined; };
   for (const b of buttons){
@@ -330,10 +351,10 @@ test('every speed button carries both attributes, each is a rung of its ladder, 
     for (const r of rungs) assert.ok(found.includes(r), `${name} holds ${r}, which no data-${attr} button in the template can reach`);
   }
   /* The handler takes the nearest `[data-speed]` ancestor, which need not be a button. Count the
-     attributes in the whole template too, so one moved onto another element is not left unread. */
+     attributes inside the span too, so one moved onto another element there is not left unread. */
   for (const [attr] of ladders){
-    const all = [...html.matchAll(new RegExp(`\\bdata-${attr}="`, 'g'))].length;
-    assert.equal(all, buttons.length, `the template holds ${all} data-${attr} attributes and ${buttons.length} speed buttons; this test reads the buttons, so an attribute anywhere else goes unchecked`);
+    const all = [...inner.matchAll(new RegExp(`\\bdata-${attr}="`, 'g'))].length;
+    assert.equal(all, buttons.length, `<span id="speeds"> holds ${all} data-${attr} attributes and ${buttons.length} speed buttons; this test reads the buttons, so an attribute on another element goes unchecked`);
   }
 });
 
