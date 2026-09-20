@@ -628,6 +628,41 @@ test('a night is named from the event table alone, in three distinct phrases, an
   assert.equal(fourth.names, undefined, 'the pass came back to a night it had already passed over');
 });
 
+/* Finding 3: the listed order of EVENT_NAMES[tag].phrases decides, not the alphabetical
+   tie-break. The first night of a tag must take phrases[0] by identity, the second phrases[1],
+   the third phrases[2]. A test that only checks the three are distinct passes under either
+   rule, so this checks the actual index each night lands on. */
+function assertListedOrder(tag, lines){
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const phrases = api.EVENT_NAMES[tag].phrases;
+  const taken = [];
+  for (const line of lines){
+    api.log(line, [a], 'bad', tag);
+    const entry = api.chronicle[0];
+    api.nameEvents(c);
+    assert.ok(entry.names && entry.names.length, `a ${tag} night was not named`);
+    taken.push(entry.names[0].text);
+  }
+  for (let i = 0; i < taken.length; i++){
+    assert.equal(taken[i], phrases[i], `night ${i + 1} of ${tag} took "${taken[i]}", not the listed phrases[${i}] "${phrases[i]}"`);
+  }
+}
+test('a night takes its tag\'s phrases in listed order: frost', () => {
+  assertListedOrder('frost', [
+    'The frost bites hard.',
+    'The frost bites again.',
+    'A third bitter frost.',
+  ]);
+});
+test('a night takes its tag\'s phrases in listed order: fire', () => {
+  assertListedOrder('fire', [
+    'The fire runs through the camp.',
+    'The fire runs again.',
+    'A third fire.',
+  ]);
+});
+
 test('a night is never named after a place', () => {
   const { events } = run70(), api = run70world();
   const named = events.filter(e => e.names && e.names.length);
@@ -674,7 +709,10 @@ test('any phrase of a night names a night only: a place takes the joined word, n
   api.log('Last night the fire ran.', [a], 'bad', 'fire');
   const phrases = api.EVENT_NAMES.fire.phrases;
   const eventCands = api.eventCandidates(c, 'event');
-  for (const phrase of phrases) assert.ok(eventCands.some(x => x.text === phrase), `a night cannot take ${phrase}`);
+  /* The listed order decides: only the first, unclaimed phrase is offered, never the second or
+     third while the first is still free. */
+  assert.ok(eventCands.some(x => x.text === phrases[0]), `a night cannot take ${phrases[0]}`);
+  for (const phrase of phrases.slice(1)) assert.ok(!eventCands.some(x => x.text === phrase), `a night was offered ${phrase} while ${phrases[0]} was still free`);
   const joined = api.cap(api.EVENT_NAMES.fire.word) + api.WORD_TAIL[api.EVENT_NAMES.fire.word];
   assert.ok(!eventCands.some(x => x.text === joined), 'a night can take the joined word');
   for (const kind of ['camp', 'sector', 'pond']){

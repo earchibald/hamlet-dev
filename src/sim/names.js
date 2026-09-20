@@ -519,7 +519,11 @@ function eventCandidates(c, kind = 'event'){
     if (!isEventLine(e, c)) continue;
     const t = EVENT_NAMES[e.tag], recency = Math.round((memoryDays - sinceDays) * 3 * 10) / 10;
     if (kind === 'event'){
-      for (const phrase of t.phrases) out.push({ text: phrase, axis: 'event', base: 20, recency, why: `for ${phrase}` });
+      /* The listed order decides: offer a tag's first phrase that is not already taken, and no
+         other. That gives a night the first phrase while it is free, the second once the first
+         is taken, then the third, then nothing, without touching the score or the tie-break. */
+      const phrase = t.phrases.find(p => !nameTaken(p));
+      if (phrase) out.push({ text: phrase, axis: 'event', base: 20, recency, why: `for ${phrase}` });
     } else if (WORD_TAIL[t.word]){
       out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
     }
