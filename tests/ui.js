@@ -1413,19 +1413,68 @@ test('a walk and a stroke give their ends, and a gesture with no anchor draws no
   assert.deepEqual(line, [1, 2, 3, 4], 'the record is not touched');
 });
 
-test('every gesture the map can draw has a mark and a word, so a new act cannot reach the map with nothing to show', () => {
+/* The act kinds, read out of gods.js instead of copied from it. A hand-written list cannot catch the one
+   thing such a list exists for: add a gesture kind to the engine and a test that enumerates the view's
+   own table stays green while the map draws nothing for the new act. tests/clock.js sets the precedent
+   for reading a rule out of src/sim rather than restating it. */
+function actsGodsCanWrite(){
+  const src = fs.readFileSync(require('path').join(__dirname, '..', 'src', 'sim', 'gods.js'), 'utf8');
+  /* The same pattern matches the definition, which is not a call. */
+  const calls = (src.match(/\bgesture\(/g) || []).length - (src.match(/function gesture\(/g) || []).length;
+  const lit = [...src.matchAll(/\bgesture\([^,]+,\s*'([a-z]+)'/g)];
+  /* One site names its kind with a ternary — `kind === 'height' ? 'raise' : 'dig'` — and a reader that
+     only knows literals would skip it silently and still report success. */
+  const tern = [...src.matchAll(/\bgesture\([^,]+,\s*[^,]*\?\s*'([a-z]+)'\s*:\s*'([a-z]+)'/g)];
+  const washes = [...src.matchAll(/\bgesture\([^,]+,\s*'wash',\s*\{[^}]*value:\s*'([a-z]+)'/g)].map(m => m[1]);
+  const kinds = new Set(lit.map(m => m[1]));
+  for (const m of tern){ kinds.add(m[1]); kinds.add(m[2]); }
+  return { calls, matched: lit.length + tern.length, kinds, washes: new Set(washes) };
+}
+
+test('every act gods.js can write has a mark and a word, and the table holds nothing it cannot write', () => {
   const api = loadUI(['state', 'derive', 'marks'], [...DERIVE, 'MARKS', 'markFor']);
-  const kinds = ['split','claim','make','raise','dig','flow','pool','burn','freeze','hide','show','battle','twist','mingle','sleep','born','unmade','backstop'];
-  for (const k of kinds){
+  const g = actsGodsCanWrite();
+  /* The reader must be shown to have found something before any answer it gives means anything. A regex
+     that matched nothing would leave every loop below empty and the test would pass reporting success. */
+  assert.ok(g.calls >= 15, `gods.js should hold at least fifteen gesture calls; the reader found ${g.calls}`);
+  assert.equal(g.matched, g.calls,
+    'every gesture call gave up its kind: a call written in a new shape needs this reader taught, not skipped');
+  assert.ok(g.washes.size >= 3, `a wash should carry at least three values; the reader found ${g.washes.size}`);
+
+  for (const k of g.kinds){
+    /* A wash has no mark of its own: it takes the mark of the value it carries, checked below. */
+    if (k === 'wash') continue;
     const m = api.markFor(k);
-    assert.ok(m, `${k} has no mark`);
+    assert.ok(m, `gods.js writes a '${k}' gesture and markFor answers nothing for it`);
     assert.ok(m.word && m.word.length, `${k} has no word`);
     assert.ok(Array.isArray(m.paths) && m.paths.length, `${k} has no strokes`);
     for (const d of m.paths) assert.match(d, /^M[\d.\s]/, `${k} has a stroke that does not start with a move`);
   }
+  for (const v of g.washes){
+    const m = api.markFor('wash', v);
+    assert.ok(m, `gods.js washes with '${v}' and markFor answers nothing for it`);
+    assert.ok(m.word && m.word.length, `the '${v}' wash has no word`);
+  }
+  /* And the other way, so the table cannot keep a mark for an act the engine stopped writing. */
+  const canWrite = [...[...g.kinds].filter(k => k !== 'wash'), ...g.washes].sort();
+  assert.deepEqual(Object.keys(api.MARKS).sort(), canWrite,
+    'the marks table and the acts gods.js writes are the same set, in both directions');
+
   assert.equal(api.markFor('wash', 'freeze'), api.markFor('freeze'), 'a wash takes the mark of the act it is');
-  assert.equal(api.markFor('wash', 'hide'), api.markFor('hide'));
   assert.equal(api.markFor('nonesuch'), null, 'an unknown kind draws nothing rather than guessing');
+});
+
+test('the wash inks and the washes gods.js writes are the same three, read from the engine', () => {
+  /* WASH_INK in map.js is the second hand-kept list shadowing gods.js: markFor resolves a wash by its
+     value and WASH_INK colours it by the same value, and nothing made the two keep agreeing with the
+     engine or with each other. A wash gods.js learns to write would fall through WASH_INK's
+     `|| P['field-line']` and be coloured as an ordinary line — quietly, and looking deliberate. */
+  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], [...DERIVE, 'WASH_INK', 'markFor']);
+  const g = actsGodsCanWrite();
+  assert.ok(g.washes.size >= 3, `the reader found ${g.washes.size} wash values, which is too few to be right`);
+  assert.deepEqual(Object.keys(api.WASH_INK).sort(), [...g.washes].sort(),
+    'every wash gods.js writes has an ink, and the table holds no ink for a wash it does not write');
+  for (const v of g.washes) assert.ok(api.markFor('wash', v), `the '${v}' wash has an ink but no mark`);
 });
 
 test('a mark is one word, and the word is the act in the third person', () => {
