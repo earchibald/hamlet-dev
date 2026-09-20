@@ -157,7 +157,10 @@ for (const seed of SEEDS){
        every season is named, and the message names the ones that went missing.
 
        The seasons are read from `api.SEASONS`, not copied here: a fifth season added to the table
-       must widen this claim, not leave the soak asserting four for ever.
+       must widen this claim, not leave the soak asserting four for ever. The table cannot widen
+       today: `seasonOf()` takes `% 4` and `years()` multiplies by `* 4`, both hardcoded in
+       `src/sim/clock.js` (issue #103). So do not read this line as proof that the sim is
+       season-count-agnostic. It is not.
 
        Guarded on the day count alone, not on `isDefault`. The claim does not depend on the seed,
        and `SEEDS=r DAYS=70` is the common quick check, which is exactly where a calendar change
