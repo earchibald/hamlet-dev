@@ -7,6 +7,11 @@ function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
+/* The one writer of `ui.focus`. Every file but this one calls this instead of setting the field
+   itself; writes inside actions.js keep setting it directly.
+   A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
+   every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
+function setFocus(v){ ui.focus = v; }
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){

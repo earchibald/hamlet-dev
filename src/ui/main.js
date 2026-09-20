@@ -59,7 +59,7 @@ function initUI(){
      with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
      typed seed survives Take a god the same way it already does Make world. */
   $('start').addEventListener('close', () => {
-    ui.focus = 'map'; const rv = $('start').returnValue; $('start').returnValue = '';
+    setFocus('map'); const rv = $('start').returnValue; $('start').returnValue = '';
     if (rv === 'make' || rv === 'take'){
       const seed = $('seed').value.trim() || randomSeed();
       if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
@@ -87,10 +87,10 @@ function initUI(){
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); ui.focus = `drawer:${id}`;
+    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
-  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ ui.focus = 'map'; renderUI(true); } });
+  document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });
   wireWindows();
   initTimeline();
   cv.addEventListener('pointerdown', e => { const c = cellFrom(e); cursor = { x: c.x, y: c.y, z: c.z }; hover = c; applyTool(c, e); if (tool !== 'inspect'){ tipTarget = null; tipForCell(c, e); } });

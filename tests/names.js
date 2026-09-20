@@ -156,6 +156,41 @@ test('every hill, cave, and grove carries an old name with a meaning, and no mea
   }
 });
 
+test('a meaning is never offered to a kind it does not suit', () => {
+  const api = world();
+  for (const w of api.LAND_WORDS) assert.ok(api.LAND_WORD_KINDS[w] && api.LAND_WORD_KINDS[w].length, `${w} has no kinds`);
+  for (const kind of ['water', 'hill', 'cave', 'grove', 'ford']){
+    for (let k = 0; k < 60; k++){
+      const r = api.newOldName('test', kind);
+      if (!r) break;
+      assert.ok(api.LAND_WORD_KINDS[r.meaning].includes(kind), `${r.meaning} does not suit ${kind}`);
+    }
+  }
+});
+
+test('every kind can still name as many things as the heaviest seed asks of it', () => {
+  /* hill is derived here, from the six soak seeds' own hill counts, because the helpers this
+     file already has (SEEDS, world()) give it directly. The other four come from the day-1
+     measurement in design/land-word-kinds.md (cave 10, grove 8, ford 1, water 9); that count is not a
+     landmark this file exposes a getter for, so it is not re-derived here (task 1 review, finding 2). */
+  const heaviestHills = Math.max(...SEEDS.map(seed => world(seed).hills.length));
+  const DEMAND = { water: 9, hill: heaviestHills, cave: 10, grove: 8, ford: 1 };
+  for (const kind in DEMAND){
+    const api = world();
+    let named = 0;
+    for (let k = 0; k < DEMAND[kind]; k++){ if (api.newOldName('test', kind)) named++; }
+    assert.equal(named, DEMAND[kind], `${kind}: only named ${named} of ${DEMAND[kind]} asked for`);
+  }
+});
+
+test('the six soak seeds all still name their land', () => {
+  for (const seed of SEEDS){
+    const api = world(seed);
+    const big = api.river || api.stillWater;
+    assert.ok(big && api.nameOf(big), `${seed}: the water has no name`);
+  }
+});
+
 /* Minor 20: `LAND_WORDS` holds forty meanings, and a landmark with no meaning left keeps no old
    name at all. A bigger world has more landmarks. This is the alarm for the day one runs out. */
 test('a bigger world still has a meaning for every landmark', () => {
@@ -317,10 +352,43 @@ test('a hearth that has burned three days gets the camp a plain name, kept with 
   assert.ok(r.why, 'a name needs a reason');
   assert.ok(r.scores && r.scores.length >= 2, 'the candidate list is kept');
   assert.ok(r.scores[0].score >= r.scores[1].score, 'scores are sorted, top first');
-  assert.ok(api.chronicle.some(e => e.text.includes(`call this place ${r.text}`)), api.chronicle[0].text);
+  assert.ok(api.chronicle.some(e => api.CAMP_NAMED_LINES.some(f => e.text === f(r.text, r.why))), api.chronicle[0].text);
   assert.deepEqual(api.formerNames(c).map(x => x.text), [`${a.name}'s camp`]);
   const n = api.chronicle.length; api.nameCampAtHearth(c);
   assert.equal(api.chronicle.length, n, 'a camp is named once at the hearth');
+});
+
+/* Task 3 review, Important finding: the assertion above only checks that a drawn line is SOME
+   member of CAMP_NAMED_LINES. It would still pass if the pool had collapsed to one line, or if
+   an entry were dropped or duplicated, because a single draw can never see the rest of the pool.
+   These two tests give it that sight: one calls every builder directly to prove all seven are
+   distinct and sit at the index the pool has for them, the other drives real hearth-naming
+   across the six soak seeds to prove the live draw actually varies, not just the table. */
+test('every one of the seven camp-named lines is a distinct, reachable line', () => {
+  const api = load();
+  const built = api.CAMP_NAMED_LINES.map(f => f('Coldwater', 'the well went bad'));
+  assert.equal(api.CAMP_NAMED_LINES.length, 7, 'the pool must hold seven lines');
+  assert.equal(new Set(built).size, 7, 'two entries in the pool produce the same line');
+  api.CAMP_NAMED_LINES.forEach((f, i) => {
+    assert.equal(f('Coldwater', 'the well went bad'), built[i], `entry ${i} is not stable at its own index`);
+  });
+});
+
+test('the six soak seeds do not all draw the same camp-named line', () => {
+  /* Comparing the rendered chronicle text alone would pass even with the draw broken to
+     always return index 0: two seeds give different camp names and reasons, so the same
+     template still renders two different sentences. What must vary is the INDEX into the
+     pool, so this looks up which entry produced the line, not the text it produced. */
+  const indices = SEEDS.map(seed => {
+    const { api, c } = hearthCamp(seed);
+    api.nameCampAtHearth(c);
+    const r = c.names[0];
+    const line = api.chronicle.find(e => api.CAMP_NAMED_LINES.some(f => e.text === f(r.text, r.why)));
+    assert.ok(line, `${seed}: no hearth-named line was logged`);
+    return api.CAMP_NAMED_LINES.findIndex(f => f(r.text, r.why) === line.text);
+  });
+  assert.equal(indices.length, SEEDS.length, 'every seed should reach a hearth-named line');
+  assert.ok(new Set(indices).size > 1, `all six seeds drew the same pool entry: index ${indices[0]}`);
 });
 
 test('a village keeps its name at sixty, and the line says it is a village now', () => {
@@ -516,43 +584,152 @@ test('the event table names a tagged major line at the fire, and the name reads 
   assert.equal(api.chronicle.length, n, 'an event is named once');
 });
 
-/* Important 6: a night took a place name once the fourteen event texts were spent, so seed r
-   named 89 nights, 75 of them after places, and each took a text the land could have had. */
-test('a night is named from the event table alone, and a night with no text left goes unnamed', () => {
+/* Important 6: a night took a place name once the event texts were spent, so seed r named 89
+   nights, 75 of them after places, and each took a text the land could have had. That bug is gone:
+   eventCandidates now gates the joined word (a place shape, like "Wolfhill") to a place, so a night
+   draws only from its tag's phrases. Wolf now has three phrases, so a second wolf night takes a
+   different one and a third takes the last; a fourth has nothing left. */
+test('a night is named from the event table alone, in three distinct phrases, and a fourth night with no text left goes unnamed', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
+  const phrases = api.EVENT_NAMES.wolf.phrases;
+  const joined = api.cap(api.EVENT_NAMES.wolf.word) + api.WORD_TAIL[api.EVENT_NAMES.wolf.word];
   api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
   const first = api.chronicle[0];
   api.nameEvents(c);
   assert.ok(first.names && first.names.length, 'the first wolf night was not named');
-  const texts = [api.EVENT_NAMES.wolf.phrase, api.cap(api.EVENT_NAMES.wolf.word) + api.WORD_TAIL[api.EVENT_NAMES.wolf.word]];
-  assert.ok(texts.includes(first.names[0].text), `${first.names[0].text} is not an event text`);
-  /* The wolf tag offers two texts, the phrase and the joined word. A third wolf night has
-     nothing left to take, and the camp has already named its wolf night, so it goes unnamed. */
+  assert.ok(phrases.includes(first.names[0].text), `${first.names[0].text} is not one of the wolf phrases`);
+  assert.notEqual(first.names[0].text, joined, 'a night was called a place-shaped joined word');
+
   api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
+  const second = api.chronicle[0];
   api.nameEvents(c);
+  assert.ok(second.names && second.names.length, 'the second wolf night was not named');
+  assert.notEqual(second.names[0].text, first.names[0].text, 'the second wolf night reused the first phrase');
+
   api.log('A wolf comes out of the dark a third time.', [a], 'bad', 'wolf');
   const third = api.chronicle[0];
   api.nameEvents(c);
-  assert.equal(third.names, undefined, `the third night took ${third.names && third.names[0].text}`);
-  assert.equal(api.chronicle[0], third, 'a line was logged for a night that took no name');
+  assert.ok(third.names && third.names.length, 'the third wolf night was not named');
+  assert.equal(new Set([first.names[0].text, second.names[0].text, third.names[0].text]).size, 3,
+    'the three wolf nights did not take three distinct phrases');
+  for (const n of [first, second, third]) assert.ok(phrases.includes(n.names[0].text));
+
+  /* The wolf tag's three phrases are now all taken. A fourth wolf night has nothing left to
+     take, and the camp has already named its earlier ones, so it goes unnamed. */
+  api.log('A wolf comes out of the dark a fourth time.', [a], 'bad', 'wolf');
+  const fourth = api.chronicle[0];
+  api.nameEvents(c);
+  assert.equal(fourth.names, undefined, `the fourth night took ${fourth.names && fourth.names[0].text}`);
+  assert.equal(api.chronicle[0], fourth, 'a line was logged for a night that took no name');
   /* And the pass gives up on it: a line older than a day is never looked at again. */
   api.tick += 2 * api.DAY;
   api.nameEvents(c);
-  assert.equal(third.names, undefined, 'the pass came back to a night it had already passed over');
+  assert.equal(fourth.names, undefined, 'the pass came back to a night it had already passed over');
+});
+
+/* Finding 3: the listed order of EVENT_NAMES[tag].phrases decides, not the alphabetical
+   tie-break. The first night of a tag must take phrases[0] by identity, the second phrases[1],
+   the third phrases[2]. A test that only checks the three are distinct passes under either
+   rule, so this checks the actual index each night lands on. */
+function assertListedOrder(tag, lines){
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const phrases = api.EVENT_NAMES[tag].phrases;
+  const taken = [];
+  for (const line of lines){
+    api.log(line, [a], 'bad', tag);
+    const entry = api.chronicle[0];
+    api.nameEvents(c);
+    assert.ok(entry.names && entry.names.length, `a ${tag} night was not named`);
+    taken.push(entry.names[0].text);
+  }
+  for (let i = 0; i < taken.length; i++){
+    assert.equal(taken[i], phrases[i], `night ${i + 1} of ${tag} took "${taken[i]}", not the listed phrases[${i}] "${phrases[i]}"`);
+  }
+}
+test('a night takes its tag\'s phrases in listed order: frost', () => {
+  assertListedOrder('frost', [
+    'The frost bites hard.',
+    'The frost bites again.',
+    'A third bitter frost.',
+  ]);
+});
+test('a night takes its tag\'s phrases in listed order: fire', () => {
+  assertListedOrder('fire', [
+    'The fire runs through the camp.',
+    'The fire runs again.',
+    'A third fire.',
+  ]);
+});
+
+/* Finding 3b: eventCandidates used to walk every event line of the camp when naming one of them,
+   so a fresher sibling of a DIFFERENT tag could outscore the line's own tag and give it the
+   sibling's phrase. Constructed, not hunted from a seed: an older 'found' line and a fresher
+   'birth' line in the same camp on the same day. nameEvents names the fresher one (birth) first,
+   which correctly takes its own phrases[0]; the older 'found' line is named second, and on the
+   old code its pool still held birth's next candidate (phrases[1], since phrases[0] was just
+   taken) at birth's higher recency, which beat found's own phrases[0]. This fails against the
+   code as it stood before finding 3b. */
+test('two events of different tags on one day each take a phrase from their own tag', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  api.log('Some families leave the camp.', [a], 'major', 'found');
+  const foundLine = api.chronicle[0];
+  foundLine.tick = api.tick - 500;
+  api.log('A baby is born to someone.', [a], 'major', 'birth');
+  const birthLine = api.chronicle[0];
+  assert.notEqual(foundLine, birthLine, 'the two lines are the same line');
+  api.nameEvents(c);
+  assert.ok(birthLine.names && birthLine.names.length, 'the birth line was not named');
+  assert.ok(foundLine.names && foundLine.names.length, 'the found line was not named');
+  const foundPhrases = api.EVENT_NAMES.found.phrases, birthPhrases = api.EVENT_NAMES.birth.phrases;
+  assert.ok(foundPhrases.includes(foundLine.names[0].text),
+    `the found line took "${foundLine.names[0].text}", not one of its own tag's phrases`);
+  assert.ok(birthPhrases.includes(birthLine.names[0].text),
+    `the birth line took "${birthLine.names[0].text}", not one of its own tag's phrases`);
+  assert.equal(foundLine.names[0].text, foundPhrases[0], 'the found line did not take its own listed first phrase');
+  assert.equal(birthLine.names[0].text, birthPhrases[0], 'the birth line did not take its own listed first phrase');
+});
+
+/* Two events of the SAME tag on one day still take that tag's first and second phrase, in the
+   order the nights HAPPENED (finding 3's listed-order rule), even now that eventCandidates is
+   scoped to the line it names. Both lines are logged BEFORE nameEvents ever runs, so both sit
+   in the unnamed pool together -- this is the actual same-day race, not two separate passes.
+   `chronicle` is newest first, so if nameEvents named lines in chronicle order it would name
+   the second (newer) line before the first (older) one and hand it phrases[0], the mistake
+   finding 3c fixes. This failed against the code before that fix: the second (newer) wolf
+   line took phrases[0] and the first (older) line took phrases[1]. */
+test('two events of the same tag on one day take that tag\'s phrases in the order the nights happened', () => {
+  const { api, a, c } = hearthCamp();
+  api.camp = c;
+  const phrases = api.EVENT_NAMES.wolf.phrases;
+  api.log('A wolf comes out of the dark and mauls somebody.', [a], 'bad', 'wolf');
+  const first = api.chronicle[0];
+  api.log('A wolf comes out of the dark and mauls somebody else.', [a], 'bad', 'wolf');
+  const second = api.chronicle[0];
+  assert.notEqual(first, second, 'the two lines are the same line');
+  api.nameEvents(c);
+  assert.ok(first.names && first.names.length, 'the first wolf line was not named');
+  assert.ok(second.names && second.names.length, 'the second wolf line was not named');
+  assert.equal(first.names[0].text, phrases[0], `the first (older) wolf line took "${first.names[0].text}", not phrases[0]`);
+  assert.equal(second.names[0].text, phrases[1], `the second (newer) wolf line took "${second.names[0].text}", not phrases[1]`);
 });
 
 test('a night is never named after a place', () => {
   const { events } = run70(), api = run70world();
   const named = events.filter(e => e.names && e.names.length);
   assert.ok(named.length > 0, 'no night was named in 70 days');
-  const texts = new Set();
+  const texts = new Set(), joined = new Set();
   for (const k in api.EVENT_NAMES){
     const t = api.EVENT_NAMES[k];
-    texts.add(t.phrase);
-    if (api.WORD_TAIL[t.word]) texts.add(api.cap(t.word) + api.WORD_TAIL[t.word]);
+    for (const phrase of t.phrases) texts.add(phrase);
+    if (api.WORD_TAIL[t.word]) joined.add(api.cap(t.word) + api.WORD_TAIL[t.word]);
   }
-  for (const e of named) assert.ok(texts.has(e.names[0].text), `a night was called ${e.names[0].text}`);
+  for (const e of named){
+    assert.ok(texts.has(e.names[0].text), `a night was called ${e.names[0].text}`);
+    assert.ok(!joined.has(e.names[0].text), `a night carried the place-shaped word ${e.names[0].text}`);
+  }
   assert.ok(named.length <= texts.size, `${named.length} nights from ${texts.size} texts`);
 });
 
@@ -573,24 +750,33 @@ test('a fresher event outscores an older one on recency alone', () => {
   api.chronicle[0].tick = api.tick - 10 * api.DAY;
   api.log('Last night the fire ran.', [a], 'bad', 'fire');
   const cands = api.eventCandidates(c);
-  const fire = cands.find(x => x.text === api.EVENT_NAMES.fire.phrase);
-  const wolf = cands.find(x => x.text === api.EVENT_NAMES.wolf.phrase);
+  const fire = cands.find(x => x.text === api.EVENT_NAMES.fire.phrases[0]);
+  const wolf = cands.find(x => x.text === api.EVENT_NAMES.wolf.phrases[0]);
   assert.ok(fire && wolf, 'both events should be candidates');
   assert.ok(fire.recency > wolf.recency, `fire ${fire.recency} should beat wolf ${wolf.recency}`);
 });
 
-test('the phrase of a night names a night only: a place takes the joined word, never the phrase', () => {
+test('any phrase of a night names a night only: a place takes the joined word, never a phrase', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
   api.log('Last night the fire ran.', [a], 'bad', 'fire');
-  const phrase = api.EVENT_NAMES.fire.phrase;
-  assert.ok(api.eventCandidates(c, 'event').some(x => x.text === phrase), 'a night can take the phrase');
+  const phrases = api.EVENT_NAMES.fire.phrases;
+  const eventCands = api.eventCandidates(c, 'event');
+  /* The listed order decides: only the first, unclaimed phrase is offered, never the second or
+     third while the first is still free. */
+  assert.ok(eventCands.some(x => x.text === phrases[0]), `a night cannot take ${phrases[0]}`);
+  for (const phrase of phrases.slice(1)) assert.ok(!eventCands.some(x => x.text === phrase), `a night was offered ${phrase} while ${phrases[0]} was still free`);
+  const joined = api.cap(api.EVENT_NAMES.fire.word) + api.WORD_TAIL[api.EVENT_NAMES.fire.word];
+  assert.ok(!eventCands.some(x => x.text === joined), 'a night can take the joined word');
   for (const kind of ['camp', 'sector', 'pond']){
     const cands = api.eventCandidates(c, kind);
     assert.ok(cands.length > 0, `a ${kind} gets no word from the event at all`);
-    assert.ok(!cands.some(x => x.text === phrase), `a ${kind} can be called ${phrase}`);
+    assert.ok(cands.every(x => x.text === joined), `a ${kind} pool holds something other than the joined word`);
+    for (const phrase of phrases) assert.ok(!cands.some(x => x.text === phrase), `a ${kind} can be called ${phrase}`);
   }
-  assert.ok(!api.candidatesFor('camp', a, c.site).some(x => x.text === phrase), 'the camp pool holds the phrase');
+  for (const phrase of phrases){
+    assert.ok(!api.candidatesFor('camp', a, c.site).some(x => x.text === phrase), `the camp pool holds ${phrase}`);
+  }
 });
 
 test('a finished snare names the ground the work was done on, from the work and the land', () => {
@@ -655,14 +841,38 @@ test('the valley line never says the name twice', () => {
   const line = api.chronicle.find(e => e.text.includes('gives the whole valley a name'));
   assert.ok(line, 'the valley was not named');
   assert.equal(line.text.split(rec.text).length - 1, 1, `${line.text} says ${rec.text} twice`);
-  /* Every lore reason, and every fallback, reads without its own text in it. */
+  /* Every lore reason, and every fallback, reads without its own text in it. The sky's and the
+     sprites' compounds are no longer separate fallback rows: scoreCandidates rewrites their bare
+     lore candidate into that shape instead, so valleyFallbacks now carries only the people's. */
   const rows = [...api.loreCandidates(40), ...api.valleyFallbacks()];
-  assert.equal(rows.length, 6, 'the lore offers three texts and three fallbacks');
+  assert.equal(rows.length, 4, 'the lore offers three texts and one fallback');
   for (const r of rows) assert.equal(r.why.includes(r.text), false, `${r.text}: ${r.why}`);
 });
 
 /* The three texts loreCandidates offers, in the same shapes the namer builds them. */
 function loreTexts(api){ return [api.titleCase(api.lore.people.replace(/^the /, '')), api.lore.sky.text, api.lore.sprites.text]; }
+
+/* Minor: the ruling is general, not two special cases. Any candidate text already owned by a
+   named source (the sky, the sprites) scores zero bare; the people are the one exception, since
+   naming after them is the point. Without the fix, the sky's and sprites' bare texts score like
+   any other lore candidate, and this fails. */
+test('a source\'s own word never scores above zero bare, but the people\'s own name still can', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  const cands = [
+    { text: api.lore.sky.text, axis: 'lore', base: 40 },
+    { text: api.lore.sprites.text, axis: 'lore', base: 40 },
+    { text: api.titleCase(api.lore.people.replace(/^the /, '')), axis: 'lore', base: 40 },
+    { text: `Vale of ${api.lore.sky.text}`, axis: 'lore', base: 20 },
+  ];
+  const scored = api.scoreCandidates(cands, null, api.valley);
+  const byText = t => scored.find(x => x.text === t);
+  assert.equal(byText(api.lore.sky.text).score, 0, 'the sky\'s bare word must score zero');
+  assert.equal(byText(api.lore.sprites.text).score, 0, 'the sprites\' bare word must score zero');
+  assert.ok(byText(`Vale of ${api.lore.sky.text}`).score > 0, 'the compound form must still score');
+  const peopleText = api.titleCase(api.lore.people.replace(/^the /, ''));
+  assert.ok(byText(peopleText).score > 0, 'the people\'s own name must still score bare');
+});
 
 test('the valley is named even when every lore text is already taken, and the name is its own', () => {
   const { api, c } = hearthCamp();
@@ -675,6 +885,42 @@ test('the valley is named even when every lore text is already taken, and the na
   assert.equal(api.valley.names[0].scores[0].axis, 'lore', 'the fallback is still a lore name');
   const texts = api.nameThings().flatMap(t => (t.names || []).map(r => r.text.toLowerCase()));
   assert.equal(new Set(texts).size, texts.length, 'a name is used twice');
+});
+
+/* Important review finding on task 2: a bare source word used to be struck to zero and dropped,
+   never rewritten, so the valley's pool fell straight through to the people's bare name, which
+   outscores a fallback compound (40 vs 20). Measured on seed r at day 45: the bare sky's word
+   ("Sadrumo") would have won the tie-break over the people's bare word ("Ska") before either rule
+   ran, so a source rule that keeps its score, not one that starts it over at a fallback's base,
+   must let it win still, in its distinct form. This fails on a79cd29 (the valley took "Ska") and
+   passes after the fix (the valley takes "Vale of Sadrumo"). */
+test('a source word that would have won bare wins in its distinct form, measured on seed r', () => {
+  const { api } = runDays('r', 45);
+  const n = api.nameOf(api.valley);
+  assert.equal(n, `Vale of ${api.lore.sky.text}`, `seed r's valley took ${n}, not the sky's compound`);
+});
+
+/* Important review finding on task 2's fix, second pass: `lore.sky.text` and `lore.sprites.text`
+   come from `oldWord()` in `nameTheLand` and are never put in `nameIndex`, so `nameTaken()` does
+   not know them. A land candidate made later by `newOldName` can carry the same text by chance,
+   with no relation to the sky or the sprites at all. Before this fix, scoreCandidates matched
+   that candidate by text alone and rewrote it into "Vale of <the sky's word>", keeping the land
+   candidate's own reason clause, so the chronicle credited the wrong origin (a reed by the water,
+   not the sky). The fix marks the sky's and sprites' own rows with a `source` field in
+   `loreCandidates` and rewrites only a candidate that carries it. This candidate is built by hand,
+   not drawn from a seed that happens to collide, and carries no `source` field. */
+test('a candidate that only collides with a source\'s text, and is not that source\'s own, is never rewritten into its distinct form', () => {
+  const { api, c } = hearthCamp();
+  api.camp = c;
+  const cands = [
+    { text: api.lore.sky.text, axis: 'land', base: 20, why: 'for the reed by the water' },
+  ];
+  const scored = api.scoreCandidates(cands, null, api.valley, 'valley');
+  assert.equal(scored.length, 1, 'the candidate must not be dropped from the list, only zeroed');
+  const cand = scored[0];
+  assert.equal(cand.text, api.lore.sky.text, `the land candidate was rewritten into ${cand.text}`);
+  assert.equal(cand.why, 'for the reed by the water', 'the land candidate\'s own reason was overwritten');
+  assert.equal(cand.score, 0, 'a text a source already owns must still never be shown bare');
 });
 
 test('the first camp that is a village names the valley, even when it is not the first camp in the list', () => {
@@ -700,12 +946,14 @@ test('the first camp that is a village names the valley, even when it is not the
 test('a name a person gives aloud is known at once, and describe says it', () => {
   const { api, c } = hearthCamp();
   api.camp = c;
-  /* With the plain lore text taken, one of the two old-tongue texts wins. */
+  /* The sky's word and the sprites' word never score above zero bare, so with the plain
+     people's text taken too, only a distinct compound is left to win. */
   api.giveName({ names: [] }, api.nameRecord(loreTexts(api)[0], {}));
   api.nameValley(c);
   const r = api.valley.names[0];
   assert.ok(r, 'the valley has no name');
-  assert.equal(r.tongue, 'old', 'an old-tongue lore text should have won');
+  assert.notEqual(r.text, api.lore.sky.text, 'the sky\'s word must not be offered bare');
+  assert.notEqual(r.text, api.lore.sprites.text, 'the sprites\' word must not be offered bare');
   assert.notEqual(r.by, 'lost', 'a person gave this name');
   assert.equal(api.valley.nameKnown, true, 'the people know the name they just chose');
   assert.equal(api.describe(api.valley, 'valley'), r.text);
