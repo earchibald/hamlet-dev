@@ -317,6 +317,25 @@ test('every data-pace and data-speed in the template is a rung of its ladder, an
   }
 });
 
+/* Four init sites hand a hard-coded 1 to the guarded doors:
+     src/ui/actions.js:90    setPace(1)
+     src/ui/actions.js:159   setSpeed(ui.savedSpeed || speed || 1)
+     src/ui/actions.js:222   setSpeed(ui.savedSpeed || speed || 1)
+     src/ui/main.js:142      setSpeed(1)
+   The guard throws on a value off its ladder, so a ladder edited to drop 1 does not give the player
+   a wrong speed. It gives them a blank page, because the throw lands on the startup path.
+   These two assertions are the only thing that catches that. Every other reference to either ladder
+   indexes it — PACES[1], SPEEDS[1], SPEEDS.forEach — and an index survives 1 leaving.
+   Do not delete them while removing assertions that restate a constant (issue #80). They read like
+   one and they are not: each states an assumption the init path already makes, in the one place a
+   ladder edit is read. Delete either, edit its ladder, and the suite stays green while the page
+   stops opening. */
+test('the value the init path hands each door is a rung of that door’s ladder', () => {
+  const api = loadUI(['state'], ['PACES', 'SPEEDS']);
+  assert.ok(api.PACES.includes(1), 'the ages open with setPace(1), so 1 must be a rung of PACES or the first frame throws');
+  assert.ok(api.SPEEDS.includes(1), 'the days open with setSpeed(1) and the `|| 1` fallback, so 1 must be a rung of SPEEDS or the first frame throws');
+});
+
 /* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site
    added later. 4 is on SPEEDS and not on PACES, and 2 is on PACES and not on SPEEDS, so each case is
    the drift between the two ladders, not a value invented for the test. */
