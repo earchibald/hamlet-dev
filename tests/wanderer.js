@@ -5,14 +5,16 @@ const assert = require('node:assert/strict');
 const { runDays, DAY } = require('./lib/run');
 
 /* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
-   This file asks for 48 world days, and no day count in it has been changed. A world day
-   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   This file asks for 493 world days, and no day count in it has been changed. The longest single
+   run is 48 days, which an earlier version of this note reported as the file's total; there are 15
+   runs. A world day costs about 25 s on this branch under load, against dev's 0.31 s, so the file
+   cannot finish in a usable time: about three and a half hours, not twenty minutes.
    The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
    back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
    slow engine is a gate nobody measured.
    Run it with SLOW=1. Task 4 restores it. */
 const SUSPENDED_FOR_G4 = process.env.SLOW ? false
-  : 'suspended for G4: this file asks for 48 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+  : 'suspended for G4: this file asks for 493 world days across 15 runs, and a world day costs about 25 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it, and takes hours. Task 4 restores it.';
 if (SUSPENDED_FOR_G4){
   test('tests/wanderer.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
   return;

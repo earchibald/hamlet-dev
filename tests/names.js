@@ -81,8 +81,16 @@ test('a 70-day run still ends with the baseline beings and items', { skip: !proc
   for (const seed of SEEDS){
     const { api, events } = runDays(seed, 70);
     const fp = fingerprint(api, events);
-    assert.equal(fp.beings, layout[seed].day70.beings, `seed ${seed}: beings moved by day 70`);
-    assert.equal(fp.items, layout[seed].day70.items, `seed ${seed}: items moved by day 70`);
+    /* Name the comparison, not a verdict. This guard holds a live run against a frozen record, so a
+       difference means either that naming moved something — the rule this file exists to hold — or
+       that the record is older than the engine. On a branch that retunes the clock the second is the
+       likely one, and a message reading "beings moved" accuses the code of the most serious rule in
+       CLAUDE.md for a stale fixture. Say which record, and when it was taken. */
+    const REC = 'tests/names-layout.json, taken at aa3a426';
+    assert.equal(fp.beings, layout[seed].day70.beings,
+      `seed ${seed}: the beings at day 70 differ from ${REC}. Either naming moved a being, or the record predates a deliberate change to the engine. Check which before treating this as a naming fault.`);
+    assert.equal(fp.items, layout[seed].day70.items,
+      `seed ${seed}: the items at day 70 differ from ${REC}. Either naming moved an item, or the record predates a deliberate change to the engine. Check which before treating this as a naming fault.`);
   }
 });
 

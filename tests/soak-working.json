@@ -7,6 +7,7 @@
   "beings": "481b74cc",
   "items": "2308d38",
   "legends": "e3b8f374",
+  "tiles": "676f9e76",
   "counts": {
    "storms": 0,
    "strikes": 0,
@@ -90,6 +91,7 @@
   "beings": "56d963af",
   "items": "e5d08095",
   "legends": "bb341815",
+  "tiles": "71ef44b9",
   "counts": {
    "storms": 1,
    "strikes": 1,
@@ -172,6 +174,7 @@
   "beings": "12981647",
   "items": "ab787fe0",
   "legends": "21d4981",
+  "tiles": "834dd0c1",
   "counts": {
    "storms": 1,
    "strikes": 1,
@@ -248,6 +251,7 @@
   "beings": "25a76eb3",
   "items": "1947164a",
   "legends": "a6c8c686",
+  "tiles": "ffd75482",
   "counts": {
    "storms": 1,
    "strikes": 0,
@@ -324,6 +328,7 @@
   "beings": "90d118b",
   "items": "f9431f5a",
   "legends": "9480d73b",
+  "tiles": "c0db0db8",
   "counts": {
    "storms": 1,
    "strikes": 0,
@@ -400,6 +405,7 @@
   "beings": "7afafe12",
   "items": "d397c368",
   "legends": "1a1daba8",
+  "tiles": "f630e2cc",
   "counts": {
    "storms": 1,
    "strikes": 0,
