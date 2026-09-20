@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const { runDays, cutOff } = require('./lib/run');
+const { runDays, cutOff, setClock } = require('./lib/run');
 
 /* RESTORED by G4 task 4, 2026-09-20. This file was suspended by task 1 because a world day
    cost about fifteen seconds and the file asks for 70 world days. Every day count is
@@ -97,9 +97,14 @@ test('gnomes sleep in the burrow by day and come out to the patch at dusk', () =
   const api = load(); api.startWorld('r');
   const g = api.beings.find(b => b.species === 'gnome');
   for (const k in g.needs) g.needs[k] = 90; g.needs.food = 30;
-  api.tick = api.ticks(12 * 1000 + 500); run(api, g, 200);
+  /* `setClock` and not `api.tick = ...`. Task 3 gave every being `seen`, the tick its body was last
+     brought up to, so shoving the world's tick forward by hand charges the gnome every hour of the jump
+     the moment `catchUp` next runs: it arrived at dusk starving, slept through the test's own claim and
+     the file said "doing null". `setClock` is the one function that moves the clock, and it moves every
+     accrual marker with it. Ruling 8 of plan G4, and `tests/setclock.js` holds it. */
+  setClock(api, api.ticks(12 * 1000 + 500)); run(api, g, 200);
   assert.ok(inDen(g), `by day a gnome stays home; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
-  api.tick = api.ticks(20 * 1000 + 500); g.task = null; run(api, g, 400);
+  setClock(api, api.ticks(20 * 1000 + 500)); g.task = null; run(api, g, 400);
   assert.ok(g.z === 0 && g.den.patch.some(t => api.dist(t.x, t.y, g.x, g.y) <= 1), `at dusk it goes to the patch; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
   assert.ok(g.needs.food > 30, 'and eats');
 });
@@ -127,7 +132,7 @@ test('the first gnome seen at dusk is written down once per camp', () => {
   for (let k = 1; k <= 3; k++){ const t = api.tileAt(h.x + k, h.y); t.feature = null; t.struct = null; if (!api.GROUND[t.ground].walk) t.ground = 'grass'; }
   /* Hour 20 of day 20, and one tick past it so (tick + h.id) is even: Hal's stride of 2
      must land on this tick, or the single updateBeing call below never reaches chooseTask at all. */
-  api.tick = api.ticks(20 * 1000 + Math.round(20 / 24 * 1000) + 1); api.camp = c; api.updateBeing(h);
+  setClock(api, api.ticks(20 * 1000 + Math.round(20 / 24 * 1000) + 1)); api.camp = c; api.updateBeing(h);
   assert.equal(c.gnomes.known, true);
   /* The person may pick a camp site on the same tick, so the sighting is looked for in the chronicle, not at its head. */
   assert.equal(api.chronicle.filter(e => e.text.includes('small figure')).length, 1, api.chronicle.map(e => e.text).join(' | '));

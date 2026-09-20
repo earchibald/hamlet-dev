@@ -96,9 +96,13 @@ test('a loaded world has its records joined as the saved one had', { skip: slow(
   assert.equal(api.camps.indexOf(api.camp), was.camps.indexOf(was.camp));
 });
 /* Seed r has no pitfall at day 40, so the pitfall assertion above cannot fail there. A small world on
-   seed alpha digs four by day 21, and it runs in a few seconds. */
-test('a world with pitfalls in it round-trips and keeps each pitfall in its tile', () => {
-  const was = load(); was.startWorld('alpha', { sw: 8, sh: 5 }); for (let i = 0; i < 20000; i++) was.step();
+   seed alpha is the one that digs them. The step count was an old-tick count like the rest of this file,
+   and converting it to its real span, twenty world days, was not enough: the retune moved the day the
+   first pitfall is dug. MEASURED, day by day, on this branch: nothing by day 20, two by day 29. So the
+   run is thirty world days. The assertion is untouched; what moved was the world, and the task that
+   owns the pitfall's own timings can read that number when it gets there. */
+test('a world with pitfalls in it round-trips and keeps each pitfall in its tile', { skip: slow(30) }, () => {
+  const was = load(); was.startWorld('alpha', { sw: 8, sh: 5 }); for (let i = 0; i < d(30); i++) was.step();
   assert.ok(was.camps.reduce((n, c) => n + c.pitfalls.length, 0) > 0, 'this world was meant to have a pitfall');
   const api = load(); assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
   for (const c of api.camps) for (const p of c.pitfalls){
@@ -294,6 +298,18 @@ function burnAHollow(a, ca, N){
   const beat = a.CLOCK.every.cellular;
   for (const end = at + d(0.8); at < end && !orphaned(); at += beat) runOn(a, at, beat, ca);
   assert.ok(orphaned(), 'the hollow never burned out under a living sprite, so the stray path went untested');
+  /* And on to a tick with the camp busy. `sameStory` asks that somebody be walking and somebody at
+     work at the save, in its own words "pick another step", because a save taken while the valley
+     stands still tests none of the state a walk or a job holds. The tick the hollow happens to burn
+     out on is not that tick. This runs on to the next one that is, a beat at a time, and fails rather
+     than shrugs if it never comes. */
+  for (const end = at + d(0.5); at < end; at += beat){
+    if (a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length) &&
+        a.beings.some(b => b.alive && b.task && b.task.progress > 0)) break;
+    runOn(a, at, beat, ca);
+  }
+  assert.ok(a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length),
+    'half a world day after the hollow burned out, nobody was walking');
   return at;
 }
 test('a world whose hollow pine burned out under its sprites saves, loads, and runs on', t => {
@@ -341,6 +357,15 @@ function burnAndEmptyAGrove(a, ca, N){
   assert.ok(!a.beings.some(b => b.grove === stray), 'the dead sprites were meant to be pruned out of beings');
   assert.ok(!a.groves.includes(stray), 'the grove was meant to be in no list');
   assert.ok(a.nameOf(stray), 'the grove was meant to carry a name');
+  /* And on to a busy tick, for `burnAHollow`'s reason: `sameStory` wants somebody walking and somebody
+     at work at the save, and the tick the prune happens to fall on is not that tick. */
+  for (const end = at + d(0.5); at < end; at += beat){
+    if (a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length) &&
+        a.beings.some(b => b.alive && b.task && b.task.progress > 0)) break;
+    runOn(a, at, beat, ca);
+  }
+  assert.ok(a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length),
+    'half a world day after the grove emptied, nobody was walking');
   return at;
 }
 test('a named grove that no list and no being holds any more saves, loads, and keeps its text taken', t => {
@@ -403,10 +428,10 @@ function nameState(api){
     epithets: api.beings.map(b => [b.epithet || '', ...(b.epithets || []).map(r => r.text)].join('|')),
   };
 }
-/* The small valley of seed alpha at step 23000 has named a camp twice over, a village, four sectors,
+/* The small valley of seed alpha on world day 23 has named a camp twice over, a village, four sectors,
    seven events, and the valley itself, and eighteen people carry an epithet. */
-test('a world with every kind of name, saved, loaded, and run on, names as the straight run does', t => {
-  const o = oracle('alpha', 23000, 1500, SMALL);
+test('a world with every kind of name, saved, loaded, and run on, names as the straight run does', { skip: slow(26) }, t => {
+  const o = oracle('alpha', d(23), d(1.5), SMALL);
   const snap = o.snap;
   t.diagnostic(`at the save: the valley is ${snap.valley.names[0].text}, ${snap.sectors.filter(s => s.names && s.names.length).length} sector(s) named, ${snap.lostNames.length} name(s) the index alone holds, ${snap.nrng} in the name stream`);
   /* What the save was picked for. Each is read off the save itself. */
@@ -458,7 +483,7 @@ test('a world saved before anybody living has named a thing round-trips whole', 
   /* And it names things from there as the straight run does. */
   const named = w => w.nameThings().filter(x => w.nameOf(x)).length;
   const before = named(api);
-  for (let i = 0; i < 4000; i++){ was.step(); api.step(); }
+  for (let i = 0; i < d(4); i++){ was.step(); api.step(); }
   assert.deepEqual(nameState(api), nameState(was));
   assert.ok(named(api) > before, `nothing was named after the load: ${named(api)} things named, as before`);
 });
@@ -590,7 +615,7 @@ test('a load while a god\'s turn is open leaves no turn standing, and the world 
 });
 test('a world made with forced acts round-trips, and the option comes back', () => {
   const was = load(); was.startWorld('alpha', { sw: 8, sh: 5, force: true });
-  for (let i = 0; i < 2000; i++) was.step();
+  for (let i = 0; i < d(2); i++) was.step();
   assert.equal(was.options.force, true);
   const api = load();
   assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
@@ -637,7 +662,7 @@ test('the guard walks every saved global, not only creation and the field', () =
    A refusal is enough when the save is merely wrong. These are the ones that loaded and then killed
    the page a step later, so the loader must refuse each in the stage. */
 test('a save that would kill the page a step later is refused, and the world stays as it was', () => {
-  const was = load(); was.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 2000; i++) was.step();
+  const was = load(); was.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < d(2); i++) was.step();
   const good = through(was.takeSnapshot());
   const spoil = {
     'a species no table knows':  s => { s.beings[0].species = 'elf'; },
@@ -669,7 +694,7 @@ test('a save that would kill the page a step later is refused, and the world sta
   /* The good save still loads, so the checks above refuse nothing a real world writes. */
   const api = load();
   assert.equal(api.loadSnapshot(through(good)), null);
-  for (let i = 0; i < 200; i++) api.step();
+  for (let i = 0; i < d(0.2); i++) api.step();
 });
 /* A version 1 save is refused, and this is the test that says so. G4 task 1 made a tick 86.4 world
    seconds, so a version 1 save holds a tick and every stamp beside it meaning 86.4 times less. No
@@ -819,6 +844,11 @@ const KNOWN_CONSTS = {
      refills the same object rather than reassigning it, because the manifest takes the API's
      references once at load. */
   beats: 'the cellular beats, rebuilt by resetBeats at every world start',
+  /* G4 task 4. Why the horizon was the next tick, counted for the pinned-share report. No rule reads
+     it and nothing in it decides anything, the same shape as `chronicleWritten`. `resetPins` empties
+     and refills the same object rather than reassigning it, for `beats`' reason: the manifest takes
+     the API's references once at load. */
+  pins: 'the skip\'s pinned-share counters, emptied and refilled by resetPins at every world start',
 };
 /* The containers nothing writes into after load time. Each was checked by the same grep, and none of
    them was hit. A table needs no reason beyond being a table, so this is a list of names. */

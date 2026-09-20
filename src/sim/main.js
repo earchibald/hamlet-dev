@@ -71,10 +71,13 @@ function updateWorld(){
 function step(oneAct){
   if (pending) return 'The turn is yours.';
   if (era === 'gods') return ageStep(oneAct);
-  advance(tick + 1);
+  advance(tick + CLOCK.every.next);
 }
 /* One move of the days era. `to` is the tick the world arrives at, and it may be many ticks ahead: a
-   step is `advance(tick + 1)` and a jump is `advance` of a tick `nextEvent` named. Everything below
+   step is `advance` of the next tick and a jump is `advance` of a further tick `nextEvent` named.
+   (Written in words rather than in code, because the lint in `tests/clock.js` reads a comment as a rule
+   and `CLOCK.every.next` is the constant a rule must use. The soak's lint strips comment spans; this
+   one does not, and widening it is task 11's, so the comment gives way instead.) Everything below
    is the old body of `step`, and the only change is that `tick` is assigned rather than incremented.
    Nothing here loops over the ticks between, because nothing here is owed them: the systems that run
    on a beat are on a beat, a camp's pit burns by elapsed time, and a being's body is computed from
@@ -177,14 +180,14 @@ function nextEvent(){
      world minute later, and the two runs would differ over a fire the player lit. `fireCount` is a
      count the engine already keeps, so this is one integer read. Fire is episodic on these seeds --
      the soak's six hold no burning tile at all -- so it is not a standing cost. */
-  if (fireCount > 0){ pins.fire++; pins.next++; return tick + 1; }
-  if (pinAt === tick){ pins[pinMask === 1 ? 'fire' : pinMask === 2 ? 'hunter' : pinMask === 3 ? 'both' : 'none']++; pins.next++; return tick + 1; }
-  if (acted === tick){ pins.acted++; pins.next++; return tick + 1; }
+  if (fireCount > 0){ pins.fire++; pins.next++; return tick + CLOCK.every.next; }
+  if (pinAt === tick){ pins[pinMask === 1 ? 'fire' : pinMask === 2 ? 'hunter' : pinMask === 3 ? 'both' : 'none']++; pins.next++; return tick + CLOCK.every.next; }
+  if (acted === tick){ pins.acted++; pins.next++; return tick + CLOCK.every.next; }
   let t = beat, why = 'beat';
   const mark = (v, kind) => { if (typeof v === 'number' && v > tick && v < t){ t = v; why = kind; } };
   for (const a of beings){
     if (!a.alive || SPECIES[a.species].perTick === false) continue;
-    if (a.next <= tick){ pins.being++; pins.next++; return tick + 1; }
+    if (a.next <= tick){ pins.being++; pins.next++; return tick + CLOCK.every.next; }
     mark(a.next, 'being');
   }
   /* `afterTheLast` and `theLoneFounder`, both read on every tick in `updateCamps`. */
@@ -200,7 +203,7 @@ function nextEvent(){
     if (!b.alive || !b.oldDen || b.den) continue;
     mark(b.oldDen.clearedAt + CLOCK.den.digAfter, 'stored'); mark(b.digAgain, 'stored');
   }
-  pins[why]++; if (t === tick + 1) pins.next++;
+  pins[why]++; if (t === tick + CLOCK.every.next) pins.next++;
   return t;
 }
 /* Run the world to tick `t`, jumping over the ticks with nothing in them. It is what the tests, the

@@ -157,6 +157,11 @@ const CLOCK = {
     godsRest: days(1),          // the sleeping gods are kept rested
     cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
     body: mins(1),              // the longest a being's body goes unread. See `catchUp` in beings.js.
+    /* The next tick: the finest grain the engine steps at, and the horizon when something must be
+       looked at again at once. It is one world second, written in the unit helper like every other
+       duration here, because `tick + 1` in a rule is a bare time literal and `tests/clock.js` says so.
+       G4 task 4 reads it in `nextEvent` and in `step`. */
+    next: secs(1),
   },
   /* When night falls and when it lifts, as ticks into the day. `isNight` reads them, and so does the
      stretch machinery in beings.js, which needs the tick and not the hour. */

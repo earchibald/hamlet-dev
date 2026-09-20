@@ -548,7 +548,7 @@ const SENSE = 5;                    // how far off a being notices fire or a hun
    rest. */
 const rousedBy = (a, b) => SPECIES[b.species].hunter ? a.species !== b.species : b.species === 'human' && a.species !== 'human';
 /* What the predicate must see, decided rather than inherited. The pass asks the world one question:
-   which beings had something dangerous within `SENSE` of them AT THE START OF THIS TICK. So the list
+   which beings had something dangerous within `SENSE` of them at the start of this tick. So the list
    of rousers is built once, before the loop, and nothing the loop does edits it.
 
    The list used to be built lazily inside the loop and then invalidated by that same loop. A sleeper

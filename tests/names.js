@@ -876,7 +876,7 @@ test('a finished job names the ground the work was done on, through the real sto
   const s = api.sectorOfTile(spot);
   assert.equal(api.nameOf(s), null, 'the sector is named already');
   a.x = spot.x; a.y = spot.y; a.z = 0;
-  api.setTask(a, 'setSnare', { at: [spot.x, spot.y] }, { label: 'Setting a snare', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.setTask(a, 'setSnare', { at: [spot.x, spot.y] }, { label: 'Setting a snare', path: [], progress: DONE(api), target: [spot.x, spot.y], within: 1 });
   api.runTask(a);
   assert.equal(a.task, null, 'the job did not finish');
   assert.ok(api.nameOf(s), 'the sector was not named by the finished job');
@@ -891,7 +891,7 @@ test('a job with no work word names nothing', () => {
   assert.equal(api.nameOf(s), null, 'the sector is named already');
   a.x = spot.x; a.y = spot.y; a.z = 0;
   /* checkSnare on bare ground: the effect finds no snare, so there is no work word here. */
-  api.setTask(a, 'checkSnare', { at: [spot.x, spot.y] }, { label: 'Checking the snare', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.setTask(a, 'checkSnare', { at: [spot.x, spot.y] }, { label: 'Checking the snare', path: [], progress: DONE(api), target: [spot.x, spot.y], within: 1 });
   api.runTask(a);
   assert.equal(api.nameOf(s), null, 'a job with no work word named the ground');
 });
@@ -915,12 +915,18 @@ test('the ground named is the work tile\'s, not the worker\'s, across a sector b
   assert.equal(api.nameOf(sw), null, 'the work sector is named already');
   assert.equal(api.nameOf(ss), null, 'the worker\'s sector is named already');
   a.x = stand.x; a.y = stand.y; a.z = 0;
-  api.setTask(a, 'setSnare', { at: [work.x, work.y] }, { label: 'Setting a snare', path: [], progress: 9999, target: [work.x, work.y], within: 1 });
+  api.setTask(a, 'setSnare', { at: [work.x, work.y] }, { label: 'Setting a snare', path: [], progress: DONE(api), target: [work.x, work.y], within: 1 });
   api.runTask(a);
   assert.ok(api.nameOf(sw), 'the work tile\'s sector was not named');
   assert.equal(api.nameOf(ss), null, 'the worker\'s own sector was named instead');
 });
 
+/* `DONE` is "this job is finished", and it is read from the table rather than written down. The five
+   `setTask` calls below carried `progress: DONE(api)`, which was past every job on the old clock and is
+   short of several on this one: `CLOCK.work.hut` is 20,736 now, so the hut was never built and the test
+   read a null struct. A number that must be larger than a table's largest entry is read off the table.
+   G4 task 4, while restoring this file. */
+const DONE = api => Math.max(...Object.values(api.CLOCK.work)) + 1;
 test('feeding a fire that already stands names nothing, and a finished hut names the ground', () => {
   const { api, a, c } = hearthCamp();
   api.camp = c;
@@ -928,7 +934,7 @@ test('feeding a fire that already stands names nothing, and a finished hut names
   assert.equal(api.nameOf(pitSector), null, 'the camp sector is named already');
   c.stash.stick = 20; c.stash.log = 20; c.stash.hide = 4;
   a.x = c.pit[0]; a.y = c.pit[1]; a.z = 0;
-  api.setTask(a, 'feedFire', { at: c.pit.slice() }, { label: 'Feeding the fire', path: [], progress: 9999, target: c.pit.slice(), within: 1 });
+  api.setTask(a, 'feedFire', { at: c.pit.slice() }, { label: 'Feeding the fire', path: [], progress: DONE(api), target: c.pit.slice(), within: 1 });
   api.runTask(a);
   assert.equal(api.nameOf(pitSector), null, 'feeding the fire named the ground');
   /* The same stop, on a job that raises a structure where none stood: that one names the ground. */
@@ -936,7 +942,7 @@ test('feeding a fire that already stands names nothing, and a finished hut names
   const s = api.sectorOfTile(spot);
   assert.equal(api.nameOf(s), null, 'the sector is named already');
   a.x = spot.x; a.y = spot.y; a.z = 0;
-  api.setTask(a, 'buildHut', { at: [spot.x, spot.y] }, { label: 'Building a hut', path: [], progress: 9999, target: [spot.x, spot.y], within: 1 });
+  api.setTask(a, 'buildHut', { at: [spot.x, spot.y] }, { label: 'Building a hut', path: [], progress: DONE(api), target: [spot.x, spot.y], within: 1 });
   api.runTask(a);
   assert.equal(api.tileAt(spot.x, spot.y).struct.type, 'hut', 'the hut was not built');
   assert.ok(api.nameOf(s), 'the finished hut did not name the ground');
