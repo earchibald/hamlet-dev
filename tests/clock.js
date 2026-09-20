@@ -100,6 +100,21 @@ test('every marker converts the old clock, and none is an identity', () => {
      marker that does nothing is otherwise the mistake this test exists to catch, so the exception
      is written down rather than left to the absence of an assertion. */
   assert.equal(api.lookRate(0.35), 0.35);
+  /* `stock` is the second identity, and for a different reason: an amount HELD keeps its units when
+     the rate that spends it converts. Both are named here so the title above stays true. */
+  assert.equal(api.stock(240), 240);
+});
+
+/* A stock divided by its rate is a world time, and that time must not move. `strikeFuel` was
+   `ticks(240)` and `burn` is `tickRate(1)`: converting BOTH multiplied a lightning fire's life by
+   86.4, from dev's 0.24 world days to 20.7. Every table value was a legal number and the whole-number
+   rule passed, because 20,736 is a whole number of ticks. The fault was that a stock is not a
+   duration, and no rule about durations can see it. This is the third fault of that shape in task 1
+   and the second that only a measurement caught. */
+test('a lightning fire burns for about a quarter of a world day, as it did before the retune', () => {
+  const api = load();
+  const days = api.CLOCK.fire.strikeFuel / api.CLOCK.fire.burn / api.DAY;
+  assert.ok(Math.abs(days - 0.24) < 0.01, `a strike burns ${days.toFixed(2)} world days; dev burns 0.24`);
 });
 
 /* A duration is a whole number of world seconds, because rules compare durations with `%` and a

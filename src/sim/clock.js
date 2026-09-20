@@ -60,6 +60,15 @@ const ticks = n => Math.round(n * 86.4), strides = n => Math.round(n * 172.8), t
    the plant block in G4 task 1 and it stopped plant growth in the valley. The marker still says
    nobody has decided what the value should be; it says only that the rebasing must not touch it. */
 const lookRate = p => p;
+/* `stock` is a legacy marker for an amount HELD: fuel in a pit, fire in a tile. A stock does not
+   convert. Its rate does: `fire.burn` is fuel a tick and divides like any amount a tick, so the fuel
+   keeps its own units and the time to burn down is preserved by itself.
+   `strikeFuel` was written `ticks(240)`, and that read as right because on the old clock `burn` was
+   exactly 1 a tick, so one number was both a fuel and a count of ticks. The rebasing broke the
+   coincidence and converting BOTH the stock and the rate multiplied the burn time by 86.4: a
+   lightning fire lasted 20.7 world days against dev's 0.24. Nothing went red. It was found only
+   because the fire share in the pinned-horizon measurement was too large to believe. */
+const stock = n => n;
 
 /* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
    because the seasons are not all the same length.
@@ -217,7 +226,7 @@ const CLOCK = {
     burn: tickRate(1),           // fuel a burning tile loses (the pit's rate is `rate.pitBurn`)
     stormQuench: tickRate(2),    // more, in rain
     spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
-    strikeFuel: ticks(240),      // a lightning strike smoulders at least this long at `burn`
+    strikeFuel: stock(240),      // fuel a strike leaves in the tile. At `burn` that is about a quarter of a world day.
   },
   plant: {
     samples: tickRate(60),       /* Looks a tick, and after the rebasing a fraction: sixty looks an
