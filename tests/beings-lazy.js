@@ -209,6 +209,71 @@ test('a sleeper with a wolf five tiles off wakes on that tick', () => {
   assert.ok(a.thoughts.some(t => t.key === 'woken'), 'being woken by a wolf is something the player can see');
 });
 
+/* `rousedBy` rouses an animal too: a hunter rouses anything but its own kind, and a person rouses
+   every animal. That waking is new — the old head returned at the sleep check before it ever looked —
+   and a new behaviour the player cannot see is a behaviour that is not there. The inspector's Thoughts
+   panel is drawn for every species, so a thought is the row that shows it. */
+test('an animal roused out of sleep gets a thought too', () => {
+  for (const species of ['gnome', 'rabbit', 'deer']){
+    const { api, a } = world();
+    api.tick = api.days(1) + api.hours(23);
+    const b = api.makeBeing(species, a.x + 20, a.y);
+    b.asleep = true; b.seen = api.tick; b.thoughts = []; api.beings.push(b);
+    api.step();
+    const w = api.makeBeing('wolf', b.x + 3, b.y);
+    w.asleep = false; api.beings.push(w);
+    api.step();
+    assert.equal(b.asleep, false, `a ${species} does not sleep through a wolf three tiles off`);
+    const t = b.thoughts.find(q => q.key === 'woken');
+    assert.ok(t, `a roused ${species} gets nothing the player can see`);
+    assert.equal(t.text, 'Woke to something moving close by', `the ${species}'s line names no time of day, because a person rouses an animal by day too`);
+  }
+});
+
+/* The thought must not outlive its own duration. `addThought` moves `until` to `tick + dur` on every
+   call, and the pass calls it on every tick a threat is still there, so the half hour of
+   `CLOCK.thought.woken` became permanent and its mood penalty of −6 with it. */
+test('the woken thought ends at its until, even while the wolf stays', () => {
+  const { api, a } = world();
+  api.tick = api.days(1) + api.hours(22);
+  /* Tired enough to go straight back to sleep, and wanting nothing else, so the person sleeps, is
+     roused, and sleeps again for as long as the wolf is there. That loop is what renewed the thought:
+     each waking moved `until` to `tick + CLOCK.thought.woken`. */
+  a.asleep = true; a.hp = 100; a.seen = api.tick;
+  a.needs.rest = 10;
+  for (const k of ['food', 'water', 'warmth', 'social']) if (a.needs[k] !== undefined) a.needs[k] = 90;
+  api.tileAt(a.x, a.y, 0).struct.fuel = 20000;
+  api.step();
+  const w = api.makeBeing('wolf', a.x + 4, a.y);
+  w.asleep = false; api.beings.push(w);
+  api.step();
+  const t = a.thoughts.find(q => q.key === 'woken');
+  assert.ok(t, 'the wolf roused the sleeper');
+  const until = t.until;
+  assert.equal(until, api.tick + api.CLOCK.thought.woken, 'the thought names the tick it is gone on');
+  /* The wolf is held four tiles off and fed, so it neither leaves nor attacks, and the world runs a
+     long way past the thought's own tick. Two things are watched. A live thought's `until` must never
+     move, and the thought must lapse at least once: a waking that lands after it has gone starts a
+     fresh half hour, which is honest, and that is why the test asks for a lapse rather than for the
+     thought to stay away. */
+  let cur = until, lapses = 0, extended = 0;
+  while (api.tick < until + api.hours(2)){
+    w.x = a.x + 4; w.y = a.y; w.asleep = false; w.needs.food = 90;
+    api.step();
+    const q = a.thoughts.find(q => q.key === 'woken');
+    if (!q){ if (cur !== null) lapses++; cur = null; continue; }
+    if (cur === null){ cur = q.until; lapses++; continue; }
+    if (q.until === cur) continue;
+    /* A new `until` is honest only if the old one had run out. A being roused on the very tick its
+       thought expires lapses and wakes again inside one step, which is a lapse this loop cannot see
+       from the outside, so it is read off the old tick instead. */
+    if (cur <= api.tick) lapses++; else extended++;
+    cur = q.until;
+  }
+  assert.equal(extended, 0, `a live woken thought had its until pushed forward ${extended} times, so its half hour never ends`);
+  assert.ok(lapses > 0, `the woken thought never lapsed across ${api.tick - until} ticks past its own until, so the half hour of CLOCK.thought.woken means nothing`);
+});
+
 /* The human branch of the body is the long one, and every test above is a person. A sprite has no
    warmth and no food at all, and a rabbit has no water, so the branch that reads them must not reach
    for a need that is not there. Both are stepped by the tick like anyone else. */

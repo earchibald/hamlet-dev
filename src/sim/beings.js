@@ -569,7 +569,16 @@ function senseBeings(){
       catchUp(a);
       if (!a.alive) continue;
       a.asleep = false;
-      if (a.species === 'human') addThought(a, 'woken', 'Woke in the night to something moving', -6, CLOCK.thought.woken);
+      /* Every species that is roused gets the thought, because the rule is that a new behaviour the
+         player cannot see is a behaviour that is not there. A gnome, a rabbit and a deer are roused
+         too, and the inspector's Thoughts panel is drawn for every species. Their line does not name
+         the night, because a person rouses an animal in daylight as well.
+         The thought is not renewed while the thing that woke the being is still about. `addThought`
+         moves `until` to `tick + dur` on every call, so a wolf that lingered made the half hour of
+         `CLOCK.thought.woken` permanent and the mood penalty with it. A waking after the thought has
+         lapsed starts a fresh half hour, which is what a second waking is. */
+      if (!hasThought(a, 'woken'))
+        addThought(a, 'woken', a.species === 'human' ? 'Woke in the night to something moving' : 'Woke to something moving close by', -6, CLOCK.thought.woken);
     }
   }
 }
