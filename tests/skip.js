@@ -256,6 +256,34 @@ test('a thought whose until falls inside a jump is gone on the far side, in both
   sameStory(a, b, 'a thought ending');
 });
 
+/* A STORED TICK THAT DRAWS A NUMBER WHEN IT FIRES, which is the sharpest of these cases and the one
+   the six real seeds cannot see. `camp.nextArrival` is read on every tick in `updateCamps` and reset
+   with `rint(CLOCK.arrival.spread)` the moment it passes, so a jump that lands past it moves the draw
+   to another tick and the whole stream after it shifts. It is set here to a tick off the beat, which
+   is where the horizon has to name it rather than stumble on it.
+   This is also the measurement of what the six-seed test does NOT cover. Drop `mark(c.nextArrival)`
+   from `nextEvent` and the six seeds stay green over three world days -- measured, not assumed,
+   because nothing skips in a live valley -- while this test goes red. */
+test('an arrival tick that falls inside a span is read on its own tick', t => {
+  const api0 = load();
+  let want = 0;
+  const { a, b } = bothWays('r', NIGHT(api0), 600, api => {
+    layAPit(api, 40);
+    const c = api.camps[0];
+    /* Twenty-three ticks on, so it is inside the first jump and not on the beat. */
+    want = api.tick + 23; c.nextArrival = want;
+  });
+  t.diagnostic(`the arrival tick is ${want}; the engine landed on it: ${landedOn(b, want)}; ` +
+    `next arrival after: stepped ${a.api.camps[0].nextArrival}, skipped ${b.api.camps[0].nextArrival}`);
+  assert.ok(b.jumps.length > 0, 'the engine made no jump at all, so this case did not run');
+  assert.ok(landedOn(b, want), `the engine did not land on tick ${want}: nextEvent does not name the arrival`);
+  assert.ok(!inAJump(b, want), `tick ${want} fell inside a jump`);
+  assert.notEqual(b.api.camps[0].nextArrival, want, 'the arrival tick was never read, so the case did not run');
+  assert.equal(b.api.camps[0].nextArrival, a.api.camps[0].nextArrival,
+    'the next arrival was drawn at another tick in the skipped run, so the whole stream after it differs');
+  sameStory(a, b, 'an arrival tick');
+});
+
 /* THE FIFTH ADVERSARIAL CASE IS TASK 9'S, and it is written down here rather than left out. A stop
    set inside a jump cannot be tested, because the days era has no stop to set: `src/sim/door.js`
    answers a days-era `run` with the same sentence twice, and the watch list is task 9's work. So this
@@ -312,6 +340,62 @@ test('a wolf that walks is on the tick anyway, so it cannot be jumped over at an
   assert.ok(wolf.alive && wolf.task, 'the wolf never picked a task, so it was not walking');
   assert.equal(w.jumps.length, 0, 'the engine jumped while an awake animal was on the tick');
   assert.equal(w.api.moves, n, 'a walking being did not hold the engine to the tick');
+});
+
+/* ---------- the predicate the horizon reads ---------- */
+/* THE SKIP READS `senseBeings`' PREDICATE AS ITS HORIZON, so what that predicate sees is task 4's
+   business and not only task 3's. The list of rousers was built lazily inside the pass's own loop and
+   invalidated there, so a sleeper the pass woke early joined a list built later and roused a being
+   further down `beings`. It is built once now, before the loop, and the answer it gives is the state
+   at the START of the tick.
+
+   This is the only test in the suite that can tell the two apart. Measured, not assumed: put the lazy
+   list back and the six seeds over three world days stay green, the soak's working record does not
+   move, and every other file passes. A change nothing distinguishes is a change nobody can defend, so
+   the arrangement is built by hand.
+
+   A wolf asleep on a burning tile is woken by the fire, which needs no rouser. A rabbit within five
+   tiles of it, later in `beings` and not acting, is then asked whether anything rouses it. Under the
+   old list the wolf was already awake by then and the rabbit woke with it. Under the new one the wolf
+   was asleep when the question was framed, so the rabbit sleeps -- and wakes on the NEXT tick, when
+   the wolf is awake at the start of the pass. A waking is news a tick later, not in the same breath. */
+test('a sleeper the pass wakes does not rouse its neighbour until the next tick', t => {
+  const api = load();
+  const c = collect(api);
+  api.startWorld('r');
+  /* THE VALLEY IS EMPTIED FIRST, and that is not tidiness. Under the old lazy list the divergence
+     needs the FIRST being the pass wakes to be woken without asking for the list, which only fire
+     does. Any other being that fails its fire check builds the list before then, and the list is
+     stale in the harmless direction instead. So the three beings below are the whole population, and
+     the arrangement is written down rather than hoped for. The gods stay: they are off the tick and
+     the pass passes over them.
+     A burning tile, a wolf five tiles from it, and a rabbit five tiles beyond the wolf and ten from
+     the fire. The wolf is woken by the fire alone. The rabbit cannot see the fire at ten tiles, so the
+     only thing that could rouse it is a wolf that was asleep when the pass began. */
+  const keep = api.beings.filter(b => api.SPECIES[b.species].perTick === false);
+  api.beings.splice(0, api.beings.length, ...keep);
+  const y0 = 6;
+  const wolf = api.makeBeing('wolf', 11, y0, null, 0);
+  const rabbit = api.makeBeing('rabbit', 16, y0, null, 0);
+  for (const b of [wolf, rabbit]){ b.z = 0; b.asleep = true; b.task = null; b.next = api.tick + api.CLOCK.every.body; b.seen = api.tick; }
+  api.beings.push(wolf, rabbit);
+  assert.ok(api.beings.indexOf(wolf) < api.beings.indexOf(rabbit), 'the wolf must be asked before the rabbit');
+  assert.equal(api.near(wolf, rabbit), 5);
+  const t0 = api.tileAt(6, y0, 0);
+  assert.ok(t0, 'no tile at the place the fire was to be lit');
+  assert.match(String(api.lightTile(6, y0, 0)), /burning/, 'the tile would not burn, so the case cannot be arranged');
+  assert.equal(api.nearestFire(wolf.x, wolf.y, 5, 0) >= 0, true, 'the wolf cannot see the fire');
+  assert.equal(api.nearestFire(rabbit.x, rabbit.y, 5, 0) >= 0, false, 'the rabbit can see the fire, so the case is decided by the fire');
+  api.advance(api.tick + 1);
+  t.diagnostic(`after one tick: wolf asleep ${wolf.asleep}, rabbit asleep ${rabbit.asleep}`);
+  assert.equal(wolf.asleep, false, 'the fire did not wake the wolf, so the case did not run');
+  assert.equal(rabbit.asleep, true, 'the rabbit was roused by a wolf that was asleep when the pass began');
+  /* And on the next tick, with the wolf awake from the start, it is roused. */
+  rabbit.next = api.tick + api.CLOCK.every.body; rabbit.asleep = true;
+  api.advance(api.tick + 1);
+  t.diagnostic(`after two ticks: rabbit asleep ${rabbit.asleep}`);
+  assert.equal(rabbit.asleep, false, 'an awake wolf five tiles off never roused the rabbit, so the test proves nothing either way');
+  c.check('the rousing order');
 });
 
 /* ---------- the long run ---------- */
