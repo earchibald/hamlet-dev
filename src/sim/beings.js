@@ -547,18 +547,41 @@ const SENSE = 5;                    // how far off a being notices fire or a hun
    person is not roused by another person, or a camp asleep by its own fire would never get a night's
    rest. */
 const rousedBy = (a, b) => SPECIES[b.species].hunter ? a.species !== b.species : b.species === 'human' && a.species !== 'human';
+/* What the predicate must see, decided rather than inherited. The pass asks the world one question:
+   which beings had something dangerous within `SENSE` of them AT THE START OF THIS TICK. So the list
+   of rousers is built once, before the loop, and nothing the loop does edits it.
+
+   The list used to be built lazily inside the loop and then invalidated by that same loop. A sleeper
+   the pass woke had `asleep` turned off and so joined a list built afterwards, and a being its
+   `catchUp` killed stayed in a list built before. Both outcomes turned on the order of `beings`, and
+   task 4 reads this predicate the other way round as the skip's horizon, so a list that moves under
+   the loop is a wolf the horizon did not see.
+
+   Two reasons the start-of-tick answer is the right one and not merely the tidy one. A being the pass
+   wakes has not MOVED: it was already where it was, and whether it rouses a neighbour is a question
+   for the next tick, when it acts. And a rouser that dies inside the pass died of hunger or cold
+   accrued over the stretch `catchUp` has just closed, not on this tick; `b.alive` is still read per
+   candidate, so a body found dead here stops rousing, which is the one live reading the list keeps.
+
+   The cost is one filter over `beings` on every tick the pass runs, against a filter that used to be
+   skipped when every non-acting being already stood in fire. The pass walks `beings` anyway, so it is
+   one more walk of seventy records beside a tile read for each of them. */
 function senseBeings(){
-  let movers = null;
+  const movers = beings.filter(b => b.alive && !b.asleep && (SPECIES[b.species].hunter || b.species === 'human'));
   for (const a of beings){
     if (!a.alive || SPECIES[a.species].perTick === false || a.next <= tick) continue;
     const here = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null;
-    let found = !!(here && here.fire > 0);
-    if (!found && fireCount > 0) found = nearestFire(a.x, a.y, SENSE, a.z) >= 0;
+    let found = !!(here && here.fire > 0), cause = found ? 'fire' : null;
+    if (!found && fireCount > 0){ found = nearestFire(a.x, a.y, SENSE, a.z) >= 0; if (found) cause = 'fire'; }
     if (!found){
-      if (movers === null) movers = beings.filter(b => b.alive && !b.asleep && (SPECIES[b.species].hunter || b.species === 'human'));
-      for (const b of movers) if (b !== a && rousedBy(a, b) && near(b, a) <= SENSE){ found = true; break; }
+      for (const b of movers) if (b !== a && b.alive && rousedBy(a, b) && near(b, a) <= SENSE){ found = true; cause = 'hunter'; break; }
     }
     if (!found) continue;
+    /* The hazard precondition of task 4, taken off the answer the pass has just worked out rather
+       than worked out a second way. A tick on which a hazard stands beside a being that is not acting
+       is a tick the engine steps away from rather than jumps from. See `nextEvent` in main.js. */
+    if (pinAt !== tick){ pinAt = tick; pinMask = 0; }
+    pinMask |= cause === 'fire' ? 1 : 2;
     a.next = tick;
     /* A sleeper does not act, so the pass is the only thing that can rouse it. Sleeping through a wolf
        at five tiles is what the head did, because it returned at the sleep check before it ever looked;

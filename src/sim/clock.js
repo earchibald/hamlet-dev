@@ -110,9 +110,14 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
-  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
-     not a duration, which is why it is a small whole number and not a world unit. */
-  dark: { slower: 2 },
+  /* A person feeling their way in the dark takes one step every two world seconds. It reads as a
+     rate — one tick in this many is a step — and it is a PERIOD all the same, two world seconds
+     long, read as `tick % CLOCK.dark.slower`. So it is written in a unit helper like every other
+     period in this table. `secs(2)` is 2, so nothing moves; what changes is that the entry now says
+     what it measures. It was the one genuinely bare time literal left in `CLOCK`, counted by the
+     task 3 review: ten entries are outside a unit helper, and the other nine are dimensionless (the
+     seven chances whose beat carries the time, and the two god thoughts with their own comment). */
+  dark: { slower: secs(2) },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs

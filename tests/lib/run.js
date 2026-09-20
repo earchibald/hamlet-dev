@@ -16,13 +16,24 @@ const DAY = load().DAY;
 function scriptGod(api, i){
   for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 });
 }
+/* THE EARLIEST TICK THIS GOD MIGHT ACT ON, so the engine does not jump past it. A god is an outside
+   actor, and its act must land on the tick it would have landed on stepping, or a skipped run and a
+   stepped run tell two stories and the skip is blamed for it. The loop index `i` is `api.tick - off`,
+   so a threshold on `i` of `c.coals` is a threshold on the tick of `off + c.coals`. The other half of
+   the condition -- a pit that stands laid and cold -- becomes true on a tick a being acted, and the
+   engine holds the tick after an act, so `runOn` is handed control there anyway. */
+scriptGod.wants = (api, off) => { let t = Infinity; for (const c of api.camps) if (c.pit && !c.everLit) t = Math.min(t, off + c.coals); return t; };
 /* A god that replays a log: every event goes through the door at its own tick, in order, and nothing
    else happens. The door refuses an event that arrives at the wrong tick, so an event this god has
    let slip past is an error here, never a silent drop. A `load` entry is passed over: it carries no
    snapshot of its own, and a replay tells the saved world's story by stepping through, not by loading. */
 function logGod(log){
   let k = 0;
-  return api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.act === 'load') continue; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
+  const god = api => { while (k < log.length && log[k].tick <= api.tick){ const e = log[k++]; if (e.act === 'load') continue; if (e.tick < api.tick) throw new Error(`replay fell behind: event for tick ${e.tick} reached at tick ${api.tick}`); api.inject(e); } };
+  /* The next logged tick, so the engine does not jump past it. Without this the replay throws its own
+     "fell behind" error on the first jump, which reads as a fault in the door and is not one. */
+  god.wants = () => (k < log.length ? log[k].tick : Infinity);
+  return god;
 }
 /* A god built from a replay record ({ seed, options, log }): replays its log. Meant to be used with
    runDays(replay.seed, days, onTick, replayGod(replay), replay.options), so a seed, its options,
@@ -52,9 +63,31 @@ function collect(api){
   return { events, from, check };
 }
 /* Step a world on. The loop index starts at `fromStep`, not at 0, so a world that carries on from a
-   snapshot gives the script god the same numbers an unbroken run gives it. */
-function runOn(api, fromStep, steps, collector, god = scriptGod){
-  for (let i = fromStep; i < fromStep + steps; i++){ api.step(); god(api, i); }
+   snapshot gives the script god the same numbers an unbroken run gives it.
+
+   THIS IS `runTo`'S OWN LOOP WITH THE GOD FOLDED INTO THE HORIZON. The engine's `runTo(t)` jumps from
+   one horizon to the next and hands nothing back in between, which is right for the page and wrong
+   here: a god is an outside actor and it must be asked on every tick the engine visits, or its act
+   lands late and the skipped run tells another story. So the loop asks `nextEvent()` for the horizon,
+   brings it forward to the god's own earliest tick, and makes the one move with `advance`. A god with
+   no `wants` is asked only at the horizon, which is the right answer for a god that watches the world
+   rather than the clock.
+
+   `off` turns a tick into the loop index the god expects: `i = api.tick - off`. A step of one tick
+   from `fromStep` gives `i = fromStep`, which is what the old loop gave it.
+
+   `onTick` is called at each visited tick too, for the same reason: the soak samples the world with
+   it, and a sample that fires only at a horizon is a sample nobody chose. */
+function runOn(api, fromStep, steps, collector, god = scriptGod, onTick){
+  const end = api.tick + steps, off = api.tick - fromStep + 1;
+  while (api.tick < end){
+    let to = Math.min(api.nextEvent(), end);
+    if (god && god.wants){ const w = god.wants(api, off); if (w > api.tick && w < to) to = w; }
+    api.advance(to);
+    const i = api.tick - off;
+    god(api, i);
+    if (onTick) onTick(api, i, collector.events);
+  }
   return collector;
 }
 
@@ -66,8 +99,7 @@ function runDays(seed, days, onTick, god = scriptGod, opts = {}){
   const c = collect(api);
   api.startWorld(seed, opts);
   const n = days * DAY;
-  if (!onTick) runOn(api, 0, n, c, god);
-  else for (let i = 0; i < n; i++){ runOn(api, i, 1, c, god); onTick(api, i, c.events); }
+  runOn(api, 0, n, c, god, onTick);
   /* Both silent failures, and both look like a pass: a short chronicle fingerprints cleanly. */
   if (c.from !== 0) throw new Error(`seed ${seed}: the creation was logged before the collector watched (${c.from} lines)`);
   c.check(`seed ${seed}`);

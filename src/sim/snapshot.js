@@ -315,6 +315,15 @@ const NOT_SAVED = {
   lastLoadFault: 'the reason the last load was refused, not world state',
   chronicleSink: 'a test seam; null on the page, and a save must never install one',
   chronicleWritten: 'a count for the test harness, not world state',
+  /* The skip's own bookkeeping. `acted` and `pinAt` are the ticks the last being act and the last
+     hazard fell on, and both are read only against the tick they were written on, so a loaded world
+     that has not yet run has nothing to remember: the first horizon it asks for is taken after its
+     first move, which writes them again. `moves` and `pins` are a measurement of the run and not of
+     the world, the same shape as `chronicleWritten`. No rule reads any of them. */
+  acted: 'the tick a being last acted on, read only against the tick it was written on',
+  moves: 'moves made in this run, stepped or jumped, a measurement for the tests',
+  pinAt: 'the tick the proximity pass last found a hazard on, read only against that tick',
+  pinMask: 'which kinds of hazard that tick held, read only with pinAt',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
   threatSources: "the tick's people, foxes and wolves, for threatsFor; rebuilt on the next call",

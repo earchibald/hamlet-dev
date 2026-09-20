@@ -89,7 +89,12 @@ for (const seed of SEEDS){
   test(`seed ${seed}, ${DAYS} days`, async t => {
     const t0 = Date.now();
     const stranded = [];
-    const { api, events } = runDays(seed, DAYS, (api, i) => { if (api.tick % 1000 === 0) stranded.push(...cutOff(api)); });
+    /* Sampled on a multiple of the world's own beat, `CLOCK.every.cellular`, and not on a round 1000.
+       The engine jumps from one horizon to the next now, and every horizon is a multiple of the beat or
+       earlier, so a tick on the beat's grid is always visited and a tick off it may not be. A sample
+       tick the run can skip is a sample that silently stops firing. 1200 ticks is twenty world
+       minutes. It reads the world and changes nothing, so it moves no record. */
+    const { api, events } = runDays(seed, DAYS, (api, i) => { if (api.tick % 1200 === 0) stranded.push(...cutOff(api)); });
     const counts = countEvents(api, events), fp = fingerprint(api, events);
     t.diagnostic(`${seed}: ${Date.now() - t0} ms, ${events.length} chronicle lines`);
     t.diagnostic(api.camps.map(c => campLine(api, c)).join(' | '));

@@ -590,9 +590,14 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
-  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
-     not a duration, which is why it is a small whole number and not a world unit. */
-  dark: { slower: 2 },
+  /* A person feeling their way in the dark takes one step every two world seconds. It reads as a
+     rate — one tick in this many is a step — and it is a PERIOD all the same, two world seconds
+     long, read as `tick % CLOCK.dark.slower`. So it is written in a unit helper like every other
+     period in this table. `secs(2)` is 2, so nothing moves; what changes is that the entry now says
+     what it measures. It was the one genuinely bare time literal left in `CLOCK`, counted by the
+     task 3 review: ten entries are outside a unit helper, and the other nine are dimensionless (the
+     seven chances whose beat carries the time, and the two god thoughts with their own comment). */
+  dark: { slower: secs(2) },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
@@ -4004,18 +4009,41 @@ const SENSE = 5;                    // how far off a being notices fire or a hun
    person is not roused by another person, or a camp asleep by its own fire would never get a night's
    rest. */
 const rousedBy = (a, b) => SPECIES[b.species].hunter ? a.species !== b.species : b.species === 'human' && a.species !== 'human';
+/* What the predicate must see, decided rather than inherited. The pass asks the world one question:
+   which beings had something dangerous within `SENSE` of them AT THE START OF THIS TICK. So the list
+   of rousers is built once, before the loop, and nothing the loop does edits it.
+
+   The list used to be built lazily inside the loop and then invalidated by that same loop. A sleeper
+   the pass woke had `asleep` turned off and so joined a list built afterwards, and a being its
+   `catchUp` killed stayed in a list built before. Both outcomes turned on the order of `beings`, and
+   task 4 reads this predicate the other way round as the skip's horizon, so a list that moves under
+   the loop is a wolf the horizon did not see.
+
+   Two reasons the start-of-tick answer is the right one and not merely the tidy one. A being the pass
+   wakes has not MOVED: it was already where it was, and whether it rouses a neighbour is a question
+   for the next tick, when it acts. And a rouser that dies inside the pass died of hunger or cold
+   accrued over the stretch `catchUp` has just closed, not on this tick; `b.alive` is still read per
+   candidate, so a body found dead here stops rousing, which is the one live reading the list keeps.
+
+   The cost is one filter over `beings` on every tick the pass runs, against a filter that used to be
+   skipped when every non-acting being already stood in fire. The pass walks `beings` anyway, so it is
+   one more walk of seventy records beside a tile read for each of them. */
 function senseBeings(){
-  let movers = null;
+  const movers = beings.filter(b => b.alive && !b.asleep && (SPECIES[b.species].hunter || b.species === 'human'));
   for (const a of beings){
     if (!a.alive || SPECIES[a.species].perTick === false || a.next <= tick) continue;
     const here = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null;
-    let found = !!(here && here.fire > 0);
-    if (!found && fireCount > 0) found = nearestFire(a.x, a.y, SENSE, a.z) >= 0;
+    let found = !!(here && here.fire > 0), cause = found ? 'fire' : null;
+    if (!found && fireCount > 0){ found = nearestFire(a.x, a.y, SENSE, a.z) >= 0; if (found) cause = 'fire'; }
     if (!found){
-      if (movers === null) movers = beings.filter(b => b.alive && !b.asleep && (SPECIES[b.species].hunter || b.species === 'human'));
-      for (const b of movers) if (b !== a && rousedBy(a, b) && near(b, a) <= SENSE){ found = true; break; }
+      for (const b of movers) if (b !== a && b.alive && rousedBy(a, b) && near(b, a) <= SENSE){ found = true; cause = 'hunter'; break; }
     }
     if (!found) continue;
+    /* The hazard precondition of task 4, taken off the answer the pass has just worked out rather
+       than worked out a second way. A tick on which a hazard stands beside a being that is not acting
+       is a tick the engine steps away from rather than jumps from. See `nextEvent` in main.js. */
+    if (pinAt !== tick){ pinAt = tick; pinMask = 0; }
+    pinMask |= cause === 'fire' ? 1 : 2;
     a.next = tick;
     /* A sleeper does not act, so the pass is the only thing that can rouse it. Sleeping through a wolf
        at five tiles is what the head did, because it returned at the sleep check before it ever looked;
@@ -6146,7 +6174,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats();
+  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats(); resetPins();
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
@@ -6209,7 +6237,17 @@ function updateWorld(){
 function step(oneAct){
   if (pending) return 'The turn is yours.';
   if (era === 'gods') return ageStep(oneAct);
-  tick++; updateWorld(); camp = camps[0];
+  advance(tick + 1);
+}
+/* One move of the days era. `to` is the tick the world arrives at, and it may be many ticks ahead: a
+   step is `advance(tick + 1)` and a jump is `advance` of a tick `nextEvent` named. Everything below
+   is the old body of `step`, and the only change is that `tick` is assigned rather than incremented.
+   Nothing here loops over the ticks between, because nothing here is owed them: the systems that run
+   on a beat are on a beat, a camp's pit burns by elapsed time, and a being's body is computed from
+   `a.seen`. A rule that still needed the ticks in between would be a rule `nextEvent` must name, and
+   `tests/skip.js` is what says whether one was missed. */
+function advance(to){
+  tick = to; updateWorld(); camp = camps[0];
   /* Danger first, on every tick, for the beings that are not acting on this one. It only brings an act
      forward; the act itself is below. See `senseBeings` in beings.js. */
   senseBeings();
@@ -6219,11 +6257,116 @@ function step(oneAct){
   for (const a of beings){
     if (!a.alive || SPECIES[a.species].perTick === false || a.next > tick) continue;
     updateBeing(a);
+    acted = tick;
     /* `nextAct` and the body beat are both at least one tick, so the soonest next act is the next
        tick and no floor is needed here. */
     if (a.alive) a.next = tick + Math.min(CLOCK.every.body, nextAct(a));
   }
   if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
+  moves++;
+}
+
+/* ---------- the skip ----------
+   Ruling 2: a world second must cost what happens in it and not what it spans. Task 2 put every
+   system on a named beat and task 3 gave every being the tick of its next act, so the engine can now
+   name the next tick at which anything at all happens and arrive there in one move.
+
+   `nextEvent()` is that tick. It is never this tick and never further off than the world's own beat.
+   It reads no wall clock, draws no random number, and changes nothing, so calling it is free of the
+   stream: a run that asks for the horizon and a run that does not tell the same story.
+
+   THE WORLD'S BEAT IS THE CEILING ON A JUMP, and it is deliberate. Every system that reads the world
+   rather than a being runs on a multiple of `CLOCK.every.cellular`, one world minute: the six
+   cellular systems, the camp beat that burns the pit, the spoil and fae and prune and carcass
+   periods, the spawn periods, the den and grove and gnome periods, the nightly naming pass, and every
+   calendar break a rule reads (dawn at 06:00, dusk at 20:00, the turn of a day and with it the turn
+   of a season). So the next multiple of the beat is a horizon that covers all of them at once, and
+   `tests/skip.js` holds the list to it: a period that is not a multiple of the beat goes red there
+   rather than becoming a missed event nobody can see.
+
+   That is why the pit's out-tick needs no entry of its own, and the reason is worth writing down
+   because the plan expected one. It is arithmetic and not a stored tick — `fuel / (rate x
+   modifiers)` — which makes it the kind that gets left out. Task 2 put the pit's burn on the camp
+   beat, so the fuel falls in whole beats and the fire goes out ON a beat. The horizon reaches every
+   beat, so it reaches that one. Should the burn ever leave the beat, this is the entry to add, and
+   the adversarial case for it is already in `tests/skip.js`.
+
+   THREE KINDS OF ENTRY BESIDE THE BEAT.
+
+   A being's next act. `a.next` is the tick it named for itself. Nothing the world does moves a being
+   between two of its acts, so a jump from one to the next passes over nothing.
+
+   A tick stored on a camp, a den or the valley that a rule reads EVERY tick rather than on a beat.
+   These are the four `updateCamps` and `denTick` read outside their own periods, and each writes a
+   chronicle line on the tick it fires, so a jump that lands past one puts that line at the wrong tick
+   and the fingerprint says so. They are listed one by one below.
+
+   The next tick after a being acted. A being's act changes what the world's own rules read on the
+   tick after it — a storehouse finished, a pit laid, a person dead, a hearth lit — and `updateCamps`
+   runs before the beings within a tick, so it sees the change one tick later. Holding the tick after
+   an act is the cheap and honest answer: a walking being acts every tick and pays nothing for it,
+   and a sleeping valley has no acts to hold. Refining it would mean naming which fields of a camp a
+   given act can touch, which is a list that rots.
+
+   And the hazard precondition of ruling 6. `senseBeings` records the tick it last found a hazard
+   beside a being that was not acting, and the engine steps away from that tick rather than jumping.
+   The pass has already answered the question, so the pin costs nothing to read.
+
+   THE COUNTERS ARE A MEASUREMENT AND NOT A RULE. `pins` counts, for every horizon asked for, why the
+   answer was the next tick. It is split by cause with a bucket for a pin with no cause, because a
+   two-way split that quietly absorbs a third case is what makes a permanent cost read as an episodic
+   one: a camp's fire burns every night of the world's life, while a wolf near a sleeper is an evening.
+   `both` is its own bucket rather than being folded into either. Nothing here draws a random number or
+   changes an answer, and the predicate behind the fire and hunter buckets was answered by
+   `senseBeings` for its own reasons, so counting it is free. `pins` and the four `let`s below are in
+   NOT_SAVED beside `chronicleWritten`. */
+let acted = -1;                 // the last tick on which a being acted
+let moves = 0;                  // moves made, stepped or jumped, since the world began. `steps` is taken, in path.js.
+let pinAt = -1, pinMask = 0;    // the last tick `senseBeings` found a hazard, and which kinds it found
+/* `asked` is how many horizons were asked for, and `next` how many of those were the next tick --
+   the pinned share is `next / asked`. The other eight are causes, one bucket each, and they sum to
+   `asked`: `fire`, `hunter` and `both` are ruling 6's pass, `none` is a pin that pass made with no
+   cause recorded and must stay zero, `acted` is the tick after a being acted, and `being`, `stored`
+   and `beat` are which kind of entry won the horizon. */
+const pins = { asked: 0, next: 0, fire: 0, hunter: 0, both: 0, none: 0, acted: 0, being: 0, stored: 0, beat: 0 };
+function resetPins(){ acted = -1; moves = 0; pinAt = -1; pinMask = 0; for (const k in pins) pins[k] = 0; }
+function nextEvent(){
+  pins.asked++;
+  const beat = tick + CLOCK.every.cellular - (tick % CLOCK.every.cellular);
+  /* The next tick, and why. The hazard is asked first because ruling 6 owns it; a being's act is
+     asked second because it is this engine's own coupling and not the world's. */
+  if (pinAt === tick){ pins[pinMask === 1 ? 'fire' : pinMask === 2 ? 'hunter' : pinMask === 3 ? 'both' : 'none']++; pins.next++; return tick + 1; }
+  if (acted === tick){ pins.acted++; pins.next++; return tick + 1; }
+  let t = beat, why = 'beat';
+  const mark = (v, kind) => { if (typeof v === 'number' && v > tick && v < t){ t = v; why = kind; } };
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    if (a.next <= tick){ pins.being++; pins.next++; return tick + 1; }
+    mark(a.next, 'being');
+  }
+  /* `afterTheLast` and `theLoneFounder`, both read on every tick in `updateCamps`. */
+  mark(wanderAt, 'stored'); mark(doomAt, 'stored');
+  for (const c of camps){
+    mark(c.nextArrival, 'stored');                             // a newcomer drawn by the smoke
+    /* A hearth gone cold long enough to end a line, and long enough for the beasts to come home.
+       `outSince` is written on any tick, so neither of these lands on the beat. */
+    if (c.outSince){ mark(c.outSince + CLOCK.arrival.afterTheDoomed, 'stored'); mark(c.outSince + CLOCK.den.campDark, 'stored'); }
+  }
+  /* A driven-out owner digging again. `denTick` reads both outside its own spring period. */
+  for (const b of beings){
+    if (!b.alive || !b.oldDen || b.den) continue;
+    mark(b.oldDen.clearedAt + CLOCK.den.digAfter, 'stored'); mark(b.digAgain, 'stored');
+  }
+  pins[why]++; if (t === tick + 1) pins.next++;
+  return t;
+}
+/* Run the world to tick `t`, jumping over the ticks with nothing in them. It is what the tests, the
+   soak and the page's faster rungs use. A caller that wants to act at a tick of its own — a script
+   god, a player's stop — asks for the horizon itself and runs to the earlier of the two, so an
+   outside act still lands on the tick it would have landed on stepping. */
+function runTo(t){
+  while (tick < t && !pending) advance(Math.min(nextEvent(), t));
+  return tick;
 }
 
 /* ---------- snapshots: the whole world as plain JSON ----------
@@ -6543,6 +6686,15 @@ const NOT_SAVED = {
   lastLoadFault: 'the reason the last load was refused, not world state',
   chronicleSink: 'a test seam; null on the page, and a save must never install one',
   chronicleWritten: 'a count for the test harness, not world state',
+  /* The skip's own bookkeeping. `acted` and `pinAt` are the ticks the last being act and the last
+     hazard fell on, and both are read only against the tick they were written on, so a loaded world
+     that has not yet run has nothing to remember: the first horizon it asks for is taken after its
+     first move, which writes them again. `moves` and `pins` are a measurement of the run and not of
+     the world, the same shape as `chronicleWritten`. No rule reads any of them. */
+  acted: 'the tick a being last acted on, read only against the tick it was written on',
+  moves: 'moves made in this run, stepped or jumped, a measurement for the tests',
+  pinAt: 'the tick the proximity pass last found a hazard on, read only against that tick',
+  pinMask: 'which kinds of hazard that tick held, read only with pinAt',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
   threatSources: "the tick's people, foxes and wolves, for threatsFor; rebuilt on the next call",

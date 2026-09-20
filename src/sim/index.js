@@ -30,7 +30,7 @@ const API = `return {
   mulberry32, streamState, setStreamState,
   SNAPSHOT_VERSION, REFS, REF_KINDS, TILE_DEFAULTS, SAVED_STATE, NOT_SAVED, savedValues, takeSnapshot, unnamedRefs, loadSnapshot, checkOptions,
   get lastLoadFault(){ return lastLoadFault; }, get inhabitedTold(){ return inhabitedTold; },
-  startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
+  startWorld, step, advance, nextEvent, runTo, resetPins, get pins(){ return pins; }, get moves(){ return moves; }, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, CELLULAR, beats, DAY, SEASON_LENGTHS, YEAR_DAYS, ticks, strides, tickRate, strideRate, lookRate, stock, secs, mins, hours, days, years, perHour, rollFor,
   seasonOf, dayOf, dayOfYear, yearOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor, sourcesNow,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, stashAdd,
