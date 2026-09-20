@@ -33,7 +33,7 @@ function tileFuel(t){
 /* ---------- loose items ---------- */
 function rebuildItemGrid(){ itemGrid = new Array(NZ * W * H).fill(null); for (const it of items){ const i = idx3(it.x, it.y, it.z); if (!itemGrid[i]) itemGrid[i] = it; } }
 function addItem(kind, x, y, z = 0){ const it = { id: nextId++, kind, x, y, z, reservedBy: null, born: tick }; items.push(it); const i = idx3(x, y, z); if (!itemGrid[i]) itemGrid[i] = it; return it; }
-function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); const i = idx3(it.x, it.y, it.z); if (itemGrid[i] === it) itemGrid[i] = items.find(o => o.x === it.x && o.y === it.y && o.z === it.z) || null; }
+function removeItem(it){ const k = items.indexOf(it); if (k >= 0) items.splice(k, 1); const i = idx3(it.x, it.y, it.z); if (itemGrid[i] === it) itemGrid[i] = null; }
 /** @returns {GroundItem|null} */
 const itemAt = (x, y, z = 0) => itemGrid[idx3(x, y, z)];
 
