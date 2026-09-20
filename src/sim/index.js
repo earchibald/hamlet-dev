@@ -60,7 +60,7 @@ const API = `return {
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
   get options(){ return options; },
-  campName, campNameOf, campHumans, humans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
+  campName, campNameOf, campHumans, humans, loneHumans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },
   /* The chronicle test seam. This object is built inside a template literal, so no backticks here.

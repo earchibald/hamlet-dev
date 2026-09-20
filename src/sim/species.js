@@ -23,6 +23,16 @@ function drowsy(a){
   return false;
 }
 
+/* Who a wolf `a` could stalk: a person alone, past their cooldown, not by a lit pit, in range, and
+   not carrying an ember. `cooldown.stalked` sits on the person, not on the wolf above, so one more
+   wolf cannot halve the wait between two maulings of the same person. `hs` is read once: `humans()`
+   filters the whole beings array, and calling it again inside the loop, once per person, made the
+   cost people times a fresh list times people. */
+function loneHumans(a){
+  const hs = humans();
+  return hs.filter(h => !(tick < (h.cooldown.stalked || 0)) && !hs.some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
+}
+
 /* Animal actions. Foxes and wolves hunt, raid, and stalk. Deer keep the herd. */
 Object.assign(TASKS, {
   hunt: { type: 'hunt',
@@ -69,10 +79,7 @@ Object.assign(TASKS, {
   stalk: { type: 'stalk',
     begin(a, args){
       if (a.species !== 'wolf' || !isNight() || a.needs.food > 35) return false;
-      /* `cooldown.stalked` sits on the person, not on the wolf above, so one more wolf cannot halve
-         the wait between two maulings of the same person. */
-      const lone = humans().filter(h => !(tick < (h.cooldown.stalked || 0)) && !humans().some(o => o !== h && near(o, h) <= 5) && !(h.camp && h.camp.pit && tileAt(...h.camp.pit).struct.lit && nearAt(h, ...h.camp.pit) <= 8) && near(h, a) <= 30 && !(h.carrying && h.carrying.kind === 'ember'));
-      const h = lone.sort((p, q) => near(p, a) - near(q, a))[0]; if (!h) return false;
+      const lone = loneHumans(a); const h = lone.sort((p, q) => near(p, a) - near(q, a))[0]; if (!h) return false;
       args.who = h.id;
       return { label: 'Stalking someone alone in the dark', path: [], fast: true, progress: 0 };
     },
