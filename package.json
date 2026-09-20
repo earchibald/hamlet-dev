@@ -11,7 +11,13 @@
     "soak:quick": "SEEDS=r,x DAYS=10 node tests/soak.js",
     "bless": "UPDATE_GOLDEN=1 node tests/soak.js",
     "trace": "node tests/trace-deaths.js",
+    "perf": "node tests/perf/measure.js --seed r --days 10 --runs 3 --profile",
+    "perf:ladder": "node tests/perf/measure.js --ladder --seed r --days 10 --runs 3 --profile",
     "ages": "node --test tests/ages.js",
-    "fast": "node --test tests/names.js tests/field.js tests/gods.js tests/become.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js tests/wanderer.js tests/snapshot.js tests/ui.js tests/clock.js tests/tasks.js tests/chronicle.js tests/beats.js tests/beings-lazy.js tests/setclock.js"
+    "fast": "node --test tests/names.js tests/field.js tests/gods.js tests/become.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js tests/wanderer.js tests/snapshot.js tests/ui.js tests/clock.js tests/soak-guards.js tests/tasks.js tests/chronicle.js tests/itemgrid.js tests/garden.js tests/stalk.js tests/types.js tests/reachable.js tests/beats.js tests/beings-lazy.js tests/setclock.js",
+    "types": "node_modules/.bin/tsc -p tsconfig.sim.json --pretty false"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }

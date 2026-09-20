@@ -34,12 +34,31 @@ test('the unit helpers turn world units into ticks', () => {
   assert.equal(api.YEAR_DAYS, 365);
 });
 
-/* The year, and the seasons that are not all the same length. */
-test('a year is 365 days and winter carries the odd one', () => {
+/* The calendar against plain numbers, not against itself. A line like
+   `years(1) === YEAR_DAYS * DAY` is an identity between two constants: it passes whatever the year
+   length is, so it cannot report a calendar that changed (issue #94, the shape of #80). The literals
+   below are the calendar the rules and the tests are tuned for: a 365-day year, four seasons of
+   91, 91, 91 and 92 days, and winter carrying the odd one. Change the calendar and this goes red,
+   which is the point: a year the soak cannot cross leaves every `seasonOf()` and `isWinter()` read
+   site dead, with no failing test.
+
+   The soak's run length is not restated here. `tests/soak.js` owns `DEFAULT_DAYS`, and its 'the run
+   visits every season' test observes the crossing directly, on the real run, rather than computing it
+   from a copy of the number. `tests/lib/claims.js` pins `SEASON_CLAIM_DAYS` to the 365 asserted here.
+   Bless a new number here only with that claim still green. */
+test('a year is 365 days and winter carries the odd one, in plain numbers', () => {
   const api = load();
+  assert.equal(api.YEAR_DAYS, 365);
+  assert.equal(api.years(1), 31536000);
+  assert.equal(api.years(1) / api.DAY, 365);
   assert.deepEqual(api.SEASON_LENGTHS, [91, 91, 91, 92]);
   assert.equal(api.SEASON_LENGTHS.reduce((a, b) => a + b, 0), api.YEAR_DAYS);
 });
+
+/* dev's 'the legacy markers return their argument unchanged' test does not come across this merge.
+   On this branch the four markers are converters, not identities, and the test below,
+   'every marker converts the old clock, and none is an identity', is its replacement. Carrying both
+   would assert `ticks(1) === 1` and `ticks(1) === 86` in one file. */
 
 test('the calendar names the season, the day of the year, and the year', () => {
   const api = load();

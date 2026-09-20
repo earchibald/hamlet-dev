@@ -12,7 +12,9 @@ function makeCamp(name){
   c.names = []; c.namedAt = 0; c.founder = null; c.villageNamed = 0;
   camps.push(c); return c;
 }
+/** @returns {Being[]} */
 const campHumans = () => beings.filter(b => b.species === 'human' && b.alive && b.camp === camp);
+/** @returns {Camp|null} */
 const campNear = (a, r) => camps.filter(c => c.site && nearAt(a, ...c.site) <= r).sort((p, q) => nearAt(a, ...p.site) - nearAt(a, ...q.site))[0] || null;
 
 function stashAdd(kind, n){

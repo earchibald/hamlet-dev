@@ -148,16 +148,59 @@ const LAND_WORDS = [
   'the red clay', 'the thin path', 'the high seat', 'the wet hollow',
   'the still pool', 'the burnt slope', 'where the wind rests', 'the grey face',
   'the salt ground', 'the small light', 'the heavy rock', 'the last watch',
+  'the dry hole', 'where the cold sits', 'the stone mouth', 'the low crawl',
+  'where the bats sleep', 'the high ridge', 'the slow rise', 'the crooked trees',
+  'where the branches tangle', 'the slow current',
+  'where the fish gather', 'the place we drink', 'the green shallows', 'where the reeds thicken',
+  'the stepping stones', 'the low bank', 'the sure footing', 'the sunless side',
+  'the side the wind takes', 'the three stones', 'the long climb', 'where the roof drips',
+  'the still air', 'the crack in the rock', 'where the echo lives', 'the trees no one has cut',
+  'where the nuts fall', 'the fallen trunks', 'where the sap runs', 'where winter shows first',
 ];
-function takeMeaning(){
-  const free = LAND_WORDS.filter(w => !usedMeanings.has(w));
+/* The kinds a meaning suits: `water`, `hill`, `cave`, `grove`, `ford`, the five `nameTheLand`
+   names. A phrase that says nothing about the shape of the place suits all five. Approved
+   wording and kind tags, in `design/land-word-kinds.md`; read those, do not re-derive. */
+const LAND_WORD_KINDS = {
+  'the sleeping hill': ['hill'], 'where the water turns': ['water', 'ford'], 'the pines that watch': ['grove'],
+  'the stone that does not move': ['hill', 'cave'], 'the cold spring': ['water', 'cave'],
+  'the place of many birds': ['water', 'hill', 'cave', 'grove', 'ford'], 'the long shadow': ['hill', 'cave', 'grove'],
+  'the first light': ['water', 'hill', 'grove', 'ford'], 'the hollow under the rock': ['cave'],
+  'where the deer cross': ['grove', 'ford'], 'the quiet ground': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the wind from the north': ['hill', 'grove'], 'the black earth': ['hill', 'cave', 'grove'],
+  'the old fire': ['water', 'hill', 'cave', 'grove', 'ford'], 'where the river forgets': ['water', 'ford'],
+  'the bones of the hill': ['hill', 'cave'], 'the bright water': ['water', 'ford'], 'the last tree': ['grove'],
+  'the low mist': ['water', 'hill', 'grove'], 'the broken rim': ['hill', 'cave'], 'where the ice stays': ['water', 'cave'],
+  'the round stone': ['hill', 'cave', 'ford'], 'the deep dark': ['cave'], 'the loud water': ['water', 'ford'],
+  'the bare crown': ['hill'], 'the green step': ['hill', 'grove'], 'the hidden mouth': ['cave'],
+  'where the wolves sing': ['hill', 'cave', 'grove'], 'the red clay': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the thin path': ['hill', 'cave', 'grove', 'ford'], 'the high seat': ['hill'], 'the wet hollow': ['water', 'cave'],
+  'the still pool': ['water'], 'the burnt slope': ['hill', 'grove'], 'where the wind rests': ['hill', 'grove'],
+  'the grey face': ['hill', 'cave'], 'the salt ground': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the small light': ['water', 'hill', 'cave', 'grove', 'ford'], 'the heavy rock': ['hill', 'cave', 'ford'],
+  'the last watch': ['water', 'hill', 'cave', 'grove', 'ford'],
+  'the dry hole': ['cave'], 'where the cold sits': ['cave'], 'the stone mouth': ['cave'], 'the low crawl': ['cave'],
+  'where the bats sleep': ['cave'], 'the high ridge': ['hill'], 'the slow rise': ['hill'], 'the crooked trees': ['grove'],
+  'where the branches tangle': ['grove'], 'the slow current': ['water', 'ford'],
+  'where the fish gather': ['water', 'ford'], 'the place we drink': ['water', 'ford'], 'the green shallows': ['water', 'ford'],
+  'where the reeds thicken': ['water'], 'the stepping stones': ['ford'], 'the low bank': ['water', 'ford'],
+  'the sure footing': ['ford'], 'the sunless side': ['hill'], 'the side the wind takes': ['hill'],
+  'the three stones': ['hill', 'cave'], 'the long climb': ['hill'], 'where the roof drips': ['cave'],
+  'the still air': ['cave'], 'the crack in the rock': ['cave'], 'where the echo lives': ['cave'],
+  'the trees no one has cut': ['grove'], 'where the nuts fall': ['grove'], 'the fallen trunks': ['grove'],
+  'where the sap runs': ['grove'], 'where winter shows first': ['water', 'hill', 'cave', 'grove', 'ford'],
+};
+/* `kind` narrows the draw to the phrases that suit the thing being named. With no kind, every
+   free phrase is in play, which is the one pool this was before kinds existed. */
+function takeMeaning(kind){
+  const free = LAND_WORDS.filter(w => !usedMeanings.has(w) && (!kind || LAND_WORD_KINDS[w].includes(kind)));
   if (!free.length) return '';
   const w = npick(free); usedMeanings.add(w); return w;
 }
 /* One old name with its meaning, or null when the world has run out of either. A name with
-   no meaning is not a name, so the meaning is taken first and given back on failure. */
-function newOldName(why){
-  const meaning = takeMeaning(); if (!meaning) return null;
+   no meaning is not a name, so the meaning is taken first and given back on failure. `kind`
+   is the thing being named (`water`, `hill`, `cave`, `grove`, `ford`); every caller passes one. */
+function newOldName(why, kind){
+  const meaning = takeMeaning(kind); if (!meaning) return null;
   for (let k = 0; k < 10; k++){
     const text = oldName();
     if (!nameTaken(text)) return nameRecord(text, { tongue: 'old', meaning, why: why || `the old people called it ${meaning}` });
@@ -205,6 +248,10 @@ function nameTheLand(){
     sky: { text: oldWord(), meaning: npick(SKY_MEANINGS) },
     sprites: { text: oldWord(), meaning: npick(SPRITE_MEANINGS) },
   };
+  /* Every source whose own word a candidate may not use bare. The people are left out:
+     naming a thing after the people themselves is the one case where the repeat is the
+     point. A lore source added later joins this same list and needs no other change. */
+  lore.sources = [lore.sky, lore.sprites];
   findWaters();
   oldNamesOnTheLand();
 }
@@ -257,14 +304,14 @@ function findWaters(){
    holds runs out, and the rest of the land keeps no old name at all. */
 function oldNamesOnTheLand(){
   const big = river || stillWater;
-  if (big){ const r = newOldName('the old people named the water'); if (r) giveName(big, r); }
-  for (const h of hills){ const x = newOldName('the old people named the hill'); if (x) giveName(h, x); }
+  if (big){ const r = newOldName('the old people named the water', 'water'); if (r) giveName(big, r); }
+  for (const h of hills){ const x = newOldName('the old people named the hill', 'hill'); if (x) giveName(h, x); }
   for (const c of caves){
     if (!OLD_CAVE_KINDS.includes(c.kind)) continue;
-    const x = newOldName('the old people named the hollow under the hill'); if (x) giveName(c, x);
+    const x = newOldName('the old people named the hollow under the hill', 'cave'); if (x) giveName(c, x);
   }
-  for (const g of groves){ const x = newOldName('the old people named the grove'); if (x) giveName(g, x); }
-  for (let k = 0; k < fords.length; k += 3){ const x = newOldName('the old people named the crossing'); if (x) giveName(fords[k], x); }
+  for (const g of groves){ const x = newOldName('the old people named the grove', 'grove'); if (x) giveName(g, x); }
+  for (let k = 0; k < fords.length; k += 3){ const x = newOldName('the old people named the crossing', 'ford'); if (x) giveName(fords[k], x); }
   /* How many old names are still unread. `learnNamesHere` runs for every awake person on every
      tick, so it needs one number to look at before it scans the ground. It counts only the things
      that pass can learn; a name given later to anything else never enters it. */
@@ -418,54 +465,74 @@ function loreCandidates(base){
   const b = base !== undefined ? base : (camp && camp.fae.known ? 30 : 10);
   return [
     { text: titleCase(lore.people.replace(/^the /, '')), axis: 'lore', base: b, why: 'for the people who were here first' },
-    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
-    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
+    { text: lore.sky.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky`, source: lore.sky },
+    { text: lore.sprites.text, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites`, source: lore.sprites },
   ];
 }
-/* The valley's last resort. A lore text another thing already holds scores zero, and three texts
-   are all the lore has, so hills, sectors, and camps can take every one and leave the valley with
-   nothing. These compounds are built from the same lore words, in a shape nothing else offers, so
-   they are always free. They score under the plain texts, so they only win once those are gone. */
+/* The one shape a source's own word may take once `scoreCandidates` will not let it score
+   above zero bare, keyed by the kind of thing being named. A kind with no row here has no
+   distinct form, so a source's bare word is dropped for it, exactly as it always was: a hill
+   cannot be a "Vale of". A source added later to `lore.sources` gets this shape at every kind
+   listed here with no other change. The rewrite follows provenance, not text: a candidate
+   is only rewritten when it carries the `source` field `loreCandidates` put on it, never by
+   matching its text against a source's word (see `scoreCandidates`). */
+const DISTINCT_FORM = {
+  valley: source => `Vale of ${source.text}`,
+};
+
+/* The valley's other fallback: the people's own name, in the one shape that still lets it win
+   once its bare text is already held by something else. This is not the source rule — the
+   people are the one exception the ruling names, so their bare word is never rewritten — it
+   only needs somewhere to land when that bare text is unavailable. */
 const VALLEY_FALLBACK_BASE = 20;
 function valleyFallbacks(){
   if (!lore) return [];
-  const b = VALLEY_FALLBACK_BASE;
   return [
-    { text: `Vale of ${lore.sky.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sky.meaning, why: `for ${lore.sky.meaning}, what ${lore.people} called the sky` },
-    { text: `Vale of ${lore.sprites.text}`, axis: 'lore', base: b, tongue: 'old', meaning: lore.sprites.meaning, why: `for ${lore.sprites.meaning}, what ${lore.people} called the sprites` },
-    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: b, why: 'for the people who were here first' },
+    { text: `${titleCase(lore.people.replace(/^the /, ''))} Vale`, axis: 'lore', base: VALLEY_FALLBACK_BASE, why: 'for the people who were here first' },
   ];
 }
 /* ---------- events ----------
    A chronicle line whose tag is in this table, and whose kind is major, bad, or a
    death, is an event. The table is keyed on the tag and gives two shapes: a word for
-   a joined name, and a whole phrase. A line without a tag is never a candidate, and
+   a joined name, and three phrases. A line without a tag is never a candidate, and
    old age carries the tag 'old', which is not in the table, so nobody names it. */
 const EVENT_NAMES = {
-  wolf:   { word: 'wolf',    phrase: 'the Night of the Wolf' },
-  fire:   { word: 'ash',     phrase: 'the Night the Fire Ran' },
-  frost:  { word: 'frost',   phrase: 'the Long Frost' },
-  sprite: { word: 'light',   phrase: 'the Night of Lights' },
-  found:  { word: 'parting', phrase: 'the Day They Left' },
-  death:  { word: 'grave',   phrase: 'the Day We Lost One' },
-  birth:  { word: 'cradle',  phrase: 'the Day a Child Came' },
+  wolf:   { word: 'wolf',    phrases: ['the Night of the Wolf', 'the Night the Wolves Came', 'the Night of Teeth'] },
+  fire:   { word: 'ash',     phrases: ['the Night the Fire Ran', 'the Night It Burned', 'the Night the Pine Burned'] },
+  frost:  { word: 'frost',   phrases: ['the Night of the Long Frost', 'the Night the Water Froze', 'the Cold That Stayed'] },
+  sprite: { word: 'light',   phrases: ['the Night of Lights', 'the Night the Valley Glowed', 'the Night Nobody Slept'] },
+  found:  { word: 'parting', phrases: ['the Day They Left', 'the Day the Camp Split', 'the Morning the Camp Was Smaller'] },
+  death:  { word: 'grave',   phrases: ['the Day We Lost One', 'the Day the Hearth Was Quiet', 'the Night the Food Went Cold'] },
+  birth:  { word: 'cradle',  phrases: ['the Day a Child Came', 'the Day the Camp Grew', 'the Morning of the Cradle'] },
 };
 const EVENT_KINDS = ['major', 'bad', 'death'];
 const isEventLine = (e, c) => !!e.tag && !!EVENT_NAMES[e.tag] && EVENT_KINDS.includes(e.kind) && e.camp === c.id;
 /* The camp's own events of the last `eventMemory`, worth 20 and 3 a day of freshness. */
-/* What a camp's recent events offer. The phrase is a night's name ("the Night of the Wolf"), so only
-   an event may take it. A place takes the joined word ("Wolfhill"), which reads as a place. */
-function eventCandidates(c, kind = 'event'){
+/* What a camp's recent events offer. Each phrase is a night's name ("the Night of the Wolf"), so
+   only an event may take one. A place takes the joined word ("Wolfhill"), which reads as a place. */
+function eventCandidates(c, kind = 'event', line){
   const out = [];
   if (!c) return out;
   const memoryDays = CLOCK.names.eventMemory / DAY;
   for (const e of chronicle){
+    /* `line` is the one event line being named. When it is given, no other event line is a
+       candidate: a birth's pool never sees the fire's phrases or the wolf's, so a sibling
+       event's recency can never outscore the line's own tag. The place path never passes
+       `line`, so a place still sees every recent event and takes the joined word. */
+    if (line && e !== line) continue;
     const sinceDays = (tick - e.tick) / DAY;
     if (sinceDays > memoryDays) continue;
     if (!isEventLine(e, c)) continue;
     const t = EVENT_NAMES[e.tag], recency = Math.round((memoryDays - sinceDays) * 3 * 10) / 10;
-    if (kind === 'event') out.push({ text: t.phrase, axis: 'event', base: 20, recency, why: `for ${t.phrase}` });
-    if (WORD_TAIL[t.word]) out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
+    if (kind === 'event'){
+      /* The listed order decides: offer a tag's first phrase that is not already taken, and no
+         other. That gives a night the first phrase while it is free, the second once the first
+         is taken, then the third, then nothing, without touching the score or the tie-break. */
+      const phrase = t.phrases.find(p => !nameTaken(p));
+      if (phrase) out.push({ text: phrase, axis: 'event', base: 20, recency, why: `for ${phrase}` });
+    } else if (WORD_TAIL[t.word]){
+      out.push({ text: cap(t.word) + WORD_TAIL[t.word], axis: 'event', base: 20, recency, why: `for the ${t.word} of that day` });
+    }
   }
   return out;
 }
@@ -476,10 +543,20 @@ function eventCandidates(c, kind = 'event'){
 function nameEvents(c){
   if (!c.site) return;
   const by = namerFor(c.site); if (!by) return;
+  /* `chronicle` is newest first (`log` unshifts). Naming in that order would name the newer of
+     two same-day, same-tag lines before the older one, and the listed-order rule (finding 3)
+     would then hand the night that happened LATER the first phrase. So the walk below still
+     stops at the same one-day boundary, for the same reason as before, but it only collects
+     the unnamed lines it accepts; the collected lines are then named oldest first, so the
+     night that happened first always gets first pick of its tag's phrases. */
+  const due = [];
   for (const e of chronicle.slice()){
     if (tick - e.tick > DAY) break;
     if (e.names || !isEventLine(e, c)) continue;
-    const rec = nameThing(e, 'event', by, c.site);
+    due.push(e);
+  }
+  for (let i = due.length - 1; i >= 0; i--){
+    const rec = nameThing(due[i], 'event', by, c.site);
     if (rec) log(`They will call it ${rec.text}.`, campHumans(), 'major');
   }
 }
@@ -488,18 +565,40 @@ const eventName = entry => nameOf(entry);
 function candidatesFor(kind, by, place){
   return [...landCandidates(place), ...eventCandidates(camp, kind), ...notableCandidates(), ...oldCandidates(place), ...loreCandidates()];
 }
-/* Score, drop duplicates, and sort. A text another thing already owns scores zero. */
-function scoreCandidates(cands, by, thing){
+/* Score, drop duplicates, and sort. A text another thing already owns scores zero. A source's
+   own candidate (`c.source`, set by `loreCandidates`) is never offered as itself: where this
+   kind has a distinct form (`DISTINCT_FORM`), the candidate is rewritten into that form and
+   keeps the score its bare text would have had, so it competes exactly as the bare text would
+   have; where the kind has none, the candidate is dropped, as before. The rewrite follows
+   provenance, not text: a source's word (`lore.sky`, `lore.sprites`) is never put in
+   `nameIndex`, so a land name made later can carry the same text by chance, and matching that
+   collision by text would rewrite the wrong candidate and credit the wrong origin. A
+   candidate that only collides in text, but carries no `source` field, still scores zero and
+   is dropped bare, so a source's bare word is still never shown bare from any candidate. The
+   people are not a source here, so their own name still scores, and sorts, bare. The
+   tie-break sorts on `sortText`, the text the candidate would have shown bare, so a source's
+   word that would have won bare still wins once it is rewritten into its distinct form. */
+function scoreCandidates(cands, by, thing, kind){
   const seen = new Set(), out = [];
+  const owned = lore && lore.sources ? new Set(lore.sources.map(s => s.text.toLowerCase())) : null;
+  const form = DISTINCT_FORM[kind];
   for (const c of cands){
-    const key = c.text.toLowerCase();
+    const bareKey = c.text.toLowerCase();
+    let cand = c, bareOwnedNoForm = false;
+    if (c.source){
+      if (form) cand = { ...c, text: form(c.source), sortText: c.text };
+      else bareOwnedNoForm = true;
+    } else if (owned && owned.has(bareKey)){
+      bareOwnedNoForm = true;
+    }
+    const key = cand.text.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     const owner = nameIndex.get(key);
-    c.score = owner && owner !== thing ? 0 : Math.round((c.base + (c.recency || 0)) * axisMult(c.axis, by) * 10) / 10;
-    out.push(c);
+    cand.score = bareOwnedNoForm || (owner && owner !== thing) ? 0 : Math.round((cand.base + (cand.recency || 0)) * axisMult(cand.axis, by) * 10) / 10;
+    out.push(cand);
   }
-  return out.sort((p, q) => q.score - p.score || p.text.localeCompare(q.text));
+  return out.sort((p, q) => q.score - p.score || (p.sortText || p.text).localeCompare(q.sortText || q.text));
 }
 /* The most sociable living member at the place, or the only one there is. */
 function namerFor(place){
@@ -517,9 +616,9 @@ function namerFor(place){
    table has no text left the night keeps no name. */
 function nameThing(thing, kind, by, place, extra = []){
   const pool = kind === 'valley' ? extra
-    : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event')]
+    : kind === 'event' ? [...extra, ...eventCandidates(camp, 'event', thing)]
     : [...extra, ...candidatesFor(kind, by, place)];
-  const scored = scoreCandidates(pool, by, thing);
+  const scored = scoreCandidates(pool, by, thing, kind);
   const top = scored[0];
   if (!top || top.score <= 0) return null;
   if (thing.names && thing.names.length && thing.names[0].text === top.text) return thing.names[0];
@@ -542,13 +641,25 @@ function nameFoundersCamp(c, a){
   if (nameTaken(text)){ nameThing(c, 'camp', a, c.site); return; }
   rename(c, nameRecord(text, { why: `the camp ${a.name} made`, by: a.id }));
 }
+/* The seven approved lines for the moment a camp takes its name. Each takes the name and the
+   reason clause nameThing already built. None may use the word village: nameVillage announces
+   that separately. Drawn from nrng so the run stays deterministic. */
+const CAMP_NAMED_LINES = [
+  (text, why) => `The camp has a name now: ${text}, ${why}.`,
+  (text, why) => `They start to call the camp ${text}, ${why}.`,
+  (text, why) => `The camp is ${text} now, ${why}.`,
+  (text, why) => `The camp goes by ${text} now, ${why}.`,
+  (text, why) => `Nobody calls it the camp any more. It is ${text}, ${why}.`,
+  (text, why) => `They have agreed on a name for the camp: ${text}, ${why}.`,
+  (text, why) => `They say the new name all evening: ${text}, ${why}.`,
+];
 /* The hearth has burned three days, so the place has a name. */
 function nameCampAtHearth(c){
   if (c.namedAt || !c.site || c.bestStreak < CLOCK.limit.hearthProven) return;
   const prev = camp; camp = c;
   const by = namerFor(c.site);
   const rec = by ? nameThing(c, 'camp', by, c.site) : null;
-  if (rec){ c.namedAt = tick; log(`They start to call this place ${rec.text}, ${rec.why}.`, campHumans(), 'major'); }
+  if (rec){ c.namedAt = tick; log(npick(CAMP_NAMED_LINES)(rec.text, rec.why), campHumans(), 'major'); }
   camp = prev;
 }
 /* A camp that becomes a village names itself again, with its whole history to draw on.
@@ -570,7 +681,7 @@ function nameVillage(c){
   /* nameThing renames a camp in place before it returns, so c.name is already the new text by
      here. The kept-or-changed check must look at `was`, the name this place had a moment ago. */
   if (!rec || rec.text === was) log(`${c.name} is a village now.`, campHumans(), 'major');
-  else log(`${c.name} is a village now. Its people call it ${rec.text}, ${rec.why}.`, campHumans(), 'major');
+  else log(`${was} is a village now. Its people call it ${rec.text}, ${rec.why}.`, campHumans(), 'major');
   camp = prev;
 }
 /* The nightly pass, at the fire. It runs at the end of updateCamps, once a day, at the hour

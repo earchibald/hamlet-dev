@@ -7,6 +7,11 @@ function setTool(id, sticky = false){
   tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
+/* The one writer of `ui.focus`. Every file but this one calls this instead of setting the field
+   itself; writes inside actions.js keep setting it directly.
+   A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
+   every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
+function setFocus(v){ ui.focus = v; }
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
@@ -15,8 +20,22 @@ function relabelSpeeds(labels, key){
     if (label !== undefined) b.firstChild.textContent = label;
   });
 }
-function setSpeed(s){ speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* Each ladder is written twice: once as `PACES` or `SPEEDS` in state.js, and once as the `data-pace`
+   and `data-speed` attributes in src/page.template.html. The click handler in main.js reads the
+   attribute straight into `ACTIONS.speed`, and nothing derives either copy from the other. A
+   `data-pace="4"` typed into the template therefore set a pace no rule had ever seen, and the whole
+   suite stayed green. `restore()` in state.js already guards its own incoming value with
+   `SPEEDS.includes(s.speed)`; these two doors did not.
+   A value off the ladder throws. It is not ignored and not clamped: every legitimate route in —
+   `speedStep`, which indexes the ladder; `restore`, which is already guarded; `setPace(1)` at the
+   ages — can only produce a rung, so an argument off the ladder is a defect in the code or in the
+   template, and a defect that is quietly absorbed is the failure this guard exists to end. The
+   throw comes before the assignment, so `pace` and `speed` keep their last good value. */
+function onLadder(rungs, v, fn, name){
+  if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }

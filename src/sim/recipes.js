@@ -56,6 +56,10 @@ function recipeUnlocked(r){
   if (camp[r.after] !== undefined) return !!camp[r.after];
   const g = GOALS.find(g => g.id === r.after); return !!g && goalState(g).s === 'done';
 }
+/* Does the camp's garden still have a living bush? A garden's four bushes are always the DIRS
+   neighbours of camp.garden (MAKERS.garden plants them there and nowhere else), so this reads only
+   those four tiles instead of the whole map. Guarded by hasTile so an edge garden cannot throw. */
+const gardenLives = () => !!(camp.garden && DIRS.some(([dx, dy]) => { const x = camp.garden[0] + dx, y = camp.garden[1] + dy; return hasTile(x, y, 0) && tileAt(x, y).garden === camp && tileAt(x, y).feature === 'bush'; }));
 /* Where a recipe's work happens, and how much faster (a place with no spot is not built yet). */
 const PLACES = {
   stash: { spot: () => camp.stashTile },
@@ -66,12 +70,12 @@ const PLACES = {
   water: {},
   bank: {},
   kiln: { spot: () => camp.kiln },
-  garden: { spot: () => (camp.garden && world.some(t => t.garden === camp && t.feature === 'bush')) ? null : gardenSpot() },
+  garden: { spot: () => gardenLives() ? null : gardenSpot() },
   pitfall: { spot: () => pitfallSite() },
   face: {},
 };
 function placeFor(r){ return PLACES[r.place] && PLACES[r.place].spot ? PLACES[r.place].spot() : null; }
-const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && camp.garden && world.some(t => t.garden === camp && t.feature === 'bush')));
+const recipeDone = r => r.makes && ((r.makes.tool && camp.tools[r.makes.tool]) || (r.makes.struct && camp[r.makes.struct]) || (r.makes.garden && gardenLives()));
 /* What the offer of a missing input is: the existing gatherers for loose things, the axe for logs
    (loose logs run out; a tree makes more), or nothing for things another recipe makes. */
 const gatherOffer = kind => GATHERERS[kind] || null;

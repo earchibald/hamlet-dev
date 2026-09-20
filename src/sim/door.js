@@ -15,6 +15,7 @@ const DOOR_SOURCES = ['player', 'chance', 'llm', 'human'];
 let doorLog = [];
 let replayHead = null;
 /* Acts by name. Each takes the event and returns its message. */
+/** @type {{ [act: string]: DoorAct }} */
 const DOOR_ACTS = {
   light(e){ return lightTile(e.x, e.y, e.z || 0); },
   poke(e){

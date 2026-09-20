@@ -1,0 +1,37 @@
+# Run the fast suite on every push to dev and on every pull request into dev.
+# This job reports. It does not gate the release: pages.yml publishes on its own.
+# A red run here leaves the site published, with a red mark on the commit.
+# It does not run the soak (node tests/soak.js). The soak is still run by hand.
+name: Fast suite
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+permissions:
+  contents: read
+# This job uses its own concurrency group, not the pages group. The pages group
+# cancels an earlier run when two merges land close together. A cancelled test run
+# is not a passing run. So this job keeps its own group.
+# A new push to a pull request cancels the run that it replaces.
+# A push to dev does not cancel a run. The commit is part of the group name, so
+# every commit on dev keeps its own result.
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'head' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # tests/types.js skips when tsc is missing, and a skip is green. Fail here instead.
+      - run: test -x node_modules/.bin/tsc
+      - run: node build.js
+      - run: npm run fast
