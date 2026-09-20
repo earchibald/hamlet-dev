@@ -168,16 +168,24 @@ function fileFor(map, total, line){
     : { file: '(before src/sim, native prelude)', local: line };
 }
 
+/* Two profiles, not one. The creation (startWorld: the ages and the settle) runs once and is
+   costly, so a single profile mixed its functions into the shares of daily play. `play` covers
+   the ticks only. `creation` covers startWorld only. */
 async function captureProfile(seed, days, opts){
   const session = new inspector.Session();
   session.connect();
   await session.post('Profiler.enable');
   await session.post('Profiler.setSamplingInterval', { interval: 100 });
+  const api = load();
   await session.post('Profiler.start');
-  runOnce(seed, days, opts);
-  const { profile } = await session.post('Profiler.stop');
+  api.startWorld(seed, opts);
+  const creation = (await session.post('Profiler.stop')).profile;
+  const n = days * api.DAY;
+  await session.post('Profiler.start');
+  for (let i = 0; i < n; i++){ api.step(); scriptGod(api, i); }
+  const play = (await session.post('Profiler.stop')).profile;
   session.disconnect();
-  return profile;
+  return { play, creation };
 }
 
 function analyzeProfile(profile){
@@ -264,8 +272,10 @@ async function measureOne(seed, days, opts, runs, profile, label){
   let profileAnalysis = null;
   if (profile){
     const p = await captureProfile(seed, days, opts);
-    profileAnalysis = analyzeProfile(p);
-    printProfile(profileAnalysis, label);
+    profileAnalysis = analyzeProfile(p.play);
+    profileAnalysis.creation = analyzeProfile(p.creation);
+    printProfile(profileAnalysis, `${label}, PLAY (the ticks only)`);
+    printProfile(profileAnalysis.creation, `${label}, CREATION (startWorld only)`);
   }
   return { label, opts, days, runs: results, agg, size: { W: last.W, H: last.H, levels: last.levels }, profile: profileAnalysis };
 }
@@ -296,10 +306,11 @@ async function main(){
       const r = await measureOne(args.seed, args.days, opts, args.runs, args.profile, sz.label);
       out.ladder.push(r);
     }
-    console.log('\n== ladder summary: median µs/tick, top 5 self ==');
+    console.log('\n== ladder summary: median µs/tick, top 5 self of PLAY ==');
     for (const r of out.ladder){
       console.log(`\n${r.label} (${r.size.W}x${r.size.H}x${r.size.levels}): median meanUs/tick = ${fmt(r.agg.meanUs.median)}`);
       if (r.profile) for (const s of r.profile.selfTop.slice(0, 5)) console.log(`  ${s.pct.toFixed(2)}%\t${s.key}`);
+      if (r.profile && r.profile.creation) console.log(`  creation, top self: ${r.profile.creation.selfTop.slice(0, 2).map(c => `${c.pct.toFixed(1)}% ${c.key}`).join(', ')}`);
     }
   } else {
     const opts = {};
