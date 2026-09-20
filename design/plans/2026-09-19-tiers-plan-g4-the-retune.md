@@ -553,6 +553,54 @@ This task answers ruling 2. It is also the task whose numbers decide the floors,
   - Whether the pinned share rises with population: day 3 against day 400 on one seed, from runs this task already makes.
   - **The counter must not disturb what it measures.** It draws no random number, changes no rule's answer, and lives in `NOT_SAVED`, the same shape as `chronicleWritten`. The precondition is already evaluated every tick, so counting is free; deriving it a second way, or evaluating it again to count it, is not.
   - Measure and report. This task tunes nothing toward the number.
+- [x] **The floors number is decided, 2026-09-20.** The user took themselves out of this one: "take
+  the decision for the timing figure at task 4. we're bogged down." So the number below is mine, and
+  it is a judgement and not a measurement. Task 4 reports against it and does not tune toward it.
+
+  **The figure is the gate's wall time, not seconds a world day.** Seconds a world day is the cause
+  and it does not decide anything on its own, because a gate is affordable or not by how long a person
+  waits for it. Measured on a quiet machine, with the one-minute load average stated beside every
+  figure:
+
+  | gate | ceiling | run when |
+  |---|---|---|
+  | `npm run fast`, with all six suspended files restored | **300 s** | after every change |
+  | the default soak, six seeds and three days | **180 s** | after every change to the core |
+  | one restored file, measured on its own | **120 s** | inside `fast` |
+  | `LONG=1` soak, 70 days on one seed | **1800 s** | at a gate, not per change |
+  | the six-seed 70-day bless | no ceiling | task 11, once, hours are accepted |
+
+  Where those numbers come from. `npm run fast` is **146.65 s at load 2.99** today, with the six files
+  still skipping, so 300 s doubles the present cost and leaves the restoration a real budget rather
+  than a token one. The default soak is **109 s at load 4.26** today, so 180 s is headroom and not a
+  target. The `LONG=1` ceiling is the one the skip has to earn: the bless estimate puts a 70-day seed
+  at about 4,000 s, so 1800 s is **missed today by about 2.2 times**. That is deliberate. A ceiling
+  a task already meets decides nothing.
+
+  The six suspended files are 435 world days between them — 202, 70, 50, 48, 40 and 25. At today's
+  3 s a world day that is 1,305 s and no ceiling holds. The skip is what closes the gap, because a
+  test world with one or two beings is nearly all idle ticks, which is exactly the case the skip is
+  for. If the skip delivers there, 435 days fits inside 300 s with room. If it does not, the answer is
+  the rule below and not a smaller number.
+
+  **Five rules ride with the figure, and they matter more than the figure.**
+
+  1. **No floor is removed and no day count is lowered to meet a ceiling.** Not one. A ceiling is met
+     by the skip being faster, or by the test moving behind a flag. A task that shortens a run to fit
+     a budget has deleted the claim and kept the green.
+  2. **A restored file over 120 s lives behind `LONG=1` permanently**, and `npm run fast` names it as a
+     public skip that states its day count, its seconds and the flag. A file behind a flag is still a
+     test. A file with a smaller day count is not the same test.
+  3. **If task 4 misses a ceiling, that is a finding with a measured number behind it.** Task 5 removes
+     nothing, and the plan does not wait for another word. Report the miss, name what it costs, carry
+     on.
+  4. **The pinned-share report is unchanged and still required.** The ceiling is the result; the pinned
+     share is the cause, and the result generalises only with the cause. A wall time met on a quiet
+     seed and a wall time met structurally look identical in a table.
+  5. **These ceilings are literals and they live here, in this plan, and nowhere else.** No test reads
+     them and no gate asserts on them, because a wall-time assertion on a shared machine is a flake
+     that teaches people to ignore red. Task 4 quotes them in its report beside what it measured.
+
 - [ ] **Measure and report, do not decide.** Use two `load()` scopes in one process for the before and after, so the two runs meet the same machine on the same day. Seconds a world day at day 3, day 50, and day 400. Seconds for a 70-day run and for an 800-day run, on one seed and on six. The wall time of `npm run fast` and of the soak. Put the table in the pull request, name the floors that the numbers would let the soak keep, and say plainly which ones still cost more than the budget.
 - [ ] Do not remove a floor. Tell dev-coordinator that the floors question is with the user, and carry on with task 5.
 - [ ] **Restore the six files task 1 suspended.** They are suspended, not cut: every day count in
