@@ -597,6 +597,31 @@ This task answers ruling 2. It is also the task whose numbers decide the floors,
   4. **The pinned-share report is unchanged and still required.** The ceiling is the result; the pinned
      share is the cause, and the result generalises only with the cause. A wall time met on a quiet
      seed and a wall time met structurally look identical in a table.
+  6. **CORRECTED 2026-09-20, by measurement: the fast suite's cost is its slowest single file, not a
+     sum.** `node --test` runs files in parallel, eighteen at a time on this machine. The merged suite
+     was 434.49 s of wall time against 1,465 s of user time, so moving the second largest file buys
+     nothing while the largest still runs. My earlier rule said "move suites behind `LONG=1` in
+     descending order of seconds until it fits", which is a sum model and is wrong. **Find the slowest
+     single file, and inside it the slowest single test, and move that.** Then measure again, because
+     the new slowest file may be a different one.
+
+     The proof, and it is also the lesson about projections. Every file was measured alone: 1,082 s
+     sequential. `tests/stalk.js` was **76.5 s, not the 92 s** everyone quoted; `tests/snapshot.js`
+     **73.3 s, not 106**; `tests/ui.js` **37.4 s, not 63**. All three estimates were high. The two
+     biggest files were on nobody's list: `tests/names.js` at **411.6 s** and `tests/door.js` at
+     **142.1 s**. And inside `names.js`, one ungated `runDays('r', 45)` at line 935 was **371.8 s of
+     that file's 411.6 s**, with the next slowest test in the file at 4.1 s. One test was 86 percent of
+     one file and 372 s of the whole gate's 434 s.
+
+     So the rule is: measure every file alone, then the tests inside the worst one. A ranked list built
+     from remembered numbers ranked three files wrongly and omitted the only two that mattered.
+
+  7. **`tests/door.js` at 142.1 s is over the 120 s per-file ceiling and stays in the fast suite.** Its
+     cost is spread — 94.1, 18.4, 12.9 and 12.5 s — so there is no single test to move, and the suite
+     fits at 174.81 s without moving it. Rule 2's 120 s figure is about a **restored** file earning its
+     way back into the gate, not about evicting a file the gate already holds and can afford. A later
+     task may split its four costly tests; it is not a reason to flag the file today.
+
   5. **These ceilings are literals and they live here, in this plan, and nowhere else.** No test reads
      them and no gate asserts on them, because a wall-time assertion on a shared machine is a flake
      that teaches people to ignore red. Task 4 quotes them in its report beside what it measured.
