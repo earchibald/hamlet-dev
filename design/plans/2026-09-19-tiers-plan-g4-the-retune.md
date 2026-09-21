@@ -422,9 +422,9 @@ Each item below has an owner. Nothing here is a suggestion.
 | item | owner |
 |---|---|
 | `dark.slower: 2`, a bare two-second period in `CLOCK` | task 4 |
-| `tests/garden.js:104`, `DAY = 1000` | the merge |
+| ~~`tests/garden.js:104`, `DAY = 1000`~~ | **closed by the merge.** `tests/garden.js:114` reads `DAY / 40`. |
 | the soak's two claims red on dev's own guard (#113) | the merge, and never by lowering a literal |
-| six record fields no type declares | the merge |
+| ~~six record fields no type declares~~ | **closed by the merge.** All six are in `types/sim/records.d.ts`. |
 | three bare-return silent passes in the tests | task 10 |
 | whether to widen the `tests/clock.js` lint | this plan, below |
 | the working record re-taken after dev's reworded chronicle | task 11 |
@@ -439,12 +439,18 @@ does. That is the strongest evidence the branch has produced.
 
 Two of dev's own numbers do not survive the merge, and the merge fixes them:
 
-`tests/garden.js:104` reads `const N = 25, DAYS = 15, DAY = 1000`. `DAY = 1000` is dev's day, so the
-real-run loop covers 0.17 of a G4 day. The divergence assertion at line 96 never fired once and only
-the vacuity control spoke. `gardenLives` is not implicated. Give it a G4-era day.
+~~`tests/garden.js:104` reads `const N = 25, DAYS = 15, DAY = 1000`.~~ **Closed.** It read dev's day,
+so the real-run loop covered 0.17 of a G4 day, the divergence assertion never fired once, and only the
+vacuity control spoke. `tests/garden.js:114` now reads `const DAYS = 15, CHECKS_A_DAY = 40, N =
+Math.round(DAY / CHECKS_A_DAY)`, and `DAY` comes from `tests/lib/run.js`, so the cadence follows the
+world day instead of a literal. `gardenLives` was never implicated.
 
-`tests/soak.js` gates `the run visits every season` and `somebody dies of old age` on one
-`longEnough = DAYS >= DEFAULT_DAYS`. On this branch `DEFAULT_DAYS` is 3, so the guard reads `3 >= 3`
+**Closed by the merge and by #113.** `longEnough` is gone from `tests/soak.js`. The season claim now
+reads `seasonClaimSkip(DAYS)` against `SEASON_CLAIM_DAYS` in `tests/lib/claims.js`. The record of why
+follows, because the defect it names is the one a later task is most likely to repeat.
+
+~~`tests/soak.js` gates `the run visits every season` and `somebody dies of old age` on one
+`longEnough = DAYS >= DEFAULT_DAYS`.~~ On this branch `DEFAULT_DAYS` is 3, so the guard reads `3 >= 3`
 and both claims run on three days of a 365-day year. Both go red. **They are resolved by naming the
 reason, never by touching the guard.** Issue #113 carries the fix: two literals, one per claim, each
 pinned by a literal claim in `tests/clock.js`, so neither can move without something else going red
