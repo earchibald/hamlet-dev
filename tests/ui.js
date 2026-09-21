@@ -303,6 +303,67 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
   assert.equal(keyHit(api, ev('q'), 'map'), null);
 });
 
+test('every side tab starts closed', () => {
+  const api = loadUI(['state'], ['ui']);
+  assert.deepEqual(api.ui.open, [], 'ui.open starts empty, so no card covers the map at the start');
+});
+
+/* Recommendation 15: a tab's key opens and closes the drawer, and never takes the keyboard with it.
+   The approved table: 1 opens People and the game keys still work; 1 again closes it; a click inside
+   the card gives the card the keyboard, until Esc or a click on the map gives it back to the game,
+   and the card stays open through that. */
+test('a tab’s key opens and closes the drawer, and leaves the game keys working', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  assert.equal(api.ui.focus, 'map');
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.deepEqual(api.ui.open, ['people'], 'People opens');
+  assert.equal(api.ui.focus, 'map', 'the keys still act on the game, not the card');
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.deepEqual(api.ui.open, [], 'pressing the key again closes People');
+  assert.equal(api.ui.focus, 'map');
+});
+
+test('once a click has put the keyboard on the card, Esc gives it back to the game and leaves the card open', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  withPage(() => api.ACTIONS.drawer('people'));
+  /* A click inside the card is main.js's own pointerdown handler, which calls setFocus. Here that is
+     stood in for directly, since main.js wires no DOM in this file's tests. */
+  api.ui.focus = 'drawer:people';
+  assert.deepEqual(keyHit(api, ev('2'), api.ui.focus), { action: 'rowPick', arg: 2 }, 'a number now picks a row in the card');
+  withPage(() => api.ACTIONS.back());
+  assert.equal(api.ui.focus, 'map', 'Esc returns the keys to the game');
+  assert.deepEqual(api.ui.open, ['people'], 'the card stays open');
+});
+
+test('opening Chronicle by / or a stage by its chord still takes the player into the card, deliberately', () => {
+  withDom(() => {
+    const api = loadUI(UI_ALL, [...KEYS, 'ui']);
+    api.startWorld('r'); api.camp = api.camps[0];
+    api.ACTIONS.searchChronicle();
+    assert.equal(api.ui.focus, 'drawer:chronicle', 'a search jump still enters the card');
+    const stageId = api.STAGES[0].id;
+    api.ACTIONS.stage(stageId);
+    assert.equal(api.ui.focus, 'drawer:goals', 'a stage jump still enters the card');
+  });
+});
+
+test('Make world and Take a god close every tab, even one a saved session had open; Continue and Load do not', () => {
+  const api = loadUI(['state', 'derive', 'actions'],
+    [...DERIVE, 'ACTIONS', 'newWorld', 'onLoad'],
+    { setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }' });
+  api.setUp();
+  withPage(() => api.newWorld('r'));
+  api.ui.open = ['people', 'goals'];
+  withPage(() => api.newWorld('r'));
+  assert.deepEqual(api.ui.open, [], 'Make world closes every tab, whatever was open before it');
+  api.ui.open = ['camp'];
+  withPage(() => api.ACTIONS.takeGod('r'));
+  assert.deepEqual(api.ui.open, [], 'and so does Take a god');
+  api.ui.open = ['camp', 'legends'];
+  withPage(() => api.onLoad());
+  assert.deepEqual(api.ui.open, ['camp', 'legends'], 'a load keeps the tabs the loaded world had open');
+});
+
 /* Buttons rendered by the interface, not by the template. */
 const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
 

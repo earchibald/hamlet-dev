@@ -68,7 +68,7 @@ const ui = {
   mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
   seenTick: -1,        /* the newest chronicle tick notePulses has read */
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
-  open: ['people', 'goals'], /* drawers open, in order */
+  open: [], /* drawers open, in order. Empty at the start: every tab begins closed. */
   focus: 'map',        /* 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>' */
   row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */

@@ -84,7 +84,12 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
+     session had open: the People and Goals cards used to cover the map at the very start. Continue
+     and Load do not call this, so they keep the tabs a saved world had open. */
+  ui.open = [];
+  if (ui.savedSpeed) setSpeed(ui.savedSpeed);
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
@@ -241,12 +246,20 @@ function applyTool(c, e){
   renderUI(true);
 }
 
-/* The action table. Every key and every click ends here. The only place view state changes. */
-function openDrawer(id, on){
+/* The action table. Every key and every click ends here. The only place view state changes.
+   `enterFocus` is for a caller that deliberately takes the player into the card, such as a search
+   or a jump to a stage: it moves `ui.focus` into the drawer, and back to the map when the drawer
+   closes. Without it, the tab's own key or a click on the tab opens or closes the drawer and leaves
+   focus where it was, so the game keys keep working while the card sits open. The one case that
+   still moves focus to the map without `enterFocus` is closing the drawer the player had clicked
+   into: its card is gone, so nothing is left to hold that focus. */
+function openDrawer(id, on, enterFocus){
   const has = ui.open.includes(id), want = on === undefined ? !has : on;
   const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
-  ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
+  if (enterFocus) ui.focus = want ? `drawer:${id}` : 'map';
+  else if (!want && ui.focus === `drawer:${id}`) ui.focus = 'map';
+  ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
 /* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
@@ -380,7 +393,7 @@ const ACTIONS = {
   },
   /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
      rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
-  searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  searchChronicle(){ openDrawer('chronicle', true, true); const box = $('chronSearch'); if (box) box.focus(); },
   /* The one writer of the query. The box's input handler calls it, and so does Esc. A shorter list would
      leave a stale row index pointing past the end, so the row goes back to the top with every change. */
   setChronSearch(v){
@@ -401,7 +414,7 @@ const ACTIONS = {
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
   chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
-  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  stage(id){ closeDialogs(); openDrawer('goals', true, true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },
   unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },

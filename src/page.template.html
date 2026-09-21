@@ -106,6 +106,7 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
+#drawerTabs .btn kbd{margin-left:0;margin-inline-start:5px}
 #drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
