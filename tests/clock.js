@@ -200,12 +200,18 @@ test('needs, cooldowns, and the base tasks read the table', () => {
   assert.deepEqual(C.cold, { under: R(0.012), winterNight: R(0.06), winterDay: R(0.025), summer: 0, night: R(0.012), day: R(0.003) });
   assert.equal(C.rate.fireWarms, R(0.5)); assert.equal(C.rate.freezeHurts, R(0.03)); assert.equal(C.rate.starveHurts, R(0.04));
   assert.equal(C.rate.heals, R(0.01)); assert.equal(C.rate.fireHurts, R(2.5)); assert.equal(C.rate.oldAgeDeath, R(0.0006));
-  assert.equal(C.rate.sitRests, S(0.05)); assert.equal(C.rate.sitWarms, S(0.4));
+  /* An evening by the fire is an amount for each world hour now, and sleep pays rest back at twice
+     the rate it is spent, which is what makes a night eight hours long. */
+  assert.equal(C.rate.sitRests, load().perHour(1)); assert.equal(C.rate.sitWarms, load().perHour(8));
+  assert.equal(C.rate.restsAsleep, 2);
   const T = load().ticks;
   assert.equal(C.cooldown.offerFailed, T(60)); assert.equal(C.cooldown.pathBlocked, T(40)); assert.equal(C.cooldown.taskFailed, T(120)); assert.equal(C.cooldown.needFailed, T(120)); assert.equal(C.cooldown.disturb, T(1000));
-  assert.equal(C.limit.task, T(1500)); assert.equal(C.limit.hurtRemembered, T(600));
-  const St = load().strides;
-  assert.equal(C.task.sit, St(90)); assert.equal(C.task.sitChat, St(25)); assert.equal(C.task.standStill, St(20));
+  /* Three days for the watchdog, so a job broken off by a night, a storm and a wolf is still the
+     same job when the person comes back to it. The longest job in `work` is under seven hours. */
+  assert.equal(C.limit.task, load().days(3)); assert.equal(C.limit.hurtRemembered, T(600));
+  const H = load().hours, M = load().mins;
+  assert.equal(C.task.sit, H(4.25)); assert.equal(C.task.sitChat, H(1.25)); assert.equal(C.task.standStill, H(1));
+  assert.equal(C.task.talk, M(30)); assert.equal(C.task.doze, H(3)); assert.equal(C.task.nibble, M(45));
   assert.equal(C.thought.grief, T(3000)); assert.equal(C.thought.ateCooked, T(700));
 });
 
@@ -224,20 +230,45 @@ test('the animals, the sprites, and the gnomes read the table', () => {
   const St = api.strides;
   assert.equal(C.chase.wolf, St(140)); assert.equal(C.chase.wolfPerSkill, St(30)); assert.equal(C.chase.stalk, St(160));   // task 7 rules on the chases
   assert.equal(C.sprite.dance, St(240)); assert.equal(C.sprite.prankGap, T(300));
-  assert.equal(api.SPECIES.human.decay.food, api.tickRate(0.035));
+  /* A person's needs are points an hour now, read off three meals a day, five drinks and one sleep.
+     The animals' rows are still the old tick's and are task 6's. */
+  assert.deepEqual(api.SPECIES.human.decay, { food: api.perHour(7), water: api.perHour(17), rest: api.perHour(2.5), social: api.perHour(1), warmth: api.perHour(0) });
+  assert.equal(api.SPECIES.wolf.decay.food, api.tickRate(0.02), 'the animals wait for task 6');
   /* `stride` is a speed in tiles a tick now, not a count of ticks between acts. Everyone walks one. */
   assert.equal(api.SPECIES.sprite.stride, 1); assert.equal(api.SPECIES.human.stride, 1);
 });
 
-test('human work reads the table', () => {
+/* Work is world time for a person of no skill. Three values are the spec's and are not conversions:
+   an axe is an hour and a lean-to four. Every other entry is the stretch it took before, rounded to
+   the nearest quarter hour, so a table that drifted back to the old strides is caught here. */
+test('human work reads the table, in world time', () => {
   const api = load(), C = api.CLOCK;
-  const St = api.strides;
-  assert.equal(C.work.firepit, St(70)); assert.equal(C.work.knapAxe, St(70)); assert.equal(C.work.leanTo, St(110)); assert.equal(C.work.storehouse, St(140)); assert.equal(C.work.hut, St(120));
-  assert.equal(C.work.feedFire, St(6)); assert.equal(C.work.checkSnare, St(4)); assert.equal(C.work.fish, St(110)); assert.equal(C.work.cutTree, St(60));
+  const H = api.hours, M = api.mins, St = api.strides;
+  assert.equal(C.work.knapAxe, H(1), 'the spec: an axe is an hour');
+  assert.equal(C.work.leanTo, H(4), 'the spec: a lean-to is four hours');
+  assert.equal(C.work.firepit, H(3.25)); assert.equal(C.work.storehouse, H(6.75)); assert.equal(C.work.hut, H(5.75));
+  assert.equal(C.work.feedFire, M(15)); assert.equal(C.work.checkSnare, M(15)); assert.equal(C.work.fish, H(5.25)); assert.equal(C.work.cutTree, H(3));
+  assert.equal(C.work.berryEvery, M(15)); assert.equal(C.work.fibreEvery, M(30));
+  /* Every entry of the group is a whole number of quarter hours, which is what "rounded to a quarter
+     hour" means, and no entry is left in strides. */
+  for (const k in C.work){
+    assert.equal(C.work[k] % M(15), 0, `CLOCK.work.${k} is ${C.work[k]}, which is not a whole number of quarter hours`);
+    assert.ok(C.work[k] > 0 && C.work[k] <= H(7), `CLOCK.work.${k} is ${C.work[k]}, outside the range the group was read in`);
+  }
   assert.equal(C.chase.deer, St(220)); assert.equal(C.chase.deerPerSkill, St(40)); assert.equal(C.chase.deerMissed, St(40)); assert.equal(C.chase.guard, St(200));
   assert.equal(C.limit.guardEmber, api.ticks(500)); assert.equal(C.limit.hearthProven, api.days(3));
   assert.equal(C.cooldown.sparks, api.ticks(150)); assert.equal(C.cooldown.wolfBurned, api.ticks(2500)); assert.equal(C.cooldown.wolfDriven, api.ticks(3000));
-  assert.equal(api.RECIPES.find(r => r.id === 'workshop').work, St(140));
+});
+
+/* Every recipe's work is world time too, and each is a whole number of quarter hours. */
+test('every recipe reads its work in world time', () => {
+  const api = load(), M = api.mins, H = api.hours, C = api.CLOCK;
+  assert.equal(api.RECIPES.find(r => r.id === 'workshop').work, H(6.75));
+  assert.equal(api.RECIPES.find(r => r.id === 'cord').work, H(1.5));
+  /* Each recipe reads the table by its own id, so the lint needs no exemption for recipes.js. */
+  for (const r of api.RECIPES) if (r.work !== undefined) assert.equal(r.work, C.work[r.id], `recipe ${r.id} does not read CLOCK.work.${r.id}`);
+  const bad = api.RECIPES.filter(r => r.work !== undefined && (r.work % M(15) !== 0 || r.work <= 0 || r.work > H(7)));
+  assert.deepEqual(bad.map(r => `${r.id} = ${r.work}`), [], 'a recipe whose work is not a whole number of quarter hours of world time');
 });
 
 /* ---------- the lint: no bare time literal in a rule ---------- */

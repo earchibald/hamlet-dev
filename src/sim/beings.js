@@ -430,7 +430,7 @@ function bodyStretch(a, lim){
   const night = isNight(s + 1), human = a.species === 'human', storm = weather.storm;
   /* The step each need takes on every tick of this stretch. A sleeper gains rest instead of losing it. */
   const step = {};
-  for (const k in sp.decay) step[k] = sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1);
+  for (const k in sp.decay) step[k] = sp.decay[k] * (k === 'rest' && a.asleep ? -CLOCK.rate.restsAsleep : 1);
   const w0 = human ? n.warmth : 0;
   let dW = 0, byFire = false, roofed = false;
   if (human){

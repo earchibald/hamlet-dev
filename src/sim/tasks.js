@@ -6,7 +6,7 @@
      begin(a, args)  the checks and the search that start the task. It returns the record's other
                      fields, or false when the task cannot start, or true when it handed over to
                      another kind.
-     stops           functions (a, t). The executor calls stops[t.stop] on each stride once the path
+     stops           functions (a, t). The executor calls stops[t.stop] on each act once the path
                      is walked. Each returns 'continue', 'done', or 'fail'.
      release(a, t)   what the task lets go of when it ends or fails.
      work, effect    declared by workKind for a job done at one place. */
@@ -104,7 +104,9 @@ function chain(a, old, ok){ if (!ok) return null; a.task.started = old.started; 
 const skillOfLabel = label => /cook|smok|butcher/i.test(label) ? 'cook' : /knap|sew|spear/i.test(label) ? 'craft' : /snare/i.test(label) ? 'trap' : 'build';
 /* A job done at one place: walk to args.at, work until the progress reaches the amount, and then the
    effect lands. label, amount, and skill are values, or functions of args for a job whose record says
-   them. The kind declares work and effect, so another executor can do the same job without the strides. */
+   them. `amount` is WORLD TIME: the stretch the job takes a person of no skill, and `workSpeed`
+   divides it. The kind declares work and effect, so another executor can do the same job without
+   this one's bookkeeping. */
 /** @type {(spec: WorkKindSpec) => any} */
 function workKind({ label, amount, skill, effect, type = 'work' }){
   const of = (v, args) => typeof v === 'function' ? v(args) : v;

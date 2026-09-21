@@ -17,15 +17,16 @@ function readyCamp(seed = 'r'){
   return { api, a, c };
 }
 /* Take one offer by label and run the person until the task ends or the budget runs out. The budget
-   was 600 ticks of the old 1000-tick day. G4 task 1 made a tick one world second, so the same budget
-   in world time is `ticks(600)`, about 14 hours. It is converted rather than renumbered: 600 was
-   never a considered figure, only "long enough for any craft", and it still says that. */
+   was 600 ticks of the old 1000-tick day, which task 1 carried over as `ticks(600)`, about 14 hours.
+   Task 5 reads it and writes it in world time: fifteen hours. What the number has always meant is
+   "long enough for any craft", and the longest job in `CLOCK.work` is under seven hours for a person
+   of no skill, so fifteen leaves room for the walk to the work tile and for a job done badly. */
 function doOffer(api, a, label){
   const o = api.offersFor(a).find(o => o.label === label);
   assert.ok(o, `no offer "${label}"; offers: ${api.offersFor(a).map(o => o.label).join(', ')}`);
   assert.ok(api.startTask(a, o.task.kind, o.task.args), `offer "${label}" would not start`);
   a.task.started = api.tick; a.task.key = label;
-  const budget = api.ticks(600);
+  const budget = api.hours(15);
   for (let k = 0; k < budget && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; }
   assert.equal(a.task, null, `"${label}" did not finish in ${budget} ticks, which is ${(budget / api.DAY).toFixed(1)} world days`);
 }

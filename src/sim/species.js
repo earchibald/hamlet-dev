@@ -5,7 +5,25 @@ const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, o
 const ageDays = (a, t = tick) => (t - a.born) / DAY;
 const stage = (a, t = tick) => { const L = LIFE[a.species]; const d = ageDays(a, t); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
-  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
+  /* A person's needs, in points lost for each world hour. A need runs from 100 to 0 and urgency
+     starts at 60, so each rate is read off how often a person should act: three meals a day, five
+     drinks, one sleep. The counts are the test, in `tests/tasks.js`.
+       food 7      three meals a day, because a meal off the stash is worth 55 points and three of
+                   them is 165, which is a day at 7 an hour. Full to empty is fourteen hours.
+       water 17    five drinks a day. A drink fills the skin to 100, and a person puts thirst off
+                   until work stops paying, which measures out at about 70 points. Five of those is
+                   350, which is a day at 17 an hour. Full to empty is under six hours, and that is
+                   the price of drinking five times: a person near water is never in trouble and one
+                   cut off from it is in trouble within the day.
+       rest 2.5    one sleep a night. The arithmetic alone says 1.25: a person is awake sixteen hours
+                   and lies down at 80, which is twenty points. But sitting by the fire and the rest
+                   task put rest back, and at 1.25 an hour the top-ups kept a person above 80 for
+                   days -- measured one sleep in three days on five of six seeds. At 2.5 they cannot,
+                   and every seed sleeps once a night. `CLOCK.rate.restsAsleep` pays it back at twice
+                   the rate it is spent, which is what makes the night about eight hours long.
+       social 1    a person who sees nobody wants company again inside two days.
+     The animals' rows are still in the old tick's units. They are task 6's. */
+  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: perHour(7), water: perHour(17), rest: perHour(2.5), social: perHour(1), warmth: perHour(0) }, stride: 1, zmin: -2, zmax: 2 },
   rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
   fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
   wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },

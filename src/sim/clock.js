@@ -96,13 +96,26 @@ const CLOCK = {
     fireWarms: tickRate(0.5),          // warmth gained within 3 tiles of a lit pit
     freezeHurts: tickRate(0.03), starveHurts: tickRate(0.04), heals: tickRate(0.01), fireHurts: tickRate(2.5),
     oldAgeDeath: tickRate(0.0006),     // past the usual span, divided by hardiness
-    sitRests: strideRate(0.05), sitWarms: strideRate(0.4),
+    /* An evening by the fire, for each world hour of it. Both were an amount a stride, which was
+       1.04 and 8.33 an hour, so each keeps its meaning at a whole point an hour. */
+    sitRests: perHour(1), sitWarms: perHour(8),
+    /* How many times faster rest comes back asleep than it goes while awake. A person is awake
+       sixteen hours and asleep eight, so what sixteen hours spend eight hours must earn back: a
+       factor of two, and that is what makes a night's sleep eight hours long. It was six, which gave
+       a sleep of under three hours and let a person sleep twice in a night. One number for every
+       species, so each keeps its own rest decay in the ratio; what an ANIMAL's rest need should be is
+       task 6's to rule on, and this entry only says how sleep pays it back. */
+    restsAsleep: 2,
     danceGlows: strideRate(0.6), danceRests: strideRate(0.3), dancePlays: strideRate(0.5), visitPlays: strideRate(0.4),
   },
   limit: {
     ember: ticks(420),        // how long a carried ember lives
     poked: ticks(400),        // how long a poked being stays startled
-    task: ticks(1500),                // a task older than this is dropped
+    /* A task older than this is dropped. Three days, because the longest single job in `work` is
+       under seven hours and the watchdog is there for a task that has stopped making progress, not
+       for a long one: it must not cut off a person who was interrupted by a night, a storm and a
+       wolf and went back to the same job. It was 1,500 old ticks, which is a day and a half. */
+    task: days(3),
     hurtRemembered: ticks(600),       // a wound names the cause of death this long
     swarm: ticks(4000), swarmReturn: ticks(1500), blight: ticks(5000),
     gnomeHolds: days(2),              // a borrowed thing comes back after this
@@ -126,27 +139,50 @@ const CLOCK = {
   },
   /* Warmth a person loses each tick, by where and when. */
   cold: { under: tickRate(0.012), winterNight: tickRate(0.06), winterDay: tickRate(0.025), summer: tickRate(0), night: tickRate(0.012), day: tickRate(0.003) },
-  /* How long the base tasks take, in strides. */
+  /* How long the base tasks take, in world time. Every one is the stretch it took before, rounded to
+     the nearest quarter hour, and each is a duration a person would say out loud. The four that end
+     in a need -- eating a carcass, eating mushrooms, resting in a den, chattering with kin -- are an
+     animal's or a gnome's, and their rows are here because the duration of an act belongs with work.
+     What an animal's REST need does is task 6's, not this table's. */
   task: {
-    nibble: strides(15), talk: strides(10), shelterWait: strides(60),
-    sit: strides(90), sitChat: strides(25), sitTeach: strides(30), sitTeachAt: strides(15),
-    standStill: strides(20), doze: strides(60),
-    eatCarcass: strides(25), eatShrooms: strides(8), denRest: strides(60), kinChat: strides(20),
+    nibble: mins(45),           // a rabbit grazes three quarters of an hour before it is fed
+    talk: mins(30),             // two people stop and talk for half an hour
+    shelterWait: hours(3),      // how long a person waits out the rain under a roof before giving up
+    sit: hours(4.25),           // an evening by the fire
+    sitChat: hours(1.25), sitTeach: hours(1.5), sitTeachAt: mins(45),   // periods inside that evening
+    standStill: hours(1),       // a being with nowhere to be stands for an hour
+    doze: hours(3),             // an animal's daytime doze
+    eatCarcass: hours(1.25),    // a wolf or a fox at a carcass
+    eatShrooms: mins(30),       // a gnome at a mushroom patch
+    denRest: hours(3),          // a beast lying up in its den
+    kinChat: hours(1),          // two gnomes talking
   },
-  /* How much work a job takes. A worker adds workSpeed to the job's progress each stride, and
-     workSpeed is 1 for a person with no skill, so an entry is the strides the job takes them. The
-     four entries that end in `Every` are periods inside a gathering task: one thing is gathered
-     each time that many strides pass. */
+  /* How much work a job takes, as the WORLD TIME it takes a person of no skill. `workKind` adds the
+     worker's `workSpeed` for each world second that passed, and `workSpeed` is 1 for a person with
+     no skill, so an entry is that person's stretch at the job and a skilled one divides it.
+
+     Three values are the spec's and are not conversions: knapping an axe is an hour, a lean-to is
+     four hours, and a night's sleep is eight (the sleep is not a job, so it lives in the rest rates
+     below and not here). Every other entry is the stretch it took before, rounded to the nearest
+     quarter hour, which is the finest grain a person says a duration in.
+
+     The four entries that end in `Every` are periods inside a gathering task: one thing is gathered
+     each time that much world time passes. */
   work: {
-    firepit: strides(70), feedFire: strides(6), strikeSparks: strides(40), mossLight: strides(10), layFire: strides(15),
-    butcherDeer: strides(60), cookFish: strides(25), cookCatch: strides(35),
-    setSnare: strides(30), checkSnare: strides(4), rearmSnare: strides(10), haulDeer: strides(12),
-    knapAxe: strides(70), testRocks: strides(50), spear: strides(50), waterskin: strides(60),
-    leanTo: strides(110), storehouse: strides(140), hut: strides(120),
-    offeringStone: strides(30), leaveBerries: strides(8), wardPosts: strides(60),
-    rack: strides(50), smokeMeat: strides(45), smokeFish: strides(40),
-    fish: strides(110), quarry: strides(25), breakRockfall: strides(60), cutTree: strides(60), fillWaterskin: strides(12),
-    berryEvery: strides(6), fibreEvery: strides(8), clayEvery: strides(10), cuttingsEvery: strides(6),
+    firepit: hours(3.25), feedFire: mins(15), strikeSparks: hours(2), mossLight: mins(30), layFire: mins(45),
+    butcherDeer: hours(3), cookFish: hours(1.25), cookCatch: hours(1.75),
+    setSnare: hours(1.5), checkSnare: mins(15), rearmSnare: mins(30), haulDeer: mins(30),
+    knapAxe: hours(1), testRocks: hours(2.5), spear: hours(2.5), waterskin: hours(3),
+    leanTo: hours(4), storehouse: hours(6.75), hut: hours(5.75),
+    offeringStone: hours(1.5), leaveBerries: mins(30), wardPosts: hours(3),
+    rack: hours(2.5), smokeMeat: hours(2.25), smokeFish: hours(2),
+    fish: hours(5.25), quarry: hours(1.25), breakRockfall: hours(3), cutTree: hours(3), fillWaterskin: mins(30),
+    berryEvery: mins(15), fibreEvery: mins(30), clayEvery: mins(30), cuttingsEvery: mins(15),
+    /* The crafts. One row of `RECIPES` reads each by its own id. They sat in the recipe rows as
+       stride counts; they are durations like every other entry here, so they live here where
+       `tests/clock.js` reads the whole group at once and the lint has no exemption to grant. */
+    cord: hours(1.5), workshop: hours(6.75), basket: hours(3), rod: hours(2),
+    clothes: hours(3.25), kiln: hours(5.75), pot: hours(2.5), garden: hours(3.75), pitfall: hours(4.25),
   },
   /* How often a rule looks. A rule runs when tick % every is 0, or is the `At` entry beside it. */
   every: {

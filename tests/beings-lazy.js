@@ -35,7 +35,7 @@ function refThought(b, key, text, value, dur){
    Everything else is here, in the head's own order. */
 function refTick(api, b){
   const C = api.CLOCK, sp = api.SPECIES[b.species], n = b.needs, night = api.isNight();
-  for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && b.asleep ? -6 : 1));
+  for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && b.asleep ? -C.rate.restsAsleep : 1));
   if (b.species === 'human'){
     const camp = api.camp, hereTile = api.tileAt(b.x, b.y, b.z);
     const season = api.seasonOf(), under = b.z < 0 || !!hereTile.cave;
