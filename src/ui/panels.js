@@ -147,6 +147,8 @@ function renderFoot(){
   const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
   const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  /* The act caption already says this sentence, in its own place above the foot. The foot does not say it twice. */
+  const echoed = captionText && e && e.text === captionText;
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e || echoed ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }

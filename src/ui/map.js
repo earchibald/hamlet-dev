@@ -135,9 +135,19 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The disc's own radius, the halo drawMark draws around the mark. The word beside it keeps clear of
+   this circle, so named here rather than left as a bare 34 in two places. */
+const MARK_R = 34;
+/* Where the mark's word goes: to the right of the disc, at a fixed gap past its radius, unless the
+   disc sits too close to the canvas edge for the word to fit there, when it goes to the left instead.
+   Pure, so a test can walk every position without a canvas. */
+function markWordSide(x, textWidth, canvasWidth, gap = 8){
+  return x + MARK_R + gap + textWidth <= canvasWidth ? 'right' : 'left';
+}
 /* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
-   appears under it. The disc is the map's own background at just over half, so the mark reads on any
-   country and the ground still shows through. */
+   appears beside it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. The word sits to the side of the disc, not under it, so
+   it never lies over the god's own name. */
 function drawMark(rec, f, alpha){
   const m = markFor(rec.kind, rec.value); if (!m) return;
   const q = tileSpot(rec.to); if (!q) return;
@@ -145,7 +155,7 @@ function drawMark(rec, f, alpha){
   if (d <= 0) return;
   wctx.save();
   wctx.globalAlpha = alpha;
-  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.beginPath(); wctx.arc(q.x, q.y, MARK_R, 0, Math.PI * 2);
   wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
   wctx.globalAlpha = alpha;
   wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
@@ -157,9 +167,12 @@ function drawMark(rec, f, alpha){
   wctx.save();
   wctx.globalAlpha = alpha;
   wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
-  wctx.textAlign = 'center';
-  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
-  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  const word = m.word.toUpperCase(), gap = 8;
+  const side = markWordSide(q.x, wctx.measureText(word).width, W * WS, gap);
+  wctx.textAlign = side === 'right' ? 'left' : 'right';
+  const wx = side === 'right' ? q.x + MARK_R + gap : q.x - MARK_R - gap;
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(word, wx, q.y);
+  wctx.fillStyle = P['field-line']; wctx.fillText(word, wx, q.y);
   wctx.restore();
 }
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
@@ -288,11 +301,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the line the act on stage wrote. */
-  if (figures && now && f > 0){
-    const text = captionFor(now);
-    if (text) drawCaption(text, tileSpot(now.to));
-  }
+  /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
+     never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
+     could run under a drawer or off the visible edge. */
+  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){

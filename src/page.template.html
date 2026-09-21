@@ -100,7 +100,12 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
 .over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
-#foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
+/* The foot and, above it, the act caption. Both keep clear of the drawers, so a long sentence
+   never runs under a card or off the visible edge of a canvas wider than the window. */
+.foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
+#actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
+#actCaption[hidden]{display:none}
+#foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
@@ -225,7 +230,10 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
-    <div id="foot"></div>
+    <div class="foot-stack">
+      <div id="actCaption" hidden></div>
+      <div id="foot"></div>
+    </div>
     <div id="drawerTabs"></div>
     <div id="drawers"></div>
     <div id="windows"></div>

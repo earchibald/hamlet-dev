@@ -1075,6 +1075,21 @@ test('the field colour is grey with no pole, and the mean of the poles with some
   for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
 });
 
+test('the mark word goes right when there is room, and left when there is not', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map'], ['markWordSide', 'MARK_R']);
+  /* Plenty of room on both sides: the word goes right, its own default side. */
+  assert.equal(api.markWordSide(200, 40, 800), 'right');
+  /* The disc sits close enough to the right edge that the word would run off there. */
+  assert.equal(api.markWordSide(780, 40, 800), 'left');
+  /* The boundary itself: a word that fits exactly still goes right. */
+  const x = 800 - api.MARK_R - 8 - 40;
+  assert.equal(api.markWordSide(x, 40, 800), 'right');
+  assert.equal(api.markWordSide(x + 1, 40, 800), 'left');
+  /* A wider word needs more room, so the same disc position can flip sides. */
+  assert.equal(api.markWordSide(700, 40, 800), 'right');
+  assert.equal(api.markWordSide(700, 90, 800), 'left');
+});
+
 test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
   const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], ['inspectRegion']);
   api.startCreation('alpha', {}); for (let i = 0; i < 10; i++) api.step();
@@ -1736,6 +1751,7 @@ function recordCtx(){
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
   const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+    caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
     setAcc: '(v) => { acc = v; }',
@@ -1850,15 +1866,17 @@ test('the field draws every gesture kind, including the five no seed makes, and 
   assert.equal(state(), before, 'the drawing changed the rules');
 });
 
-test('a gesture with a line and a decision draws more than one without them', () => {
+test('a gesture with a line shows it as the act caption, off the canvas, and a decision still draws more', () => {
   const { api, wctx } = fieldRig('r', 6);
   const live = api.liveRegions(), r = live[0], g = api.gods()[0];
   const head = { god: g.id, age: api.age, from: r.tiles[0], to: r.tiles[2], said: null, weighed: null, region: r.id, pole: g.pole };
   const count = rec => { api.creation.gestures.length = 0; api.creation.gestures.push(rec); api.setAcc(0.15); wctx.calls.length = 0; api.drawField(); return wctx.calls.length; };
   const plain = count({ ...head, kind: 'claim' });
+  assert.equal(api.caption(), '', 'a gesture with no line shows no act caption');
   const said = count({ ...head, kind: 'claim', said: 0 });
   assert.ok(api.legends[0], 'the creation wrote no legend to caption');
-  assert.ok(said > plain, 'a line that was written prints no caption');
+  assert.equal(api.caption(), api.legends[0].text, 'a line that was written shows as the act caption');
+  assert.equal(said, plain, 'the caption is a page element now, so it draws nothing on the canvas');
   const weighed = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
   assert.ok(weighed > plain, 'a decision shows no intent cue at the slow tier');
   /* The cue is the first thing dropped as the pace rises. Pace 2 is the top of the ages' own ladder:

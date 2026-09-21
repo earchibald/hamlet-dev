@@ -100,7 +100,12 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
 .over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
-#foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
+/* The foot and, above it, the act caption. Both keep clear of the drawers, so a long sentence
+   never runs under a card or off the visible edge of a canvas wider than the window. */
+.foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
+#actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
+#actCaption[hidden]{display:none}
+#foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
@@ -225,7 +230,10 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
-    <div id="foot"></div>
+    <div class="foot-stack">
+      <div id="actCaption" hidden></div>
+      <div id="foot"></div>
+    </div>
     <div id="drawerTabs"></div>
     <div id="drawers"></div>
     <div id="windows"></div>
@@ -7231,6 +7239,25 @@ const setHTML = (el, html) => {
   el.innerHTML = html;
 };
 
+/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
+   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
+   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
+   moved past it, the valley is made, a new world starts, or a save loads. */
+let captionText = '';
+function setActCaption(text){
+  text = text || '';
+  if (text === captionText) return;
+  captionText = text;
+  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
+     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
+     there, and the text these tests read comes straight from captionText. The text is plain narrative
+     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = $('actCaption'); if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+}
+
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
   pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */
@@ -8352,9 +8379,19 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The disc's own radius, the halo drawMark draws around the mark. The word beside it keeps clear of
+   this circle, so named here rather than left as a bare 34 in two places. */
+const MARK_R = 34;
+/* Where the mark's word goes: to the right of the disc, at a fixed gap past its radius, unless the
+   disc sits too close to the canvas edge for the word to fit there, when it goes to the left instead.
+   Pure, so a test can walk every position without a canvas. */
+function markWordSide(x, textWidth, canvasWidth, gap = 8){
+  return x + MARK_R + gap + textWidth <= canvasWidth ? 'right' : 'left';
+}
 /* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
-   appears under it. The disc is the map's own background at just over half, so the mark reads on any
-   country and the ground still shows through. */
+   appears beside it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. The word sits to the side of the disc, not under it, so
+   it never lies over the god's own name. */
 function drawMark(rec, f, alpha){
   const m = markFor(rec.kind, rec.value); if (!m) return;
   const q = tileSpot(rec.to); if (!q) return;
@@ -8362,7 +8399,7 @@ function drawMark(rec, f, alpha){
   if (d <= 0) return;
   wctx.save();
   wctx.globalAlpha = alpha;
-  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.beginPath(); wctx.arc(q.x, q.y, MARK_R, 0, Math.PI * 2);
   wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
   wctx.globalAlpha = alpha;
   wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
@@ -8374,9 +8411,12 @@ function drawMark(rec, f, alpha){
   wctx.save();
   wctx.globalAlpha = alpha;
   wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
-  wctx.textAlign = 'center';
-  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
-  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  const word = m.word.toUpperCase(), gap = 8;
+  const side = markWordSide(q.x, wctx.measureText(word).width, W * WS, gap);
+  wctx.textAlign = side === 'right' ? 'left' : 'right';
+  const wx = side === 'right' ? q.x + MARK_R + gap : q.x - MARK_R - gap;
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(word, wx, q.y);
+  wctx.fillStyle = P['field-line']; wctx.fillText(word, wx, q.y);
   wctx.restore();
 }
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
@@ -8505,11 +8545,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the line the act on stage wrote. */
-  if (figures && now && f > 0){
-    const text = captionFor(now);
-    if (text) drawCaption(text, tileSpot(now.to));
-  }
+  /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
+     never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
+     could run under a drawer or off the visible edge. */
+  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
@@ -9107,7 +9146,9 @@ function renderFoot(){
   const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
   const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  /* The act caption already says this sentence, in its own place above the foot. The foot does not say it twice. */
+  const echoed = captionText && e && e.text === captionText;
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e || echoed ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
@@ -9271,7 +9312,7 @@ function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
   startCreation(seed, {});
-  fieldKey = '';
+  fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
@@ -9333,7 +9374,7 @@ function loadWorld(snapshot, note){
 /* The view after a load. Everything it remembers points at the world that was replaced, and the new
    world can be a smaller one, so this puts the view back on the ground as onSettle does. */
 function onLoad(){
-  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
@@ -9412,7 +9453,7 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   setSpeed(ui.savedSpeed || speed || 1);
