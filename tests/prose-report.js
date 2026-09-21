@@ -22,9 +22,18 @@ const SHOW = Number(process.env.SHOW || 12);
 (async () => {
   if (!key()){ console.error('No key for the judge. Put TYPESAFE_API_KEY in ~/.config/prose-lint/env.'); process.exit(2); }
   const approved = fs.readFileSync(path.join(ROOT, 'design/approved-text.md'), 'utf8');
+  /* A line is approved when the approved text holds it, with any words in the place of each X. */
+  const isApproved = text => {
+    const parts = text.split(/\bX\b/).map(s => s.trim()).filter(s => s.length > 3).map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return parts.length > 0 && new RegExp(parts.join('.{0,60}?')).test(approved);
+  };
   const texts = new Map();
   for (const dir of ['src/sim', 'src/ui']) for (const f of fs.readdirSync(path.join(ROOT, dir)).filter(f => f.endsWith('.js') && f !== 'index.js').sort())
-    for (const l of literals(fs.readFileSync(path.join(ROOT, dir, f), 'utf8'))) if (!texts.has(l.text)) texts.set(l.text, `${dir}/${f}:${l.line}`);
+    for (const l of literals(fs.readFileSync(path.join(ROOT, dir, f), 'utf8'))){
+      /* The judge reads sentences, so a key or a label of fewer than four words is left out. A tag is not text. */
+      const text = l.text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (text.split(' ').length >= 4 && !texts.has(text)) texts.set(text, `${dir}/${f}:${l.line}`);
+    }
   const fromSource = texts.size;
   for (const line of rendered(['r', 'x', 'gamma', 'sweep23'])) if (!texts.has(line)) texts.set(line, 'a creation');
   /* All the texts go to the tool as one document, with a blank line between them. So text number i
@@ -35,7 +44,7 @@ const SHOW = Number(process.env.SHOW || 12);
   const by = {};
   for (const f of r.findings.filter(f => f.kind === 'judge')){
     const text = list[(f.line - 1) / 2];
-    (by[f.rule] = by[f.rule] || []).push({ score: f.score, text, where: texts.get(text), approved: approved.includes(f.sentence.replace(/\bX\b/g, '').trim().slice(0, 40)) });
+    (by[f.rule] = by[f.rule] || []).push({ score: f.score, text, where: texts.get(text), approved: isApproved(text) });
   }
   console.log(`${fromSource} strings from the source and ${list.length - fromSource} creation lines. ${r.tokens} new tokens, $${(r.tokens * 42e-9).toFixed(4)}.`);
   console.log('This is a report for the review panel. It is not a gate. No score here is calibrated.\n');
