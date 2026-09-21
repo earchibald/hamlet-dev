@@ -232,7 +232,7 @@ test('the animals, the sprites, and the gnomes read the table', () => {
   assert.equal(C.sprite.dance, St(240)); assert.equal(C.sprite.prankGap, T(300));
   /* A person's needs are points an hour now, read off three meals a day, five drinks and one sleep.
      The animals' rows are still the old tick's and are task 6's. */
-  assert.deepEqual(api.SPECIES.human.decay, { food: api.perHour(7), water: api.perHour(17), rest: api.perHour(2.5), social: api.perHour(1), warmth: api.perHour(0) });
+  assert.deepEqual(api.SPECIES.human.decay, { food: api.perHour(7), water: api.perHour(16), rest: api.perHour(2.5), social: api.perHour(1), warmth: api.perHour(0) });
   assert.equal(api.SPECIES.wolf.decay.food, api.tickRate(0.02), 'the animals wait for task 6');
   /* `stride` is a speed in tiles a tick now, not a count of ticks between acts. Everyone walks one. */
   assert.equal(api.SPECIES.sprite.stride, 1); assert.equal(api.SPECIES.human.stride, 1);

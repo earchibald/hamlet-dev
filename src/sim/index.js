@@ -35,7 +35,7 @@ const API = `return {
   seasonOf, dayOf, dayOfYear, yearOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor, sourcesNow,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, rebuildItemGrid, stashAdd, gardenLives, DIRS,
   TASKS, startTask, setTask, taskStop, goTo, workKind,
-  runTask, updateBeing, catchUp, bodyBreak, bodyStretch, nextAct, senseBeings, thoughtAt, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,
+  runTask, updateBeing, catchUp, bodyBreak, bodyStretch, nextAct, senseBeings, thoughtAt, die, NEED_LOW, WAKE_RESTED, WAKE_LIGHT, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,
   pathToStop, bfs, reachable, steps, idx, idx3, secOf, secIdx, tileAt, hasTile, placeTile, makeCave, carve, keepsPaths, rimExits, digDens, spawnInDens, faeTick, sectorOfTile, passable, nearestFire, itemAt, growPlants,
   near, nearAt, dist,
   seedNames, nameRecord, giveName, nameOf, formerNames, nameTaken, nameRecordOf, nameThings, oldWord, oldName, newOldName, takeMeaning, cap, titleCase, LAND_WORDS, LAND_WORD_KINDS, OLD_FORBID,

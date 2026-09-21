@@ -63,6 +63,11 @@ function refTick(api, b){
     const roof = beds.some(pl => api.nearAt(b, ...pl) <= 1), warm = camp && api.pitLit() && api.nearAt(b, ...camp.pit) <= 4;
     refThought(b, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, C.thought.slept);
   }
+  /* A sleeper whose food or water falls under `NEED_LOW` wakes, so the force in `updateBeing` can send
+     them to drink or eat. Task 5 added it, because water at 17 points an hour empties a full skin in
+     under six hours and a night is longer than that. The threshold is read from the sim and not
+     copied: a second copy of a constant in a test agrees with whatever it was last set to. */
+  if (b.asleep && (n.food < api.NEED_LOW || (n.water !== undefined && n.water < api.NEED_LOW))) b.asleep = false;
 }
 
 /* A world small enough to build in a tenth of a second, with a lit pit under the founder's feet and
@@ -101,15 +106,66 @@ function sameBody(a, b, what){
   assert.equal(keys(a), keys(b), `${what}: thoughts`);
 }
 
-test('a person asleep eight hours by a lit pit, across a dawn, agrees with the tick-by-tick head', () => {
+/* Eight hours from 22:00 to dawn. The person no longer stays asleep for all of it, and the reason is
+   task 5's water rate: 17 points an hour empties a full skin in under six hours, so a sleeper crosses
+   `NEED_LOW` before dawn and wakes to drink. The span is kept at eight hours and the crossing is
+   inside it on purpose, because that is the night a person now has. The claim that the sleep ends at
+   dawn and not later moves to the next test, which holds the water up and keeps it. */
+test('a person who lies down at 22:00 by a lit pit, across a dawn, agrees with the tick-by-tick head', () => {
   const { api, a } = world();
   const from = api.days(1) + api.hours(22);            // 22:00 on day 2, eight hours short of dawn
   api.tick = from;
-  a.asleep = true; a.needs.rest = 20; a.needs.food = 70; a.needs.water = 70; a.needs.warmth = 60; a.hp = 90;
+  /* The water is 70.3 and not 70, and the third of a point is load-bearing. Water falls 16 points an
+     hour, so 225 ticks to the point, and a whole starting value puts the crossing of `NEED_LOW`
+     exactly on a tick. There the closed form and a sum of 12,375 separate subtractions cannot be made
+     to agree: the sum's own drift decides which side of 15 that tick lands on, and the two wake one
+     tick apart. The third of a point moves the crossing off the tick boundary, where the question the
+     test is asking -- does the body agree with the head -- has an answer that is not a rounding. */
+  a.asleep = true; a.needs.rest = 20; a.needs.food = 70; a.needs.water = 70.3; a.needs.warmth = 60; a.hp = 90;
   const b = twin(a);
   bothTo(api, a, b, from, from + api.hours(8));
-  sameBody(a, b, 'eight hours asleep');
+  sameBody(a, b, 'eight hours from 22:00');
+  assert.equal(a.asleep, false, 'the person is not still asleep eight hours later');
+  assert.ok(a.needs.water < api.NEED_LOW, 'the water ran low inside the eight hours, which is what woke them');
+});
+
+/* THE EIGHT-HOUR SLEEP ITSELF, with the water held up so that thirst never wakes the sleeper. The
+   world is still, so nothing here drinks; the test tops the skin up at each tick on both sides
+   equally, which is what an unbroken night looks like from the body's side. The claim is the one the
+   previous test used to carry: a sleeper by the fire is up at dawn and not later. */
+test('a person asleep eight hours with the water held up is up at dawn, and agrees with the head', () => {
+  const { api, a } = world();
+  const from = api.days(1) + api.hours(22);
+  api.tick = from;
+  a.asleep = true; a.needs.rest = 20; a.needs.food = 90; a.needs.water = 90; a.needs.warmth = 60; a.hp = 90;
+  const b = twin(a);
+  a.seen = from;
+  for (let t = from + 1; t <= from + api.hours(8); t++){
+    api.tick = t; refTick(api, b); b.needs.water = 90; b.needs.food = 90;
+    api.catchUp(a); a.needs.water = 90; a.needs.food = 90;
+  }
+  sameBody(a, b, 'eight hours asleep, watered');
   assert.equal(a.asleep, false, 'eight hours of rest by the fire ends at dawn, not later');
+  assert.ok(a.needs.rest >= api.WAKE_LIGHT, 'the sleeper woke because it was light and they were rested enough');
+});
+
+/* THE WAKE AT ITS OWN BOUNDARY, admitted and refused. The first run puts the water just over the
+   threshold with an hour to fall through it, so the wake must fire. The second holds the water high
+   for the same hour, so it must not. The two differ in one number. */
+test('a sleeper wakes when the water crosses NEED_LOW, and not when it stays above it', () => {
+  const run = water => {
+    const { api, a } = world();
+    const from = api.days(1) + api.hours(23);
+    api.tick = from; a.seen = from;
+    a.asleep = true; a.needs.rest = 40; a.needs.food = 90; a.needs.water = water; a.needs.warmth = 60; a.hp = 90;
+    api.tick = from + api.hours(1);
+    api.catchUp(a);
+    return a;
+  };
+  /* An hour at 17 points an hour costs 17, so 20 falls through 15 and 40 does not. */
+  const woken = run(20), left = run(40);
+  assert.equal(woken.asleep, false, `a sleeper at ${woken.needs.water.toFixed(2)} water did not wake`);
+  assert.equal(left.asleep, true, `a sleeper at ${left.needs.water.toFixed(2)} water woke, and nothing was wrong`);
 });
 
 test('a person who starves to zero food inside the stretch agrees with the tick-by-tick head', () => {

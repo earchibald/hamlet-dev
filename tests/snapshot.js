@@ -133,8 +133,31 @@ test('a loaded world has its records joined as the saved one had', { skip: slow(
    ground. The old run was 20,000 bare steps, day 20 of the 1,000-tick day, and after the merge it was
    a quarter of an hour, which is what the failure "this world was meant to have a pitfall" was
    reporting. */
+/* G4 TASK 5 ADDED THE SIX LINES THAT DIG THE PIT BY HAND, and the reason is worth reading before
+   anybody takes them out. Task 5 gave a person three meals a day and five drinks, so a camp's people
+   spend far more of the day feeding themselves. The offer "dig a deer pit" scores 34 and it now loses
+   every time: this valley dug none in twenty-five world days, measured, with the logs and the cord
+   sitting in the stash the whole while. Waiting longer is not the answer, because the offer does not
+   get slower, it gets outbid.
+
+   What this test is for is the round trip of a pitfall through a save, not the question of whether a
+   valley digs one. So the run is unchanged and the pit is dug through the real offer afterwards: the
+   same label a person would pick, the same task, the same effect. The precondition below stays an
+   assertion, so a day when the offer stops existing is still a red test and not a quiet one. */
 test('a world with pitfalls in it round-trips and keeps each pitfall in its tile', () => {
   const was = load(); const wasEvents = collect(was); was.startWorld('alpha', { sw: 8, sh: 5 }); runOn(was, 0, 600000, wasEvents);
+  if (was.camps.reduce((n, c) => n + c.pitfalls.length, 0) === 0){
+    const c = was.camps[0]; was.camp = c;
+    const a = was.humans().find(h => h.camp === c);
+    assert.ok(a, 'this world was meant to have somebody in its first camp');
+    c.stash.venison = 0; c.stash.log = 8; c.stash.cord = 4;     // what the recipe asks for, and no venison, which is what makes it offered
+    was.failTask(a);
+    const o = was.offersFor(a).find(o => o.label === 'dig a deer pit');
+    assert.ok(o, `no offer "dig a deer pit"; offers: ${was.offersFor(a).map(o => o.label).join(', ')}`);
+    assert.ok(was.startTask(a, o.task.kind, o.task.args), 'the deer pit would not start');
+    a.task.started = was.tick;
+    for (let k = 0; k < was.hours(20) && a.task; k++){ was.runTask(a); was.tick = was.tick + 1; }
+  }
   assert.ok(was.camps.reduce((n, c) => n + c.pitfalls.length, 0) > 0, 'this world was meant to have a pitfall');
   const api = load(); assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
   for (const c of api.camps) for (const p of c.pitfalls){

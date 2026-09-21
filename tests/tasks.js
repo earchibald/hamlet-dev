@@ -282,10 +282,12 @@ for (const seed of ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'])
        hours abed were within an hour of every other seed's.
 
        The range is five to nine hours a night, and it is wide on purpose. The six seeds measured
-       17.38 to 22.12 hours over the three days, which is 5.8 to 7.4 a night against the spec's
+       15.73 to 20.05 hours over the three days, which is 5.2 to 6.7 a night against the spec's
        eight; the shortfall is not the rate and is written up in the task report. Planting the old
        multiplier of six gave 7.04 to 8.57 hours over the same three days, under two and a half a
        night, and failed on all six seeds. So the claim separates a night's sleep from a nap by a
-       factor of two and does not pretend to pin the hour. */
+       factor of two and does not pretend to pin the hour. Every number here is from a fixed seed with
+       no wall clock in it, so a thin margin goes red on a change of behaviour and never on a busy
+       machine. */
     assert.ok(n.abed >= 15 && n.abed <= 27, `${n.abed.toFixed(2)} hours asleep in three days, which is not five to nine hours a night`);
   });

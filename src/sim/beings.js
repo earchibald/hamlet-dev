@@ -408,6 +408,10 @@ function checkPitfall(d){
    moving the stream. */
 const FREEZING = 20;                          // the warmth a person begins to freeze below
 const WAKE_RESTED = 100, WAKE_LIGHT = 60;     // asleep until rested, or until sixty once it is light
+/* The need a person will drop everything for. `updateBeing` forces a drink or a meal below it, and a
+   sleeper wakes at it. It is need points and not time, so it holds at any clock. It was the bare 15
+   in the force below, and a sleeper now reads the same number. */
+const NEED_LOW = 15;
 
 /* The last tick that still answers the way `s + 1` does. A stretch runs from `s` to the tick this
    gives, so the turn itself — the dawn, the dusk, the new day, the new stage — is the first tick of the
@@ -449,11 +453,29 @@ function bodyStretch(a, lim){
     const j = dW < 0 ? Math.floor((w0 - FREEZING) / -dW) + 1 : Math.ceil((FREEZING - w0) / dW);
     if (j >= 2 && j - 1 < k) k = j - 1;
   }
+  /* Zero, where the body starts taking harm. The stretch stops one tick SHORT of it, so `starving1`
+     below, which is read one tick in, holds for the whole of the stretch that follows this one. */
   for (const key of ['food', 'water']){
     const v = n[key];
     if (v === undefined || !(step[key] > 0) || !(v > 0)) continue;
     const j = Math.ceil(v / step[key]);
     if (j >= 2 && j - 1 < k) k = j - 1;
+  }
+  /* `NEED_LOW`, where a sleeper wakes. This stretch stops ON that tick and not one short of it, which
+     is the opposite of the zero edge above and is not a slip. The zero edge feeds a predicate read a
+     tick ahead; this edge feeds a test on the value itself, at the end of the stretch, so the value
+     has to have crossed by then. Stopping one tick short left the need just above the threshold, the
+     wake did not fire, and the next stretch ran on to the zero edge instead -- 53 minutes late, and
+     the sleeper woke at nought with the harm already taken. */
+  if (a.asleep) for (const key of ['food', 'water']){
+    const v = n[key];
+    if (v === undefined || !(step[key] > 0) || !(v > NEED_LOW)) continue;
+    /* `floor + 1` and not `ceil`, because the wake below reads `< NEED_LOW` and a tick that lands on
+       the threshold exactly is not under it. With water at 17 points an hour the division never came
+       out whole and `ceil` looked right; at 16 it does, `ceil` stopped the stretch at exactly 15, the
+       wake did not fire, and the sleeper ran on to nought. */
+    const j = Math.floor((v - NEED_LOW) / step[key]) + 1;
+    if (j >= 1 && j < k) k = j;
   }
   /* A sleeper wakes when it is rested, or at sixty once it is light. The stretch stops on that tick. */
   if (a.asleep && step.rest < 0){
@@ -510,10 +532,18 @@ function bodyStretch(a, lim){
 
      The wake goes here, after the rested wake and guarded on still being asleep, so a person roused
      by thirst does not also get the thought that says they slept well. It adds no text of its own:
-     the `starving` thought above already says "Is dying of thirst" on this same tick, and the person
-     is then awake for the force to act on. It draws no random number, and the stretch already broke
-     on the tick the need reached zero, so the tick is the tick it always was. */
-  if (a.asleep && starving1) a.asleep = false;
+     the person is awake for the force in `updateBeing` to act on, and that force writes the status.
+     It draws no random number, and the stretch breaks on the tick the need crosses `NEED_LOW`, so a
+     skipped run and a stepped run wake the person on the same tick.
+
+     THE THRESHOLD IS `NEED_LOW` AND NOT ZERO, and the difference is the whole point. Zero is where
+     the body starts taking harm and where the thought reads "Is dying of thirst". A person who woke
+     there would lose hit points and a mood every night, because water at 17 points an hour empties a
+     full skin in under six hours and a night is about six and a half, so a full skin does not last a
+     night. `NEED_LOW` is the same 15 the force reads, so the person wakes with time to walk to the
+     water, drinks, and lies back down; rest is still under 80 and the night is still night. The night
+     comes in two pieces and the hours asleep are the same hours. */
+  if (a.asleep && (n.food < NEED_LOW || (n.water !== undefined && n.water < NEED_LOW))) a.asleep = false;
   /* The life clock. Past the usual span, each day is a gift. It was rolled once a tick against a
      chance for a tick; it is rolled once a world day now, compounded over the day with `rollFor`, so
      the chance of dying in a day of world time is the chance it always was. A stretch always begins
@@ -679,8 +709,8 @@ function updateBeing(a){
       /* Sitting warms and soothes but never feeds or waters, so it must not block the force below: someone left
          sitting by the fire while their food or water runs out needs to be pulled off it, not left to starve there. */
       const busy = ['drink', 'eat', 'sleep'].includes(a.task.type);
-      const force = busy ? null : (n.water < 15 && !(a.cooldown.drink > tick)) ? 'drink'
-        : (n.food < 15 && !(a.cooldown.eat > tick)) ? 'eat'
+      const force = busy ? null : (n.water < NEED_LOW && !(a.cooldown.drink > tick)) ? 'drink'
+        : (n.food < NEED_LOW && !(a.cooldown.eat > tick)) ? 'eat'
         : (a.task.type !== 'sit' && n.warmth < 30 && !a.homeless && camp && pitLit() && !(a.cooldown.sit > tick)) ? 'sit' : null;
       if (force){ failTask(a); if (startTask(a, force)){ a.task.started = tick; a.task.key = force; } else a.cooldown[force] = tick + CLOCK.cooldown.needFailed; }
     }
