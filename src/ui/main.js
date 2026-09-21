@@ -95,10 +95,14 @@ function initUI(){
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    /* Any click inside the drawer gives it the keys, including a click on a priority button, a
+       chronicle filter, or Show all: those still do their own thing below and return early, but the
+       focus move must happen before that, not only on the path that falls through to a row. */
+    setFocus(`drawer:${id}`);
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
+    const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });

@@ -19,6 +19,10 @@ function setActCaption(text){
   const el = $('actCaption'); if (!el) return;
   el.hidden = !text;
   el.textContent = text;
+  /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
+     renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
+     assignment, every time the caption's text actually changes. */
+  renderFoot();
 }
 
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
@@ -290,7 +294,10 @@ function openDrawer(id, on, enterFocus){
   const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   if (enterFocus) ui.focus = want ? `drawer:${id}` : 'map';
-  else if (!want && ui.focus === `drawer:${id}`) ui.focus = 'map';
+  /* Below 800 px only one drawer stays open, so opening a second one (narrow ? [id] above) can close
+     the one that held the focus without touching it here. Any focus that names a drawer no longer in
+     ui.open is stale and would leave the number keys picking rows nobody can see; send it to the map. */
+  else if (ui.focus.startsWith('drawer:') && !ui.open.includes(ui.focus.slice(7))) ui.focus = 'map';
   ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;

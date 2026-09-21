@@ -335,6 +335,61 @@ test('once a click has put the keyboard on the card, Esc gives it back to the ga
   assert.deepEqual(api.ui.open, ['people'], 'the card stays open');
 });
 
+/* setActCaption must refresh the foot itself: renderUI only runs every 250ms of wall time, so without
+   this the foot could go on repeating a sentence the caption above it already shows, or stay blank
+   after the caption clears, for up to that long. This also pins the foot's own de-duplication rule
+   (panels.js's `echoed`), through the one path a player would actually see it change. */
+test('setActCaption refreshes the foot, which leaves out a line the caption above already shows', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'strip', 'actions', 'panels'], [...DERIVE, 'ACTIONS', 'renderFoot', 'setActCaption']);
+  api.startWorld('r'); api.camp = api.camps[0]; api.ui.open = [];
+  const line = api.chronicle[0];
+  const els = { foot: cell(), actCaption: cell() };
+  const had = { document: globalThis.document, renderUI: globalThis.renderUI, hideTip: globalThis.hideTip };
+  globalThis.document = { getElementById: id => els[id] || cell(), querySelector: () => null, querySelectorAll: () => [] };
+  globalThis.renderUI = () => {}; globalThis.hideTip = () => {};
+  try {
+    api.renderFoot();
+    assert.ok(els.foot.innerHTML.includes(line.text), 'setup: with the chronicle drawer shut, the foot shows the newest line');
+    api.setActCaption(line.text);
+    assert.ok(!els.foot.innerHTML.includes(line.text), 'the caption now shows this line, and setActCaption refreshes the foot right away, so it does not go on repeating it');
+    api.setActCaption('A different sentence entirely, not the chronicle line.');
+    assert.ok(els.foot.innerHTML.includes(line.text), 'a caption with different text does not echo, so the same refresh brings the chronicle line back');
+  } finally {
+    for (const k of Object.keys(had)) if (had[k] === undefined) delete globalThis[k]; else globalThis[k] = had[k];
+  }
+});
+
+/* Recommendation 8: the notes said the keyboard could not reach a drawer's controls until a click. Tab
+   proves that wrong, through the same focusRing/focusStep path a window uses (see the window test near
+   line 717). This is the fact the accepted-cost bullet in design/notes.md is rewritten to. */
+test('Tab reaches an open drawer from the map, with no click needed', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.equal(api.ui.focus, 'map', 'the key that opened the drawer leaves the game holding the keys');
+  withPage(() => api.ACTIONS.focusNext());
+  assert.equal(api.ui.focus, 'drawer:people', 'Tab moves the keyboard into the open drawer');
+});
+
+/* Below 800 px wide only one drawer stays open (openDrawer's narrow branch). If the drawer that held the
+   focus is the one that gets closed to make room for the next, the focus must not be left naming a
+   drawer nobody can see: the number keys would go on picking rows in a hidden list. */
+test('below 800 px, opening a second drawer sends a focus left on the one it closed back to the map', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  const had = globalThis.innerWidth;
+  globalThis.innerWidth = 700;
+  try {
+    withPage(() => api.ACTIONS.drawer('people'));
+    /* A click inside the card is main.js's own pointerdown handler, which calls setFocus. Stood in
+       for directly here, as the other focus tests in this file do. */
+    api.ui.focus = 'drawer:people';
+    withPage(() => api.ACTIONS.drawer('goals'));
+    assert.deepEqual(api.ui.open, ['goals'], 'narrow width keeps only the drawer just opened');
+    assert.equal(api.ui.focus, 'map', 'People is gone, so its stale focus does not survive it');
+  } finally {
+    if (had === undefined) delete globalThis.innerWidth; else globalThis.innerWidth = had;
+  }
+});
+
 test('opening Chronicle by / or a stage by its chord still takes the player into the card, deliberately', () => {
   withDom(() => {
     const api = loadUI(UI_ALL, [...KEYS, 'ui']);
@@ -912,7 +967,14 @@ test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a
    sector. The view is the close-up's shape and scale, with the chosen camp's pit in the middle. */
 const FIRE_API = [...KEYS, 'NEXT_VIEW', 'VIEW_LABEL', 'nextView', 'locOrigin', 'cursorTo', 'cellFrom', 'W', 'H', 'LW', 'LH', 'camps', 'secOf', 'ui', 'cursorAfter', 'fireCentre', 'fireSector', 'sectors', 'secIdx'];
 const FIRE_EXTRA = { getView: '() => view', getCur: '() => cur', getCursor: '() => cursor', getLvl: '() => lvl',
-  pick: '(c) => { viewCamp = c; }', go: '(v, s) => setView(v, s)',
+  /* pick stands in for choosing a camp to watch: it puts the given shape into camps too, marked so a
+     later pick can find and drop it, because fireCentre now checks camps.includes(viewCamp) the way
+     the frame loop does. A camp under test is a live one, not a stray reference. */
+  pick: '(c) => { camps = camps.filter(x => !x.__test); if (c){ c.__test = true; camps = camps.concat(c); } viewCamp = c || null; }',
+  /* stale stands in for a camp destroyed while its fire view is still on screen: viewCamp points at it,
+     but it never joins camps, so camps.includes(viewCamp) is false, same as after a real removal. */
+  stale: '(c) => { viewCamp = c; }',
+  go: '(v, s) => setView(v, s)',
   setCv: '(r) => { cv = { getBoundingClientRect: () => r }; }' };
 function fireWorld(){ const api = loadUI(['state', 'derive', 'keys', 'actions'], FIRE_API, FIRE_EXTRA); api.startWorld('r'); return api; }
 
@@ -936,6 +998,15 @@ test('with no camp, or a camp with neither a pit nor a site, M skips the camp fi
     withPage(() => api.go('fire'));
     assert.equal(api.getView(), 'loc', 'a view with no fire to centre on falls back to the sector');
   }
+});
+
+/* A camp destroyed while its fire view is on screen leaves viewCamp pointing at a record no longer in
+   camps, the same staleness the frame loop guards against with camps.includes before it reads camp.
+   fireCentre must not read .pit off that stale reference, and the #where line must not read .name off it. */
+test('a viewCamp not in the live camps list gives no fire to centre on', () => {
+  const api = fireWorld();
+  api.stale({ pit: [5, 5], site: [5, 5] });
+  assert.equal(api.fireCentre(), null, 'a camp not in camps is stale, so there is no centre to draw');
 });
 
 test('the camp fire view puts the pit in the middle, or the site before the pit is built', () => {

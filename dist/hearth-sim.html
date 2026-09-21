@@ -7833,7 +7833,10 @@ function viewKey(){
 
 /* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
    Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
-function fireCentre(){ return viewCamp ? viewCamp.pit || viewCamp.site || null : null; }
+/* viewCamp can outlive the camp it points at: a camp destroyed while its fire view was on screen leaves
+   a stale reference until the next renderUI pass corrects it. camps.includes guards that the same way
+   the frame loop does before it reads viewCamp. */
+function fireCentre(){ return viewCamp && camps.includes(viewCamp) ? viewCamp.pit || viewCamp.site || null : null; }
 /* The sector that holds the fire the camp fire view centres on, or null with no fire. The view's line
    names this sector and not the cursor's, which keyboard moves carry into the next sector. */
 function fireSector(){ const p = fireCentre(); if (!p) return null; const f = secOf(p[0], p[1]); return sectors[secIdx(f.sx, f.sy)]; }
@@ -8020,7 +8023,7 @@ const KEYMAP = [
   { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
-  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world, camp fire', button: 'viewBtn' },
+  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world map, camp fire', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
   { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
@@ -9026,7 +9029,7 @@ function renderUI(force){
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(fireSector() || s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? (viewCamp && camps.includes(viewCamp) ? `The fire at ${viewCamp.name}, in ${sectorLabel(fireSector() || s)} \u00b7 ${levelName(lvl)}` : `The fire, unwatched \u00b7 ${levelName(lvl)}`) : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = !closeUp(view);
@@ -9266,6 +9269,10 @@ function setActCaption(text){
   const el = $('actCaption'); if (!el) return;
   el.hidden = !text;
   el.textContent = text;
+  /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
+     renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
+     assignment, every time the caption's text actually changes. */
+  renderFoot();
 }
 
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
@@ -9537,7 +9544,10 @@ function openDrawer(id, on, enterFocus){
   const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
   if (enterFocus) ui.focus = want ? `drawer:${id}` : 'map';
-  else if (!want && ui.focus === `drawer:${id}`) ui.focus = 'map';
+  /* Below 800 px only one drawer stays open, so opening a second one (narrow ? [id] above) can close
+     the one that held the focus without touching it here. Any focus that names a drawer no longer in
+     ui.open is stale and would leave the number keys picking rows nobody can see; send it to the map. */
+  else if (ui.focus.startsWith('drawer:') && !ui.open.includes(ui.focus.slice(7))) ui.focus = 'map';
   ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
@@ -9798,10 +9808,14 @@ function initUI(){
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    /* Any click inside the drawer gives it the keys, including a click on a priority button, a
+       chronicle filter, or Show all: those still do their own thing below and return early, but the
+       focus move must happen before that, not only on the path that falls through to a row. */
+    setFocus(`drawer:${id}`);
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
+    const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });

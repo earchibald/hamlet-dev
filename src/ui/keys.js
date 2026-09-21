@@ -24,7 +24,7 @@ const KEYMAP = [
   { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
-  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world, camp fire', button: 'viewBtn' },
+  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world map, camp fire', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
   { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
