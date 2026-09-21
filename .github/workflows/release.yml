@@ -1,0 +1,105 @@
+# Release the main branch. The released page is https://earchibald.github.io/hamlet/
+#
+# This job runs on every push to main. It builds the page, runs the fast suite,
+# and makes the tag vX.Y.Z and a GitHub Release with the built page attached.
+# X.Y.Z is the version in package.json. The notes are that version's section
+# of CHANGELOG.md.
+#
+# This job does not publish the site. The repository earchibald/hamlet does.
+# Its deploy.yml reads the latest release here and publishes the attached page.
+# One repository has one Pages site, and this repository's site is the dev site.
+# So the site serves the same file that passed the fast suite.
+#
+# main moves only by fast-forward to a commit on dev. Each push to main must
+# raise the version. If the tag exists on another commit, this job fails
+# before it builds.
+#
+# It does not run the soak (node tests/soak.js). Main-coordinator runs the soak
+# by hand before main moves.
+name: Release main
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+# Two releases never run at once. A later one starts when the earlier one
+# ends. It does not cancel the earlier one, because a cancelled release can
+# leave a tag with no page.
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    # A manual run from another branch must not make a release.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # No step below puts a workflow expression inside a script. This step checks
+      # the version and puts it into the environment. The later steps read it there.
+      - name: Read the version, and stop if its tag is on another commit
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::package.json has a version that is not X.Y.Z."
+            exit 1
+          fi
+          TAG="v$VERSION"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            TAGGED=$(git rev-list -n 1 "$TAG")
+            if [ "$TAGGED" != "$GITHUB_SHA" ]; then
+              echo "::error::$TAG is already on $TAGGED. Bump the version in package.json."
+              exit 1
+            fi
+          fi
+      - name: Take this version's notes from CHANGELOG.md
+        run: |
+          awk -v tag="$TAG" '
+            /^## / { on = ($2 == tag) ; next }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $TAG."
+            exit 1
+          fi
+      - run: npm ci
+      # tests/types.js skips when tsc is missing, and a skip is green. Fail here instead.
+      - run: test -x node_modules/.bin/tsc
+      - run: node build.js
+      - name: Run the fast suite
+        run: |
+          set -o pipefail
+          npm run fast 2>&1 | tee fast.log
+      # A skipped test shows as passing. Print the counts, so that a reader of the run
+      # sees how many tests did not run.
+      - name: Write the test counts to the run summary
+        if: always()
+        run: |
+          {
+            echo "### Fast suite, $TAG at ${GITHUB_SHA::7}"
+            echo '```'
+            sed 's/\x1b\[[0-9;]*m//g' fast.log | grep -E '^. (tests|pass|fail|skipped|cancelled|todo) [0-9]+$' || echo 'no counts found in fast.log'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Make the tag and the GitHub Release
+        run: |
+          cp dist/hearth-sim.html hearth-sim.html
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" hearth-sim.html --clobber
+          else
+            gh release create "$TAG" hearth-sim.html \
+              --target "$GITHUB_SHA" \
+              --title "Hearth $TAG" \
+              --notes-file notes.md
+          fi

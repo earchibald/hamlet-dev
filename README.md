@@ -18,5 +18,6 @@ A two-scale colony simulation in one HTML file, on its way to being a project.
     open dist/hearth-sim.html
 
 The dev branch is published at https://earchibald.github.io/hamlet-dev/ on every push.
+Versioned releases are cut from the main branch and published at https://earchibald.github.io/hamlet/ . `CHANGELOG.md` lists them.
 
 See `design/notes.md` for the design and `CLAUDE.md` for how to work on it.
