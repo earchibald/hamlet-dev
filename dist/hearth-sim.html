@@ -224,7 +224,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     </div>
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
-      <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
+      <button class="btn" id="viewBtn" title="Sector, nearby, world map, camp fire">Nearby<kbd>M</kbd></button>
       <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
@@ -276,7 +276,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
     <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
     <li>Nudge someone who is sitting by the fire when the woodpile is empty.</li>
-    <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view, and the world map.</li>
+    <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view, the world map, and the camp fire. The camp fire view keeps your camp's fire in the middle.</li>
     <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
     <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
     <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
@@ -7179,9 +7179,13 @@ function resetDoor(){ doorLog = []; replayHead = { seed: seedText, options }; }
    INTERFACE. Reads the simulation state and draws it.
    ============================================================ */
 const T = 26, WS = 3, MS = 9;
-/* The three views, and the order M walks them: sector, nearby, world, sector. */
-const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
-const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The four views, and the order M walks them: sector, nearby, world, camp fire, sector. The camp fire
+   view is the sector view's shape and scale, centred on the chosen camp's fire. `nextView` in derive.js
+   skips it when there is no fire to centre on. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
+/* The two views drawn tile by tile at full size: the sector, and the camp fire. */
+const closeUp = v => v === 'loc' || v === 'fire';
 /* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
@@ -7827,10 +7831,28 @@ function viewKey(){
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
+/* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
+   Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
+function fireCentre(){ return viewCamp ? viewCamp.pit || viewCamp.site || null : null; }
+/* The view M goes to next from v. The camp fire view is skipped when there is no fire to centre on. */
+function nextView(v){ const n = NEXT_VIEW[v]; return n === 'fire' && !fireCentre() ? NEXT_VIEW[n] : n; }
+/* The top-left tile of the sector view and the camp fire view. Every conversion between their pixels
+   and tiles reads it: the drawing, the pointer, the cursor, and the tools. The camp fire view puts the
+   centre at the middle tile, and stops at the world's edges so it never shows past them. */
+function locOrigin(){
+  const p = view === 'fire' && fireCentre();
+  if (p) return { ox: clamp(p[0] - (LW >> 1), 0, W - LW), oy: clamp(p[1] - (LH >> 1), 0, H - LH) };
+  return { ox: cur.sx * LW, oy: cur.sy * LH };
+}
+/* Whether the tile is on screen in the sector view or the camp fire view. */
+function inLocView(x, y){ const { ox, oy } = locOrigin(); return x >= ox && x < ox + LW && y >= oy && y < oy + LH; }
+
 /* Where the cursor lands after a move. mult is a number of tiles, 'sector', or 'edge'. In the nearby and world views every step is a sector.
-   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there. */
+   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there.
+   The camp fire view moves as the sector view does. */
 function cursorAfter(c, dx, dy, mult, view){
-  if (mult === 'edge' && view === 'loc'){
+  const near = closeUp(view);
+  if (mult === 'edge' && near){
     const s = secOf(c.x, c.y);
     const ex = dx < 0 ? s.sx * LW : dx > 0 ? (s.sx + 1) * LW - 1 : c.x, ey = dy < 0 ? s.sy * LH : dy > 0 ? (s.sy + 1) * LH - 1 : c.y;
     if (ex !== c.x || ey !== c.y) return { x: ex, y: ey, z: c.z };
@@ -7838,7 +7860,7 @@ function cursorAfter(c, dx, dy, mult, view){
     return nx < 0 || ny < 0 || nx >= W || ny >= H ? { x: c.x, y: c.y, z: c.z } : { x: nx, y: ny, z: c.z };
   }
   if (mult === 'edge') mult = 'sector';
-  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  const sx = mult === 'sector' || !near ? LW : mult, sy = mult === 'sector' || !near ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
 /* The cursor when a sector opens. A cursor already in that sector stays, so a hovered centre is kept. Any other keeps its place in its own sector. */
@@ -7995,7 +8017,7 @@ const KEYMAP = [
   { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
-  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
+  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world, camp fire', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
   { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
@@ -8223,7 +8245,7 @@ const MARKS = {
 /* A wash is the act it carries: a freeze, a hiding, or a showing. */
 function markFor(kind, value){ return MARKS[kind === 'wash' ? value : kind] || null; }
 
-/* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
+/* Canvas drawing for all four views: world map, nearby sectors, the sector in view, and the camp fire. */
 
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
@@ -8604,9 +8626,9 @@ function drawMid(){
   }
 }
 
-/* ---- location view ---- */
+/* ---- location view: the sector in view, or the camp fire view, from the origin locOrigin gives ---- */
 function drawLoc(){
-  const ox = cur.sx * LW, oy = cur.sy * LH;
+  const { ox, oy } = locOrigin();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `500 ${T - 6}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
   const fires = [];
@@ -8652,14 +8674,14 @@ function drawLoc(){
     }
     if (below > 0){ ctx.fillStyle = P.halo; ctx.globalAlpha = 0.45; ctx.fillRect(px, py, T, T); ctx.globalAlpha = 1; }
   }
-  for (const c of camps) if (lvl === 0 && c.site && !c.pit && secOf(...c.site).sx === cur.sx && secOf(...c.site).sy === cur.sy){
+  for (const c of camps) if (lvl === 0 && c.site && !c.pit && inLocView(...c.site)){
     const [x, y] = c.site; ctx.strokeStyle = P.select; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.strokeRect((x - ox) * T + 2, (y - oy) * T + 2, T - 4, T - 4); ctx.setLineDash([]);
   }
   { ctx.fillStyle = P.corpse; for (const c of corpses){ if (c.x >= ox && c.x < ox + LW && c.y >= oy && c.y < oy + LH && c.z === lvl) ctx.fillText('x', (c.x - ox) * T + T / 2, (c.y - oy) * T + T / 2 + 1); } }
   const dark = darkness(); if (dark > 0){ ctx.fillStyle = `rgba(${P.night},${dark})`; ctx.fillRect(0, 0, LW * T, LH * T); }
   if (isWinter()){ ctx.fillStyle = P.snow; ctx.globalAlpha = 0.22; ctx.fillRect(0, 0, LW * T, LH * T); ctx.globalAlpha = 1; }
   if (weather.storm){ ctx.strokeStyle = P.rain; ctx.globalAlpha = 0.35; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 90; k++){ const x = (hash(k, 3) % (LW * T)), y = ((hash(k, 7) + tick * 9) % (LH * T)); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 9); } ctx.stroke(); ctx.globalAlpha = 1; }
-  for (const c of camps) if (lvl === 0 && c.pit && tileAt(...c.pit).struct.lit && dark > 0){ const [px, py] = c.pit; if (secOf(px, py).sx === cur.sx && secOf(px, py).sy === cur.sy){ const gr = ctx.createRadialGradient((px - ox) * T + T / 2, (py - oy) * T + T / 2, 4, (px - ox) * T + T / 2, (py - oy) * T + T / 2, T * 4); gr.addColorStop(0, `rgba(255,180,90,${dark * 0.9})`); gr.addColorStop(1, 'rgba(255,180,90,0)'); ctx.fillStyle = gr; ctx.fillRect((px - ox) * T - T * 4, (py - oy) * T - T * 4, T * 9, T * 9); } }
+  for (const c of camps) if (lvl === 0 && c.pit && tileAt(...c.pit).struct.lit && dark > 0){ const [px, py] = c.pit; if (inLocView(px, py)){ const gr = ctx.createRadialGradient((px - ox) * T + T / 2, (py - oy) * T + T / 2, 4, (px - ox) * T + T / 2, (py - oy) * T + T / 2, T * 4); gr.addColorStop(0, `rgba(255,180,90,${dark * 0.9})`); gr.addColorStop(1, 'rgba(255,180,90,0)'); ctx.fillStyle = gr; ctx.fillRect((px - ox) * T - T * 4, (py - oy) * T - T * 4, T * 9, T * 9); } }
   for (const [lx, ly, x, y] of fires){
     const fl = (tick + hash(x, y)) % 3;
     ctx.globalAlpha = 0.7 + 0.15 * fl; ctx.fillStyle = P['fire-bg']; ctx.fillRect(lx * T, ly * T, T, T); ctx.globalAlpha = 1;
@@ -8677,7 +8699,7 @@ function drawLoc(){
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
-  if (secOf(cursor.x, cursor.y).sx === cur.sx && secOf(cursor.x, cursor.y).sy === cur.sy && cursor.z === lvl){
+  if (inLocView(cursor.x, cursor.y) && cursor.z === lvl){
     const cx = (cursor.x - ox) * T, cy = (cursor.y - oy) * T;
     ctx.strokeStyle = P.select; ctx.lineWidth = 2; ctx.strokeRect(cx + 1, cy + 1, T - 2, T - 2);
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
@@ -8997,12 +9019,15 @@ function renderUI(force){
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  /* The view button names the view M goes to next. It is written here, not only when the view changes,
+     because the camp fire view joins the cycle when the camp picks its site, with the view unchanged. */
+  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
-  $('tools').hidden = view !== 'loc';
+  $('tools').hidden = !closeUp(view);
   $('nav').hidden = view === 'world';
-  $('levels').hidden = view !== 'loc';
+  $('levels').hidden = !closeUp(view);
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
   if (view !== 'world') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
     const b = $(id), nx = cur.sx + dx, ny = cur.sy + dy, ok = nx >= 0 && ny >= 0 && nx < SW && ny < SH;
@@ -9281,33 +9306,39 @@ function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; rende
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
   if (inAges()) v = 'world';
+  /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
+  const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
-  $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
-  $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
+  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view. */
+  if (p){ cur = secOf(p[0], p[1]); if (!inLocView(cursor.x, cursor.y)) cursor = { x: p[0], y: p[1], z: lvl }; }
+  $('world').hidden = v !== 'world'; $('loc').hidden = !closeUp(v); $('mid').hidden = v !== 'mid';
   renderUI(true);
 }
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
-/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
+/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
+   The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
   cursor = { x: clamp(x, 0, W - 1), y: clamp(y, 0, H - 1), z: clamp(z, ZMIN, ZMAX) };
   const s = secOf(cursor.x, cursor.y);
-  if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
-  if (view === 'loc' && cursor.z !== lvl) setLevel(cursor.z);
+  if (view === 'fire'){ if (inLocView(cursor.x, cursor.y)){ cur = s; renderUI(true); } else setView('loc', s); }
+  else if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
+  if (closeUp(view) && cursor.z !== lvl) setLevel(cursor.z);
 }
-function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
+/* A sector step leaves the camp fire view for the sector view of the sector the cursor lands in. */
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && mult === 'sector') setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
   if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
-  if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
-  const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
+  if (!closeUp(view)){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
+  const { ox, oy } = locOrigin(), c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - ox, ly: cursor.y - oy };
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(nextView(view)); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
-function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
+function cellFrom(e){ const r = cv.getBoundingClientRect(), { ox, oy } = locOrigin(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: ox + lx, y: oy + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
@@ -9547,8 +9578,8 @@ const ACTIONS = {
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
-  levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
-  levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
+  levelUp(){ if (closeUp(view)) setLevel(lvl + 1); },
+  levelDown(){ if (closeUp(view)) setLevel(lvl - 1); },
   nav([dx, dy]){ moveCursor([dx, dy, 'sector']); },
   cursor(arg){ moveCursor(arg); },
   applyAt(){ applyAt(); },
@@ -9580,6 +9611,7 @@ const ACTIONS = {
   focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
+  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. */
   campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
@@ -9620,8 +9652,8 @@ const ACTIONS = {
   continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
-    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
-    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (!closeUp(view)) setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (!closeUp(view)) setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
   },
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
@@ -9695,7 +9727,8 @@ function frame(now){
     /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
        take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
     if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */

@@ -2,9 +2,13 @@
    INTERFACE. Reads the simulation state and draws it.
    ============================================================ */
 const T = 26, WS = 3, MS = 9;
-/* The three views, and the order M walks them: sector, nearby, world, sector. */
-const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
-const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The four views, and the order M walks them: sector, nearby, world, camp fire, sector. The camp fire
+   view is the sector view's shape and scale, centred on the chosen camp's fire. `nextView` in derive.js
+   skips it when there is no fire to centre on. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
+/* The two views drawn tile by tile at full size: the sector, and the camp fire. */
+const closeUp = v => v === 'loc' || v === 'fire';
 /* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },

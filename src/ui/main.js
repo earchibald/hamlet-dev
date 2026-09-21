@@ -34,7 +34,8 @@ function frame(now){
     /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
        take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
     if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */

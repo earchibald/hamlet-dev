@@ -908,6 +908,93 @@ test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a
   assert.deepEqual(api.cursorAfter(c, -1, 0, 'edge', 'world'), at(1 * LW + 7, 1 * LH + 4), 'in the nearby and world views it is a plain sector step');
 });
 
+/* Recommendation 8: a view on the camp fire. M walks sector, nearby, world, camp fire, and back to
+   sector. The view is the close-up's shape and scale, with the chosen camp's pit in the middle. */
+const FIRE_API = [...KEYS, 'NEXT_VIEW', 'VIEW_LABEL', 'nextView', 'locOrigin', 'cursorTo', 'cellFrom', 'W', 'H', 'LW', 'LH', 'camps', 'secOf', 'ui'];
+const FIRE_EXTRA = { getView: '() => view', getCur: '() => cur', getCursor: '() => cursor', getLvl: '() => lvl',
+  pick: '(c) => { viewCamp = c; }', go: '(v, s) => setView(v, s)',
+  setCv: '(r) => { cv = { getBoundingClientRect: () => r }; }' };
+function fireWorld(){ const api = loadUI(['state', 'derive', 'keys', 'actions'], FIRE_API, FIRE_EXTRA); api.startWorld('r'); return api; }
+
+test('M walks sector, nearby, world, camp fire, and back to sector', () => {
+  const api = fireWorld();
+  assert.deepEqual(api.NEXT_VIEW, { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' });
+  assert.equal(api.VIEW_LABEL.fire, 'Camp fire', 'the view button names the view in words a player reads');
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  const seen = [];
+  withPage(() => { api.go('loc'); for (let i = 0; i < 4; i++){ api.ACTIONS.view(); seen.push(api.getView()); } });
+  assert.deepEqual(seen, ['mid', 'world', 'fire', 'loc']);
+});
+
+test('with no camp, or a camp with neither a pit nor a site, M skips the camp fire view', () => {
+  const api = fireWorld();
+  for (const c of [null, { pit: null, site: null }]){
+    api.pick(c);
+    assert.equal(api.nextView('world'), 'loc');
+    withPage(() => { api.go('world'); api.ACTIONS.view(); });
+    assert.equal(api.getView(), 'loc', `from the world map M goes to the sector with camp ${JSON.stringify(c)}`);
+    withPage(() => api.go('fire'));
+    assert.equal(api.getView(), 'loc', 'a view with no fire to centre on falls back to the sector');
+  }
+});
+
+test('the camp fire view puts the pit in the middle, or the site before the pit is built', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  api.pick({ pit: [100, 50], site: [97, 48] });
+  withPage(() => api.go('fire'));
+  assert.deepEqual(api.locOrigin(), { ox: 100 - (LW >> 1), oy: 50 - (LH >> 1) }, 'the pit sits at the middle tile of the view');
+  api.pick({ pit: null, site: [97, 48] });
+  assert.deepEqual(api.locOrigin(), { ox: 97 - (LW >> 1), oy: 48 - (LH >> 1) }, 'before the pit, the site is the centre');
+  withPage(() => api.go('loc', { sx: 1, sy: 2 }));
+  assert.deepEqual(api.locOrigin(), { ox: LW, oy: 2 * LH }, 'the sector view keeps its own origin');
+});
+
+test('the camp fire view stops at the world’s edges', () => {
+  const api = fireWorld(), { LW, LH, W, H } = api;
+  withPage(() => { api.pick({ pit: [2, 3], site: [2, 3] }); api.go('fire'); });
+  assert.deepEqual(api.locOrigin(), { ox: 0, oy: 0 }, 'a fire by the top-left corner');
+  api.pick({ pit: [W - 1, H - 2], site: [W - 1, H - 2] });
+  assert.deepEqual(api.locOrigin(), { ox: W - LW, oy: H - LH }, 'a fire by the bottom-right corner');
+});
+
+test('in the camp fire view the pointer, the cursor and the levels read its origin, and leaving it opens the sector', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const { ox, oy } = api.locOrigin();
+  const k = api.getCursor();
+  assert.ok(k.x >= ox && k.x < ox + LW && k.y >= oy && k.y < oy + LH, 'entering the view puts the cursor inside it');
+  api.setCv({ left: 0, top: 0, width: LW * 10, height: LH * 10 });
+  const c = api.cellFrom({ clientX: 5, clientY: 5 });
+  assert.deepEqual([c.x, c.y], [ox, oy], 'the top-left pixel is the view’s top-left tile');
+  withPage(() => api.ACTIONS.levelDown());
+  assert.equal(api.getLvl(), -1, 'the level keys work as in the sector view');
+  withPage(() => api.ACTIONS.levelUp());
+  withPage(() => api.cursorTo(ox + LW - 1, oy, 0));
+  assert.equal(api.getView(), 'fire', 'a cursor inside the view keeps it');
+  withPage(() => api.cursorTo(ox + LW, oy, 0));
+  assert.equal(api.getView(), 'loc', 'a cursor past the edge opens the sector it is in');
+  assert.deepEqual(api.getCur(), api.secOf(ox + LW, oy));
+  withPage(() => { api.go('fire'); api.ACTIONS.nav([0, 1]); });
+  assert.equal(api.getView(), 'loc', 'a sector step leaves the camp fire view');
+  assert.deepEqual(api.getCur(), api.secOf(api.getCursor().x, api.getCursor().y));
+  /* At the world's edge a sector step cannot move the cursor, so it stays in view. The step still leaves. */
+  const { W, H } = api;
+  withPage(() => { api.pick({ pit: [W - 1, H - 1], site: [W - 1, H - 1] }); api.go('fire'); api.cursorTo(W - 1, H - 1, 0); api.ACTIONS.nav([1, 0]); });
+  assert.equal(api.getView(), 'loc', 'a sector step at the world’s edge leaves the camp fire view too');
+});
+
+test('F1 in the camp fire view centres it on that camp’s fire', () => {
+  const api = fireWorld(), { LW, LH } = api, c = api.camps[0];
+  /* A camp has no site straight after the ages. Give it one far from the first fire, so the view must move. */
+  if (!c.site) c.site = [150, 60];
+  const p = c.pit || c.site;
+  withPage(() => { api.pick({ pit: [10, 10], site: [10, 10] }); api.go('fire'); api.ACTIONS.campN(1); });
+  assert.equal(api.getView(), 'fire');
+  const { ox, oy } = api.locOrigin();
+  assert.ok(p[0] >= ox && p[0] < ox + LW && p[1] >= oy && p[1] < oy + LH, 'the new camp’s fire is in view');
+});
+
 test('a reached stage shows when it has a row to show or a goal done, not when its only news is a folded idle goal', () => {
   const api = loadUI(['state', 'derive'], [...DERIVE, 'stagesShown', 'stageReached']);
   api.startWorld('r');

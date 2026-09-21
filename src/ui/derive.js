@@ -491,10 +491,28 @@ function viewKey(){
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
+/* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
+   Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
+function fireCentre(){ return viewCamp ? viewCamp.pit || viewCamp.site || null : null; }
+/* The view M goes to next from v. The camp fire view is skipped when there is no fire to centre on. */
+function nextView(v){ const n = NEXT_VIEW[v]; return n === 'fire' && !fireCentre() ? NEXT_VIEW[n] : n; }
+/* The top-left tile of the sector view and the camp fire view. Every conversion between their pixels
+   and tiles reads it: the drawing, the pointer, the cursor, and the tools. The camp fire view puts the
+   centre at the middle tile, and stops at the world's edges so it never shows past them. */
+function locOrigin(){
+  const p = view === 'fire' && fireCentre();
+  if (p) return { ox: clamp(p[0] - (LW >> 1), 0, W - LW), oy: clamp(p[1] - (LH >> 1), 0, H - LH) };
+  return { ox: cur.sx * LW, oy: cur.sy * LH };
+}
+/* Whether the tile is on screen in the sector view or the camp fire view. */
+function inLocView(x, y){ const { ox, oy } = locOrigin(); return x >= ox && x < ox + LW && y >= oy && y < oy + LH; }
+
 /* Where the cursor lands after a move. mult is a number of tiles, 'sector', or 'edge'. In the nearby and world views every step is a sector.
-   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there. */
+   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there.
+   The camp fire view moves as the sector view does. */
 function cursorAfter(c, dx, dy, mult, view){
-  if (mult === 'edge' && view === 'loc'){
+  const near = closeUp(view);
+  if (mult === 'edge' && near){
     const s = secOf(c.x, c.y);
     const ex = dx < 0 ? s.sx * LW : dx > 0 ? (s.sx + 1) * LW - 1 : c.x, ey = dy < 0 ? s.sy * LH : dy > 0 ? (s.sy + 1) * LH - 1 : c.y;
     if (ex !== c.x || ey !== c.y) return { x: ex, y: ey, z: c.z };
@@ -502,7 +520,7 @@ function cursorAfter(c, dx, dy, mult, view){
     return nx < 0 || ny < 0 || nx >= W || ny >= H ? { x: c.x, y: c.y, z: c.z } : { x: nx, y: ny, z: c.z };
   }
   if (mult === 'edge') mult = 'sector';
-  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  const sx = mult === 'sector' || !near ? LW : mult, sy = mult === 'sector' || !near ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
 /* The cursor when a sector opens. A cursor already in that sector stays, so a hovered centre is kept. Any other keeps its place in its own sector. */
