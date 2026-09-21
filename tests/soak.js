@@ -106,12 +106,24 @@ for (const seed of SEEDS){
     /* Sampled on a multiple of the world's own beat, `CLOCK.every.cellular`, and not on a round 1000.
        The engine jumps from one horizon to the next now, and every horizon is a multiple of the beat or
        earlier, so a tick on the beat's grid is always visited and a tick off it may not be. A sample
-       tick the run can skip is a sample that silently stops firing. 1200 ticks is twenty world
-       minutes. It reads the world and changes nothing, so it moves no record.
+       tick the run can skip is a sample that silently stops firing. It reads the world and changes
+       nothing, so it moves no record.
 
-       Not `api.tick % api.DAY`, which dev sampled on. `DAY` is 86400 and a 70-day run ends near tick
-       70292, so that test is true at tick 0 and at no later tick in the run: the stranded check ran
-       once. 1200 keeps it at 58 samples in the same run.
+       THE COST IS THE SAMPLE COUNT AND NOT THE INTERVAL, so both are written down. 1200 ticks is twenty
+       world minutes, which is 72 samples a world day: 216 in the everyday three-day seed and 5,040 in a
+       seventy-day LONG=1 seed. Each sample is a flood fill from every camp's stash and one more for the
+       caves, measured at 7.4 to 9.0 ms a sample on the six default seeds, so the sampler is about 1.8 s
+       of a seed's three days and at least 42 s of its seventy. "Every 1,200 ticks" hides that. Dev
+       samples on `api.tick % api.DAY`, which is once a world day, or 3 and 70 samples in the same two
+       runs. An earlier note here said dev's sampler fires once in a whole run; that rested on a run
+       ending near tick 70,292, which is the pre-G4 day, and it is wrong.
+
+       WHETHER THE FREQUENT SAMPLE CATCHES ANYTHING THE DAILY ONE MISSES IS UNSETTLED, and the interval
+       stays where it is until somebody settles it. Sampled every 60 ticks -- the beat itself, 4,320
+       samples a seed -- `cutOff` was EMPTY at every sample on all six default seeds over three world
+       days. No stranding occurred, so the two intervals agree, and their agreement says only that the
+       instrument found nothing. It is not evidence that a daily sample would do. See
+       design/reports/2026-09-20-g4-task-4-remediation.md.
 
        `seasonOf()` reads the tick and draws no random number, so it cannot move the stream either. */
     const seasonsSeen = new Set();

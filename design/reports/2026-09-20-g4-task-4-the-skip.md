@@ -6,7 +6,7 @@
 
 | What | Result |
 |---|---|
-| `nextEvent()` and `runTo(t)` | Built. A skipped run and a stepped run give the same fingerprint, the same chronicle line for line, and the same layout, on six seeds over three world days. |
+| `nextEvent()` and `runTo(t)` | Built. A skipped run and a stepped run give the same fingerprint, the same chronicle line for line, and the same layout, on six seeds over three world days. **Corrected 2026-09-20:** the proof cited here never called `runTo`. Both harnesses held their own copy of its loop, so `runTo` shipped with no caller and gutting it left every gate green. Both call it now, at `fbda7d8`. |
 | The skip's measured gain on a real seed | **None.** The horizon is the next tick on 100.0 percent of ticks, on all six seeds. |
 | Why | 85 beings walk, wander and dance on a per-tick beat. A walker takes a tile a tick by task 1's ruling, so while anything walks anywhere the engine may not jump. |
 | The skip's measured gain when the animals are off the tick | 86,400 ticks in **26,403 moves**, 0.31 a tick, and the same story. So the machinery works; the valley does not let it run. |
@@ -151,6 +151,13 @@ predicate behind the fire and hunter buckets was answered by `senseBeings` for i
 counting it is free. `both` is its own bucket and `none` is the bucket for a pin with no cause, so a
 third case cannot be absorbed by a two-way split.
 
+> **Correction, 2026-09-20, by the task 4 remediation.** The last sentence was false when it was
+> written. `senseBeings` set its mask with `cause === 'fire' ? 1 : 2`, so a third case WAS absorbed: it
+> was counted as a hunter, and `none` could not be reached at all. The review proved it by relabelling
+> the rouser branch's cause in a throwaway copy and getting byte-identical counters. The pass now sets a
+> bit of its own for a cause it does not name and `pinBucket` counts every such mask in `none`. Read
+> `none` as a count from `0714b47` on, and as a constant before it.
+
 ### Six seeds, three world days each (259,200 ticks)
 
 | seed | horizons asked | pinned | fire | hunter | both | none | a being acted | a being overdue | beat |
@@ -165,7 +172,9 @@ third case cannot be absorbed by a two-way split.
 Read the split carefully, because the buckets are ordered and the first one to answer wins.
 
 - **`none` is zero on every seed.** The third bucket the plan asked for is empty, which is the answer
-  it was there to get.
+  it was there to get. **Corrected 2026-09-20:** it was empty because it was unreachable, so this row
+  was a constant and not an answer. The six zeros above stand -- there is no third cause today -- but
+  they became a measurement only when the mask was fixed. See the correction above.
 - **`fire` is zero on every seed.** No soak seed holds a burning tile over three days, which the
   snapshot file already recorded independently ("Every soak seed has fireCount 0 at the save"). So the
   permanent cost the plan feared from a camp's fire does not appear here at all: a camp's hearth is a
@@ -252,7 +261,18 @@ Every figure carries the one-minute load average at the moment it was taken, and
 skipped, and compared them: **19 tests, 19 pass, 0 fail, 0 skipped, 2,653 s in total** at a one-minute
 load average of 6.92 falling to 2.65. Stepped **1,290.9 s**, skipped **1,236.4 s**, both in 6,048,000
 moves of 6,048,000 ticks — the same story, the same move count, and a 4 percent difference that is
-noise. That is **18.4 s a world day** at seventy days, which agrees with task 3's 17.98 s at day 50.
+noise. That is **18.4 s a world day** at seventy days.
+
+> **Correction, 2026-09-20, by the task 4 remediation.** This line read "which agrees with task 3's
+> 17.98 s at day 50". It does not agree with it, and the two numbers do not corroborate each other.
+> 18.4 s is 1,290.9 s divided by 70, a mean over days 1 to 70. 17.98 s is one world day measured at day
+> 50, an instantaneous rate. A mean and a rate are different quantities, and their near-equality is a
+> coincidence of the arithmetic. If both hold, the cost of the late days follows: days 1 to 50 cannot
+> cost more than 50 x 18 = 900 s, so days 51 to 70 cost at least 1,290.9 - 900 = 391 s, which is
+> **19.6 s a world day at the least**. On a curve that runs from about 3 s a day at day 3 to 18 s at
+> day 50, the late days are nearer **35 s a day**. The two figures are consistent with a steep late
+> curve, not with each other. The 70-day figure was not re-taken; this is arithmetic on the numbers
+> already reported.
 
 The soak's own run agrees. `LONG=1 node tests/soak.js` is **1,363 s at a one-minute load average of
 2.46**, 18 tests, 13 pass, 0 fail, 5 skipped, with seed r's seventy days taking 1,320 s and writing

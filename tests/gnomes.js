@@ -233,7 +233,12 @@ test('a village within thirty tiles is too loud: the gnomes dig a new hole farth
    the village grew loud, must open onto ground the camp can reach today, not the ground of the first
    day. Before the fix, digGnomeBurrow still checked startRegion, the snapshot taken at generation, so
    a relocated burrow could open behind a sapling or structure that grew up since. cutOff walks the
-   live map from the first camp's stash every day of the run, the same way the soak does. */
+   live map from the first camp's stash, the same way the soak does, every 1,200 ticks: twenty world
+   minutes, 72 samples a world day, 5,040 flood fills over the seventy days. The sample count is the
+   cost, so it is written beside the interval. Whether so many are needed is unsettled: sampled every 60
+   ticks over three world days, `cutOff` was empty at all 4,320 samples on every default seed, so no
+   stranding occurred to measure the length of. See
+   design/reports/2026-09-20-g4-task-4-remediation.md. */
 test('seed r: a burrow dug mid-game opens onto ground the first camp can reach, 70 days', { skip: slow(70) }, () => {
   const { api } = runDays('r', 70, (api) => { if (api.tick % 1200 === 0) { const bad = cutOff(api).filter(m => m.includes('burrow cave')); assert.deepEqual(bad, []); } });
   const bad = cutOff(api).filter(m => m.includes('burrow cave'));
