@@ -162,7 +162,7 @@ const NOT_WORLD_PERIODS = {
 function stripComments(text){
   return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1');
 }
-test('every tick-modulo rule in src/sim names a period this file checks', () => {
+test('every tick-modulo rule in src/sim names a period this file checks', t => {
   const api = load();
   const site = /tick\s*%\s*([A-Za-z_$][\w$.]*)\s*(?:[!=]==?\s*([A-Za-z_$][\w$.]*))?/g;
   const listed = new Set(WORLD_PERIODS.map(p => 'CLOCK.' + p));
@@ -184,14 +184,16 @@ test('every tick-modulo rule in src/sim names a period this file checks', () => 
       }
     }
   }
-  /* A positive gate on the instrument: a scan that found nothing would satisfy every claim below. */
-  assert.ok(sites >= 19, `only ${sites} tick-modulo sites were found in src/sim/, and there were 19 when this check was written: the scan is reading less than the source`);
   assert.deepEqual(unlisted, [], 'a tick-modulo rule reads a period nothing checks against the beat');
   /* And the other way: a name in the list that no rule reads any more is a stale entry, and a stale
-     list is one nobody can trust the length of. */
+     list is one nobody can trust the length of. This is also the positive gate on the instrument: a
+     scan that found nothing would satisfy the claim above and fails this one, naming all seventeen
+     periods at once. A floor on the number of sites would do the same job and would go red on the next
+     task that legitimately takes a rule off the tick, so the count below is printed and not asserted. */
   const stale = WORLD_PERIODS.filter(p => !seen.has('CLOCK.' + p)).map(p => `CLOCK.${p} is in WORLD_PERIODS and no tick-modulo rule in src/sim/ reads it`);
   assert.deepEqual(stale, [], 'WORLD_PERIODS names a period no rule reads');
   assert.ok(api.CLOCK.every.cellular > 0, 'the beat itself is gone');
+  t.diagnostic(`${sites} tick-modulo sites in src/sim/, reading ${seen.size} periods, of which WORLD_PERIODS names ${WORLD_PERIODS.length}`);
 });
 
 /* ---------- the pin counters ---------- */
