@@ -342,7 +342,11 @@ function campSummary(){
 
 function seasonLine(){
   if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
-  const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
+  /* The seasons are not all the same length, so the days left are counted off this season's own
+     length rather than one shared number. */
+  const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
+  let d = dayOfYear(); for (let k = 0; k < i; k++) d -= SEASON_LENGTHS[k];
+  const left = SEASON_LENGTHS[i] - d + 1;
   return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
 }
 

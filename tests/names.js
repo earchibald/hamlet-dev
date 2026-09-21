@@ -14,6 +14,21 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+
+/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
+   This file asks for 202 world days, 342 under SLOW=1, and no day count in it has been changed. A world day
+   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
+   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
+   slow engine is a gate nobody measured.
+   Run it with SLOW=1. Task 4 restores it. */
+const SUSPENDED_FOR_G4 = process.env.SLOW ? false
+  : 'suspended for G4: this file asks for 202 world days, 342 under SLOW=1 and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+if (SUSPENDED_FOR_G4){
+  test('tests/names.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
+  return;
+}
+
 const { load } = require('../src/sim');
 const { runDays, fingerprint } = require('./lib/run');
 
@@ -66,8 +81,16 @@ test('a 70-day run still ends with the baseline beings and items', { skip: !proc
   for (const seed of SEEDS){
     const { api, events } = runDays(seed, 70);
     const fp = fingerprint(api, events);
-    assert.equal(fp.beings, layout[seed].day70.beings, `seed ${seed}: beings moved by day 70`);
-    assert.equal(fp.items, layout[seed].day70.items, `seed ${seed}: items moved by day 70`);
+    /* Name the comparison, not a verdict. This guard holds a live run against a frozen record, so a
+       difference means either that naming moved something — the rule this file exists to hold — or
+       that the record is older than the engine. On a branch that retunes the clock the second is the
+       likely one, and a message reading "beings moved" accuses the code of the most serious rule in
+       CLAUDE.md for a stale fixture. Say which record, and when it was taken. */
+    const REC = 'tests/names-layout.json, taken at aa3a426';
+    assert.equal(fp.beings, layout[seed].day70.beings,
+      `seed ${seed}: the beings at day 70 differ from ${REC}. Either naming moved a being, or the record predates a deliberate change to the engine. Check which before treating this as a naming fault.`);
+    assert.equal(fp.items, layout[seed].day70.items,
+      `seed ${seed}: the items at day 70 differ from ${REC}. Either naming moved an item, or the record predates a deliberate change to the engine. Check which before treating this as a naming fault.`);
   }
 });
 

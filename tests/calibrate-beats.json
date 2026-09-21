@@ -1,0 +1,32 @@
+{
+ "r": {
+  "berriesGrown": 111,
+  "bushesSeeded": 18,
+  "alive": 86
+ },
+ "x": {
+  "berriesGrown": 99,
+  "bushesSeeded": 15,
+  "alive": 62
+ },
+ "alpha": {
+  "berriesGrown": 106,
+  "bushesSeeded": 17,
+  "alive": 84
+ },
+ "beta": {
+  "berriesGrown": 48,
+  "bushesSeeded": 17,
+  "alive": 90
+ },
+ "gamma": {
+  "berriesGrown": 172,
+  "bushesSeeded": 18,
+  "alive": 36
+ },
+ "delta": {
+  "berriesGrown": 100,
+  "bushesSeeded": 18,
+  "alive": 36
+ }
+}

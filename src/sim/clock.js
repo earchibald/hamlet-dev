@@ -1,15 +1,20 @@
 /* ---------- the clock: the calendar, the units, and every duration and rate ---------- */
-/* A tick is the smallest step of the world. DAY is the number of ticks in a world day. TPS is the
-   number of ticks the page runs in a real second at speed 1. */
-const DAY = 1000, TPS = 12;
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A tick is one world second. DAY is the number of ticks in a world day, so it is the number of
+   seconds in a day. How fast the page draws those ticks is the interface's business and is not in
+   here: speed is view state and never passes the door, so the same seed reaches the same world
+   whether it is watched at one tick a second or run flat out with nobody looking. */
+const DAY = 86400;
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A year is 365 days. Winter carries the odd day, so the four lengths sum to the year exactly and
+   no season has to be derived by subtraction. */
+const SEASON_LENGTHS = [91, 91, 91, 92], YEAR_DAYS = 365;
 
-/* World units into ticks. Built for the retune. No rule reads secs, mins, or years yet. */
+/* World units into ticks. */
 const secs = n => n * DAY / 86400;
 const mins = n => n * DAY / 1440;
 const hours = n => n * DAY / 24;
 const days = n => n * DAY;
-const years = n => n * SEASON_DAYS * 4 * DAY;
+const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
    does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
@@ -18,17 +23,68 @@ const perHour = p => p / hours(1);
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
    and a roll must not move. */
 const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
-/* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
-   clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
-   stride. The retune replaces every one with a world unit. When none is left, the retune is done. */
-const ticks = n => n, strides = n => n, tickRate = p => p, strideRate = p => p;
+/* Legacy markers. A value inside one is still in the units of the old clock: a count of the old
+   1000-tick day, a count of a being's strides, a rate for each of those ticks, a rate for each
+   stride. The retune replaces every one with a world unit. When none is left, the retune is done.
 
-/* The calendar. */
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
-const hourOf = () => ((tick % DAY) / DAY) * 24;
-const dayOf = () => Math.floor(tick / DAY) + 1;
-const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
+   All four are converters now, and none is an identity. The old day held 1000 ticks and the new one
+   holds 86,400, so one old tick is 86.4 world seconds. A stride was two of those ticks for every
+   being that works, so it is 172.8. Converting is not a reading and does not settle anything: it
+   keeps each value's meaning in the world exactly where it was, so that the retune's later tasks
+   read a value that still means what it always meant rather than one that became 86 times shorter
+   the day the day got longer.
+
+   The two duration markers round, and that is not tidiness. A tick is one world second and a
+   duration counted in ticks must be a whole number of them, because rules compare durations with
+   `%`. `strides(6)` is 1036.8 exactly, and `++progress % 1036.8` is never zero for a whole
+   `progress`, so a rule written that way stops firing altogether and does not fail: the berry is
+   never picked and the picker picks for ever. That is what happened here, and nothing went red.
+   Every duration this table holds is therefore a whole number of ticks, and `tests/clock.js`
+   asserts it, so the next non-integer duration is caught by a test and not by a stuck villager.
+
+   The rates convert the other way, by division, for the same reason. A chance of 0.0006 a tick used
+   to come up about once in 1,700 ticks, which was under two world days; left alone it would come up
+   about once every half hour. Lightning would strike a camp eighty-six times as often and nothing
+   would be red, because a rate is a number and every number is still a number after a rebasing.
+
+   A marker is a to-do item and not a spelling. It says nobody has decided what this means in real
+   time. Only the task that owns a group converts that group's markers, having read each value. Do
+   not convert one because it happens to equal a round world unit: the arithmetic is free and the
+   reading is not, and a value that arrives at its task already looking settled is not asked the
+   question the task owes it. A marker may be removed, never added. */
+const ticks = n => Math.round(n * 86.4), strides = n => Math.round(n * 172.8), tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+/* `lookRate` is a legacy marker that does not convert, and it is deliberate. A chance for one look
+   is not a chance a tick: the rule draws a number of looks, that count carries the world time, and
+   the chance rides on top of it unchanged. Converting one of these as a chance a tick divides it by
+   86.4 a second time, on top of the look count that was already divided. That is what happened to
+   the plant block in G4 task 1 and it stopped plant growth in the valley. The marker still says
+   nobody has decided what the value should be; it says only that the rebasing must not touch it. */
+const lookRate = p => p;
+/* `stock` is a legacy marker for an amount HELD: fuel in a pit, fire in a tile. A stock does not
+   convert. Its rate does: `fire.burn` is fuel a tick and divides like any amount a tick, so the fuel
+   keeps its own units and the time to burn down is preserved by itself.
+   `strikeFuel` was written `ticks(240)`, and that read as right because on the old clock `burn` was
+   exactly 1 a tick, so one number was both a fuel and a count of ticks. The rebasing broke the
+   coincidence and converting BOTH the stock and the rate multiplied the burn time by 86.4: a
+   lightning fire lasted 20.7 world days against dev's 0.24. Nothing went red. It was found only
+   because the fire share in the pinned-horizon measurement was too large to believe. */
+const stock = n => n;
+
+/* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
+   because the seasons are not all the same length.
+   Each takes a day and falls back to today's. That is not only for the tests: a rule or a panel that
+   asks what season some other day falls in should not have to move the world to find out, and a
+   function that answers from its argument can be checked without a world at all. */
+const dayOfYear = (d = dayOf()) => ((d - 1) % YEAR_DAYS) + 1;
+const yearOf = (d = dayOf()) => Math.floor((d - 1) / YEAR_DAYS) + 1;
+const seasonOf = (d = dayOf()) => { let n = dayOfYear(d); for (let i = 0; i < 4; i++){ if (n <= SEASON_LENGTHS[i]) return SEASONS[i]; n -= SEASON_LENGTHS[i]; } return SEASONS[3]; };
+const isWinter = (d = dayOf()) => seasonOf(d) === 'winter';
+const hourOf = (t = tick) => ((t % DAY) / DAY) * 24;
+const dayOf = (t = tick) => Math.floor(t / DAY) + 1;
+/* Night falls at 20:00 and lifts at 06:00. `CLOCK.night` holds the two hours as ticks into the day,
+   because a rule that computes a being's state over a stretch of ticks has to know the tick the
+   stretch breaks on and cannot ask an hour. */
+const isNight = (t = tick) => { const s = t % DAY; return s >= CLOCK.night.falls || s < CLOCK.night.lifts; };
 
 /* Every duration and every rate that is not a row of a species, a life, or a recipe. Rules read
    this table by name. No rule holds a bare tick count. */
@@ -54,6 +110,9 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
+  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
+     not a duration, which is why it is a small whole number and not a world unit. */
+  dark: { slower: 2 },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
@@ -91,7 +150,12 @@ const CLOCK = {
     prune: ticks(200),          // the dead leave the list of beings
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
+    cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
+    body: mins(1),              // the longest a being's body goes unread. See `catchUp` in beings.js.
   },
+  /* When night falls and when it lifts, as ticks into the day. `isNight` reads them, and so does the
+     stretch machinery in beings.js, which needs the tick and not the hour. */
+  night: { falls: hours(20), lifts: hours(6) },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
@@ -170,17 +234,21 @@ const CLOCK = {
     burn: tickRate(1),           // fuel a burning tile loses (the pit's rate is `rate.pitBurn`)
     stormQuench: tickRate(2),    // more, in rain
     spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
-    strikeFuel: ticks(240),      // a lightning strike smoulders at least this long at `burn`
+    strikeFuel: stock(240),      // fuel a strike leaves in the tile. At `burn` that is about a quarter of a world day.
   },
   plant: {
-    samples: tickRate(60),       // random tiles looked at each tick. Each chance below is a chance for one look on one tick.
-    bushOld: days(60), bushDies: tickRate(0.01),
+    samples: tickRate(60),       /* Looks a tick, and after the rebasing a fraction: sixty looks an
+                                    old tick is 0.694 looks a world second, so 60,000 looks a world
+                                    day either way. `growPlants` draws a whole number from it.
+                                    Every chance below is a chance for ONE LOOK, so each is marked
+                                    `lookRate` and none of them converts. */
+    bushOld: days(60), bushDies: lookRate(0.01),
     bushYoung: days(3), bushTired: days(48),
-    berryGrow: { spring: tickRate(0.15), summer: tickRate(0.25), autumn: tickRate(0.35), winter: tickRate(0) }, berryWither: tickRate(0.15),
-    bushSeedsFrom: days(5), bushSeeds: tickRate(0.012),
-    saplingGrown: days(12), shroomGrow: tickRate(0.3),
-    pineOld: days(100), pineFalls: tickRate(0.03), stickDrops: tickRate(0.02),
-    ashHeals: tickRate(0.05), saplingSprouts: tickRate(0.004),
+    berryGrow: { spring: lookRate(0.15), summer: lookRate(0.25), autumn: lookRate(0.35), winter: lookRate(0) }, berryWither: lookRate(0.15),
+    bushSeedsFrom: days(5), bushSeeds: lookRate(0.012),
+    saplingGrown: days(12), shroomGrow: lookRate(0.3),
+    pineOld: days(100), pineFalls: lookRate(0.03), stickDrops: lookRate(0.02),
+    ashHeals: lookRate(0.05), saplingSprouts: lookRate(0.004),
     hollowAge: days(300),        // age given to a grove's hollow when the world is made
     grovePineAge: days(60),      // age given to a grove pine when the world is made
     grovePineSpread: days(60),   // spread added to a grove pine's age when the world is made
@@ -214,6 +282,39 @@ const CLOCK = {
     axeMade: ticks(1500), axeCut: ticks(3000),
     pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
     clothes: ticks(1500), garden: ticks(1500),
+    woken: mins(30),   // roused from sleep by something near. Written in world units: a new value never takes a marker.
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
+
+/* ---------- the beats ----------
+   The six systems that look at the world rather than at a being. None of them needs a tick's
+   resolution: a minute of world time is finer than anything a player can see in a plant growing or a
+   fire spreading, and before the retune each ran once per 86.4 world seconds anyway. Running them
+   every tick is 86.4 times the work for a resolution nobody asked for.
+
+   `beats` is the record task 4 reads. `next` is the tick a system runs on again, which is what a
+   horizon needs; `runs` and `looks` are counted for the tests. No rule reads any of it, so it is in
+   NOT_SAVED: a loaded world recomputes every `next` on its first beat.
+
+   A chance that used to be rolled once a tick is now rolled once a beat with `rollFor(rate, n)`,
+   which is the compounded probability over n ticks and not the rate times n. A chance for one LOOK
+   is not rolled at all: the look count carries the world time, and rolling it as well would be task
+   1's finding 5 a second time. */
+const CELLULAR = ['growPlants', 'spreadFire', 'updateWeather', 'strayLightning', 'rotCarcasses', 'groveTick'];
+/* A const container that is emptied and refilled rather than reassigned, because the manifest takes
+   the API's references once at load and a reassignment would leave every reader holding the old
+   object. It is a container, so it is named in KNOWN_CONSTS rather than in SAVED_STATE. */
+const beats = {};
+function resetBeats(){
+  for (const k in beats) delete beats[k];
+  for (const k of CELLULAR) beats[k] = { runs: 0, next: CLOCK.every.cellular, looks: 0 };
+}
+/* True on the ticks a cellular system runs, and it records the next one as it goes. Called at the
+   head of each of the six, so the beat lives in one place rather than in six copies of a modulo. */
+function onBeat(name){
+  if (tick % CLOCK.every.cellular) return false;
+  const b = beats[name] || (beats[name] = { runs: 0, next: 0, looks: 0 });
+  b.runs++; b.next = tick + CLOCK.every.cellular;
+  return true;
+}

@@ -33,6 +33,16 @@ interface Being {
   hp: number;
   alive: boolean;
   born: number;
+  /* The tick this being acts again (makeBeing's literal, beings.js:19). `main.js` skips a being
+     whose `next` is past this tick, and sets it to `tick + Math.min(CLOCK.every.body, nextAct(a))`
+     after the act; the proximity pass in beings.js pulls it back to `tick` to rouse one.
+     Always a number: makeBeing sets it, and nothing ever clears it. */
+  next: number;
+  /* The tick this being's body was last brought up to (makeBeing's literal, beings.js:19).
+     `bodyStretch` moves it to the end of the stretch it ran, and `catchUp` leaves it at `tick`.
+     Always a number by construction; catchUp's `typeof a.seen !== 'number'` guard is for a record
+     that came back from an older save, not for one this code built. */
+  seen: number;
   parents: number[] | null;
   lastChild: number;
   needs: { [need: string]: number };
@@ -102,12 +112,18 @@ interface Being {
   body?: Hill | Cave | null;
 }
 
-/** One thought on a.thoughts: a labelled mood swing that decays over `left` ticks. addThought() in beings.js. */
+/** One thought on a.thoughts: a labelled mood swing that lasts until a named tick. thoughtAt() in
+    beings.js builds it, and addThought() is thoughtAt() at this tick. It no longer counts down: a
+    thought used to hold `left`, the ticks remaining, and `left` is gone. */
 interface Thought {
   key: string;
   text: string;
   value: number;
-  left: number;
+  /* The tick the thought is gone on. The one place a thought is built sets it
+     (`a.thoughts.push({ key, text, value, until })`, beings.js:47), and the one place that refreshes
+     an existing thought sets it again on the same line, so it is never absent. catchUp drops the
+     thought once it is past: `a.thoughts = a.thoughts.filter(t => t.until > tick)` (beings.js:522). */
+  until: number;
 }
 
 /** One line of the chronicle, as log() in core.js builds it, and the last forty of which a.history keeps.
@@ -345,6 +361,22 @@ interface Task {
   key?: string;
   target?: any;
   within?: number;
+  /* The tick work was last put into this job (tasks.js). Optional: no task record is built with it
+     — `begin()` returns `{ label, path, progress, target, within }` (tasks.js:114) — and the work
+     stop reads its own absence, `const ran = t.worked === undefined ? 1 : Math.max(1, tick - t.worked);`
+     (tasks.js:124). A step of the walk sets it too, `t.worked = tick;` (tasks.js:52), so the walk to
+     the work tile is never credited as work. */
+  worked?: number;
+  /* The tick an unfinished job will be done on, so the worker is not looked at on every tick of it:
+     `if (t.progress < n){ t.due = tick + Math.ceil((n - t.progress) / speed); return 'continue'; }`
+     (tasks.js:128). Optional: it is absent until a stop leaves the job unfinished, and nextAct reads
+     it as a plain comparison, `if (t.due > tick) return t.due - tick;` (beings.js:538). */
+  due?: number;
+  /* The tick a wait is over on, converted once from the countdown `t.wait`:
+     `if (t.wait > 0){ t.waitUntil = tick + t.wait; t.wait = 0; }` (tasks.js:47). Optional: only a
+     task that asked for a wait ever has it, and both readers compare it, `if (t.waitUntil > tick) return;`
+     (tasks.js:48) and beings.js:536. */
+  waitUntil?: number;
 }
 
 /** An item carried, stashed, or dropped: a kind and a count, plus whatever else that kind tracks. */

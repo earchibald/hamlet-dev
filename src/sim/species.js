@@ -1,15 +1,17 @@
 /* Life clocks, in days. adult: grown up. old: slows down. life: the usual span. */
 const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, old: 60, life: 84 }, rabbit: { adult: 3, old: 14, life: 20 }, deer: { adult: 8, old: 36, life: 50 }, fox: { adult: 5, old: 26, life: 36 }, wolf: { adult: 6, old: 32, life: 46 }, gnome: { adult: 20, old: 80, life: 110, seed: 35 } };
-const ageDays = a => (tick - a.born) / DAY;
-const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
+/* Both take a tick and fall back to now, so a rule that works out a being's state over a stretch of
+   ticks can ask what stage the being was in at the start of the stretch without moving the world. */
+const ageDays = (a, t = tick) => (t - a.born) / DAY;
+const stage = (a, t = tick) => { const L = LIFE[a.species]; const d = ageDays(a, t); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
-  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: ticks(2), zmin: -2, zmax: 2 },
-  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
-  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 2, prey: true },
-  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(1), zmin: -2, zmax: 2, fae: true },
-  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, folk: true },
+  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
+  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
+  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true },
+  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, fae: true },
+  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, folk: true },
 };
 const NAMES = ['Ada','Bram','Cora','Dov','Esk','Fen','Greta','Hal','Iva','Jory','Kit','Lune','Mott','Nell','Orrin','Pim','Quill','Rook','Sable','Tam','Ulla','Voss','Wren','Yara'];
 

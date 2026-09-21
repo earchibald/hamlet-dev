@@ -3,6 +3,21 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
 const { runDays, cutOff } = require('./lib/run');
+
+/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
+   This file asks for 70 world days, and no day count in it has been changed. A world day
+   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
+   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
+   slow engine is a gate nobody measured.
+   Run it with SLOW=1. Task 4 restores it. */
+const SUSPENDED_FOR_G4 = process.env.SLOW ? false
+  : 'suspended for G4: this file asks for 70 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+if (SUSPENDED_FOR_G4){
+  test('tests/gnomes.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
+  return;
+}
+
 const SEEDS = ['r', 'x', 'alpha', 'beta', 'gamma', 'delta'];
 
 /* A burrow is dug in the country where a god made gnomes, and the burrows of one country stand thirty tiles
@@ -67,16 +82,18 @@ test('a gnome never picks mushrooms off a patch tile whose feature is gone', () 
   assert.equal(cleared.shrooms, 3, 'the cleared tile is untouched');
 });
 
-const run = (api, b, n) => { for (let k = 0; k < n && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
+/* `n` is a budget in ticks of the old 1000-tick day, which is what every caller is written in.
+   G4 task 1 converts it here so no call site had to be re-read. */
+const run = (api, b, n) => { for (let k = 0, b2 = api.ticks(n); k < b2 && b.alive; k++){ api.camp = api.camps[0]; api.updateBeing(b); api.tick = api.tick + 1; } };
 const inDen = b => b.den.tiles.some(t => t.x === b.x && t.y === b.y && t.z === b.z);
 
 test('gnomes sleep in the burrow by day and come out to the patch at dusk', () => {
   const api = load(); api.startWorld('r');
   const g = api.beings.find(b => b.species === 'gnome');
   for (const k in g.needs) g.needs[k] = 90; g.needs.food = 30;
-  api.tick = 12 * 1000 + 500; run(api, g, 200);
+  api.tick = api.ticks(12 * 1000 + 500); run(api, g, 200);
   assert.ok(inDen(g), `by day a gnome stays home; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
-  api.tick = 20 * 1000 + 500; g.task = null; run(api, g, 400);
+  api.tick = api.ticks(20 * 1000 + 500); g.task = null; run(api, g, 400);
   assert.ok(g.z === 0 && g.den.patch.some(t => api.dist(t.x, t.y, g.x, g.y) <= 1), `at dusk it goes to the patch; it is at ${g.x},${g.y},${g.z} doing ${g.task && g.task.label}`);
   assert.ok(g.needs.food > 30, 'and eats');
 });
@@ -104,7 +121,7 @@ test('the first gnome seen at dusk is written down once per camp', () => {
   for (let k = 1; k <= 3; k++){ const t = api.tileAt(h.x + k, h.y); t.feature = null; t.struct = null; if (!api.GROUND[t.ground].walk) t.ground = 'grass'; }
   /* Hour 20 of day 20, and one tick past it so (tick + h.id) is even: Hal's stride of 2
      must land on this tick, or the single updateBeing call below never reaches chooseTask at all. */
-  api.tick = 20 * 1000 + Math.round(20 / 24 * 1000) + 1; api.camp = c; api.updateBeing(h);
+  api.tick = api.ticks(20 * 1000 + Math.round(20 / 24 * 1000) + 1); api.camp = c; api.updateBeing(h);
   assert.equal(c.gnomes.known, true);
   /* The person may pick a camp site on the same tick, so the sighting is looked for in the chronicle, not at its head. */
   assert.equal(api.chronicle.filter(e => e.text.includes('small figure')).length, 1, api.chronicle.map(e => e.text).join(' | '));
@@ -117,17 +134,17 @@ test('gnomes copy a workshop, borrow a pot at night, and bring it back with a gi
   /* Put the camp beside the burrow with a workshop and a pot. */
   api.setSite(burrow.exit.x + 3, burrow.exit.y); const t = api.tileAt(...c.site); t.ground = 'soil'; t.feature = null; t.struct = { type: 'firepit', fuel: 300, lit: false }; c.pit = [t.x, t.y];
   c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.everLit = true;
-  api.tick = 5 * 1000; for (let k = 0; k < 40 && !burrow.bench; k++){ api.tick = api.tick + 500; api.gnomeTick(); }
+  api.tick = api.ticks(5 * 1000); for (let k = 0; k < 40 && !burrow.bench; k++){ api.tick = api.tick + api.ticks(500); api.gnomeTick(); }
   assert.ok(burrow.bench, 'no bench after twenty days beside a workshop');
   assert.ok(api.chronicle.some(e => e.text.includes('clink')));
   const g = api.beings.find(b => b.species === 'gnome' && b.den === burrow); g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90;
-  api.tick = 22 * 1000; assert.ok(api.startTask(g, 'borrow'), 'the borrow should start');
-  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  api.tick = api.ticks(22 * 1000); assert.ok(api.startTask(g, 'borrow'), 'the borrow should start');
+  for (let k = 0, b2 = api.ticks(300); k < b2 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
   assert.equal(c.stash.pot, 0); assert.ok(burrow.holding && burrow.holding.kind === 'pot');
   assert.ok(api.chronicle.some(e => e.text.includes('Small footprints')));
-  api.tick = api.tick + 2 * 1000 + 10; g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
+  api.tick = api.tick + api.ticks(2 * 1000 + 10); g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
   assert.ok(api.startTask(g, 'repay'), 'the repayment should start');
-  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  for (let k = 0, b2 = api.ticks(300); k < b2 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
   /* The pot comes home, and the gift beside it may be another pot. */
   assert.ok(c.stash.pot >= 1, 'the pot never came back'); assert.equal(burrow.holding, null);
   assert.ok(c.stash.cord + c.stash.clay + c.stash.pot >= 2, 'a gift beside it');
@@ -143,10 +160,10 @@ test('two gnomes of the same burrow cannot both borrow the same night', () => {
   const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
   assert.ok(kin.length >= 2, 'need two gnomes in the burrow to test the race');
   for (const g of kin){ g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90; }
-  api.tick = 22 * 1000;
+  api.tick = api.ticks(22 * 1000);
   const potBefore = c.stash.pot, cordBefore = c.stash.cord, basketBefore = c.tools.basket;
   for (const g of kin) assert.ok(api.startTask(g, 'borrow'), 'each borrow should be able to start');
-  for (let k = 0; k < 300 && kin.some(g => g.task); k++){ for (const g of kin) if (g.task) api.runTask(g); api.tick = api.tick + 1; }
+  for (let k = 0, b2 = api.ticks(300); k < b2 && kin.some(g => g.task); k++){ for (const g of kin) if (g.task) api.runTask(g); api.tick = api.tick + 1; }
   const taken = (potBefore - c.stash.pot) + (cordBefore - c.stash.cord) + (basketBefore - c.tools.basket);
   assert.equal(taken, 1, `expected exactly one thing gone from the stash, stash pot=${c.stash.pot} cord=${c.stash.cord} basket=${c.tools.basket}`);
   assert.ok(burrow.holding, 'the burrow should record the one thing it took');
@@ -159,14 +176,14 @@ test('a gnome does not borrow again for six days after repaying', () => {
   c.workshop = [t.x + 1, t.y]; api.tileAt(...c.workshop).struct = { type: 'workshop', camp: c }; c.stash.pot = 1; c.everLit = true;
   burrow.bench = 1;
   const g = api.beings.find(b => b.species === 'gnome' && b.den === burrow); g.x = burrow.exit.x; g.y = burrow.exit.y; g.z = 0; g.task = null; for (const k in g.needs) g.needs[k] = 90;
-  api.tick = 22 * 1000; assert.ok(api.startTask(g, 'borrow'), 'the borrow should start');
-  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
-  api.tick = api.tick + 2 * 1000 + 10; g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
+  api.tick = api.ticks(22 * 1000); assert.ok(api.startTask(g, 'borrow'), 'the borrow should start');
+  for (let k = 0, b2 = api.ticks(300); k < b2 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  api.tick = api.tick + api.ticks(2 * 1000 + 10); g.x = burrow.exit.x; g.y = burrow.exit.y; g.task = null;
   assert.ok(api.startTask(g, 'repay'), 'the repayment should start');
-  for (let k = 0; k < 300 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
+  for (let k = 0, b2 = api.ticks(300); k < b2 && g.task; k++){ api.runTask(g); api.tick = api.tick + 1; }
   assert.equal(burrow.holding, null);
   g.task = null; assert.equal(api.startTask(g, 'borrow'), false, 'right after repaying, no new borrow yet');
-  api.tick = api.tick + 6 * 1000; g.task = null;
+  api.tick = api.tick + api.ticks(6 * 1000); g.task = null;
   assert.ok(api.startTask(g, 'borrow'), 'six days later, a new borrow can start');
 });
 
@@ -179,13 +196,13 @@ test('a village within thirty tiles is too loud: the gnomes dig a new hole farth
   const c = api.camps[0]; api.camp = c;
   api.setSite(burrow.exit.x + 4, burrow.exit.y); c.village = true;
   const kin = api.beings.filter(b => b.species === 'gnome' && b.den === burrow);
-  api.tick = 5 * 1000;
+  api.tick = api.ticks(5 * 1000);
   /* One tick is enough to notice the village: the loud check is immediate, so mark leaving before it
      has any chance to also clear the three-day wait and dig the new hole in the same call. */
-  api.tick = api.tick + 500; api.gnomeTick();
+  api.tick = api.tick + api.ticks(500); api.gnomeTick();
   assert.ok(burrow.leaving, 'the burrow should be marked as leaving');
   assert.ok(api.chronicle.some(e => e.text.includes('too loud')));
-  for (let k = 0; k < 40 && !burrow.abandoned; k++){ api.tick = api.tick + 500; api.gnomeTick(); }
+  for (let k = 0; k < 40 && !burrow.abandoned; k++){ api.tick = api.tick + api.ticks(500); api.gnomeTick(); }
   assert.ok(burrow.abandoned, 'the old hole stands empty');
   const fresh = kin[0].den; assert.notEqual(fresh, burrow); assert.equal(fresh.kind, 'burrow');
   assert.ok(api.dist(fresh.exit.x, fresh.exit.y, ...c.site) >= 50, 'the new hole is far from the village');

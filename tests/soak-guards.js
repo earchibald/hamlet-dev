@@ -29,18 +29,19 @@ test('the season guard admits a year and turns away a day less', () => {
   assertSkipped(seasonClaimSkip(SEASON_CLAIM_DAYS - 1), SEASON_CLAIM_DAYS - 1, SEASON_CLAIM_DAYS);
 });
 
-test('the old-age guard admits its measured floor and turns away a day less', () => {
-  assert.equal(oldAgeClaimSkip(OLD_AGE_CLAIM_DAYS), false, 'a run of exactly the measured floor must make the old-age claim');
+test('the old-age guard admits its own floor and turns away a day less', () => {
+  assert.equal(oldAgeClaimSkip(OLD_AGE_CLAIM_DAYS), false, 'a run of exactly the old-age floor must make the old-age claim');
   assertSkipped(oldAgeClaimSkip(OLD_AGE_CLAIM_DAYS - 1), OLD_AGE_CLAIM_DAYS - 1, OLD_AGE_CLAIM_DAYS);
 });
 
-/* The direction that was silent. A 40-day run visits all four seasons. Under the old single guard
-   the season claim skipped anyway, because 40 is less than the soak's 70. Every run from a year to a
-   day short of the default lost that coverage and said nothing. */
-test('a run longer than a year but shorter than the soak makes the season claim and not the old-age one', () => {
-  for (const days of [SEASON_CLAIM_DAYS, 40, OLD_AGE_CLAIM_DAYS - 1]){
-    assert.equal(seasonClaimSkip(days), false, `${days} days covers a year, so the season claim must run`);
-    assertSkipped(oldAgeClaimSkip(days), days, OLD_AGE_CLAIM_DAYS);
+/* The direction that was silent: a run that can make one claim and not the other. The two literals
+   are disjoint, and on the 365-day calendar the old-age floor is the SHORTER of the two, so the band
+   runs the other way than it did on the 32-day year. A 100-day run carries the oldest newcomer past
+   the span and cannot reach winter. Under the old single guard it made both claims or neither. */
+test('a run past the old-age floor but shorter than a year makes the old-age claim and not the season one', () => {
+  for (const days of [OLD_AGE_CLAIM_DAYS, 100, SEASON_CLAIM_DAYS - 1]){
+    assert.equal(oldAgeClaimSkip(days), false, `${days} days passes the old-age floor, so the old-age claim must run`);
+    assertSkipped(seasonClaimSkip(days), days, SEASON_CLAIM_DAYS);
   }
 });
 
@@ -55,14 +56,15 @@ test('a run far too short for either claim skips both, whatever the soak default
 });
 
 test('a long run makes both claims', () => {
-  for (const days of [OLD_AGE_CLAIM_DAYS, 90, 365]){
+  for (const days of [SEASON_CLAIM_DAYS, 400, 730]){
     assert.equal(seasonClaimSkip(days), false, `${days} days must make the season claim`);
     assert.equal(oldAgeClaimSkip(days), false, `${days} days must make the old-age claim`);
   }
 });
 
 /* What holds the season literal. It is a calendar fact, so it is checked against the calendar.
-   tests/clock.js pins the calendar itself in plain numbers: a season of 8 days, a year of 32. A
+   tests/clock.js pins the calendar itself in plain numbers: a year of 365 days, and seasons of 91,
+   91, 91 and 92. A
    calendar change goes red there and names the number. It goes red here too, naming this literal. */
 test('the season literal is one year by the calendar', () => {
   const api = load();
@@ -70,9 +72,10 @@ test('the season literal is one year by the calendar', () => {
     `the season claim waits ${SEASON_CLAIM_DAYS} days for a year that is now ${api.years(1) / api.DAY} days. A shorter wait makes a claim the run cannot meet; a longer one skips a run that could.`);
 });
 
-/* What holds the old-age literal, which is a weaker thing and says so. 70 is a measured floor, and
-   no test can pin a measurement. `70 === 70` is a test that cannot fail, and issue #94 exists to
-   remove tests like that. The life table gives a lower bound instead. A newcomer arrives aged
+/* What holds the old-age literal, which is a weaker thing and says so. 70 is a floor carried over
+   from dev, and on this branch it is not even that: nobody has measured it at the 86,400-tick day
+   (G4 task 4 owes it). No test can pin a measurement anyway. `70 === 70` is a test that cannot fail,
+   and issue #94 exists to remove tests like that. The life table gives a lower bound instead. A newcomer arrives aged
    between `adult` and `old`, and dies past `life`. So the oldest arrival needs `life - old` days to
    cross the span, and the literal must sit above that. It sits far above it on purpose. The death is
    a roll that needs ticks to fire, so the arithmetic minimum would make the claim intermittent. */

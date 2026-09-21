@@ -8,7 +8,17 @@ function frame(now){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
-      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+      /* The days run against a wall-clock budget, not a step count. A count cannot bound a frame's
+         cost, because the cost of a step is not constant: it grows with the beings and the items in
+         the valley, and it grows again in a storm. The old line stopped at 200 steps and then threw
+         the rest of the frame's ticks away (`if (n >= 200) acc = 0`), so above 200 ticks a frame the
+         top rung ran at whatever 200 steps came to and still printed its own rate. Now the loop
+         spends STEP_BUDGET_MS and stops, and a rung the machine cannot hold simply arrives late.
+         The clock is read every step: performance.now() costs about 45 ns against a step's 14,000 ns,
+         both measured in Safari on 2026-09-20, so reading it is 0.3% and a coarser check would only
+         buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
+         leaves no backlog for a later one to run in one burst. */
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS; while (acc >= 1){ step(); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the

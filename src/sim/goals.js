@@ -319,11 +319,13 @@ const GOALS = [
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
     offers(a){ if (!camp.pit || camp.rack) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the rack', score: 30, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 2, 3); if (!site) return [];
       return [{ label: 'build the drying rack', score: 45, task: { kind: 'buildRack', args: { at: site } } }]; } },
-  /* The aim of 8 and SEASON_DAYS are set apart, and today they happen to match, so "one strip a day"
-     holds. Plan G4 retunes the clock, and a season that is no longer eight days makes this sentence
-     false in words as the old one was false in digits. Read it again with G4. */
+  /* The aim of 8 was set when winter was eight days long, so "one strip a day" held. G4 made winter
+     92 days and the sentence stopped being true, so it no longer claims a rate. The aim itself is a
+     quantity and not a duration, so this task does not move it: eight strips against a 92-day winter
+     is now thin, and that is a tuning question for task 11 with the long run in front of it, not an
+     arithmetic one to settle here. Reported, not fixed. */
   { id: 'smoke', title: 'Smoke meat for lean days', stage: 'food', after: 'rack', standing: true,
-    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS} days long, and the bushes give nothing then. That is one strip a day.` }; },
+    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. The bushes give nothing through winter, and it is a long one.` }; },
     offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
       const out = [];
       if (camp.stash.carcass >= 1) out.push({ label: 'smoke a rabbit over the fire', score: seasonOf() === 'autumn' ? 66 : camp.stash.smoked < 4 ? 60 : 30, task: { kind: 'smokeMeat', args: { at: camp.rack } } });

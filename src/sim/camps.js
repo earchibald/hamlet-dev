@@ -287,12 +287,22 @@ function theLoneFounder(){
 function updateCamps(){
   afterTheLast();
   theLoneFounder();
+  /* Read once rather than per camp: every camp's rate-driven work shares the world's beat. The
+     event-driven parts below -- an arrival whose tick is stored, a village promotion that waits on a
+     storehouse -- are not on it, because their next moment is already named by something else. */
+  const onCampBeat = tick % CLOCK.every.cellular === 0;
   for (const c of camps){
     camp = c;
     const pt = pitTile();
-    if (pt && pt.struct.lit){
+    /* The pit burns by elapsed time, on the beat, rather than a tick at a time. `pitBurn` is fuel a
+       tick, so a beat costs it the beat's ticks, and `litTicks` and `streak` ADD the beat rather
+       than being stepped through it. They stay counts of ticks; only the grain changes.
+       The tick a fire goes out is therefore a division and not a roll, which is what lets task 4
+       name it ahead of time. It is quantised to the beat now, which is still exactly nameable. */
+    if (pt && pt.struct.lit && onCampBeat){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      const n = CLOCK.every.cellular;
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * n * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks += n; camp.streak += n; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
       if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, CLOCK.thought.fireout); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
@@ -323,7 +333,7 @@ function updateCamps(){
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
-    tryLightning();
+    if (onCampBeat) tryLightning();
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);

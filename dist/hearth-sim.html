@@ -204,7 +204,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <button class="btn" id="stepBtn">Step<kbd>.</kbd></button>
       <button class="btn" id="hourBtn">Hour<kbd>&gt;</kbd></button>
       <button class="btn" id="hurryBtn" hidden>Hurry<kbd>H</kbd></button>
-      <span id="speeds"><button class="btn" id="speed1" data-speed="1" data-pace="0.25">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed4" data-speed="4" data-pace="0.5">4×<kbd>Shift+2</kbd></button><button class="btn" id="speed16" data-speed="16" data-pace="1">16×<kbd>Shift+3</kbd></button><button class="btn" id="speed64" data-speed="64" data-pace="2">64×<kbd>Shift+4</kbd></button></span>
+      <span id="speeds"><button class="btn" id="speed1" data-speed="1" data-pace="0.25">1×<kbd>Shift+1</kbd></button><button class="btn" id="speed8" data-speed="8" data-pace="0.5">8×<kbd>Shift+2</kbd></button><button class="btn" id="speed64" data-speed="64" data-pace="1">64×<kbd>Shift+3</kbd></button><button class="btn" id="speed256" data-speed="256" data-pace="2">256×<kbd>Shift+4</kbd></button></span>
       <button class="btn" id="chordBtn">Goals<kbd>G</kbd></button>
       <button class="btn" id="paletteBtn">Palette<kbd>⌘K</kbd></button>
       <button class="btn" id="helpBtn">?<kbd>?</kbd></button>
@@ -486,17 +486,22 @@ function log(text, who = [], kind = 'info', tag = null){
 }
 
 /* ---------- the clock: the calendar, the units, and every duration and rate ---------- */
-/* A tick is the smallest step of the world. DAY is the number of ticks in a world day. TPS is the
-   number of ticks the page runs in a real second at speed 1. */
-const DAY = 1000, TPS = 12;
-const SEASON_DAYS = 8, SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A tick is one world second. DAY is the number of ticks in a world day, so it is the number of
+   seconds in a day. How fast the page draws those ticks is the interface's business and is not in
+   here: speed is view state and never passes the door, so the same seed reaches the same world
+   whether it is watched at one tick a second or run flat out with nobody looking. */
+const DAY = 86400;
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+/* A year is 365 days. Winter carries the odd day, so the four lengths sum to the year exactly and
+   no season has to be derived by subtraction. */
+const SEASON_LENGTHS = [91, 91, 91, 92], YEAR_DAYS = 365;
 
-/* World units into ticks. Built for the retune. No rule reads secs, mins, or years yet. */
+/* World units into ticks. */
 const secs = n => n * DAY / 86400;
 const mins = n => n * DAY / 1440;
 const hours = n => n * DAY / 24;
 const days = n => n * DAY;
-const years = n => n * SEASON_DAYS * 4 * DAY;
+const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
    does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
@@ -505,17 +510,68 @@ const perHour = p => p / hours(1);
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
    and a roll must not move. */
 const rollFor = (rate, n) => n === 1 ? rate : 1 - Math.pow(1 - rate, n);
-/* Legacy markers. Each returns its argument. A value inside one is still in the units of the old
-   clock: a count of ticks, a count of a being's strides, a rate for each tick, a rate for each
-   stride. The retune replaces every one with a world unit. When none is left, the retune is done. */
-const ticks = n => n, strides = n => n, tickRate = p => p, strideRate = p => p;
+/* Legacy markers. A value inside one is still in the units of the old clock: a count of the old
+   1000-tick day, a count of a being's strides, a rate for each of those ticks, a rate for each
+   stride. The retune replaces every one with a world unit. When none is left, the retune is done.
 
-/* The calendar. */
-const seasonOf = () => SEASONS[Math.floor((dayOf() - 1) / SEASON_DAYS) % 4];
-const isWinter = () => seasonOf() === 'winter';
-const hourOf = () => ((tick % DAY) / DAY) * 24;
-const dayOf = () => Math.floor(tick / DAY) + 1;
-const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
+   All four are converters now, and none is an identity. The old day held 1000 ticks and the new one
+   holds 86,400, so one old tick is 86.4 world seconds. A stride was two of those ticks for every
+   being that works, so it is 172.8. Converting is not a reading and does not settle anything: it
+   keeps each value's meaning in the world exactly where it was, so that the retune's later tasks
+   read a value that still means what it always meant rather than one that became 86 times shorter
+   the day the day got longer.
+
+   The two duration markers round, and that is not tidiness. A tick is one world second and a
+   duration counted in ticks must be a whole number of them, because rules compare durations with
+   `%`. `strides(6)` is 1036.8 exactly, and `++progress % 1036.8` is never zero for a whole
+   `progress`, so a rule written that way stops firing altogether and does not fail: the berry is
+   never picked and the picker picks for ever. That is what happened here, and nothing went red.
+   Every duration this table holds is therefore a whole number of ticks, and `tests/clock.js`
+   asserts it, so the next non-integer duration is caught by a test and not by a stuck villager.
+
+   The rates convert the other way, by division, for the same reason. A chance of 0.0006 a tick used
+   to come up about once in 1,700 ticks, which was under two world days; left alone it would come up
+   about once every half hour. Lightning would strike a camp eighty-six times as often and nothing
+   would be red, because a rate is a number and every number is still a number after a rebasing.
+
+   A marker is a to-do item and not a spelling. It says nobody has decided what this means in real
+   time. Only the task that owns a group converts that group's markers, having read each value. Do
+   not convert one because it happens to equal a round world unit: the arithmetic is free and the
+   reading is not, and a value that arrives at its task already looking settled is not asked the
+   question the task owes it. A marker may be removed, never added. */
+const ticks = n => Math.round(n * 86.4), strides = n => Math.round(n * 172.8), tickRate = p => p / 86.4, strideRate = p => p / 172.8;
+/* `lookRate` is a legacy marker that does not convert, and it is deliberate. A chance for one look
+   is not a chance a tick: the rule draws a number of looks, that count carries the world time, and
+   the chance rides on top of it unchanged. Converting one of these as a chance a tick divides it by
+   86.4 a second time, on top of the look count that was already divided. That is what happened to
+   the plant block in G4 task 1 and it stopped plant growth in the valley. The marker still says
+   nobody has decided what the value should be; it says only that the rebasing must not touch it. */
+const lookRate = p => p;
+/* `stock` is a legacy marker for an amount HELD: fuel in a pit, fire in a tile. A stock does not
+   convert. Its rate does: `fire.burn` is fuel a tick and divides like any amount a tick, so the fuel
+   keeps its own units and the time to burn down is preserved by itself.
+   `strikeFuel` was written `ticks(240)`, and that read as right because on the old clock `burn` was
+   exactly 1 a tick, so one number was both a fuel and a count of ticks. The rebasing broke the
+   coincidence and converting BOTH the stock and the rate multiplied the burn time by 86.4: a
+   lightning fire lasted 20.7 world days against dev's 0.24. Nothing went red. It was found only
+   because the fire share in the pinned-horizon measurement was too large to believe. */
+const stock = n => n;
+
+/* The calendar. `dayOfYear` counts from 1. `seasonOf` walks the four lengths rather than dividing,
+   because the seasons are not all the same length.
+   Each takes a day and falls back to today's. That is not only for the tests: a rule or a panel that
+   asks what season some other day falls in should not have to move the world to find out, and a
+   function that answers from its argument can be checked without a world at all. */
+const dayOfYear = (d = dayOf()) => ((d - 1) % YEAR_DAYS) + 1;
+const yearOf = (d = dayOf()) => Math.floor((d - 1) / YEAR_DAYS) + 1;
+const seasonOf = (d = dayOf()) => { let n = dayOfYear(d); for (let i = 0; i < 4; i++){ if (n <= SEASON_LENGTHS[i]) return SEASONS[i]; n -= SEASON_LENGTHS[i]; } return SEASONS[3]; };
+const isWinter = (d = dayOf()) => seasonOf(d) === 'winter';
+const hourOf = (t = tick) => ((t % DAY) / DAY) * 24;
+const dayOf = (t = tick) => Math.floor(t / DAY) + 1;
+/* Night falls at 20:00 and lifts at 06:00. `CLOCK.night` holds the two hours as ticks into the day,
+   because a rule that computes a being's state over a stretch of ticks has to know the tick the
+   stretch breaks on and cannot ask an hour. */
+const isNight = (t = tick) => { const s = t % DAY; return s >= CLOCK.night.falls || s < CLOCK.night.lifts; };
 
 /* Every duration and every rate that is not a row of a species, a life, or a recipe. Rules read
    this table by name. No rule holds a bare tick count. */
@@ -541,6 +597,9 @@ const CLOCK = {
     hearthProven: days(3),            // an unbroken hearth streak this long counts as established
     resourceCache: ticks(100),        // a sector's resource count is cached this long
   },
+  /* One tick in this many is a step, for a person feeling their way in the dark. It is a rate and
+     not a duration, which is why it is a small whole number and not a world unit. */
+  dark: { slower: 2 },
   startsAt: hours(7),   // the hour of the first day at which a world begins
   names: {
     nameHour: Math.round(hours(20)),   // the hour of night the nightly naming pass runs
@@ -578,7 +637,12 @@ const CLOCK = {
     prune: ticks(200),          // the dead leave the list of beings
     carcassRot: ticks(50),      // old carcasses are checked
     godsRest: days(1),          // the sleeping gods are kept rested
+    cellular: mins(1),          // the beat the world's own systems run on. See CELLULAR below.
+    body: mins(1),              // the longest a being's body goes unread. See `catchUp` in beings.js.
   },
+  /* When night falls and when it lifts, as ticks into the day. `isNight` reads them, and so does the
+     stretch machinery in beings.js, which needs the tick and not the hour. */
+  night: { falls: hours(20), lifts: hours(6) },
   cooldown: {
     rotLine: ticks(600),        // between two chronicle lines about spoiled food
     offerFailed: ticks(60), pathBlocked: ticks(40), taskFailed: ticks(120), needFailed: ticks(120),
@@ -657,17 +721,21 @@ const CLOCK = {
     burn: tickRate(1),           // fuel a burning tile loses (the pit's rate is `rate.pitBurn`)
     stormQuench: tickRate(2),    // more, in rain
     spread: tickRate(0.08), stormSpread: tickRate(0.012),   // the chance to catch, times how well the tile burns
-    strikeFuel: ticks(240),      // a lightning strike smoulders at least this long at `burn`
+    strikeFuel: stock(240),      // fuel a strike leaves in the tile. At `burn` that is about a quarter of a world day.
   },
   plant: {
-    samples: tickRate(60),       // random tiles looked at each tick. Each chance below is a chance for one look on one tick.
-    bushOld: days(60), bushDies: tickRate(0.01),
+    samples: tickRate(60),       /* Looks a tick, and after the rebasing a fraction: sixty looks an
+                                    old tick is 0.694 looks a world second, so 60,000 looks a world
+                                    day either way. `growPlants` draws a whole number from it.
+                                    Every chance below is a chance for ONE LOOK, so each is marked
+                                    `lookRate` and none of them converts. */
+    bushOld: days(60), bushDies: lookRate(0.01),
     bushYoung: days(3), bushTired: days(48),
-    berryGrow: { spring: tickRate(0.15), summer: tickRate(0.25), autumn: tickRate(0.35), winter: tickRate(0) }, berryWither: tickRate(0.15),
-    bushSeedsFrom: days(5), bushSeeds: tickRate(0.012),
-    saplingGrown: days(12), shroomGrow: tickRate(0.3),
-    pineOld: days(100), pineFalls: tickRate(0.03), stickDrops: tickRate(0.02),
-    ashHeals: tickRate(0.05), saplingSprouts: tickRate(0.004),
+    berryGrow: { spring: lookRate(0.15), summer: lookRate(0.25), autumn: lookRate(0.35), winter: lookRate(0) }, berryWither: lookRate(0.15),
+    bushSeedsFrom: days(5), bushSeeds: lookRate(0.012),
+    saplingGrown: days(12), shroomGrow: lookRate(0.3),
+    pineOld: days(100), pineFalls: lookRate(0.03), stickDrops: lookRate(0.02),
+    ashHeals: lookRate(0.05), saplingSprouts: lookRate(0.004),
     hollowAge: days(300),        // age given to a grove's hollow when the world is made
     grovePineAge: days(60),      // age given to a grove pine when the world is made
     grovePineSpread: days(60),   // spread added to a grove pine's age when the world is made
@@ -701,9 +769,42 @@ const CLOCK = {
     axeMade: ticks(1500), axeCut: ticks(3000),
     pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
     clothes: ticks(1500), garden: ticks(1500),
+    woken: mins(30),   // roused from sleep by something near. Written in world units: a new value never takes a marker.
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
   },
 };
+
+/* ---------- the beats ----------
+   The six systems that look at the world rather than at a being. None of them needs a tick's
+   resolution: a minute of world time is finer than anything a player can see in a plant growing or a
+   fire spreading, and before the retune each ran once per 86.4 world seconds anyway. Running them
+   every tick is 86.4 times the work for a resolution nobody asked for.
+
+   `beats` is the record task 4 reads. `next` is the tick a system runs on again, which is what a
+   horizon needs; `runs` and `looks` are counted for the tests. No rule reads any of it, so it is in
+   NOT_SAVED: a loaded world recomputes every `next` on its first beat.
+
+   A chance that used to be rolled once a tick is now rolled once a beat with `rollFor(rate, n)`,
+   which is the compounded probability over n ticks and not the rate times n. A chance for one LOOK
+   is not rolled at all: the look count carries the world time, and rolling it as well would be task
+   1's finding 5 a second time. */
+const CELLULAR = ['growPlants', 'spreadFire', 'updateWeather', 'strayLightning', 'rotCarcasses', 'groveTick'];
+/* A const container that is emptied and refilled rather than reassigned, because the manifest takes
+   the API's references once at load and a reassignment would leave every reader holding the old
+   object. It is a container, so it is named in KNOWN_CONSTS rather than in SAVED_STATE. */
+const beats = {};
+function resetBeats(){
+  for (const k in beats) delete beats[k];
+  for (const k of CELLULAR) beats[k] = { runs: 0, next: CLOCK.every.cellular, looks: 0 };
+}
+/* True on the ticks a cellular system runs, and it records the next one as it goes. Called at the
+   head of each of the six, so the beat lives in one place rather than in six copies of a modulo. */
+function onBeat(name){
+  if (tick % CLOCK.every.cellular) return false;
+  const b = beats[name] || (beats[name] = { runs: 0, next: 0, looks: 0 });
+  b.runs++; b.next = tick + CLOCK.every.cellular;
+  return true;
+}
 
 /* ---------- names: the record, the second stream, and the old tongue ----------
    A name is a record. Every nameable thing keeps a list of records, newest
@@ -1039,8 +1140,9 @@ function learnName(thing, a, what){
   return true;
 }
 /* Only a person reads marks, and only while there are marks left to read. Both tests are one
-   comparison each, because this runs for every awake person on every tick. What is learned, and
-   the tick it is learned on, are the same as they would be without them. */
+   comparison each. This used to run for every awake person on every tick; since G4 task 3 it runs when
+   a person acts, which for a walker is still every tick and for a person at a job is once a world
+   minute. A person who has not moved has no new mark to read. */
 function learnNamesHere(a){
   if (!lore || !lore.unknown || a.species !== 'human') return;
   const t = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null; if (!t) return;
@@ -2421,9 +2523,33 @@ function placeGrove(within, mark){
    It also waits for the tile itself to be empty: someone standing still
    there, gathering or sleeping, must not wake up inside solid wood. */
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
-/* Plants grow, seed, and die. Sixty random tiles a tick. */
+/* Plants grow, seed, and die. Sixty thousand random tiles a world day.
+   `CLOCK.plant.samples` is looks a tick, and the rebasing made it 0.694. A `for` bound truncates a
+   fraction, so the loop ran once a tick rather than 0.694 times, while every chance below had been
+   divided by 86.4 as though it were a chance a tick. Both halves were wrong and they compounded to
+   sixty times fewer plant events a world day: measured on seed `r`, one world day, berries went
+   from +134 on dev to -91 here, bushes seeded from 21 to 0, saplings from 49 to 1. The soak stayed
+   green throughout. Take a whole number of looks from the rate, and leave the per-look chances to
+   `lookRate`, which does not convert.
+   The look count is a closed form of the tick and not a random draw, which is deliberate and is task
+   4's business. Rolling the fraction would spend a random number every tick unconditionally, so
+   `growPlants` would have no next beat: it would have to run at every tick whatever else was true,
+   and a system that must run every tick pins the skip's horizon every tick. This form draws nothing,
+   spreads the same 60,000 looks a world day, and gives the same answer over a jump as over the ticks
+   it replaces, because the looks from tick A to tick B are `floor(B * rate) - floor(A * rate)`.
+   `at` is that running total at this tick, and the next tick's total is `at + rate`. It is written
+   by adding the rate rather than by multiplying out the following tick, because the bare-time-literal
+   lint reads any number added to `tick` as a duration. Here such a number would have been a tick
+   boundary and not a length of time, and the lint cannot tell the two apart. It also reads comments,
+   so this note avoids spelling the expression out. */
 function growPlants(){
-  const samples = CLOCK.plant.samples;
+  if (!onBeat('growPlants')) return;
+  /* Looks a run, not looks a tick. The closed form of task 1 is gone with the per-tick call: on a
+     beat the count is the rate times the beat's ticks, which is 60,000 a world day either way. It is
+     still drawn without a random number, so the system keeps a next beat task 4 can name. */
+  const rate = CLOCK.plant.samples, at = tick * rate;
+  const samples = Math.floor(at + rate * CLOCK.every.cellular) - Math.floor(at);
+  beats.growPlants.looks += samples;
   for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
@@ -2445,7 +2571,11 @@ function growPlants(){
   }
 }
   /* Old carcasses rot. */
+/* On the beat, but the sweep itself keeps its own longer period: it walks every item, and food does
+   not spoil finely enough to be worth that 1,440 times a day. The beat is the gate; the period is
+   the work. Both are multiples of the beat, so the next beat is still exactly nameable. */
 function rotCarcasses(){
+  if (!onBeat('rotCarcasses')) return;
   if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */
@@ -2796,12 +2926,22 @@ function theLoneFounder(){
 function updateCamps(){
   afterTheLast();
   theLoneFounder();
+  /* Read once rather than per camp: every camp's rate-driven work shares the world's beat. The
+     event-driven parts below -- an arrival whose tick is stored, a village promotion that waits on a
+     storehouse -- are not on it, because their next moment is already named by something else. */
+  const onCampBeat = tick % CLOCK.every.cellular === 0;
   for (const c of camps){
     camp = c;
     const pt = pitTile();
-    if (pt && pt.struct.lit){
+    /* The pit burns by elapsed time, on the beat, rather than a tick at a time. `pitBurn` is fuel a
+       tick, so a beat costs it the beat's ticks, and `litTicks` and `streak` ADD the beat rather
+       than being stepped through it. They stay counts of ticks; only the grain changes.
+       The tick a fire goes out is therefore a division and not a roll, which is what lets task 4
+       name it ahead of time. It is quantised to the beat now, which is still exactly nameable. */
+    if (pt && pt.struct.lit && onCampBeat){
       camp.outSince = 0;
-      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks++; camp.streak++; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
+      const n = CLOCK.every.cellular;
+      const p = pt.struct; p.fuel -= CLOCK.rate.pitBurn * n * (weather.storm ? 1.5 : 1) * (isWinter() ? 1.2 : 1) * (camp.fae.favor >= 30 ? 0.85 : 1); camp.litTicks += n; camp.streak += n; camp.bestStreak = Math.max(camp.bestStreak, camp.streak);
       if (p.fuel <= 0){ p.fuel = 0; p.lit = false; camp.streak = 0; camp.outSince = tick; log('The fire goes out. Only embers and cold stone remain.', campHumans(), 'bad'); for (const h of campHumans()) addThought(h, 'fireout', 'The fire went out', -8, CLOCK.thought.fireout); }
     } else if (pt && !pt.struct.lit && !camp.outSince){
       camp.outSince = tick;
@@ -2832,7 +2972,7 @@ function updateCamps(){
         log(`${c.name} is born to ${pair.p.name} and ${pair.q.name} under the roof of ${camp.name}.`, [c, pair.p, pair.q], 'major', 'birth');
       }
     }
-    tryLightning();
+    if (onCampBeat) tryLightning();
     /* The fire draws people. */
     if (camp.everLit && camp.nextArrival && tick >= camp.nextArrival){
       camp.nextArrival = tick + CLOCK.arrival.wait + rint(CLOCK.arrival.spread);
@@ -2888,13 +3028,30 @@ TASKS.walkTo = { type: 'travel', begin: () => false,
   stops: [(a, t) => goTo(a, t, t.args.at[0], t.args.at[1], t.args.within, t.args.at[2] || 0) || 'done'] };
 function runTask(a){
   const t = a.task; a.status = t.label;
-  if (t.wait > 0){ t.wait--; return; }
+  /* A wait was a countdown, one off a tick. It is the tick the wait is over on now, so the being names
+     it as its next act and nothing is stepped in between. A wait must still be sat out: a being roused
+     early by the proximity pass, or looked at on the body beat, does not have its wait cut short. */
+  if (t.wait > 0){ t.waitUntil = tick + t.wait; t.wait = 0; }
+  if (t.waitUntil > tick) return;
   if (t.path.length){
-    if (a.inDark){ a.darkStep = !a.darkStep; if (a.darkStep) return; }
-    const [nx, ny, nz] = t.path[0];
-    if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
-    a.x = nx; a.y = ny; a.z = nz; t.path.shift();
-    if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    /* Walking is not working. `worked` is the tick work was last put into a job, and it moves with the
+       walk so that a long walk to the work tile is not credited as work done on arrival. */
+    t.worked = tick;
+    /* A tick is one world second and a tile is a stride, so walking is one tile a tick and a run is
+       two. `stride` is the species' walking speed in tiles a tick; `fast` is the run.
+       In the dark a person feels their way at half speed. That was a flag on the being that flipped
+       each time it walked, which is state for something the tick already answers: move on even ticks
+       only. A flag would also have to be saved, and it said nothing a reader of the tick could not
+       work out. Half of one tile a tick is one tile every two ticks either way. */
+    if (a.inDark && tick % CLOCK.dark.slower) return;
+    const sp = SPECIES[a.species];
+    const speed = t.fast ? 2 : (sp.stride || 1);
+    for (let n = 0; n < speed && t.path.length; n++){
+      const [nx, ny, nz] = t.path[0];
+      if (!passable(nx, ny, nz)){ a.cooldown[t.key] = tick + CLOCK.cooldown.pathBlocked; failTask(a); return; }
+      a.x = nx; a.y = ny; a.z = nz; t.path.shift();
+      if (a.species === 'rabbit') rollSnare(a); else if (a.species === 'deer'){ const dt = tileAt(a.x, a.y, a.z); if (dt) dt.deer = (dt.deer || 0) + 1; checkPitfall(a); }
+    }
     return;
   }
   const r = taskStop(a);
@@ -2944,10 +3101,18 @@ function workKind({ label, amount, skill, effect, type = 'work' }){
       return { label: `Walking to ${of(label, args).toLowerCase().replace(/^\w+ing /, '')}`, path: p, progress: 0, target: args.at, within: 1 };
     },
     stops: [(a, t) => {
-      const at = t.args.at, r = goTo(a, t, at[0], at[1], 1); if (r) return r;
+      /* `worked` is the tick this job last had work put into it. A worker that names the tick its job
+         ends is not looked at on every tick of it, so when it is looked at it puts in the work of the
+         stretch that passed and not of one tick. `runTask` moves `worked` with every step of the walk,
+         so the walk to the work tile is never credited as work. */
+      const at = t.args.at, r = goTo(a, t, at[0], at[1], 1); if (r){ t.worked = tick; return r; }
       const l = of(label, t.args), n = of(amount, t.args);
-      t.progress += workSpeed(a, of(skill, t.args) || skillOfLabel(l)); t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
-      if (t.progress < n) return 'continue';
+      const speed = workSpeed(a, of(skill, t.args) || skillOfLabel(l));
+      const ran = t.worked === undefined ? 1 : Math.max(1, tick - t.worked);
+      t.worked = tick;
+      t.progress += speed * ran; t.label = `${l} (${Math.min(99, Math.floor(t.progress / n * 100))}%)`;
+      /* The job names the tick it finishes on, so the worker is not woken on every tick of it. */
+      if (t.progress < n){ t.due = tick + Math.ceil((n - t.progress) / speed); return 'continue'; }
       /* Only a job that finished a structure names the ground. The test is the work tile itself,
          read before the effect and again after: bare before and built after means this job raised
          it. Feeding a fire, cooking at one, or checking a snare works at a structure that already
@@ -3431,6 +3596,9 @@ function makeBeing(species, x, y, name, hue){
     skills: { gather: 0, build: 0, cook: 0, trap: 0, craft: 0, woodcut: 0, hunt: 0, wary: 0 }, xp: {},
     thoughts: [], opinions: {}, rel: {}, task: null, carrying: null, status: 'Arriving', asleep: false,
     cooldown: {}, history: [], lastChoice: null, lastHurt: null, homeless: false, pokedUntil: 0, camp: null,
+    /* `seen` is the tick this being's body was last brought up to, and `next` the tick it acts again.
+       See `catchUp` below. A fresh being is up to date and acts at once. */
+    seen: tick, next: tick,
     /* How many tagged lines this person stands in, by tag. `log` counts them. The history holds
        only the last forty lines, so a deed read back out of it is gone within a day or two; this
        count is what an epithet reads. Plain numbers, and nothing but an epithet reads it. */
@@ -3449,10 +3617,18 @@ const beingById = id => beings.find(b => b.id === id);
 const humans = () => beings.filter(b => b.species === 'human' && b.alive);
 /* The first person of the world. The gods come into being before the people, so beings[0] is a god. */
 const firstPerson = () => beings.find(b => b.species === 'human');
-function addThought(a, key, text, value, dur){
+/* A thought holds `until`, the tick it is gone on, and no longer counts down. The head used to
+   subtract one from every thought of every being on every tick, which is arithmetic a comparison does
+   for free. `at` is the tick the thought was had on: a stretch of world time brought up to date in one
+   go had it on the last tick of the stretch, and not on the tick the bringing up to date happens to
+   run. A thought now lasts `dur` ticks exactly. The head counted down after it had added this tick's,
+   so a thought used to be one tick shorter than its duration said; that tick is not worth keeping. */
+function thoughtAt(a, at, key, text, value, dur){
+  const until = at + dur;
   const t = a.thoughts.find(t => t.key === key);
-  if (t){ t.left = dur; t.value = value; t.text = text; } else a.thoughts.push({ key, text, value, left: dur });
+  if (t){ t.until = until; t.value = value; t.text = text; } else a.thoughts.push({ key, text, value, until });
 }
+function addThought(a, key, text, value, dur){ thoughtAt(a, tick, key, text, value, dur); }
 const hasThought = (a, key) => a.thoughts.some(t => t.key === key);
 function mood(a){
   let m = 50; for (const t of a.thoughts) m += t.value;
@@ -3659,25 +3835,53 @@ Object.assign(TASKS, {
     stops: [a => { a.asleep = true; a.task = null; return 'done'; }] },
 });
 
+/* Every being that can be a threat to another: a person, a fox, or a wolf. Read the six branches of
+   `threatsFor` below and no other species appears as a source. A valley holds seventy beings or more,
+   most of them rabbits and sprites, and `threatsFor` runs for every being on every tick, which is
+   ruling 6. Walking a list of three to eight instead of a list of seventy is two of the six seconds a
+   world day cost.
+
+   The list may be kept between calls, and what makes that safe is spelt out because a stale list here
+   would be a wolf nobody saw:
+     a being pushed onto `beings`     `beings.length` grows, and the list is rebuilt
+     the prune, or a loaded save      `beings` is a new array, and the list is rebuilt
+     a being that dies mid-tick       every branch below reads `b.alive` for itself
+     the tick moving on               the list is rebuilt
+   A being cannot leave `beings` inside a tick: the one filter is the prune, which is the last thing a
+   step does. A being can join, and the length catches it. The three checks are two integers and one
+   reference, and they are cheaper than the loop they save. `threatSources` and its two keys hold no
+   record a snapshot must keep and are in NOT_SAVED.
+
+   `near` is also moved after the species test in the rabbit and the deer branch, which worked out a
+   distance to every being in the valley before asking whether it could matter. Same answer, same
+   order: `near` is arithmetic on two records. */
+let threatSources = [], threatSourcesAt = -1, threatSourcesOf = null, threatSourcesLen = -1;
+function sourcesNow(){
+  if (threatSourcesAt !== tick || threatSourcesOf !== beings || threatSourcesLen !== beings.length){
+    threatSourcesAt = tick; threatSourcesOf = beings; threatSourcesLen = beings.length;
+    threatSources = beings.filter(b => b.species === 'human' || SPECIES[b.species].hunter);
+  }
+  return threatSources;
+}
 function threatsFor(a){
   const out = [];
   const timid = a.traits.bravery < 0.3 ? 2 : a.traits.bravery > 0.7 ? -1 : 0, wary = Math.min(3, a.skills.wary || 0);
   const f = nearestFire(a.x, a.y, 4, a.z); if (f >= 0) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (hasTile(a.x + dx, a.y + dy, a.z) && tileAt(a.x + dx, a.y + dy, a.z).fire > 0) out.push([a.x + dx, a.y + dy]);
   const ember = b => b.carrying && b.carrying.kind === 'ember';
-  if (a.species === 'rabbit') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if (((b.species === 'fox' || b.species === 'wolf') && d <= 6 + timid + wary) || (b.species === 'human' && d <= 2 + wary && !b.asleep)) out.push([b.x, b.y]); }
-  if (a.species === 'deer') for (const b of beings){ if (!b.alive || b === a) continue; const d = near(b, a); if ((b.species === 'wolf' && d <= 8 + timid + wary) || (b.species === 'human' && d <= (b.carrying && b.carrying.kind === 'spear' ? 6 : 3) + timid + wary && !b.asleep)) out.push([b.x, b.y]); }
+  if (a.species === 'rabbit') for (const b of sourcesNow()){ if (!b.alive || b === a) continue; const hunts = b.species === 'fox' || b.species === 'wolf', person = b.species === 'human'; if (!hunts && !person) continue; const d = near(b, a); if ((hunts && d <= 6 + timid + wary) || (person && d <= 2 + wary && !b.asleep)) out.push([b.x, b.y]); }
+  if (a.species === 'deer') for (const b of sourcesNow()){ if (!b.alive || b === a) continue; const hunts = b.species === 'wolf', person = b.species === 'human'; if (!hunts && !person) continue; const d = near(b, a); if ((hunts && d <= 8 + timid + wary) || (person && d <= (b.carrying && b.carrying.kind === 'spear' ? 6 : 3) + timid + wary && !b.asleep)) out.push([b.x, b.y]); }
   if (a.species === 'fox' || a.species === 'wolf'){
     const r = a.species === 'fox' ? 3 : 1;
-    for (const b of beings){ if (b.alive && b.species === 'human' && near(b, a) <= (ember(b) ? 7 : r)) out.push([b.x, b.y]); }
+    for (const b of sourcesNow()){ if (b.alive && b.species === 'human' && near(b, a) <= (ember(b) ? 7 : r)) out.push([b.x, b.y]); }
     for (const c of camps) if (c.pit && ((tileAt(...c.pit).struct.lit && nearAt(a, ...c.pit) <= (a.species === 'fox' ? 6 : 8)) || (a.shyOf === c && (a.cooldown.raid || 0) > tick && nearAt(a, ...c.pit) <= 20))) out.push(c.pit);
   }
-  if (a.species === 'human') for (const b of beings){ if (b.alive && b.species === 'wolf' && near(b, a) <= 3 && !ember(a)) out.push([b.x, b.y]); }
+  if (a.species === 'human') for (const b of sourcesNow()){ if (b.alive && b.species === 'wolf' && near(b, a) <= 3 && !ember(a)) out.push([b.x, b.y]); }
   if (a.species === 'sprite'){
-    for (const b of beings){ if (b.alive && b.species === 'human' && (b.carrying && (b.carrying.kind === 'spear' || b.carrying.kind === 'ember')) && near(b, a) <= 5 + timid) out.push([b.x, b.y]); }
+    for (const b of sourcesNow()){ if (b.alive && b.species === 'human' && (b.carrying && (b.carrying.kind === 'spear' || b.carrying.kind === 'ember')) && near(b, a) <= 5 + timid) out.push([b.x, b.y]); }
     for (const c of camps) if (c.ward && c.pit && nearAt(a, ...c.pit) <= 9) out.push(c.pit);
   }
   if (a.species === 'gnome'){
-    for (const b of beings){ if (!b.alive) continue; if (b.species === 'human' && ember(b) && near(b, a) <= 5) out.push([b.x, b.y]); if (b.species === 'wolf' && near(b, a) <= 6) out.push([b.x, b.y]); }
+    for (const b of sourcesNow()){ if (!b.alive) continue; if (b.species === 'human' && ember(b) && near(b, a) <= 5) out.push([b.x, b.y]); if (b.species === 'wolf' && near(b, a) <= 6) out.push([b.x, b.y]); }
   }
   return out;
 }
@@ -3757,51 +3961,243 @@ function checkPitfall(d){
     for (const o of beings) if (o.alive && o.species === 'deer' && near(o, d) <= 10) addThought(o, 'herdloss', 'One of the herd was taken', -6, CLOCK.thought.herdloss);
   }
 }
-function updateBeing(a){
-  const sp = SPECIES[a.species], n = a.needs, night = isNight();
+/* ---------- a being between acts ----------
+   The head of `updateBeing` used to run on every being on every tick. At 86,400 ticks a world day it
+   was most of the cost of a day, and almost all of it was arithmetic with a constant step: a need
+   decays by the same amount every tick, warmth moves by the same amount, hp by the same amount. So a
+   being's body is now computed from the time that has passed rather than stepped through it.
+
+   `a.seen` is the tick a being's body was last brought up to. `catchUp(a)` brings needs, warmth, hp,
+   thoughts and a sleeper's waking up to `tick`, in stretches. A stretch runs while nothing the body
+   reads changes, so inside one every quantity is linear and the whole stretch is one multiplication.
+   Every clamp holds across a stretch because each quantity moves one way inside it: a need only
+   decays, rest only rises while asleep, warmth and hp move by a constant step. Clamping n times and
+   clamping once are then the same number.
+
+   A stretch breaks at dawn, at dusk, at the turn of a day (which is where a season turns), at a life
+   stage, and, inside itself, at the tick a need reaches zero, at the tick warmth crosses the freezing
+   line, at the tick hp would reach zero, and at the tick a sleeper wakes. `tests/beings-lazy.js`
+   holds the old head as a reference and drives it a tick at a time against this.
+
+   What a stretch cannot see coming it reads on the wrong side of, for at most one world minute. The
+   pit lighting or going out, a storm arriving and a roof going up are the three, and the bound is
+   `CLOCK.every.body`: `nextAct` never names a tick further off, so no stretch is longer than a
+   minute and the error is at most 59 ticks of one rate. For the pit that is a third of a point of
+   warmth out of a hundred. Task 4 lengthens stretches past a minute, and it must give those three a
+   seam that brings the camp's people up to date before the change, or the bound goes with the beat.
+
+   Nothing here draws a random number except the old-age roll, so a rule may call `catchUp` without
+   moving the stream. */
+const FREEZING = 20;                          // the warmth a person begins to freeze below
+const WAKE_RESTED = 100, WAKE_LIGHT = 60;     // asleep until rested, or until sixty once it is light
+
+/* The last tick that still answers the way `s + 1` does. A stretch runs from `s` to the tick this
+   gives, so the turn itself — the dawn, the dusk, the new day, the new stage — is the first tick of the
+   next stretch and never sits inside one that read the old side of it. Everything it names is ahead of
+   `s`, so a stretch always moves. */
+function bodyBreak(a, s){
+  const t0 = s + 1, d = Math.floor(t0 / DAY);
+  let b = (d + 1) * DAY - 1;                  // the turn of the day, and with it the turn of a season
+  const lifts = d * DAY + CLOCK.night.lifts - 1, falls = d * DAY + CLOCK.night.falls - 1;
+  if (lifts > s && lifts < b) b = lifts;
+  if (falls > s && falls < b) b = falls;
+  const L = LIFE[a.species];
+  for (const g of [L.adult, L.old]){ const t = a.born + Math.round(g * DAY) - 1; if (t > s && t < b) b = t; }
+  return b;
+}
+
+/* One stretch of a being's body, from `a.seen` to at most `lim`. It moves `a.seen` to where it got. */
+function bodyStretch(a, lim){
+  const s = a.seen, sp = SPECIES[a.species], n = a.needs;
+  const night = isNight(s + 1), human = a.species === 'human', storm = weather.storm;
+  /* The step each need takes on every tick of this stretch. A sleeper gains rest instead of losing it. */
+  const step = {};
+  for (const k in sp.decay) step[k] = sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1);
+  const w0 = human ? n.warmth : 0;
+  let dW = 0, byFire = false, roofed = false;
+  if (human){
+    const here = tileAt(a.x, a.y, a.z);
+    const season = seasonOf(dayOf(s + 1)), under = a.z < 0 || !!(here && here.cave);
+    const cold = under ? CLOCK.cold.under : season === 'winter' ? (night ? CLOCK.cold.winterNight : CLOCK.cold.winterDay) : season === 'summer' ? CLOCK.cold.summer : (night ? CLOCK.cold.night : CLOCK.cold.day);
+    byFire = !!(camp && pitLit() && nearAt(a, ...camp.pit) <= 3);
+    roofed = under || hasTile(a.x, a.y, a.z + 1) || !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
+    dW = -cold * (1.3 - a.traits.hardiness * 0.6) * (storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (a.clothes ? 0.6 : 1) * (stage(a, s + 1) === 'adult' ? 1 : 1.3) + (byFire ? CLOCK.rate.fireWarms : 0);
+  }
+  /* How much of the stretch shares one answer to "is this person freezing" and "is this person out of
+     food or water". Warmth moves one way and a need only decays, so each changes at most once inside
+     a stretch and the tick it changes on is arithmetic. */
+  let k = lim - s;
+  if (human && dW !== 0){
+    const j = dW < 0 ? Math.floor((w0 - FREEZING) / -dW) + 1 : Math.ceil((FREEZING - w0) / dW);
+    if (j >= 2 && j - 1 < k) k = j - 1;
+  }
+  for (const key of ['food', 'water']){
+    const v = n[key];
+    if (v === undefined || !(step[key] > 0) || !(v > 0)) continue;
+    const j = Math.ceil(v / step[key]);
+    if (j >= 2 && j - 1 < k) k = j - 1;
+  }
+  /* A sleeper wakes when it is rested, or at sixty once it is light. The stretch stops on that tick. */
+  if (a.asleep && step.rest < 0){
+    const g = -step.rest, want = night ? WAKE_RESTED : WAKE_LIGHT;
+    const j = n.rest >= want ? 1 : Math.ceil((want - n.rest) / g);
+    if (j >= 1 && j < k) k = j;
+  }
+  /* The two predicates, read from the state one tick in. They hold for the whole stretch by the cap
+     above, so hp moves by a constant step and the tick it would reach zero on is arithmetic too. */
+  const cold1 = human && clamp(w0 + dW, 0, 100) < FREEZING;
+  const dry = key => n[key] !== undefined && Math.max(0, n[key] - (step[key] || 0)) <= 0;
+  const starving1 = dry('food') || dry('water');
+  const heals = CLOCK.rate.heals * (0.6 + a.traits.hardiness * 0.8);
+  const dHp = (cold1 ? -CLOCK.rate.freezeHurts : 0) + (starving1 ? -CLOCK.rate.starveHurts : heals);
+  if (dHp < 0){ const j = Math.ceil(a.hp / -dHp); if (j >= 1 && j < k) k = j; }
+
+  for (const key in step){
+    const d = step[key];
+    if (d > 0) n[key] = Math.max(0, n[key] - d * k);
+    else if (d < 0) n[key] = Math.min(100, n[key] - d * k);
+  }
+  if (human) n.warmth = clamp(w0 + dW * k, 0, 100);
+  /* Freezing costs hp and so does an empty stomach, and a body that is doing neither mends. The head
+     took the freeze off first and then mended, so the two are one step when both apply. */
+  if (starving1) a.hp -= (CLOCK.rate.starveHurts + (cold1 ? CLOCK.rate.freezeHurts : 0)) * k;
+  else a.hp = Math.min(100, a.hp + dHp * k);
+
+  const e = s + k;
+  a.seen = e;
+  if (cold1) thoughtAt(a, e, 'cold', 'Is freezing', -15, CLOCK.thought.cold);
+  if (human && storm && !roofed && !a.asleep) thoughtAt(a, e, 'wet', 'Soaked by the rain', -4, CLOCK.thought.wet);
+  else if (human && storm && roofed && a.z >= 0) thoughtAt(a, e, 'dry', 'Dry under the roof while it pours', 3, CLOCK.thought.dry);
+  if (starving1 && human) thoughtAt(a, e, 'starving', n.water <= 0 ? 'Is dying of thirst' : 'Is starving', -25, CLOCK.thought.starving);
+  if (a.hp <= 0){
+    const frozen = n.warmth !== undefined && n.warmth < FREEZING;
+    die(a, n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : frozen ? 'froze in the cold' : (a.lastHurt || 'died'), frozen ? 'frost' : 'death');
+    return;
+  }
+  if (byFire) thoughtAt(a, e, 'warm', 'Warm by the fire', 5, CLOCK.thought.warm);
+  if (a.asleep && (n.rest >= WAKE_RESTED || (!night && n.rest >= WAKE_LIGHT))){
+    a.asleep = false;
+    if (human){
+      const roof = !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1)), warm = !!(camp && pitLit() && nearAt(a, ...camp.pit) <= 4);
+      thoughtAt(a, e, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, CLOCK.thought.slept);
+    }
+  }
+  /* The life clock. Past the usual span, each day is a gift. It was rolled once a tick against a
+     chance for a tick; it is rolled once a world day now, compounded over the day with `rollFor`, so
+     the chance of dying in a day of world time is the chance it always was. A stretch always begins
+     on the turn of a day, so exactly one stretch a day can ask it. */
+  if ((s + 1) % DAY === 0 && ageDays(a, s + 1) > LIFE[a.species].life && rng() < rollFor(CLOCK.rate.oldAgeDeath / (0.5 + a.traits.hardiness), DAY)){
+    const warm = human && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
+    /* Two tags for the one cause, so the fate epithet says what the line says. */
+    die(a, human ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age', warm ? 'old' : 'oldCold');
+  }
+}
+
+/* Bring a being's body up to this tick. Cheap when it is already there, which is the common case: a
+   rule that wants to read a need may call it without thinking about the cost or about the stream. */
+function catchUp(a){
   if (a.camp) camp = a.camp;
-  for (const k in sp.decay) n[k] = Math.max(0, n[k] - sp.decay[k] * (k === 'rest' && a.asleep ? -6 : 1));
+  if (typeof a.seen !== 'number' || a.seen > tick) a.seen = tick;
+  while (a.alive && a.seen < tick) bodyStretch(a, Math.min(tick, bodyBreak(a, a.seen)));
+  if (!a.alive) return;
+  a.seen = tick;
+  a.thoughts = a.thoughts.filter(t => t.until > tick);
+  if (a.species === 'human' && a.lastHurtAt && tick - a.lastHurtAt > CLOCK.limit.hurtRemembered){ a.lastHurt = null; a.lastHurtAt = null; }
+}
+
+/* When this being acts again, in ticks from now. A walker acts every tick, because a tile is a tick.
+   A sleeper and a being at a job name the tick their rest or their work ends. Nothing else names one
+   yet, and an unnamed act is the next tick, which is what the head did for everything. The body beat
+   caps it, so nothing goes unread for longer than a world minute: see `catchUp`. */
+function nextAct(a){
+  if (a.asleep) return CLOCK.every.body;
+  const t = a.task;
+  if (!t) return 1;
+  /* The order is `runTask`'s order: a wait is sat out before a step is taken, and a step is taken
+     before the stop at the end of the path is asked anything. */
+  if (t.waitUntil > tick) return t.waitUntil - tick;
+  if (t.path.length) return 1;
+  if (t.due > tick) return t.due - tick;
+  return 1;
+}
+
+/* The proximity pass. Ruling 6 keeps danger on every world second, and this is it. A being that acts
+   this tick looks for itself, so the pass is for the ones that do not: a person asleep, or three
+   minutes into a job. It draws no random number and decides nothing. All it does is bring the being's
+   next act forward to this tick, and the act then runs the rules the head always ran. Task 4 reads the
+   same predicate the other way round: a tick this pass has work on is a tick the engine cannot skip. */
+const SENSE = 5;                    // how far off a being notices fire or a hunter while it is not acting
+/* What rouses what. A hunter rouses anything but its own kind, and a person rouses the animals. A
+   person is not roused by another person, or a camp asleep by its own fire would never get a night's
+   rest. */
+const rousedBy = (a, b) => SPECIES[b.species].hunter ? a.species !== b.species : b.species === 'human' && a.species !== 'human';
+function senseBeings(){
+  let movers = null;
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false || a.next <= tick) continue;
+    const here = hasTile(a.x, a.y, a.z) ? tileAt(a.x, a.y, a.z) : null;
+    let found = !!(here && here.fire > 0);
+    if (!found && fireCount > 0) found = nearestFire(a.x, a.y, SENSE, a.z) >= 0;
+    if (!found){
+      if (movers === null) movers = beings.filter(b => b.alive && !b.asleep && (SPECIES[b.species].hunter || b.species === 'human'));
+      for (const b of movers) if (b !== a && rousedBy(a, b) && near(b, a) <= SENSE){ found = true; break; }
+    }
+    if (!found) continue;
+    a.next = tick;
+    /* A sleeper does not act, so the pass is the only thing that can rouse it. Sleeping through a wolf
+       at five tiles is what the head did, because it returned at the sleep check before it ever looked;
+       ruling 6 asks for danger every world second, and a person who sleeps through it is not covered.
+       The body is brought up to date before the flag turns, because a sleeper gains rest and a waking
+       one loses it. */
+    if (a.asleep){
+      catchUp(a);
+      if (!a.alive) continue;
+      a.asleep = false;
+      /* Every species that is roused gets the thought, because the rule is that a new behaviour the
+         player cannot see is a behaviour that is not there. A gnome, a rabbit and a deer are roused
+         too, and the inspector's Thoughts panel is drawn for every species. Their line does not name
+         the night, because a person rouses an animal in daylight as well.
+         The thought is not renewed while the thing that woke the being is still about. `addThought`
+         moves `until` to `tick + dur` on every call, so a wolf that lingered made the half hour of
+         `CLOCK.thought.woken` permanent and the mood penalty with it. A waking after the thought has
+         lapsed starts a fresh half hour, which is what a second waking is. */
+      if (!hasThought(a, 'woken'))
+        addThought(a, 'woken', a.species === 'human' ? 'Woke in the night to something moving' : 'Woke to something moving close by', -6, CLOCK.thought.woken);
+    }
+  }
+}
+
+/* What a being does when it acts. Everything here was the tail of the old head, and the body is
+   already up to date before any of it runs. Three things moved off the tick and into it: the small
+   neighbours seen in the dusk, the count of a foot in a gnome's burrow, and the marks read off the
+   ground. None of them moves a need, and a being that has not moved and is not acting has nothing new
+   to see. */
+function updateBeing(a){
+  const n = a.needs;
+  if (a.camp) camp = a.camp;
+  catchUp(a);
+  if (!a.alive) return;
   if (a.species === 'human'){
     const hereTile = tileAt(a.x, a.y, a.z);
-    const season = seasonOf(), under = a.z < 0 || !!hereTile.cave, cold = under ? CLOCK.cold.under : season === 'winter' ? (night ? CLOCK.cold.winterNight : CLOCK.cold.winterDay) : season === 'summer' ? CLOCK.cold.summer : (night ? CLOCK.cold.night : CLOCK.cold.day);
-    const byFire = camp && pitLit() && nearAt(a, ...camp.pit) <= 3, roofed = under || hasTile(a.x, a.y, a.z + 1) || (camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
-    n.warmth = clamp(n.warmth - cold * (1.3 - a.traits.hardiness * 0.6) * (weather.storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (a.clothes ? 0.6 : 1) * (stage(a) === 'adult' ? 1 : 1.3) + (byFire ? CLOCK.rate.fireWarms : 0), 0, 100);
-    if (n.warmth < 20){ addThought(a, 'cold', 'Is freezing', -15, CLOCK.thought.cold); a.hp -= CLOCK.rate.freezeHurts; }
-    if (weather.storm && !roofed && !a.asleep) addThought(a, 'wet', 'Soaked by the rain', -4, CLOCK.thought.wet);
-    else if (weather.storm && roofed && a.z >= 0) addThought(a, 'dry', 'Dry under the roof while it pours', 3, CLOCK.thought.dry);
     /* Gnomes are drowsy from hour 6 to 19, and the sighting predicate already requires !drowsy(b); skip the
        scan of every being outright in those hours, so a camp waiting to learn of its neighbours is not paying
-       a per-tick cost with no chance of a hit. */
+       a cost with no chance of a hit. */
     if (camp && !camp.gnomes.known && !a.asleep && !(hourOf() >= 6 && hourOf() < 19)){ const g = beings.find(b => b.alive && b.species === 'gnome' && !b.asleep && !drowsy(b) && near(b, a) <= 6); if (g){ camp.gnomes.known = true; log(`${a.name} sees a small figure in the dusk, no taller than a child, with a pack on its back. It is gone before ${a.name} can speak. There are neighbours under the meadow.`, campHumans(), 'major'); addThought(a, 'gnome', 'Saw one of the small neighbours', 3, CLOCK.thought.gnome); } }
     { const here = hereTile; if (here && here.cave && here.cave.kind === 'burrow' && here.cave.owner === 'gnome' && !(a.cooldown.disturb > tick)){ here.cave.disturbed++; here.cave.disturbedBy = camp; a.cooldown.disturb = tick + CLOCK.cooldown.disturb; addThought(a, 'burrow', 'Crept into the neighbours\' hole. It felt wrong', -4, CLOCK.thought.burrow); for (const g of beings) if (g.alive && g.species === 'gnome' && g.den === here.cave) addThought(g, 'intruder', 'A big one came into the hole', -10, CLOCK.thought.intruderGnome); } }
     /* A person awake on the ground reads the marks the lost people cut. It gives no thought and
        changes no need, so nobody's day moves because of it. */
     if (!a.asleep) learnNamesHere(a);
   }
-  if (a.asleep) n.rest = Math.min(100, n.rest);
   if (a.den) defendDen(a);
-  for (const t of a.thoughts) t.left--; a.thoughts = a.thoughts.filter(t => t.left > 0);
-  if (n.food <= 0 || (n.water !== undefined && n.water <= 0)){ a.hp -= CLOCK.rate.starveHurts; if (a.species === 'human') addThought(a, 'starving', n.water <= 0 ? 'Is dying of thirst' : 'Is starving', -25, CLOCK.thought.starving); }
-  else if (a.hp < 100) a.hp = Math.min(100, a.hp + CLOCK.rate.heals * (0.6 + a.traits.hardiness * 0.8));
-  if (a.species === 'human' && a.lastHurtAt && tick - a.lastHurtAt > CLOCK.limit.hurtRemembered){ a.lastHurt = null; a.lastHurtAt = null; }
-  /* The life clock. Past the usual span, each day is a gift. */
-  if (ageDays(a) > LIFE[a.species].life && rng() < CLOCK.rate.oldAgeDeath / (0.5 + a.traits.hardiness)){
-    const warm = a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 4;
-    /* Two tags for the one cause, so the fate epithet says what the line says. */
-    die(a, a.species === 'human' ? (warm ? 'died in their sleep, old and warm by the fire' : 'died of old age') : 'died of old age', warm ? 'old' : 'oldCold'); return;
-  }
   const here = tileAt(a.x, a.y, a.z);
   if (here.fire > 0){ a.hp -= CLOCK.rate.fireHurts; a.asleep = false; if (a.species === 'human' && !hasThought(a, 'burned')) log(`${a.name} is caught in the flames.`, [a], 'bad'); addThought(a, 'burned', 'Was burned by fire', -20, CLOCK.thought.burned); if (!hasThought(a, 'burned')) drift(a, 'bravery', -0.02); if (!a.task || a.task.type !== 'flee'){ failTask(a); startTask(a, 'flee'); } }
   if (a.hp <= 0){
-    const burned = here.fire > 0, frozen = n.warmth !== undefined && n.warmth < 20;
+    const burned = here.fire > 0, frozen = n.warmth !== undefined && n.warmth < FREEZING;
     die(a, burned ? 'burned to death' : n.water !== undefined && n.water <= 0 ? 'died of thirst' : n.food <= 0 ? 'starved to death' : frozen ? 'froze in the cold' : (a.lastHurt || 'died'),
       burned ? 'fire' : frozen ? 'frost' : 'death'); return;
   }
-  if (a.species === 'human' && camp && pitLit() && nearAt(a, ...camp.pit) <= 3) addThought(a, 'warm', 'Warm by the fire', 5, CLOCK.thought.warm);
-  if (a.asleep){
-    if (n.rest >= 100 || (!night && n.rest >= 60)){ a.asleep = false; if (a.species === 'human'){ const roof = camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1), warm = camp && pitLit() && nearAt(a, ...camp.pit) <= 4; addThought(a, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, CLOCK.thought.slept); } }
-    else { a.status = 'Sleeping'; return; }
-  }
+  /* The waking is the body's, in `catchUp`. A being still asleep here has nothing to do. */
+  if (a.asleep){ a.status = 'Sleeping'; return; }
   /* Below the surface it is dark. Without a burning ember a person cannot see to work, and feels their way out at half speed. */
   a.inDark = a.species === 'human' && a.z < 0 && !(a.carrying && a.carrying.kind === 'ember');
   if (a.inDark){
@@ -3809,8 +4205,6 @@ function updateBeing(a){
     /* No work in the dark: any task that is not a walk back to the light fails, and the walk is slow. */
     if (a.task && a.task.type !== 'flee' && !(a.task.path.length && a.task.path[a.task.path.length - 1][2] >= 0)) failTask(a);
   }
-  const fast = a.task && a.task.fast;
-  if (!fast && (tick + a.id) % sp.stride) return;
   if (a.carrying && a.carrying.kind === 'ember' && tick > a.carrying.dies){ a.carrying = null; failTask(a); log(`The ember ${a.name} carried goes dark before it reaches the pit.`, [a], 'bad'); addThought(a, 'emberlost', 'Lost the ember on the way', -5, CLOCK.thought.emberlost); }
   if (a.species === 'human' && fireCount > 0 && (!a.task || (a.task.type !== 'flee' && a.task.type !== 'ember' && a.task.type !== 'guard'))){
     const d = nearestFire(a.x, a.y, 5, a.z);
@@ -3836,16 +4230,18 @@ function updateBeing(a){
 
 /* Life clocks, in days. adult: grown up. old: slows down. life: the usual span. */
 const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, old: 60, life: 84 }, rabbit: { adult: 3, old: 14, life: 20 }, deer: { adult: 8, old: 36, life: 50 }, fox: { adult: 5, old: 26, life: 36 }, wolf: { adult: 6, old: 32, life: 46 }, gnome: { adult: 20, old: 80, life: 110, seed: 35 } };
-const ageDays = a => (tick - a.born) / DAY;
-const stage = a => { const L = LIFE[a.species]; const d = ageDays(a); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
+/* Both take a tick and fall back to now, so a rule that works out a being's state over a stretch of
+   ticks can ask what stage the being was in at the start of the stretch without moving the world. */
+const ageDays = (a, t = tick) => (t - a.born) / DAY;
+const stage = (a, t = tick) => { const L = LIFE[a.species]; const d = ageDays(a, t); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
 const SPECIES = {
-  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: ticks(2), zmin: -2, zmax: 2 },
-  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
-  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: ticks(2), zmin: 0, zmax: 2, prey: true },
-  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: ticks(1), zmin: -2, zmax: 2, fae: true },
-  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: ticks(2), zmin: -2, zmax: 2, folk: true },
+  human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
+  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
+  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true },
+  sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, fae: true },
+  gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, folk: true },
 };
 const NAMES = ['Ada','Bram','Cora','Dov','Esk','Fen','Greta','Hal','Iva','Jory','Kit','Lune','Mott','Nell','Orrin','Pim','Quill','Rook','Sable','Tam','Ulla','Voss','Wren','Yara'];
 
@@ -4266,6 +4662,7 @@ function faeTick(){
 }
 /* Groves calm down over time and bear a new sprite in a quiet spring. */
 function groveTick(){
+  if (!onBeat('groveTick')) return;
   if (tick % CLOCK.grove.every === 0) for (const g of groves){ g.anger = Math.max(0, g.anger - 1); const kin = beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g);
     if (seasonOf() === 'spring' && kin.length < 5 && g.anger < 20 && tick - g.lastBirth > CLOCK.grove.birthGap && sectorCount(g.sector, 'oldpines', t => t.feature === 'tree' && tick - (t.planted || 0) > CLOCK.grove.oldPine) > 25 && rng() < CLOCK.grove.birthChance){ g.lastBirth = tick; const q = nearFind(g.x, g.y, q => passable(q.x, q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.born = tick; sp.grove = g; beings.push(sp); } } }
 }
@@ -4591,11 +4988,13 @@ const GOALS = [
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
     offers(a){ if (!camp.pit || camp.rack) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the rack', score: 30, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 2, 3); if (!site) return [];
       return [{ label: 'build the drying rack', score: 45, task: { kind: 'buildRack', args: { at: site } } }]; } },
-  /* The aim of 8 and SEASON_DAYS are set apart, and today they happen to match, so "one strip a day"
-     holds. Plan G4 retunes the clock, and a season that is no longer eight days makes this sentence
-     false in words as the old one was false in digits. Read it again with G4. */
+  /* The aim of 8 was set when winter was eight days long, so "one strip a day" held. G4 made winter
+     92 days and the sentence stopped being true, so it no longer claims a rate. The aim itself is a
+     quantity and not a duration, so this task does not move it: eight strips against a 92-day winter
+     is now thin, and that is a tuning question for task 11 with the long run in front of it, not an
+     arithmetic one to settle here. Reported, not fixed. */
   { id: 'smoke', title: 'Smoke meat for lean days', stage: 'food', after: 'rack', standing: true,
-    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. Winter is ${SEASON_DAYS} days long, and the bushes give nothing then. That is one strip a day.` }; },
+    state(){ if (!camp.rack) return { s: 'blocked', text: 'Needs the drying rack.' }; return { s: 'active', text: `${camp.stash.smoked} strips stored. Aim: 8. The bushes give nothing through winter, and it is a long one.` }; },
     offers(a){ if (!camp.rack || !pitLit() || (camp.stash.carcass < 1 && camp.stash.fish < 1) || camp.stash.smoked >= 8) return [];
       const out = [];
       if (camp.stash.carcass >= 1) out.push({ label: 'smoke a rabbit over the fire', score: seasonOf() === 'autumn' ? 66 : camp.stash.smoked < 4 ? 60 : 30, task: { kind: 'smokeMeat', args: { at: camp.rack } } });
@@ -4851,6 +5250,7 @@ function burnOut(t){
 
 /* Fire spreads to neighbours and burns down. Rain slows it. Surface tiles first, then the tiles off the surface. */
 function spreadFire(){
+  if (!onBeat('spreadFire')) return;
   if (fireCount <= 0) return;
   let count = 0;
   for (const t of world) if (t.fire > 0){ count++; burnTile(t); }
@@ -4859,19 +5259,20 @@ function spreadFire(){
 }
 /* One burning tile: spread to the four beside it, up from a slope, and down onto a slope. Uphill is 1.5 times as likely. */
 function burnTile(t){
-  t.fire -= CLOCK.fire.burn;
+  t.fire -= CLOCK.fire.burn * CLOCK.every.cellular;
   for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z, 1);
   if (t.slope) for (const [dx, dy] of DIRS) spreadTo(t.x + dx, t.y + dy, t.z + 1, 1.5);
   for (const [dx, dy] of DIRS){ const nx = t.x + dx, ny = t.y + dy; if (hasTile(nx, ny, t.z - 1) && tileAt(nx, ny, t.z - 1).slope) spreadTo(nx, ny, t.z - 1, 1); }
-  if (weather.storm) t.fire -= CLOCK.fire.stormQuench;
+  if (weather.storm) t.fire -= CLOCK.fire.stormQuench * CLOCK.every.cellular;
   if (t.fire <= 0) burnOut(t);
 }
 function spreadTo(nx, ny, nz, mult){
   if (!hasTile(nx, ny, nz)) return; const nb = tileAt(nx, ny, nz); if (nb.fire > 0) return;
-  const f = tileFlam(nb); if (f > 0 && rng() < f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult) ignite(nb);
+  const f = tileFlam(nb); if (f > 0 && rng() < rollFor(f * (weather.storm ? CLOCK.fire.stormSpread : CLOCK.fire.spread) * mult, CLOCK.every.cellular)) ignite(nb);
 }
 /* Weather. Storms bring rain and lightning. */
 function updateWeather(){
+  if (!onBeat('updateWeather')) return;
   if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
   if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 }
@@ -4879,7 +5280,7 @@ function updateWeather(){
 function tryLightning(){
   if (camp.site && weather.storm){
     const out = camp.pit && !pitLit();
-    if (rng() < (out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit)){
+    if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
@@ -4889,8 +5290,11 @@ function tryLightning(){
   }
 }
 /* A stray strike anywhere in the world. */
+/* The chance was a chance a tick and is now rolled once a beat over the beat's ticks, so the strikes
+   a storm makes in a world day are what they were. `rollFor` compounds; it does not multiply. */
 function strayLightning(){
-  if (weather.storm && rng() < CLOCK.rate.strayLightning){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
+  if (!onBeat('strayLightning')) return;
+  if (weather.storm && rng() < rollFor(CLOCK.rate.strayLightning, CLOCK.every.cellular)){ for (let k = 0; k < 60; k++){ const t = world[rint(W * H)]; if (t.feature === 'tree' && t.fire === 0){ ignite(t); log('Lightning strikes a pine, and it catches fire.', [], 'bad'); break; } } }
 }
 
 /* ---------- the primal gods ----------
@@ -4898,7 +5302,7 @@ function strayLightning(){
    tile. Gods come into being from contrasts: the seed makes the first, and every other is made by a
    lack. In the gods era a step is an age; every awake god scores its acts over the live regions and
    does the best one, eldest first. Everything here draws from the gods' own stream. */
-SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: ticks(0), zmin: 0, zmax: 0, perTick: false };
+SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: 0, zmin: 0, zmax: 0, perTick: false };
 LIFE.god = { adult: 0, old: Infinity, life: Infinity, death: 'killable' };
 const GOD_NAMES = ['Ondru', 'Sael', 'Ashka', 'Veyl', 'Morrow', 'Ilse', 'Thrum', 'Kesh', 'Ubbe', 'Nyr', 'Tamsa', 'Orun'];
 const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet', dry: 'who is Dry', hot: 'who is Hot', cold: 'who is Cold', still: 'who is Still', moving: 'who Moves', light: 'who is Light', dark: 'who is Dark' };
@@ -5880,7 +6284,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0; doomAt = 0;
+  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats();
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
@@ -5915,6 +6319,8 @@ function poke(a){
   /* A sleeping god is a being in the list like any other, and a nudge would startle it awake and set it wandering.
      What wakes a god is its own rule, and it is not built yet (the spec's section 5). Until then the door refuses. */
   if (a.species === 'god') return `${a.name} sleeps on, ${a.epithet}. A nudge from above does not wake a god.`;
+  /* A nudge that wakes a sleeper changes which way rest runs, so the body is brought up to date on this tick before the flag turns. */
+  catchUp(a); if (!a.alive) return `${a.name} does not stir.`;
   if (a.species === 'human'){ camp = a.camp; failTask(a); a.asleep = false; a.pokedUntil = tick + CLOCK.limit.poked; addThought(a, 'poked', 'Felt a nudge from above', 2, CLOCK.thought.poked); log(`${a.name} feels a nudge from above.`, [a]); chooseTask(a); return `${a.name} looks up, then ${a.lastChoice && a.lastChoice.picked ? `goes to ${a.lastChoice.picked}` : 'gets to it'}.`; }
   failTask(a); a.asleep = false; a.task = null; startTask(a, 'flee') || startTask(a, 'wander'); log(`The ${SPECIES[a.species].label} startles at a nudge from above.`); return `The ${SPECIES[a.species].label} startles.`;
 }
@@ -5942,7 +6348,19 @@ function step(oneAct){
   if (pending) return 'The turn is yours.';
   if (era === 'gods') return ageStep(oneAct);
   tick++; updateWorld(); camp = camps[0];
-  for (const a of beings) if (a.alive && SPECIES[a.species].perTick !== false) updateBeing(a);
+  /* Danger first, on every tick, for the beings that are not acting on this one. It only brings an act
+     forward; the act itself is below. See `senseBeings` in beings.js. */
+  senseBeings();
+  /* A being acts on the tick it named, and not on every tick. `updateBeing` brings its body up to date
+     before it does anything, so a being skipped for a minute of world time is a being whose day is
+     computed rather than stepped, not one whose day did not happen. */
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false || a.next > tick) continue;
+    updateBeing(a);
+    /* `nextAct` and the body beat are both at least one tick, so the soonest next act is the next
+       tick and no floor is needed here. */
+    if (a.alive) a.next = tick + Math.min(CLOCK.every.body, nextAct(a));
+  }
   if (tick % CLOCK.every.prune === 0) beings = beings.filter(b => b.alive || b.species === 'human' || SPECIES[b.species].perTick === false);
 }
 
@@ -5955,7 +6373,10 @@ function step(oneAct){
    record they name, so the sharing that the rules compare by identity comes back whole.
 
    Nothing here draws from a random stream, and nothing here writes to a live record. */
-const SNAPSHOT_VERSION = 1;
+/* Version 2: plan G4 made a tick one world second, so `tick` and every stamp saved beside it mean
+   86.4 times less than they did. A version 1 save holds numbers that are all still numbers and are
+   all wrong, which no field-by-field default can rescue, so it is refused with its sentence. */
+const SNAPSHOT_VERSION = 2;
 
 /* Every field of a record that holds a reference, and the kind of record it points at. A dotted name
    is a path into a plain object the record owns; the encoder copies the objects along that path. The
@@ -6263,6 +6684,10 @@ const NOT_SAVED = {
   chronicleWritten: 'a count for the test harness, not world state',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
+  threatSources: "the tick's people, foxes and wolves, for threatsFor; rebuilt on the next call",
+  threatSourcesAt: 'the tick that list was built on',
+  threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
+  threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
@@ -6761,11 +7186,22 @@ let lvl = 0;
 let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
+   so this is how much faster than life the valley runs when it is watched at the slowest pace.
+   It lives here and not in the clock table because it is wall time, and wall time is the
+   interface's: it never passes the door, and the same seed reaches the same world at any pace. */
+const TICKS_A_SECOND = 60;
 /* The ages. pace is the speed of the gods era: a quarter, a half, single, or double. It is not saved; a
    new world starts at single. lastEra is the era the last frame saw, so the frame can see the flip at
    settle. */
 const BEAT_MS = 1000;
 const PACES = [0.25, 0.5, 1, 2];
+/* How long one frame may spend stepping the world in the days. A frame at 60 fps is 16.7 ms, so half
+   of it is left for the draw, the once-a-quarter-second interface render, and the browser's own work.
+   The world view redraws in about 0.2 ms on an M-series Mac (Safari, 2026-09-20), so the half is
+   generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
+   several milliseconds still draws: the frame drops world ticks rather than frames. */
+const STEP_BUDGET_MS = 8;
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
    full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
@@ -6814,11 +7250,44 @@ const ui = {
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
-/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
-const SPEEDS = [1, 4, 16, 64];
+/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
+
+   A rung is a multiplier on TICKS_A_SECOND, so rung v asks for v * 60 world ticks in one real second.
+   The G4 retune made a world day 86,400 ticks where it was 1,000, and a year 365 days where it was 32.
+   The old top rung, 64, asks 3,840 ticks a second, which crosses a world day in 22 s and reaches
+   winter, day 274, in about 1.7 h of watching. The rungs were raised, not counted again: four rungs
+   keep every key and every button where they are.
+
+   What each rung costs, at 86,400 ticks a world day and 31,536,000 a world year:
+
+     rung 1      60 ticks/s       a day 24 min     a year 6.1 real days
+     rung 8      480 ticks/s      a day 3 min      a year 18.3 h
+     rung 64     3,840 ticks/s    a day 22.5 s     a year 2.3 h
+     rung 256    15,360 ticks/s   a day 5.6 s      a year 34 min
+
+   The top rung was measured, not chosen by taste. Measured 2026-09-20 on this branch, on an
+   M-series Mac, in valleys grown to world day 12 (40 to 48 beings, 2,300 to 3,700 ground items; the
+   seed differs between the Node runs and the browser runs, so the counts are given as a range):
+
+     the engine alone, nothing drawn     31,000 to 37,000 ticks/s in Node
+                                         about 32,000 ticks/s in Safari
+     the page, world map, no drawer      13,943 ticks/s at 60.1 fps in Safari
+     the page, location map, two drawers  7,085 ticks/s at 60.2 fps in Safari
+
+   The page reaches less than the engine because a frame keeps STEP_BUDGET_MS and gives the rest to
+   the draw, so a costlier view buys fewer world ticks. 256 asks 15,360. The world map, which is the
+   view a player watches from while the seasons pass, meets nine tenths of it. The location map with
+   two drawers open meets under half, and the frame rate holds at 60 either way: the budget spends
+   what it has and drops the rest, so a heavy view costs world time and never the drawing.
+
+   The step from 64 is four and not eight because the machine ends the ladder there. A rung above
+   this one would only mean "as fast as this machine allows" and would make its own printed rate a
+   lie. 512 was built and measured first: the same page under it delivered 12,249 ticks a second,
+   which is 40% of what its label claims. */
+const SPEEDS = [1, 8, 64, 256];
 /* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
    page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
-const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const SPEED_LABEL = { 1: '1×', 8: '8×', 64: '64×', 256: '256×' };
 const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
@@ -7188,7 +7657,11 @@ function campSummary(){
 
 function seasonLine(){
   if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
-  const s = seasonOf(), next = SEASONS[(SEASONS.indexOf(s) + 1) % 4], left = SEASON_DAYS - ((dayOf() - 1) % SEASON_DAYS);
+  /* The seasons are not all the same length, so the days left are counted off this season's own
+     length rather than one shared number. */
+  const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
+  let d = dayOfYear(); for (let k = 0; k < i; k++) d -= SEASON_LENGTHS[k];
+  const left = SEASON_LENGTHS[i] - d + 1;
   return `${s[0].toUpperCase()}${s.slice(1)}, ${next} in ${left}`;
 }
 
@@ -9122,7 +9595,17 @@ function frame(now){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
-      else { acc += dt * TPS * speed / 1000; let n = 0; while (acc >= 1 && n < 200){ step(); acc--; n++; } if (n >= 200) acc = 0; }
+      /* The days run against a wall-clock budget, not a step count. A count cannot bound a frame's
+         cost, because the cost of a step is not constant: it grows with the beings and the items in
+         the valley, and it grows again in a storm. The old line stopped at 200 steps and then threw
+         the rest of the frame's ticks away (`if (n >= 200) acc = 0`), so above 200 ticks a frame the
+         top rung ran at whatever 200 steps came to and still printed its own rate. Now the loop
+         spends STEP_BUDGET_MS and stops, and a rung the machine cannot hold simply arrives late.
+         The clock is read every step: performance.now() costs about 45 ns against a step's 14,000 ns,
+         both measured in Safari on 2026-09-20, so reading it is 0.3% and a coarser check would only
+         buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
+         leaves no backlog for a later one to run in one burst. */
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS; while (acc >= 1){ step(); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the

@@ -3,7 +3,7 @@
    tile. Gods come into being from contrasts: the seed makes the first, and every other is made by a
    lack. In the gods era a step is an age; every awake god scores its acts over the live regions and
    does the best one, eldest first. Everything here draws from the gods' own stream. */
-SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: ticks(0), zmin: 0, zmax: 0, perTick: false };
+SPECIES.god = { glyph: '✶', label: 'god', plural: 'gods', decay: { expression: 0, company: 0, rest: 0, calm: 0 }, stride: 0, zmin: 0, zmax: 0, perTick: false };
 LIFE.god = { adult: 0, old: Infinity, life: Infinity, death: 'killable' };
 const GOD_NAMES = ['Ondru', 'Sael', 'Ashka', 'Veyl', 'Morrow', 'Ilse', 'Thrum', 'Kesh', 'Ubbe', 'Nyr', 'Tamsa', 'Orun'];
 const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet', dry: 'who is Dry', hot: 'who is Hot', cold: 'who is Cold', still: 'who is Still', moving: 'who Moves', light: 'who is Light', dark: 'who is Dark' };

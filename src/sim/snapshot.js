@@ -7,7 +7,10 @@
    record they name, so the sharing that the rules compare by identity comes back whole.
 
    Nothing here draws from a random stream, and nothing here writes to a live record. */
-const SNAPSHOT_VERSION = 1;
+/* Version 2: plan G4 made a tick one world second, so `tick` and every stamp saved beside it mean
+   86.4 times less than they did. A version 1 save holds numbers that are all still numbers and are
+   all wrong, which no field-by-field default can rescue, so it is refused with its sentence. */
+const SNAPSHOT_VERSION = 2;
 
 /* Every field of a record that holds a reference, and the kind of record it points at. A dotted name
    is a path into a plain object the record owns; the encoder copies the objects along that path. The
@@ -315,6 +318,10 @@ const NOT_SAVED = {
   chronicleWritten: 'a count for the test harness, not world state',
   nameIndex: 'derived: rebuilt from the saved name records by rebuildNames',
   usedMeanings: 'derived: the meanings on the saved old names, rebuilt by rebuildNames',
+  threatSources: "the tick's people, foxes and wolves, for threatsFor; rebuilt on the next call",
+  threatSourcesAt: 'the tick that list was built on',
+  threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
+  threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */

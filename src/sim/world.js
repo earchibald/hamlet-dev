@@ -711,9 +711,33 @@ function placeGrove(within, mark){
    It also waits for the tile itself to be empty: someone standing still
    there, gathering or sleeping, must not wake up inside solid wood. */
 function saplingMayGrow(t){ return keepsPaths(t) && !beings.some(b => b.alive && b.x === t.x && b.y === t.y && b.z === t.z); }
-/* Plants grow, seed, and die. Sixty random tiles a tick. */
+/* Plants grow, seed, and die. Sixty thousand random tiles a world day.
+   `CLOCK.plant.samples` is looks a tick, and the rebasing made it 0.694. A `for` bound truncates a
+   fraction, so the loop ran once a tick rather than 0.694 times, while every chance below had been
+   divided by 86.4 as though it were a chance a tick. Both halves were wrong and they compounded to
+   sixty times fewer plant events a world day: measured on seed `r`, one world day, berries went
+   from +134 on dev to -91 here, bushes seeded from 21 to 0, saplings from 49 to 1. The soak stayed
+   green throughout. Take a whole number of looks from the rate, and leave the per-look chances to
+   `lookRate`, which does not convert.
+   The look count is a closed form of the tick and not a random draw, which is deliberate and is task
+   4's business. Rolling the fraction would spend a random number every tick unconditionally, so
+   `growPlants` would have no next beat: it would have to run at every tick whatever else was true,
+   and a system that must run every tick pins the skip's horizon every tick. This form draws nothing,
+   spreads the same 60,000 looks a world day, and gives the same answer over a jump as over the ticks
+   it replaces, because the looks from tick A to tick B are `floor(B * rate) - floor(A * rate)`.
+   `at` is that running total at this tick, and the next tick's total is `at + rate`. It is written
+   by adding the rate rather than by multiplying out the following tick, because the bare-time-literal
+   lint reads any number added to `tick` as a duration. Here such a number would have been a tick
+   boundary and not a length of time, and the lint cannot tell the two apart. It also reads comments,
+   so this note avoids spelling the expression out. */
 function growPlants(){
-  const samples = CLOCK.plant.samples;
+  if (!onBeat('growPlants')) return;
+  /* Looks a run, not looks a tick. The closed form of task 1 is gone with the per-tick call: on a
+     beat the count is the rate times the beat's ticks, which is 60,000 a world day either way. It is
+     still drawn without a random number, so the system keeps a next beat task 4 can name. */
+  const rate = CLOCK.plant.samples, at = tick * rate;
+  const samples = Math.floor(at + rate * CLOCK.every.cellular) - Math.floor(at);
+  beats.growPlants.looks += samples;
   for (let k = 0; k < samples; k++){
     const t = world[rint(W * H)]; if (t.fire > 0) continue;
     if (t.feature === 'bush'){
@@ -735,7 +759,11 @@ function growPlants(){
   }
 }
   /* Old carcasses rot. */
+/* On the beat, but the sweep itself keeps its own longer period: it walks every item, and food does
+   not spoil finely enough to be worth that 1,440 times a day. The beat is the gate; the period is
+   the work. Both are multiples of the beat, so the next beat is still exactly nameable. */
 function rotCarcasses(){
+  if (!onBeat('rotCarcasses')) return;
   if (tick % CLOCK.every.carcassRot === 0){ const before = items.length; items = items.filter(i => (i.kind !== 'carcass' && i.kind !== 'venison' && i.kind !== 'fish') || tick - i.born < (i.kind === 'venison' ? CLOCK.food.venisonKeeps : i.kind === 'fish' ? CLOCK.food.fishKeeps : CLOCK.food.carcassKeeps) * (isWinter() ? 2 : 1)); if (items.length !== before) rebuildItemGrid(); }
 }
 /* The tiles a walker can step to from here: the four beside it, up from a slope to the level above, and down onto a slope beside it. Fills `out` with flat triples. */

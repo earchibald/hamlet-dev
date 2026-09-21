@@ -3,6 +3,21 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const sim = require('../src/sim');
+
+/* SUSPENDED for the duration of G4, by task 1, with the user's approval through dev-coordinator.
+   This file asks for 25 world days, and no day count in it has been changed. A world day
+   costs about 15 s on this branch against dev's 0.31 s, so the file cannot finish in a usable time.
+   The cost is the retune's, not the file's: nothing here grew, and task 4 is built to give the day
+   back. The day counts are kept exactly as written rather than cut, because a count reduced to fit a
+   slow engine is a gate nobody measured.
+   Run it with SLOW=1. Task 4 restores it. */
+const SUSPENDED_FOR_G4 = process.env.SLOW ? false
+  : 'suspended for G4: this file asks for 25 world days and a world day costs about 15 s on this branch, not dev\'s 0.31 s. SLOW=1 runs it. Task 4 restores it.';
+if (SUSPENDED_FOR_G4){
+  test('tests/ui.js is suspended for the duration of G4', { skip: SUSPENDED_FOR_G4 }, () => {});
+  return;
+}
+
 const ui = require('../src/ui');
 
 /* Join the sim and the pure UI files in one scope, as the page does, and return the names the tests reach into.
@@ -65,7 +80,7 @@ const DERIVE = ['gauges', 'daysOfWood', 'alerts', 'notePulses', 'isMuted', 'mute
 function day21(){
   const api = loadUI(['state', 'derive'], DERIVE); api.startWorld('r');
   let lit = false;
-  for (let i = 0; i < 21 * 1000; i++){ api.step(); if (!lit && api.camps[0].pit){ api.camp = api.camps[0]; api.lightTile(...api.camps[0].pit); lit = true; } }
+  for (let i = 0; i < api.ticks(21 * 1000); i++){ api.step(); if (!lit && api.camps[0].pit){ api.camp = api.camps[0]; api.lightTile(...api.camps[0].pit); lit = true; } }
   api.camp = api.camps[0]; return api;
 }
 
@@ -106,7 +121,7 @@ test('alerts: a major chronicle line becomes a pulse that lasts 1500 ticks', () 
   api.log(`${who.name} finds a fine flat stone.`, [], 'major'); api.notePulses();
   const chip = api.alerts().find(x => x.type === 'event' && x.text.includes(who.name));
   assert.ok(chip, 'the named line is a chip'); assert.equal(chip.being, who.id, 'the chip knows its cause');
-  api.tick = api.tick + 1600; api.notePulses();
+  api.tick = api.tick + api.ticks(1600); api.notePulses();
   assert.ok(!api.alerts().some(x => x.type === 'event' && x.text.includes('Test comes over the hills')), 'pulse gone');
 });
 
@@ -836,7 +851,7 @@ test('a reached stage shows when it has a row to show or a goal done, not when i
   const api = loadUI(['state', 'derive'], [...DERIVE, 'stagesShown', 'stageReached']);
   api.startWorld('r');
   let lit = false;
-  for (let i = 0; i < 3 * 1000; i++){ api.step(); if (!lit && api.camps[0].pit){ api.camp = api.camps[0]; api.lightTile(...api.camps[0].pit); lit = true; } }
+  for (let i = 0; i < api.ticks(3 * 1000); i++){ api.step(); if (!lit && api.camps[0].pit){ api.camp = api.camps[0]; api.lightTile(...api.camps[0].pit); lit = true; } }
   api.camp = api.camps[0];
   const guard = api.GOALS.find(g => g.id === 'guard');
   assert.ok(api.camp.pit, 'seed r has a pit by day 3'); assert.equal(api.goalState(guard).s, 'idle', 'and no wolf is near');

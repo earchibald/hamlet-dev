@@ -1,7 +1,12 @@
 // Shared test runner. Loads the sim in Node, runs it for a number of days
 // with a script god, and keeps every chronicle line, not only the last 300.
 const { load } = require('../../src/sim');
-const DAY = 1000;
+/* The day comes from the sim and is never written down here. A second copy of a constant in a test
+   is not a check on the first: it agrees with whatever it was last set to, and when the real one
+   moves the test keeps measuring the old world while still reporting in days. This file held
+   `const DAY = 1000` and plan G4 made the day 86,400, so every test that asked for seventy days
+   would quietly have run for a fifth of one. */
+const DAY = load().DAY;
 
 /* The script god lights each camp's pit once, the first time it stands laid
    and cold, through the door, so the run leaves a log. A founding party carries
@@ -67,6 +72,46 @@ function runDays(seed, days, onTick, god = scriptGod, opts = {}){
   if (c.from !== 0) throw new Error(`seed ${seed}: the creation was logged before the collector watched (${c.from} lines)`);
   c.check(`seed ${seed}`);
   return { api, events: c.events };
+}
+
+/* ---------- setting the clock ----------
+   Ruling 8 of plan G4, in the user's words: "we can set the date directly if we need to." A test may
+   jump the world to a date rather than pay the days to reach it. This is the one function that does
+   it. It lives here and never in `src/sim/`, because a rule reachable only through a back door in the
+   product is a rule the product can lose without a sound.
+
+   It writes the world's tick, and it moves every accrual marker with it. An accrual marker is a tick
+   on a record whose gap to the present is multiplied into a quantity, so a marker left in the past
+   charges or credits the whole jump. There are two, and both are task 3's:
+
+     `b.seen`     the tick a being's body was last brought up to. Left behind, a clock shoved ten days
+                  forward charges every being ten days of hunger it was never alive for, and a wolf
+                  sent to midday arrives starving.
+     `t.worked`   the tick a job last had work put into it. Left behind, a jump of one world hour put
+                  3,600 ticks of work into a snare nobody touched, and a jump of a world day finished
+                  the job. Measured twice in the task 3 review, and the reason this function was
+                  corrected.
+
+   Nothing else moves, and nothing accrues across a jump: no hunger, no work, no fuel burnt, no plant
+   grown. A deadline already set is left where it is and so expires — a cooldown, a thought's `until`,
+   a wait, a storm's end — which is what an arrived world would also have done. A gap read as a
+   threshold is left alone for the same reason: a jump longer than `CLOCK.limit.task` abandons a held
+   task and a jump past `CLOCK.limit.hurtRemembered` forgets a wound, exactly as the days would have.
+
+   `tests/setclock.js` holds both halves. It also keeps an inventory of every elapsed gap the rules
+   read, so a rule that adds a new one goes red there and its task must say which kind it is. `worked`
+   reached the branch with nobody asked, which is the reason the inventory exists.
+
+   A test that uses this proves a rule runs at that date. It does not prove the date is reachable by
+   playing, and the suite owes a run that arrives by simulating. See the plan's "What ruling 8
+   obliges". */
+function setClock(api, at){
+  api.tick = at;
+  for (const b of api.beings){
+    b.seen = at;
+    if (b.task && b.task.worked !== undefined) b.task.worked = at;
+  }
+  return at;
 }
 
 const OLD_AGE = /died of old age|old and warm/;
@@ -164,4 +209,4 @@ function cutOff(api){
 
 const campLine = (api, c) => `${c.name}: site ${!!c.site} pit ${!!c.pit} lit ${c.everLit} members ${api.beings.filter(h => h.species === 'human' && h.alive && h.camp === c).length} food ${c.stash.berries + c.stash.cooked + c.stash.smoked}`;
 
-module.exports = { DAY, runDays, collect, runOn, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };
+module.exports = { DAY, setClock, runDays, collect, runOn, scriptGod, logGod, replayGod, countEvents, fingerprint, deaths, oddDeaths, denDeaths, gnomeDeaths, cutOff, campLine, OLD_AGE };

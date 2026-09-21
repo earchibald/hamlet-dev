@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const { runDays, runOn, collect, scriptGod, replayGod, fingerprint } = require('./lib/run');
+const { DAY, runDays, runOn, collect, scriptGod, replayGod, fingerprint } = require('./lib/run');
 
 test('an unknown act or source is refused and not logged', () => {
   const api = load(); api.startWorld('r');
@@ -103,10 +103,13 @@ test('a site on an unreachable tile is refused through inject', () => {
 });
 
 test('the site act carries its camp: a second camp\'s site replays deterministically across days through the harness', () => {
-  const DAY = 1000;
+  /* This test held `const DAY = 1000`, a second private copy of the day, which is the same fault
+     `tests/lib/run.js` held and which finding 3 of task 1's report records. One copy was found and
+     fixed; this one was in another file and was not looked at. The ticks below are now written as
+     fractions of the real day, so they say what they mean at any length of day. */
   const DAYS = 3;
-  const SITE_TICK = DAY + 100;       // day 2, after day 1
-  const POKE_TICK = DAY * 2 + 250;   // day 3, a different tick, a different act
+  const SITE_TICK = DAY + DAY / 10;      // day 2, a tenth of the way in
+  const POKE_TICK = DAY * 2 + DAY / 4;   // day 3, a different tick, a different act
 
   /* Both tiles must be ones the first person can walk to, or the site guard refuses the act. */
   const findTwoOpenTiles = api => {
@@ -197,9 +200,11 @@ test('a load from an unknown source is refused as every act is', () => {
 });
 
 test('a story with a load in it replays: the load passes through inject, and a replay run tells the same story without sending it to the door', () => {
-  const SAVE_STEP = 9000, TOTAL_STEP = 14000;
+  /* Nine days and fourteen days, which were written as 9000 and 14000 ticks of the old 1000-tick
+     day. They are days, so they are written as days. */
+  const SAVE_STEP = 9 * DAY, TOTAL_STEP = 14 * DAY;
 
-  const rec = runDays('r', SAVE_STEP / 1000, null, scriptGod);
+  const rec = runDays('r', SAVE_STEP / DAY, null, scriptGod);
   const cut = rec.events.length;
   const snap = JSON.parse(JSON.stringify(rec.api.takeSnapshot()));
 

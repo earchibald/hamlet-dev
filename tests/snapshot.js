@@ -4,7 +4,48 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { load, FILES } = require('../src/sim/index.js');
-const { runDays, collect, runOn, fingerprint } = require('./lib/run.js');
+const { runDays, collect, runOn, fingerprint, DAY } = require('./lib/run.js');
+/* The sim's own converter from the old 1,000-tick day to world ticks, used for every span in this
+   file whose only meaning was an amount of world time. It is asked of the sim, never written down
+   here, for the reason `tests/lib/run.js` gives about the day itself. */
+const ticks = load().ticks;
+
+/* BEHIND SLOW=1, PERMANENTLY. The oracle here saves a world in the middle of its life and runs two
+   copies of it on, so it pays for the same world time three times over, and its longest world is
+   forty days old. Measured on this branch: the seconds named in the skip below, for 49 tests. No day count here
+   was cut to reduce them. The flag carries the cost; a shorter run would be a different test wearing
+   this one's name.
+
+   Every step count in this file was once a count of the old 1,000-tick day, so `12400` meant day
+   12.4. G4 made a day 86,400 ticks, and the same numbers then meant a quarter of an hour. They are
+   converted two ways, and each site says which it used:
+
+     by measurement, where the step was chosen because something is true of the world there. Every
+       save point is one of these. The oracle asks that somebody be walking and somebody at work at
+       the save, and each case asks for more beside, in the sentence written next to it. The step is
+       the one where that sentence is true, found by running the seed with the same god and watching
+       the world, not by multiplying the old number. The ticks in those sentences are measurements
+       and will move if a rule moves; each one names what it is a measurement OF, so the next reader
+       can take it again.
+     by `api.ticks(n)`, where the number was a span of world time and nothing else: a cap on a wait,
+       a warm-up, a run-on long enough for the world to move. `ticks` is the sim's own legacy
+       converter and holds the span's meaning in the world exactly where it was.
+
+   Two numbers here are neither, and are left as they are: `n < 4000` in `steeredWorld` and `n < 200`
+   in the open-turn test count attempts at a thing, not world time, and both stop long before the cap.
+
+   The plan names the snapshot oracle as one of the three gates standing in for the golden between
+   task 1 and the bless. The flag does NOT remove that gate: the oracle also runs in `tests/soak.js`
+   as "seed x saved on day 1.5, loaded into a fresh sim, tells the same story to day 3", which runs
+   at every task's gate. The gate moves; it does not go. */
+const SLOW_SECS = 1120;
+const TOO_SLOW = process.env.SLOW ? false
+  : `the oracle saves a world mid-life and runs two copies of it on, and its longest world is 40 days old: about ${SLOW_SECS} s on this branch (18m36s measured with \`time SLOW=1 node --test tests/snapshot.js\` on an 18-core Mac at one-minute load average 12.4, with other runs of the sim on the machine). SLOW=1 runs it. The soak runs a save-and-load oracle of its own at every gate.`;
+if (TOO_SLOW){
+  test('tests/snapshot.js runs behind SLOW=1', { skip: TOO_SLOW }, () => {});
+  return;
+}
+
 
 test('a stream gives the numbers it gave before', () => {
   const api = load(); const f = api.mulberry32(12345);
@@ -75,9 +116,17 @@ test('a loaded world has its records joined as the saved one had', () => {
   assert.equal(api.camps.indexOf(api.camp), was.camps.indexOf(was.camp));
 });
 /* Seed r has no pitfall at day 40, so the pitfall assertion above cannot fail there. A small world on
-   seed alpha digs four by day 21, and it runs in a few seconds. */
+   seed alpha has one from day 6.2 and two from day 7.1.
+
+   This run takes the script god, which every other run in this file already takes, because measuring
+   it showed that without one this valley digs nothing at all: no snare and no pitfall in fifteen
+   world days, since the camp's pit is never lit. With the god it lays its first snare on day 0.3 and
+   digs its first pitfall at tick 535,000. The save goes at 600,000, day 6.9, with one pitfall in the
+   ground. The old run was 20,000 bare steps, day 20 of the 1,000-tick day, and after the merge it was
+   a quarter of an hour, which is what the failure "this world was meant to have a pitfall" was
+   reporting. */
 test('a world with pitfalls in it round-trips and keeps each pitfall in its tile', () => {
-  const was = load(); was.startWorld('alpha', { sw: 8, sh: 5 }); for (let i = 0; i < 20000; i++) was.step();
+  const was = load(); const wasEvents = collect(was); was.startWorld('alpha', { sw: 8, sh: 5 }); runOn(was, 0, 600000, wasEvents);
   assert.ok(was.camps.reduce((n, c) => n + c.pitfalls.length, 0) > 0, 'this world was meant to have a pitfall');
   const api = load(); assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
   for (const c of api.camps) for (const p of c.pitfalls){
@@ -146,9 +195,11 @@ test('a save that cannot be read is refused and the world stays as it was', () =
   }
 });
 test('a world of another size loads into a sim of the default size', () => {
-  const small = load(); small.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 3000; i++) small.step();
+  /* Both spans were counts of the old day and mean only "a world that has been running"; they
+     convert with the sim's converter and keep the world time they had. */
+  const small = load(); small.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < ticks(3000); i++) small.step();
   const api = load(); api.startWorld('x'); assert.equal(api.loadSnapshot(through(small.takeSnapshot())), null);
-  assert.equal(api.W, small.W); for (let i = 0; i < 500; i++) api.step();
+  assert.equal(api.W, small.W); for (let i = 0; i < ticks(500); i++) api.step();
 });
 
 /* ---------- the oracle ---------- */
@@ -162,7 +213,17 @@ test('a world of another size loads into a sim of the default size', () => {
 function oracle(seed, N, M, opts = {}, before = null){
   const a = load(); const ca = collect(a); a.startWorld(seed, opts);
   runOn(a, 0, N, ca);
-  const at = before ? before(a, ca, N) : N;
+  let at = before ? before(a, ca, N) : N;
+  /* The save must be taken where the world is moving, because a save with nobody walking and nobody
+     at work does not test the fields that carry a path or a job, which is what `sameStory` says. A
+     save point named in CASES is already such a step, measured, and this loop turns over nothing
+     there. It is for the runs that reach their save through a `before` hook: a hook waits for a fire
+     or a burn-out, and where that wait ends is not something the case can choose. Both grove runs
+     ended theirs in the small hours with the valley asleep. Half a world day is the cap, which is
+     longer than a night; `sameStory` still fails if the world never woke. */
+  const moving = () => a.beings.some(b => b.alive && b.task && b.task.path && b.task.path.length)
+    && a.beings.some(b => b.alive && b.task && b.task.progress > 0);
+  for (let i = 0; i < ticks(500) && !moving(); i++){ runOn(a, at, 1, ca); at++; }
   const midTask = a.beings.filter(b => b.alive && b.task && b.task.path && b.task.path.length).length;
   const working = a.beings.filter(b => b.alive && b.task && b.task.progress > 0).length;
   const denless = a.beings.filter(b => b.alive && b.oldDen && !b.den).length;
@@ -185,19 +246,56 @@ function sameStory(o){
   assert.ok(jb === ja, 'the two worlds hold the same state, but one writes an object\'s keys in another order');
 }
 /* What each case was picked for is in the comment beside it. The steps are kept as low as the case
-   allows, because each one runs its world once whole and then twice more from the save. */
+   allows, because each one runs its world once whole and then twice more from the save.
+
+   Every N and M here is measured, not multiplied. Each seed was run with the script god the oracle
+   uses, sampled every 5,000 ticks, and the tick written down is one where the case's own sentence is
+   true: somebody walking and somebody at work, plus whatever else the sentence names. The measured
+   ticks are quoted beside each row so the next reader can take them again rather than trust them.
+   The old numbers were 12,400, 12,400, 30,300 and 20,000 steps of the 1,000-tick day, and after the
+   merge they were a quarter of an hour of world time each, at which no case's sentence was true and
+   all four failed on "nobody was walking and nobody was at work at the save". */
 const SMALL = { sw: 8, sh: 5 };
+/* Each row carries a `want`, and it is the point of the conversion. The sentence beside a row used
+   to be a comment alone, and a comment cannot fail: when the merge left these runs at a quarter of
+   an hour of world time, nothing in the row noticed that its valley had no second camp and its sky
+   no storm. `want` asserts the sentence, on the save or on the lines after it, so a row that stops
+   being the case it was kept for says so. */
+const storms = o => o.after.filter(e => /storm rolls in|Sleet drives/.test(e.text)).length;
+const spears = snap => snap.camps.reduce((n, c) => n + (c.tools.spear || 0), 0) + snap.items.filter(i => i.kind === 'spear').length;
 const CASES = [
-  ['r', 12400, 8000, {}],        // one camp founds a second after the load, and a storm rolls in
-  ['x', 12400, 4000, {}],        // another valley, two storms after the load
-  ['gamma', 30300, 2000, {}],    // a grown valley: two camps, huts, and a spear
-  ['alpha', 20000, 3000, SMALL], // a small valley with snares and pitfalls in the ground, and two camps
+  /* Seed r, day 7.06: 9 people walking, 30 at work. A storm rolls in at tick 651,420 and the camp
+     founds a second between 700,000 and 705,000, so 100,000 steps after the save hold both. */
+  ['r', 610000, 100000, {}, o => {
+    assert.ok(storms(o) > 0, 'no storm rolled in after the load, and this row is kept for one');
+    assert.ok(o.a.camps.length > 1, 'no second camp was founded after the load, and this row is kept for that');
+  }],
+  /* Seed x, day 4.51: 3 walking, 29 at work. Storms roll in at 419,220 and at 633,060, so 250,000
+     steps after the save hold the two this row was kept for. */
+  ['x', 390000, 250000, {}, o => {
+    assert.ok(storms(o) >= 2, `only ${storms(o)} storm(s) after the load, and this row is kept for two`);
+  }],
+  /* Seed gamma, day 8.04, the first sample at which it is the grown valley this row names: two
+     camps, two huts and a spear, with 2 walking and 8 at work. */
+  ['gamma', 695000, ticks(2000), {}, o => {
+    assert.ok(o.snap.camps.length > 1, 'this row is kept for a valley of two camps');
+    assert.ok(o.snap.camps.some(c => c.huts.length), 'this row is kept for a valley with huts in it');
+    assert.ok(spears(o.snap) > 0, 'this row is kept for a valley that has made a spear');
+  }],
+  /* Seed alpha small, day 8.04: two camps, four snares and two pitfalls in the ground, 1 walking and
+     8 at work. */
+  ['alpha', 695000, ticks(3000), SMALL, o => {
+    assert.ok(o.snap.camps.length > 1, 'this row is kept for a small valley of two camps');
+    assert.ok(o.snap.camps.some(c => c.snares.length), 'this row is kept for snares in the ground');
+    assert.ok(o.snap.camps.some(c => c.pitfalls.length), 'this row is kept for pitfalls in the ground');
+  }],
 ];
-for (const [seed, N, M, opts] of CASES)
-  test(`seed ${seed}: saved at step ${N}, loaded, and run on, the story is the straight run's`, t => {
+for (const [seed, N, M, opts, want] of CASES)
+  test(`seed ${seed}: saved on day ${(N / DAY).toFixed(1)}, loaded, and run on, the story is the straight run's`, t => {
     const o = oracle(seed, N, M, opts);
-    t.diagnostic(`${seed}: ${o.midTask} walking, ${o.working} at work, ${o.a.camps.length} camps, ${o.after.length} lines after the save`);
+    t.diagnostic(`${seed}: ${o.midTask} walking, ${o.working} at work, ${o.a.camps.length} camps, ${storms(o)} storm(s) and ${o.after.length} lines after the save`);
     sameStory(o);
+    want(o);
   });
 
 /* A burning world. Every soak seed has fireCount 0 at the save, so the fire path would go untested:
@@ -209,11 +307,19 @@ function lightTheWoods(a, ca, N){
   assert.ok(trees.length > 6 && high.length > 3, 'this world was meant to have woods and tiles off the surface that burn');
   for (const t of trees.slice(0, 6)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: 0 });
   for (const t of high.slice(0, 3)) a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: t.z });
-  runOn(a, N, 60, ca);   // long enough for the fire to spread, short enough that it still burns
-  return N + 60;
+  /* Long enough for the fire to spread, short enough that it still burns. Sixty ticks was a minute
+     and a half of the old day; a minute of world time now lights nothing, so the span converts with
+     the sim's own converter and stays the world time it was. The two assertions in the test below
+     are what say it landed: fire at the save, and some of it off the surface. */
+  const spread = ticks(60);
+  runOn(a, N, spread, ca);
+  return N + spread;
 }
 test('a world saved while the woods burn runs on as the straight run does', t => {
-  const o = oracle('r', 6000, 3000, SMALL, lightTheWoods);
+  /* Seed r small, saved on day 5.84 with the woods alight. The old 6,000 was day 6 of the old
+     clock, and the save point is measured from the same intent: an early valley that is up and
+     working, here 505,000 with 2 walking and 22 at work, plus the spread window above. */
+  const o = oracle('r', 505000, ticks(3000), SMALL, lightTheWoods);
   const alight = lv => lv.filter(t => t && t.fire > 0).length;
   const offSurface = o.snap.levels.reduce((n, lv, i) => n + (i === o.a.ZOFF ? 0 : alight(lv)), 0);
   t.diagnostic(`fire at the save: ${o.snap.fireCount} tiles, ${offSurface} of them off the surface; grove anger ${JSON.stringify(o.a.groves.map(g => g.anger))}`);
@@ -224,9 +330,15 @@ test('a world saved while the woods burn runs on as the straight run does', t =>
 
 /* A wolf den dug after the load. digDen reads startRegion through rimExits, and startRegion is a Set
    of about thirty thousand numbers that the save carries whole. A world that digs no den after the
-   load would never touch it. This small valley clears a den at tick 4994 and digs a new one at 7994. */
+   load would never touch it, and the assertion below says so rather than passing quietly.
+
+   Measured: this small valley digs exactly one new den in thirty days, at tick 1,315,375, day 15.2,
+   and three wolves are den-less from day 12 on. The save goes at 1,255,000, day 14.5, where 4 people
+   are walking and 43 at work, and 70,000 steps after it hold the dig. The old pair, 6,000 and 2,500,
+   was chosen when a den was cleared at 4,994 and dug at 7,994 on the 1,000-tick day; after the merge
+   those steps were an hour and a half of world time and no den was dug at all. */
 test('a world that digs a wolf den after the load runs on as the straight run does', t => {
-  const o = oracle('r', 6000, 2500, SMALL);
+  const o = oracle('r', 1255000, 70000, SMALL);
   const dug = o.loaded.filter(e => /dug a new den/.test(e.text));
   t.diagnostic(`${o.denless} wolves were den-less at the save; after the load: ${dug.map(e => e.text).join(' ')}`);
   assert.equal(dug.length, 1, 'no den was dug after the load, so startRegion and rimExits went untested');
@@ -236,8 +348,12 @@ test('a world that digs a wolf den after the load runs on as the straight run do
 
 /* A late save of a world of the default size. The three cases above are early or small, so a grown
    valley with a gnome burrow holding a thing and two camps went untested. */
+/* Measured: seed beta has a second camp from tick 760,000, day 8.8, and a burrow holding something
+   from 1,005,000, day 11.6. The save goes at 1,010,000, day 11.7, the first sample past both, with
+   2 people walking and 10 at work. The old 13,779 was day 13.8 of the 1,000-tick day; after the
+   merge it was ten minutes of world time, one camp, and nothing held. */
 test('a grown valley of the default size, saved late, runs on as the straight run does', t => {
-  const o = oracle('beta', 13779, 2500, {});
+  const o = oracle('beta', 1010000, ticks(2500), {});
   /* The preconditions are read off the save, not off the world after it ran on: a burrow gives up
      what it holds, and a camp is founded later. */
   const holding = o.snap.caves.filter(c => c.holding).length;
@@ -251,6 +367,11 @@ test('a grown valley of the default size, saved late, runs on as the straight ru
    burnOut takes a grove out of `groves` when its hollow pine burns, and the sprites of that grove
    keep pointing at it until the last of them dies. The snapshot names such a grove `{ stray: i }` and
    writes it whole, once, so the sprites that shared it share it still. */
+/* The save point the three grove runs share: seed r small at tick 345,000, day 4, where 8 people are
+   walking and 28 at work, the first sample of that valley at which the oracle's own precondition is
+   comfortably true. The old number was 4,000, day 4 of the 1,000-tick day, so the world is the same
+   age it was; the tick is written from the measurement and not from the arithmetic, because the
+   arithmetic alone would have landed on 345,600, where nobody is walking. */
 function burnAHollow(a, ca, N){
   const hollow = a.levels.flat().filter(t => t && t.feature === 'hollow');
   assert.ok(hollow.length > 0, 'this world was meant to have a hollow pine');
@@ -258,12 +379,16 @@ function burnAHollow(a, ca, N){
   a.inject({ source: 'player', act: 'light', x: t.x, y: t.y, z: t.z });
   const orphaned = () => a.beings.some(b => b.alive && b.grove && !a.groves.includes(b.grove));
   let at = N;
-  for (let i = 0; i < 800 && !orphaned(); i++){ runOn(a, at, 1, ca); at++; }
+  /* The wait is a span of world time and converts as one: 800 ticks of the old day was a fifth of a
+     day, and a pine takes world time to burn through whatever the day is worth in ticks. The
+     assertion under the loop is what says the wait was long enough. */
+  const wait = ticks(800);
+  for (let i = 0; i < wait && !orphaned(); i++){ runOn(a, at, 1, ca); at++; }
   assert.ok(orphaned(), 'the hollow never burned out under a living sprite, so the stray path went untested');
   return at;
 }
 test('a world whose hollow pine burned out under its sprites saves, loads, and runs on', t => {
-  const o = oracle('r', 4000, 1500, SMALL, burnAHollow);
+  const o = oracle('r', 345000, ticks(1500), SMALL, burnAHollow);
   t.diagnostic(`${o.snap.strayGroves.length} stray grove(s) in the save; ${o.b.groves.length} groves left in the world`);
   assert.ok(o.snap.strayGroves.length > 0, 'the save was meant to hold a grove that is in no list');
   /* Several sprites can share one dead grove, and the rules compare `o.grove === g`. */
@@ -278,7 +403,7 @@ test('a world whose hollow pine burned out under its sprites saves, loads, and r
    hold that text after a load, and hold it against the one object the sprites share, or a later
    naming would hand the dead grove's name to something else. */
 test('a grove that burnt out under its sprites keeps its name, held against the grove the sprites share', t => {
-  const o = oracle('r', 4000, 1500, SMALL, burnAHollow);
+  const o = oracle('r', 345000, ticks(1500), SMALL, burnAHollow);
   const strays = w => [...new Set(w.beings.filter(b => b.grove && !w.groves.includes(b.grove)).map(b => b.grove))];
   const was = o.a, api = o.b, sa = strays(was), sb = strays(api);
   const texts = sa.flatMap(g => (g.names || []).map(r => r.text));
@@ -302,14 +427,14 @@ function burnAndEmptyAGrove(a, ca, N){
   let at = burnAHollow(a, ca, N);
   const stray = a.beings.filter(b => b.alive && b.grove && !a.groves.includes(b.grove))[0].grove;
   for (const b of a.beings) if (b.alive && b.grove === stray) a.die(b, 'went out with the grove');
-  for (let i = 0; i < 4000 && a.beings.some(b => b.grove === stray); i++){ runOn(a, at, 1, ca); at++; }
+  for (let i = 0; i < ticks(4000) && a.beings.some(b => b.grove === stray); i++){ runOn(a, at, 1, ca); at++; }
   assert.ok(!a.beings.some(b => b.grove === stray), 'the dead sprites were meant to be pruned out of beings');
   assert.ok(!a.groves.includes(stray), 'the grove was meant to be in no list');
   assert.ok(a.nameOf(stray), 'the grove was meant to carry a name');
   return at;
 }
 test('a named grove that no list and no being holds any more saves, loads, and keeps its text taken', t => {
-  const o = oracle('r', 4000, 1200, SMALL, burnAndEmptyAGrove);
+  const o = oracle('r', 345000, ticks(1200), SMALL, burnAndEmptyAGrove);
   const was = o.a, api = o.b;
   const lost = o.snap.lostNames.flatMap(h => h.names.map(r => r.text));
   t.diagnostic(`${o.snap.lostNames.length} name(s) the index alone holds: ${lost.join(', ')}`);
@@ -329,7 +454,7 @@ test('a named grove that no list and no being holds any more saves, loads, and k
    grove that holds one drags in a cycle: the cave holds its tiles, and each tile points back at the
    cave. This hangs that shape on a world by hand, as the guard tests above hang a Map on a being. */
 test('a name the index alone holds is saved as its name records, never as the thing', () => {
-  const a = load(); a.startWorld('r', SMALL); for (let i = 0; i < 200; i++) a.step();
+  const a = load(); a.startWorld('r', SMALL); for (let i = 0; i < ticks(200); i++) a.step();
   const g = a.groves[0];
   assert.ok(g && a.nameOf(g), 'a grove was meant to carry an old name');
   assert.ok(a.caves.length, 'this world was meant to have a cave');
@@ -368,10 +493,16 @@ function nameState(api){
     epithets: api.beings.map(b => [b.epithet || '', ...(b.epithets || []).map(r => r.text)].join('|')),
   };
 }
-/* The small valley of seed alpha at step 23000 has named a camp twice over, a village, four sectors,
-   seven events, and the valley itself, and eighteen people carry an epithet. */
+/* Measured, in the order the kinds of name arrive in the small valley of seed alpha: a sector on day
+   0.06, the water from the moment the land is made, a camp's former name on day 3.6, a named
+   chronicle line on day 5.6, the valley and its first village together at tick 1,430,000, day 16.6,
+   and last of all a name the index alone holds, at tick 1,540,000, day 17.8, when the chronicle drops
+   the named line off the end of the three hundred it keeps. The save goes at 1,545,000, just past the
+   last of them, because this test asks for every kind at once. The old 23,000 was day 23 of the
+   1,000-tick day; after the merge it was a quarter of an hour, the valley had no name, and the test
+   threw on the `undefined` where that name should have been. */
 test('a world with every kind of name, saved, loaded, and run on, names as the straight run does', t => {
-  const o = oracle('alpha', 23000, 1500, SMALL);
+  const o = oracle('alpha', 1545000, ticks(1500), SMALL);
   const snap = o.snap;
   t.diagnostic(`at the save: the valley is ${snap.valley.names[0].text}, ${snap.sectors.filter(s => s.names && s.names.length).length} sector(s) named, ${snap.lostNames.length} name(s) the index alone holds, ${snap.nrng} in the name stream`);
   /* What the save was picked for. Each is read off the save itself. */
@@ -423,20 +554,25 @@ test('a world saved before anybody living has named a thing round-trips whole', 
   /* And it names things from there as the straight run does. */
   const named = w => w.nameThings().filter(x => w.nameOf(x)).length;
   const before = named(api);
-  for (let i = 0; i < 4000; i++){ was.step(); api.step(); }
+  for (let i = 0; i < ticks(4000); i++){ was.step(); api.step(); }
   assert.deepEqual(nameState(api), nameState(was));
   assert.ok(named(api) > before, `nothing was named after the load: ${named(api)} things named, as before`);
 });
 /* The versioning policy again: a save written before the naming work holds none of these fields, and
    the loader seeds the name stream as a fresh world does. Such a save names no water, no pond, and no
-   crossing, so no tile of it points at one. */
-test('a version 1 save written before the names loads, and the world starts its names afresh', () => {
+   crossing, so no tile of it points at one.
+   G4 task 1 rebased this test from version 1 to version 2. The version rose because the meaning of
+   `tick` changed, so a version 1 save is now refused outright, which the refusal test below asserts.
+   What this test is about is not the number: it is that the decoder tolerates a save missing fields
+   added after it was written. That policy did not change with the version, so the test follows the
+   version up rather than being deleted with it. */
+test('a save written before the names loads, and the world starts its names afresh', () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   for (const k of ['nrng', 'lore', 'tongue', 'valley', 'river', 'stillWater', 'ponds', 'fords']) delete old[k];
   for (const lv of old.levels) for (const t of lv){ if (!t) continue; delete t.water; delete t.pond; delete t.ford; }
   for (const list of ['hills', 'caves', 'sectors', 'groves', 'camps', 'beings', 'lines'])
     for (const r of old[list]){ delete r.names; delete r.nameKnown; delete r.epithet; delete r.epithets; }
-  assert.equal(old.version, 1);
+  assert.equal(old.version, api.SNAPSHOT_VERSION);
   assert.equal(api.loadSnapshot(old), null);
   assert.equal(api.lore, null);
   assert.equal(api.nameOf(api.valley), null);
@@ -445,10 +581,14 @@ test('a version 1 save written before the names loads, and the world starts its 
   assert.equal(api.nameIndex.size, 0);
   assert.equal(api.usedMeanings.size, 0);
   assert.equal(typeof api.streamState(api.nrng), 'number');
-  /* Minor 22: two hundred steps say that a world loaded with no names runs on and names again.
-     The index starts empty above and holds something here, so the run is doing the work. */
-  for (let i = 0; i < 200; i++) api.step();
-  assert.ok(api.nameIndex.size > 0, 'the loaded world named nothing in two hundred steps');
+  /* Minor 22: a fifth of a world day says that a world loaded with no names runs on and names again.
+     The index starts empty above and holds something here, so the run is doing the work.
+     This was two hundred ticks of the old 1000-tick day. Two hundred ticks of the G4 day is three
+     minutes of world time, and the naming pass runs once a night, so the run never reached one and
+     the world named nothing. The span converts; the assertion does not change. */
+  const span = api.ticks(200);
+  for (let i = 0; i < span; i++) api.step();
+  assert.ok(api.nameIndex.size > 0, `the loaded world named nothing in ${span} ticks, a fifth of a world day`);
 });
 
 /* Minor 15: TILE_DEFAULTS is the shape every fresh tile starts in, and `makeTile` and the decoder
@@ -516,12 +656,13 @@ test('a save carries who the player is and whether they have been told', () => {
   assert.deepEqual(back.inhabited, marked.inhabited);
   assert.equal(back.inhabitedTold, true);
 });
-/* The versioning policy: a field added after version 1 is read as optional, with the value a world
-   that never had it holds. The version stays 1, so a rebuilt page does not refuse every autosave. */
-test('a version 1 save written before Become loads, and the player is nobody', () => {
+/* The versioning policy: a field added after the current version is read as optional, with the value
+   a world that never had it holds. The version does not rise for a new field, so a rebuilt page does
+   not refuse every autosave. It rises only when a saved field changes meaning, as `tick` did in G4. */
+test('a save written before Become loads, and the player is nobody', () => {
   const api = load(), old = through(lateWorld().takeSnapshot());
   delete old.inhabited; delete old.inhabitedTold; delete old.strayGroves;
-  assert.equal(old.version, 1);
+  assert.equal(old.version, api.SNAPSHOT_VERSION);
   assert.equal(api.loadSnapshot(old), null);
   assert.equal(api.inhabited, null);
   assert.equal(api.inhabitedTold, false);
@@ -545,7 +686,7 @@ test('a load while a god\'s turn is open leaves no turn standing, and the world 
 });
 test('a world made with forced acts round-trips, and the option comes back', () => {
   const was = load(); was.startWorld('alpha', { sw: 8, sh: 5, force: true });
-  for (let i = 0; i < 2000; i++) was.step();
+  for (let i = 0; i < ticks(2000); i++) was.step();
   assert.equal(was.options.force, true);
   const api = load();
   assert.equal(api.loadSnapshot(through(was.takeSnapshot())), null);
@@ -566,7 +707,7 @@ test('the guard names a Map, a Set, and anything that is not plain data', () => 
     'a typed array':             (a, out) => { a.beings[0].seen = new Int32Array(4); out.push('being.seen -> not plain data, which a snapshot cannot hold'); },
   };
   for (const name in cases){
-    const a = load(); a.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 200; i++) a.step();
+    const a = load(); a.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < ticks(200); i++) a.step();
     const want = [];
     cases[name](a, want);
     assert.deepEqual(a.unnamedRefs(), want, name);
@@ -581,7 +722,7 @@ test('the guard walks every saved global, not only creation and the field', () =
     'in a resCache value': (a, out) => { a.resCache.set('made up', { home: a.camps[0] }); out.push('resCache.[made up].home -> camp'); },
   };
   for (const name in cases){
-    const a = load(); a.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 200; i++) a.step();
+    const a = load(); a.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < ticks(200); i++) a.step();
     const want = [];
     cases[name](a, want);
     assert.deepEqual(a.unnamedRefs(), want, name);
@@ -592,7 +733,7 @@ test('the guard walks every saved global, not only creation and the field', () =
    A refusal is enough when the save is merely wrong. These are the ones that loaded and then killed
    the page a step later, so the loader must refuse each in the stage. */
 test('a save that would kill the page a step later is refused, and the world stays as it was', () => {
-  const was = load(); was.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < 2000; i++) was.step();
+  const was = load(); was.startWorld('r', { sw: 8, sh: 5 }); for (let i = 0; i < ticks(2000); i++) was.step();
   const good = through(was.takeSnapshot());
   const spoil = {
     'a species no table knows':  s => { s.beings[0].species = 'elf'; },
@@ -624,12 +765,17 @@ test('a save that would kill the page a step later is refused, and the world sta
   /* The good save still loads, so the checks above refuse nothing a real world writes. */
   const api = load();
   assert.equal(api.loadSnapshot(through(good)), null);
-  for (let i = 0; i < 200; i++) api.step();
+  for (let i = 0; i < ticks(200); i++) api.step();
 });
+/* A version 1 save is refused, and this is the test that says so. G4 task 1 made a tick 86.4 world
+   seconds, so a version 1 save holds a tick and every stamp beside it meaning 86.4 times less. No
+   per-field default rescues that, so the save is refused whole rather than read wrong. */
 test('the version refusal names both versions, and a version that is no number says so plainly', () => {
   const api = load(), good = through(lateWorld().takeSnapshot());
-  assert.equal(api.loadSnapshot({ ...good, version: 2 }), 'This save is version 2. This world reads version 1.');
-  assert.equal(api.loadSnapshot({ ...good, version: '1' }), 'This file is not a save this world can read.');
+  assert.equal(api.SNAPSHOT_VERSION, 2);
+  assert.equal(api.loadSnapshot({ ...good, version: 1 }), 'This save is version 1. This world reads version 2.');
+  assert.equal(api.loadSnapshot({ ...good, version: 3 }), 'This save is version 3. This world reads version 2.');
+  assert.equal(api.loadSnapshot({ ...good, version: '2' }), 'This file is not a save this world can read.');
   assert.equal(api.loadSnapshot({ ...good, version: null }), 'This file is not a save this world can read.');
 });
 test('a refused load keeps the reason it threw, and a load that lands clears it', () => {
@@ -764,14 +910,21 @@ const KNOWN_CONSTS = {
   GOALS: 'a table, filled at load time by recipes.js', SPECIES: 'a table, the god row added at load time',
   LIFE: 'a table, the god row added at load time',
   bfsOut: 'search scratch',
+  /* G4 task 2. The tick each cellular system next runs on, and counters for the tests. No rule reads
+     it, so it is not saved: a loaded world refills it on its first beat, and `resetBeats` empties and
+     refills the same object rather than reassigning it, because the manifest takes the API's
+     references once at load. */
+  beats: 'the cellular beats, rebuilt by resetBeats at every world start',
 };
 /* The containers nothing writes into after load time. Each was checked by the same grep, and none of
    them was hit. A table needs no reason beyond being a table, so this is a list of names. */
-const FROZEN_TABLES = new Set(['DIRS', 'RING', 'NEAR', 'AROUND', 'DEFAULT_OPTIONS', 'MATERIALS', 'GROUND', 'FEATURES',
+const FROZEN_TABLES = new Set(['SEASON_LENGTHS', 'DIRS', 'RING', 'NEAR', 'AROUND', 'DEFAULT_OPTIONS', 'MATERIALS', 'GROUND', 'FEATURES',
   'ITEMS', 'BIOMES', 'TILE_DEFAULTS', 'STAGES', 'SEASONS', 'CLOCK', 'CONTRASTS', 'INHERITED', 'BIOME_OF', 'GROWS',
   'NAMES', 'GATHERERS', 'RECIPES', 'PLACES', 'MAKERS', 'GOD_NAMES', 'EPITHET', 'BODY', 'LEAVES', 'SCAR_OF', 'MAKES',
   'KINDS', 'STRAIN', 'GOD_ACTS', 'GOD_BARS', 'SCAR_PAINTERS', 'SPAWN', 'REFS', 'REF_HOMES', 'REF_DERIVED', 'REF_KINDS',
   'SAVED_STATE', 'NOT_SAVED', 'WALK_HOME', 'DOOR_SOURCES', 'DOOR_ACTS',
+  /* G4 task 2: the names of the systems that run on the cellular beat. Read by `resetBeats`, written by nothing. */
+  'CELLULAR',
   /* The naming tables. The namer reads each one and writes into none of them. */
   'OLD_ONSETS', 'OLD_VOWELS', 'OLD_CODAS', 'OLD_FORBID', 'LAND_WORDS', 'LAND_WORD_KINDS', 'LORE_BUILT', 'LORE_TOOK', 'SKY_MEANINGS',
   'SPRITE_MEANINGS', 'OLD_CAVE_KINDS', 'BIOME_WORD', 'LAND_MARKS', 'WORD_TAIL', 'WORD_PHRASE', 'NOTABLE_TAILS',
