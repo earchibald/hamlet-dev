@@ -494,6 +494,9 @@ function viewKey(){
 /* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
    Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
 function fireCentre(){ return viewCamp ? viewCamp.pit || viewCamp.site || null : null; }
+/* The sector that holds the fire the camp fire view centres on, or null with no fire. The view's line
+   names this sector and not the cursor's, which keyboard moves carry into the next sector. */
+function fireSector(){ const p = fireCentre(); if (!p) return null; const f = secOf(p[0], p[1]); return sectors[secIdx(f.sx, f.sy)]; }
 /* The view M goes to next from v. The camp fire view is skipped when there is no fire to centre on. */
 function nextView(v){ const n = NEXT_VIEW[v]; return n === 'fire' && !fireCentre() ? NEXT_VIEW[n] : n; }
 /* The top-left tile of the sector view and the camp fire view. Every conversion between their pixels

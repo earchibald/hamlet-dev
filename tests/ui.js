@@ -910,7 +910,7 @@ test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a
 
 /* Recommendation 8: a view on the camp fire. M walks sector, nearby, world, camp fire, and back to
    sector. The view is the close-up's shape and scale, with the chosen camp's pit in the middle. */
-const FIRE_API = [...KEYS, 'NEXT_VIEW', 'VIEW_LABEL', 'nextView', 'locOrigin', 'cursorTo', 'cellFrom', 'W', 'H', 'LW', 'LH', 'camps', 'secOf', 'ui'];
+const FIRE_API = [...KEYS, 'NEXT_VIEW', 'VIEW_LABEL', 'nextView', 'locOrigin', 'cursorTo', 'cellFrom', 'W', 'H', 'LW', 'LH', 'camps', 'secOf', 'ui', 'cursorAfter', 'fireCentre', 'fireSector', 'sectors', 'secIdx'];
 const FIRE_EXTRA = { getView: '() => view', getCur: '() => cur', getCursor: '() => cursor', getLvl: '() => lvl',
   pick: '(c) => { viewCamp = c; }', go: '(v, s) => setView(v, s)',
   setCv: '(r) => { cv = { getBoundingClientRect: () => r }; }' };
@@ -993,6 +993,61 @@ test('F1 in the camp fire view centres it on that camp’s fire', () => {
   assert.equal(api.getView(), 'fire');
   const { ox, oy } = api.locOrigin();
   assert.ok(p[0] >= ox && p[0] < ox + LW && p[1] >= oy && p[1] < oy + LH, 'the new camp’s fire is in view');
+});
+
+/* Alt+arrow sends an edge step, not a sector step. The first press goes to the edge of the cursor's
+   sector, which is often still inside the camp fire view. The view must still give way to the sector view. */
+test('in the camp fire view Alt+arrow opens the sector view, where the same key in the sector view lands', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  const row = api.KEYMAP.find(r => r.key === 'ArrowRight' && r.alt);
+  assert.deepEqual(row.arg, [1, 0, 'edge'], 'the Alt+arrow row sends an edge step');
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const { ox, oy } = api.locOrigin(), from = api.getCursor();
+  const want = api.cursorAfter(from, 1, 0, 'edge', 'loc');
+  /* The case that went wrong: the step lands inside the camp fire view. A landing outside it left by the old rule too. */
+  assert.ok(want.x >= ox && want.x < ox + LW && want.y >= oy && want.y < oy + LH, 'the edge step lands inside the camp fire view');
+  withPage(() => api.ACTIONS[row.action](row.arg));
+  assert.equal(api.getView(), 'loc', 'the edge step leaves the camp fire view');
+  assert.deepEqual(api.getCursor(), want, 'the cursor lands where the same key lands in the sector view');
+  assert.deepEqual(api.getCur(), api.secOf(want.x, want.y), 'the sector view is the one the cursor is in');
+});
+
+test('F1 to a camp with no site leaves the camp fire view for the sector view', () => {
+  const api = fireWorld(), c = api.camps[0];
+  c.site = null; c.pit = null;
+  withPage(() => { api.pick({ pit: [100, 50], site: [100, 50] }); api.go('fire'); });
+  assert.equal(api.getView(), 'fire');
+  withPage(() => api.ACTIONS.campN(1));
+  assert.equal(api.getView(), 'loc', 'with no fire to centre on, the view is the sector view');
+  assert.equal(api.fireCentre(), null);
+});
+
+test('entering the camp fire view from below ground puts the level and the cursor on the surface', () => {
+  const api = fireWorld();
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => { api.go('loc', api.secOf(100, 50)); api.cursorTo(100, 50, -1); });
+  assert.equal(api.getLvl(), -1, 'the setup is below ground');
+  withPage(() => api.go('fire'));
+  assert.equal(api.getLvl(), 0, 'the view opens on the surface, where the fire is');
+  assert.equal(api.getCursor().z, 0, 'the cursor is on the surface too');
+  /* A cursor off screen and below ground goes to the fire, on the surface. */
+  withPage(() => { api.go('loc', { sx: 0, sy: 0 }); api.cursorTo(0, 0, -1); api.go('fire'); });
+  assert.deepEqual(api.getCursor(), { x: 100, y: 50, z: 0 });
+  assert.equal(api.getLvl(), 0);
+});
+
+test('the camp fire view names the sector that holds the fire, not the cursor’s', () => {
+  const api = fireWorld(), { LW } = api;
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const f = api.secOf(100, 50), { ox, oy } = api.locOrigin();
+  /* A tile in the view but in another sector than the fire. */
+  const x = f.sx * LW - 1 >= ox ? f.sx * LW - 1 : (f.sx + 1) * LW;
+  withPage(() => api.cursorTo(x, oy, 0));
+  assert.equal(api.getView(), 'fire');
+  assert.notDeepEqual(api.getCur(), f, 'the cursor is in another sector than the fire');
+  assert.equal(api.fireSector(), api.sectors[api.secIdx(f.sx, f.sy)]);
 });
 
 test('a reached stage shows when it has a row to show or a goal done, not when its only news is a folded idle goal', () => {

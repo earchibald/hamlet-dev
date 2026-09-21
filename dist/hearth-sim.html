@@ -7834,6 +7834,9 @@ function viewKey(){
 /* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
    Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
 function fireCentre(){ return viewCamp ? viewCamp.pit || viewCamp.site || null : null; }
+/* The sector that holds the fire the camp fire view centres on, or null with no fire. The view's line
+   names this sector and not the cursor's, which keyboard moves carry into the next sector. */
+function fireSector(){ const p = fireCentre(); if (!p) return null; const f = secOf(p[0], p[1]); return sectors[secIdx(f.sx, f.sy)]; }
 /* The view M goes to next from v. The camp fire view is skipped when there is no fire to centre on. */
 function nextView(v){ const n = NEXT_VIEW[v]; return n === 'fire' && !fireCentre() ? NEXT_VIEW[n] : n; }
 /* The top-left tile of the sector view and the camp fire view. Every conversion between their pixels
@@ -9013,16 +9016,17 @@ function renderUI(force){
   camp = viewCamp;
   /* The clock and the foot run every tick. The view key does not know the wall clock. */
   renderClock(); renderFoot();
+  /* The view button names the view M goes to next. It is written on every call, before the view key,
+     because the key holds neither the view nor whether a fire exists. The camp fire view joins the cycle
+     when the camp picks its site, with the view unchanged. setHTML skips the write when nothing changed. */
+  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
-  /* The view button names the view M goes to next. It is written here, not only when the view changes,
-     because the camp fire view joins the cycle when the camp picks its site, with the view unchanged. */
-  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(fireSector() || s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = !closeUp(view);
@@ -9309,8 +9313,10 @@ function setView(v, s){
   /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
   const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
-  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view. */
-  if (p){ cur = secOf(p[0], p[1]); if (!inLocView(cursor.x, cursor.y)) cursor = { x: p[0], y: p[1], z: lvl }; }
+  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
+     The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
+     opened from below ground showed the fire's tiles at the lower level, with the cursor there too. */
+  if (p){ cur = secOf(p[0], p[1]); lvl = 0; cursor = inLocView(cursor.x, cursor.y) ? { x: cursor.x, y: cursor.y, z: 0 } : { x: p[0], y: p[1], z: 0 }; }
   $('world').hidden = v !== 'world'; $('loc').hidden = !closeUp(v); $('mid').hidden = v !== 'mid';
   renderUI(true);
 }
@@ -9326,8 +9332,11 @@ function cursorTo(x, y, z){
   else if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
   if (closeUp(view) && cursor.z !== lvl) setLevel(cursor.z);
 }
-/* A sector step leaves the camp fire view for the sector view of the sector the cursor lands in. */
-function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && mult === 'sector') setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
+/* A sector step or an edge step leaves the camp fire view for the sector view of the sector the cursor
+   lands in. The edge step is Alt+arrow. It lands where the same key lands in the sector view of the
+   cursor's sector: on that sector's edge, or one sector on when the cursor is already on the edge.
+   Before this, only the nav buttons left, and Alt+arrow often stayed in the camp fire view. */
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && (mult === 'sector' || mult === 'edge')) setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
   if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
@@ -9611,8 +9620,9 @@ const ACTIONS = {
   focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
-  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. */
-  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. A camp
+     with no site has no fire, so setView('fire') gives the sector view instead. */
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } else if (view === 'fire') setView('fire'); renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },

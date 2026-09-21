@@ -6,16 +6,17 @@ function renderUI(force){
   camp = viewCamp;
   /* The clock and the foot run every tick. The view key does not know the wall clock. */
   renderClock(); renderFoot();
+  /* The view button names the view M goes to next. It is written on every call, before the view key,
+     because the key holds neither the view nor whether a fire exists. The camp fire view joins the cycle
+     when the camp picks its site, with the view unchanged. setHTML skips the write when nothing changed. */
+  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
-  /* The view button names the view M goes to next. It is written here, not only when the view changes,
-     because the camp fire view joins the cycle when the camp picks its site, with the view unchanged. */
-  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? `The fire at ${viewCamp.name}, in ${sectorLabel(fireSector() || s)} \u00b7 ${levelName(lvl)}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
   $('tools').hidden = !closeUp(view);

@@ -66,8 +66,10 @@ function setView(v, s){
   /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
   const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
-  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view. */
-  if (p){ cur = secOf(p[0], p[1]); if (!inLocView(cursor.x, cursor.y)) cursor = { x: p[0], y: p[1], z: lvl }; }
+  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
+     The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
+     opened from below ground showed the fire's tiles at the lower level, with the cursor there too. */
+  if (p){ cur = secOf(p[0], p[1]); lvl = 0; cursor = inLocView(cursor.x, cursor.y) ? { x: cursor.x, y: cursor.y, z: 0 } : { x: p[0], y: p[1], z: 0 }; }
   $('world').hidden = v !== 'world'; $('loc').hidden = !closeUp(v); $('mid').hidden = v !== 'mid';
   renderUI(true);
 }
@@ -83,8 +85,11 @@ function cursorTo(x, y, z){
   else if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
   if (closeUp(view) && cursor.z !== lvl) setLevel(cursor.z);
 }
-/* A sector step leaves the camp fire view for the sector view of the sector the cursor lands in. */
-function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && mult === 'sector') setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
+/* A sector step or an edge step leaves the camp fire view for the sector view of the sector the cursor
+   lands in. The edge step is Alt+arrow. It lands where the same key lands in the sector view of the
+   cursor's sector: on that sector's edge, or one sector on when the cursor is already on the edge.
+   Before this, only the nav buttons left, and Alt+arrow often stayed in the camp fire view. */
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && (mult === 'sector' || mult === 'edge')) setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
   if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
@@ -368,8 +373,9 @@ const ACTIONS = {
   focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
-  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. */
-  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. A camp
+     with no site has no fire, so setView('fire') gives the sector view instead. */
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } else if (view === 'fire') setView('fire'); renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
