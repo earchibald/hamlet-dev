@@ -583,7 +583,14 @@ function senseBeings(){
        than worked out a second way. A tick on which a hazard stands beside a being that is not acting
        is a tick the engine steps away from rather than jumps from. See `nextEvent` in main.js. */
     if (pinAt !== tick){ pinAt = tick; pinMask = 0; }
-    pinMask |= cause === 'fire' ? 1 : 2;
+    /* ONE BIT PER CAUSE THIS PASS NAMES, AND A BIT FOR ANY OTHER. `cause` used to fall through an
+       `=== 'fire' ? 1 : 2`, so a third cause was counted as a hunter and the `none` bucket in
+       `nextEvent` could not be reached at all. The plan's "a two-way split silently absorbing a third
+       case" was the shape of the very counter built to prevent it. A cause neither named bit covers
+       sets bit 4, and `nextEvent` counts every mask that carries bit 4 in `none`. A task that adds a
+       cause here adds its own bit and its own bucket, and until it does the count lands in `none`
+       rather than in another cause's name. */
+    pinMask |= cause === 'fire' ? 1 : cause === 'hunter' ? 2 : 4;
     a.next = tick;
     /* A sleeper does not act, so the pass is the only thing that can rouse it. Sleeping through a wolf
        at five tiles is what the head did, because it returned at the sleep check before it ever looked;

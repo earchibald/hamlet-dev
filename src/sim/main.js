@@ -150,22 +150,39 @@ function advance(to){
    The pass has already answered the question, so the pin costs nothing to read.
 
    THE COUNTERS ARE A MEASUREMENT AND NOT A RULE. `pins` counts, for every horizon asked for, why the
-   answer was the next tick. It is split by cause with a bucket for a pin with no cause, because a
-   two-way split that quietly absorbs a third case is what makes a permanent cost read as an episodic
-   one: a camp's fire burns every night of the world's life, while a wolf near a sleeper is an evening.
-   `both` is its own bucket rather than being folded into either. Nothing here draws a random number or
-   changes an answer, and the predicate behind the fire and hunter buckets was answered by
-   `senseBeings` for its own reasons, so counting it is free. `pins` and the four `let`s below are in
-   NOT_SAVED beside `chronicleWritten`. */
+   answer was the next tick. It is split by cause, because a two-way split that quietly absorbs a third
+   case is what makes a permanent cost read as an episodic one: a camp's fire burns every night of the
+   world's life, while a wolf near a sleeper is an evening. `both` is its own bucket rather than being
+   folded into either, and `none` is the bucket for a cause this file does not name.
+
+   `none` WAS UNREACHABLE AND IS NOW REACHABLE, and the difference is one line in `senseBeings`. That
+   line read `pinMask |= cause === 'fire' ? 1 : 2`, so every cause but fire was a hunter, `pinMask` was
+   never 0 once the pass had pinned, and `none` was a constant rather than a count. The task 4 review
+   proved it by relabelling the rouser branch's cause in a throwaway copy and getting byte-identical
+   counters. The pass now sets bit 4 for a cause it does not name, and `pinBucket` sends every mask
+   carrying bit 4 to `none`, so the guard the plan asked for is a count and not a claim.
+
+   Nothing here draws a random number or changes an answer, and the predicate behind the fire and
+   hunter buckets was answered by `senseBeings` for its own reasons, so counting it is free. `pins` and
+   the four `let`s below are in NOT_SAVED beside `chronicleWritten`. */
 let acted = -1;                 // the last tick on which a being acted
 let moves = 0;                  // moves made, stepped or jumped, since the world began. `steps` is taken, in path.js.
 let pinAt = -1, pinMask = 0;    // the last tick `senseBeings` found a hazard, and which kinds it found
 /* `asked` is how many horizons were asked for, and `next` how many of those were the next tick --
    the pinned share is `next / asked`. The other eight are causes, one bucket each, and they sum to
-   `asked`: `fire`, `hunter` and `both` are ruling 6's pass, `none` is a pin that pass made with no
-   cause recorded and must stay zero, `acted` is the tick after a being acted, and `being`, `stored`
-   and `beat` are which kind of entry won the horizon. */
+   `asked`: `fire`, `hunter` and `both` are ruling 6's pass, `none` is a pin that pass made for a cause
+   this file does not name, `acted` is the tick after a being acted, and `being`, `stored` and `beat`
+   are which kind of entry won the horizon. `none` is zero today because the pass names both of the
+   causes it can find; a count in it is news and not a fault. */
 const pins = { asked: 0, next: 0, fire: 0, hunter: 0, both: 0, none: 0, acted: 0, being: 0, stored: 0, beat: 0 };
+/* Which bucket a hazard mask belongs in. Bit 1 is fire, bit 2 is a hunter, and bit 4 is a cause
+   `senseBeings` set without naming, so every mask that carries it -- 4, 5, 6, 7 -- is `none`. The
+   mapping is a named function rather than a chain inside `nextEvent` so that a test can put a mask to
+   it and read the answer, which is how `tests/skip.js` shows that `none` can be reached. */
+function pinBucket(mask){
+  if (mask & 4) return 'none';
+  return mask === 1 ? 'fire' : mask === 2 ? 'hunter' : mask === 3 ? 'both' : 'none';
+}
 function resetPins(){ acted = -1; moves = 0; pinAt = -1; pinMask = 0; for (const k in pins) pins[k] = 0; }
 function nextEvent(){
   pins.asked++;
@@ -181,7 +198,7 @@ function nextEvent(){
      count the engine already keeps, so this is one integer read. Fire is episodic on these seeds --
      the soak's six hold no burning tile at all -- so it is not a standing cost. */
   if (fireCount > 0){ pins.fire++; pins.next++; return tick + CLOCK.every.next; }
-  if (pinAt === tick){ pins[pinMask === 1 ? 'fire' : pinMask === 2 ? 'hunter' : pinMask === 3 ? 'both' : 'none']++; pins.next++; return tick + CLOCK.every.next; }
+  if (pinAt === tick){ pins[pinBucket(pinMask)]++; pins.next++; return tick + CLOCK.every.next; }
   if (acted === tick){ pins.acted++; pins.next++; return tick + CLOCK.every.next; }
   let t = beat, why = 'beat';
   const mark = (v, kind) => { if (typeof v === 'number' && v > tick && v < t){ t = v; why = kind; } };
@@ -207,10 +224,27 @@ function nextEvent(){
   return t;
 }
 /* Run the world to tick `t`, jumping over the ticks with nothing in them. It is what the tests, the
-   soak and the page's faster rungs use. A caller that wants to act at a tick of its own — a script
-   god, a player's stop — asks for the horizon itself and runs to the earlier of the two, so an
-   outside act still lands on the tick it would have landed on stepping. */
-function runTo(t){
-  while (tick < t && !pending) advance(Math.min(nextEvent(), t));
+   soak and the page's faster rungs use.
+
+   THIS IS THE ONLY COPY OF THE LOOP, and that is the fix the task 4 review asked for. It shipped with
+   no caller: `tests/lib/run.js:runOn` held a second copy of the loop and `tests/skip.js:skipOn` a
+   third, so the two loops under test were not the loop in the product. The review gutted this function
+   to `return tick;` in a throwaway copy and every gate stayed green. Both harnesses call it now, so
+   gutting it reds the soak, `tests/skip.js` and every suite that runs days.
+
+   `atTick` is what a caller does at each tick the engine visits. A god is an outside actor and it must
+   be asked on every visited tick, or its act lands late and a skipped run tells another story than a
+   stepped one. `atTick.wants()` is the earliest tick that caller wants to be handed control at, and
+   the horizon is brought forward to it; a caller with no `wants` is handed the horizon, which is the
+   right answer for one that watches the world rather than the clock. A caller with no `atTick` at all
+   -- the page's faster rungs -- runs from horizon to horizon and is handed nothing. An act itself
+   still enters through `inject`, so the door's rule is untouched. */
+function runTo(t, atTick){
+  while (tick < t && !pending){
+    let to = Math.min(nextEvent(), t);
+    if (atTick && atTick.wants){ const w = atTick.wants(); if (w > tick && w < to) to = w; }
+    advance(to);
+    if (atTick) atTick();
+  }
   return tick;
 }
