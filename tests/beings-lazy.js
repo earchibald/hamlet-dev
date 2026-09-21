@@ -462,16 +462,50 @@ test('the old-age roll runs once a world day', () => {
   assert.deepEqual(seen, [0, 0, 0], 'the roll lands on the turn of the day');
 });
 
-/* The budget. A wall time is a property of the machine, so the load average is printed beside it and
-   the assertion stands down on a busy machine rather than teach the reader to re-run a red gate.
-   PR 31 removed this repository's one wall-clock assertion for exactly that reason.
- *
- * Standing down is a skip and not a pass. The load average and the wall seconds rise together, so the
- * guard stands down in exactly the condition that would make the assertion bite. A bare `return` had
- * printed a green tick and a suite count of 0 skipped, and the task 3 review set the budget to
- * 0.0001 s and still got 13 pass, 0 fail, 0 skipped. So the suite's own numbers must say when the
- * budget went unmeasured, and the skip names the load average that caused it. */
-test('a world day at day 3 costs under five seconds', ctx => {
+/* ---------- the budget ----------
+   THE BUDGET IS IN REFERENCE UNITS, NOT IN WALL SECONDS, AND IT NO LONGER STANDS DOWN. A wall second
+   is a property of the machine, so this test used to print the seconds and then skip above a
+   one-minute load average of 2. `node --test` runs the files of `npm run fast` in parallel -- eighteen
+   at a time on the machine this was written on -- so the load inside the gate is always above 2 and
+   the budget could never fire there. The task 4 review watched it skip at load 9.39 having measured
+   5.02 s against a budget of five: it simulated three world days, held a figure over its own budget,
+   and reported a skip. A guard that both measures and refuses to judge is the worst of the three
+   shapes, because the summary reads as a pass and the figure sits in the detail.
+
+   SO THE MEASUREMENT IS MADE LOAD-INDEPENDENT INSTEAD OF BEING ABANDONED. `refUnit` is a fixed lump of
+   arithmetic, timed in this same process on each side of the day. Contention slows the day and the
+   reference loop by the same factor, so their ratio holds while the raw seconds do not. Measured on
+   seed r, day 3, on 18 cores:
+
+     | one-minute load | the day, wall s | one reference unit, s | the day, in units |
+     | 5.17            | 2.876           | 0.2343                | 12.27             |
+     | 11.97           | 4.819           | 0.3925                | 12.28             |
+     | 12.13           | 4.543           | 0.3770                | 12.05             |
+     | 12.59           | 4.431           | 0.3532                | 12.55             |
+
+   The three loaded rows were taken with `npm run fast` running beside them. The wall seconds moved by
+   1.68 times and the units by 4 percent, which is the whole reason the budget is written in units.
+
+   WHERE THE CEILING COMES FROM. One reference unit costs 0.235 s on a quiet machine of this kind,
+   measured as the mean of eight repeats at a one-minute load average of 5.12 with a spread of 1
+   percent. The budget was five wall seconds, so it is 5 / 0.235 = 21.3 units, and the ceiling is the
+   whole number below that: 21 units, or 4.94 s quiet. That is the same budget read in another unit,
+   rounded the strict way, and nothing was widened to make it fire.
+
+   WHAT WOULD FOOL IT. The reference loop is arithmetic and the engine also walks the world's arrays,
+   so a machine whose memory system is far slower than its arithmetic, relative to this one, reads a
+   little high. The wall seconds and the load average are printed beside the units for that reason. The
+   assertion is on the units, and it is made on every run: no load check remains, so there is no
+   condition under which this test measures the day and then declines to judge it. */
+const REF_ITERATIONS = 3e7;
+const REF_QUIET_SECS = 0.235;   // what one reference unit costs on a quiet machine of this kind
+const BUDGET_SECS = 5;          // the budget as it was written, in wall seconds
+const BUDGET_UNITS = Math.floor(BUDGET_SECS / REF_QUIET_SECS);
+function refUnit(){ let s = 0; for (let i = 1; i <= REF_ITERATIONS; i++) s += Math.sqrt(i) % 1.7; return s; }
+function refSecs(){ const t0 = process.hrtime.bigint(); refUnit(); return Number(process.hrtime.bigint() - t0) / 1e9; }
+test(`a world day at day 3 costs under ${BUDGET_UNITS} reference units, which is ${BUDGET_SECS} s on a quiet machine`, () => {
+  refUnit();                                        // warm the loop, so the first timed pass is not the first run
+  const ref1 = refSecs();
   const api = load();
   api.startWorld('r');
   const god = i => { for (const c of api.camps) if (c.pit && !c.everLit && c.coals <= i) api.inject({ source: 'player', act: 'light', x: c.pit[0], y: c.pit[1], z: 0 }); };
@@ -481,8 +515,13 @@ test('a world day at day 3 costs under five seconds', ctx => {
     for (const end = i + api.DAY; i < end; i++){ api.step(); god(i); }
     secs = Number(process.hrtime.bigint() - t0) / 1e9;
   }
+  /* One reference reading on each side of the day, so a machine that grew busier or quieter during the
+     run is averaged rather than believed at one end. */
+  const ref = (ref1 + refSecs()) / 2;
+  const units = secs / ref;
   const load1m = os.loadavg()[0];
-  console.log(`    day 3 on seed r: ${secs.toFixed(2)} s, one-minute load average ${load1m.toFixed(2)}`);
-  if (load1m > 2) return ctx.skip(`the budget went unmeasured at a one-minute load average of ${load1m.toFixed(2)}, which is over 2; the day took ${secs.toFixed(2)} s. Run it again on a quiet machine.`);
-  assert.ok(secs < 5, `a world day at day 3 took ${secs.toFixed(2)} s at a one-minute load average of ${load1m.toFixed(2)}, and the budget is 5 s`);
+  console.log(`    day 3 on seed r: ${units.toFixed(2)} reference units of a budget of ${BUDGET_UNITS}; ` +
+    `${secs.toFixed(2)} wall s, one reference unit ${ref.toFixed(4)} s, one-minute load average ${load1m.toFixed(2)}`);
+  assert.ok(ref > 0.05 && ref < 5, `one reference unit took ${ref.toFixed(4)} s, which is nothing like the 0.235 s it is calibrated at: the yardstick itself is wrong and the reading below means nothing`);
+  assert.ok(units < BUDGET_UNITS, `a world day at day 3 took ${units.toFixed(2)} reference units and the budget is ${BUDGET_UNITS} (${secs.toFixed(2)} wall s at a one-minute load average of ${load1m.toFixed(2)}, one reference unit ${ref.toFixed(4)} s)`);
 });
