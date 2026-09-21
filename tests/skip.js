@@ -27,7 +27,10 @@
 // different world and not a weaker one. It is named `idle` below and each test says what it buys.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load } = require('../src/sim');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { load, FILES } = require('../src/sim');
 const { collect, fingerprint, scriptGod, setClock } = require('./lib/run');
 
 const ANIMALS = ['rabbit', 'deer', 'wolf', 'fox', 'sprite', 'gnome'];
@@ -48,20 +51,25 @@ function stepOn(w, ticks, god = scriptGod){
   while (w.api.tick < end){ w.api.step(); god(w.api, w.api.tick - off); }
   return w;
 }
-/* `runTo`'s own loop, with the god folded into the horizon the way `tests/lib/run.js` folds it, and
-   every jump written down. A jump from a to b resolved a and b and passed over the ticks between. */
+/* THE ENGINE'S OWN `runTo`, with the god folded into the horizon the way `tests/lib/run.js` folds it,
+   and every jump written down. A jump from a to b resolved a and b and passed over the ticks between.
+   This function held a third copy of `runTo`'s loop, which is how the task 4 review could gut the
+   shipping loop to `return tick;` and watch every gate stay green. It calls `runTo` now, so the loop
+   this file tests is the loop the page runs. */
 function skipOn(w, ticks, god = scriptGod){
   const api = w.api, off = api.tick + 1, end = api.tick + ticks;
   const jumps = [], visited = [];
-  while (api.tick < end){
-    let to = Math.min(api.nextEvent(), end);
-    if (god && god.wants){ const x = god.wants(api, off); if (x > api.tick && x < to) to = x; }
-    const from = api.tick;
-    api.advance(to);
+  let from = api.tick;
+  const atTick = () => {
+    const to = api.tick;
     visited.push(to);
     if (to > from + 1) jumps.push([from, to]);
-    god(api, api.tick - off);
-  }
+    from = to;
+    god(api, to - off);
+  };
+  if (god && god.wants) atTick.wants = () => god.wants(api, off);
+  api.runTo(end, atTick);
+  assert.equal(api.tick, end, `the run stopped at tick ${api.tick} of ${end}: the engine will not run through what is pending`);
   w.jumps = jumps; w.visited = visited;
   return w;
 }
@@ -100,8 +108,14 @@ function sameStory(a, b, why){
    reads the world being a multiple of it. This is the test that keeps that true. A period that is not
    a multiple of the beat is a rule the engine can jump over, and nothing else in the suite would say
    so: the fingerprint would only differ on a seed where that rule happened to fire.
-   Each path below is a `tick % ...` site in `src/sim/`, found by grep and listed by hand. A phase
-   (`at`) is a tick of the period, so it must lie on the grid too. */
+   Each path below is a `tick % ...` site in `src/sim/`. A phase (`at`) is a tick of the period, so it
+   must lie on the grid too.
+   THE LIST WAS WRITTEN BY HAND AND IS NOW CHECKED AGAINST THE SOURCE. It was a hand grep with no
+   completeness check, so a period added by a later task and never written down here was never checked
+   at all: the task 4 review planted `CLOCK.every.freshPeriod: 7`, read by a new `tick %` rule, and this
+   file stayed green while the file's own header called the list "the horizon's one assumption". The
+   second test below reads every `tick %` site out of `src/sim/` and fails on one this list does not
+   name, and on a name in this list that no site reads. */
 const WORLD_PERIODS = [
   'every.cellular', 'every.spoil', 'every.fae', 'every.prune', 'every.carcassRot', 'every.godsRest',
   'birth.every', 'grove.every', 'den.birthEvery', 'gnome.every',
@@ -122,6 +136,87 @@ test('every period the world itself runs on lies on the cellular grid', () => {
   assert.equal(api.DAY % beat, 0);
   assert.equal(api.CLOCK.night.falls % beat, 0);
   assert.equal(api.CLOCK.night.lifts % beat, 0);
+});
+
+/* THE COMPLETENESS CHECK ON THAT LIST. Every `tick %` site in `src/sim/` is read out of the source and
+   its period named, and a period the list above does not name fails here. Without this the list agrees
+   with whatever it was last set to, which is the fault the memory calls "a document can describe
+   instead of constrain".
+
+   A `tick %` site in a COMMENT is not a rule, so the comments go first. The stripper is crude -- one
+   pass for block comments and one for line comments, with no knowledge of strings -- so each stripped
+   file is compiled by `vm.Script` afterwards, which parses and runs nothing. A stripper that ate into
+   a string literal breaks the parse and this test says so, rather than quietly scanning less than it
+   claims to.
+
+   A site's period is the left operand of the `%`, and its phase is the comparand where that is a name
+   rather than a number. Both must lie on the beat, so both are looked up here. */
+const NOT_WORLD_PERIODS = {
+  /* A being's own act rate in the dark, in `TASKS`' work step, and not a period of the world. The
+     horizon names a being's `next` tick and the engine lands on it, whatever this parity then says
+     about the work done there. */
+  'CLOCK.dark.slower': 'a being\'s own rate, not a world period',
+  /* The calendar. It is checked against the beat by its own assertion in the test above. */
+  'DAY': 'the calendar, asserted against the beat above',
+};
+function stripComments(text){
+  return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1');
+}
+test('every tick-modulo rule in src/sim names a period this file checks', () => {
+  const api = load();
+  const site = /tick\s*%\s*([A-Za-z_$][\w$.]*)\s*(?:[!=]==?\s*([A-Za-z_$][\w$.]*))?/g;
+  const listed = new Set(WORLD_PERIODS.map(p => 'CLOCK.' + p));
+  const unlisted = [], seen = new Set();
+  let sites = 0;
+  for (const f of FILES){
+    const file = path.join(__dirname, '..', 'src', 'sim', f + '.js');
+    const code = stripComments(fs.readFileSync(file, 'utf8'));
+    /* The stripper's own guard: a parse, and nothing run. */
+    try { new vm.Script(code, { filename: file }); }
+    catch (e){ assert.fail(`the comment stripper broke src/sim/${f}.js, so this test scanned something that is not the source: ${e.message}`); }
+    for (const m of code.matchAll(site)){
+      sites++;
+      for (const token of [m[1], m[2]]){
+        if (!token) continue;
+        seen.add(token);
+        if (listed.has(token) || token in NOT_WORLD_PERIODS) continue;
+        unlisted.push(`src/sim/${f}.js reads ${token} as a tick period, and WORLD_PERIODS does not name it`);
+      }
+    }
+  }
+  /* A positive gate on the instrument: a scan that found nothing would satisfy every claim below. */
+  assert.ok(sites >= 19, `only ${sites} tick-modulo sites were found in src/sim/, and there were 19 when this check was written: the scan is reading less than the source`);
+  assert.deepEqual(unlisted, [], 'a tick-modulo rule reads a period nothing checks against the beat');
+  /* And the other way: a name in the list that no rule reads any more is a stale entry, and a stale
+     list is one nobody can trust the length of. */
+  const stale = WORLD_PERIODS.filter(p => !seen.has('CLOCK.' + p)).map(p => `CLOCK.${p} is in WORLD_PERIODS and no tick-modulo rule in src/sim/ reads it`);
+  assert.deepEqual(stale, [], 'WORLD_PERIODS names a period no rule reads');
+  assert.ok(api.CLOCK.every.cellular > 0, 'the beat itself is gone');
+});
+
+/* ---------- the pin counters ---------- */
+/* `none` MUST BE REACHABLE, AND IT WAS NOT. The plan asks that a third hazard cause be counted on its
+   own rather than fall into one of two, because a two-way split makes a permanent cost read as an
+   episodic one. Task 4 answered that with `pinMask |= cause === 'fire' ? 1 : 2`, under which every
+   cause but fire was a hunter and `none` was a constant zero dressed as a count. The review proved it
+   by relabelling the rouser branch's cause in a throwaway copy: the counters came back byte-identical.
+
+   An unnamed cause cannot be arranged from outside the engine, because `senseBeings` finds the only two
+   causes there are. So this test takes the mapping apart instead. `pinBucket` is the whole of the
+   decision and it is asked directly, which is why it is a named function. The line in `senseBeings`
+   that sets the bit is read out of the source, because the mapping being right buys nothing if the pass
+   never sets the bit. */
+test('a hazard cause the engine does not name is counted in none', () => {
+  const api = load();
+  assert.equal(api.pinBucket(1), 'fire');
+  assert.equal(api.pinBucket(2), 'hunter');
+  assert.equal(api.pinBucket(3), 'both');
+  assert.equal(api.pinBucket(0), 'none', 'a pin with no bits set is a pin with no cause');
+  for (const mask of [4, 5, 6, 7])
+    assert.equal(api.pinBucket(mask), 'none', `a mask of ${mask} carries the unnamed-cause bit, so it must be counted in none and not in a cause it is not`);
+  const code = fs.readFileSync(path.join(__dirname, '..', 'src', 'sim', 'beings.js'), 'utf8');
+  assert.match(code, /pinMask \|= cause === 'fire' \? 1 : cause === 'hunter' \? 2 : 4;/,
+    'senseBeings no longer sets the unnamed-cause bit, so a third cause is being counted as one of the two named ones and none is unreachable again');
 });
 
 /* ---------- the six real seeds ---------- */
@@ -234,6 +329,16 @@ test('a pit that goes out inside a span writes its line at the same tick', t => 
   assert.equal(lb.length, 1, 'the skipped run never put the fire out');
   assert.equal(lb[0].tick, la[0].tick, 'the fire went out at another tick in the skipped run');
   out = la[0].tick;
+  /* THE CLAIM IS THE RESIDUE, AND NOT WHETHER THIS RUN HAPPENED TO LAND THERE. `!inAJump` alone is a
+     net whose sensitivity depends on which residue the burn lands on: the task 4 review moved the burn
+     to 1 mod 60 and the case stayed green, because in this arrangement the engine already visits
+     residues 0, 1 and 2 mod 60 and so it landed on the out-tick by luck. The out-tick is read off the
+     STEPPED run, which visits every tick, so this assertion is a statement about the burn and not
+     about the skip: task 2 put the fuel on the camp beat, so the out-tick is a multiple of it, and the
+     beat's own horizon entry reaches it whatever else is going on. A burn that leaves the beat at ANY
+     residue reddens this line. */
+  const beat = api0.CLOCK.every.cellular;
+  assert.equal(out % beat, 0, `the fire went out at tick ${out}, which is ${out % beat} mod ${beat}: the burn has left the camp beat, so nextEvent owes the out-tick an entry of its own`);
   assert.ok(!inAJump(b, out), 'the out-tick fell inside a jump, so the burn has left the beat and nextEvent owes it an entry');
   assert.equal(b.api.camps[0].outSince, a.api.camps[0].outSince);
   assert.equal(b.api.camps[0].streak, 0);

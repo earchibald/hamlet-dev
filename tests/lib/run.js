@@ -65,13 +65,14 @@ function collect(api){
 /* Step a world on. The loop index starts at `fromStep`, not at 0, so a world that carries on from a
    snapshot gives the script god the same numbers an unbroken run gives it.
 
-   THIS IS `runTo`'S OWN LOOP WITH THE GOD FOLDED INTO THE HORIZON. The engine's `runTo(t)` jumps from
-   one horizon to the next and hands nothing back in between, which is right for the page and wrong
-   here: a god is an outside actor and it must be asked on every tick the engine visits, or its act
-   lands late and the skipped run tells another story. So the loop asks `nextEvent()` for the horizon,
-   brings it forward to the god's own earliest tick, and makes the one move with `advance`. A god with
-   no `wants` is asked only at the horizon, which is the right answer for a god that watches the world
-   rather than the clock.
+   THIS CALLS THE ENGINE'S OWN `runTo`, AND IT USED TO HOLD A COPY OF THAT LOOP. The copy is why the
+   task 4 review could gut `runTo` to `return tick;` in a throwaway copy and watch every gate stay
+   green: the loop under test was not the loop in the product. `runTo(end, atTick)` hands control back
+   at every tick it visits, and `atTick.wants()` brings the horizon forward to the god's own earliest
+   tick, which is what the copy did by hand. A god is an outside actor and it must be asked on every
+   visited tick, or its act lands late and a skipped run tells another story than a stepped one. A god
+   with no `wants` is asked at the horizon only, which is the right answer for a god that watches the
+   world rather than the clock.
 
    `off` turns a tick into the loop index the god expects: `i = api.tick - off`. A step of one tick
    from `fromStep` gives `i = fromStep`, which is what the old loop gave it.
@@ -80,14 +81,18 @@ function collect(api){
    it, and a sample that fires only at a horizon is a sample nobody chose. */
 function runOn(api, fromStep, steps, collector, god = scriptGod, onTick){
   const end = api.tick + steps, off = api.tick - fromStep + 1;
-  while (api.tick < end){
-    let to = Math.min(api.nextEvent(), end);
-    if (god && god.wants){ const w = god.wants(api, off); if (w > api.tick && w < to) to = w; }
-    api.advance(to);
+  const atTick = () => {
     const i = api.tick - off;
     god(api, i);
     if (onTick) onTick(api, i, collector.events);
-  }
+  };
+  if (god && god.wants) atTick.wants = () => god.wants(api, off);
+  api.runTo(end, atTick);
+  /* `runTo` stops on `pending`, which the page's own loop must do and which the old copy here did not.
+     No test reaches that state -- `runDays` starts in the days era and `loadSnapshot` clears
+     `pending` -- so a short run here is a seam opening, not a run someone shortened. It is named
+     rather than shrugged at. */
+  if (api.tick < end) throw new Error(`the run stopped at tick ${api.tick} of ${end}: something is pending and the engine will not run through it`);
   return collector;
 }
 
