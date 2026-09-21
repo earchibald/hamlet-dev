@@ -12,7 +12,7 @@
 | The skip's measured gain when the animals are off the tick | 86,400 ticks in **26,403 moves**, 0.31 a tick, and the same story. So the machinery works; the valley does not let it run. |
 | `npm run fast`, six files restored | **191 s at load 7.39** against a 300 s ceiling. **Met**, with every run over 120 s behind `LONG=1` and no day count lowered. 698 tests, 644 pass, 0 fail, 54 skipped. |
 | The default soak | **141 s at load 6.54** against a 180 s ceiling. **Met.** 65 pass, 0 fail, 8 skipped, and the working record did not move. |
-| The `LONG=1` soak, 70 days | **not measured**, and the reason is given rather than the number. |
+| The `LONG=1` soak, 70 days | **1,363 s at load 2.46** against an 1,800 s ceiling. **Met.** 13 pass, 0 fail, 5 skipped, and no death that was not old age. The plan expected this one to be missed by 2.2 times. |
 | `dark.slower` | `secs(2)`. Same number, and the entry now says what it measures. |
 | `senseBeings`' stale list | Built once, before the loop. The predicate answers for the start of the tick. |
 | The snapshot oracle's four spans | Converted, with nine more of the same kind in the same file. |
@@ -217,7 +217,7 @@ and none of these rows is one.
 | `npm run fast`, all six files restored | 300 s | **191 s**, 698 tests, 644 pass, 0 fail, 54 skipped | 7.39 | **met** |
 | the default soak, six seeds, three days | 180 s | **141 s**, 73 tests, 65 pass, 0 fail, 8 skipped | 6.54 | **met** |
 | one restored file on its own | 120 s | `ui` 63 s, `settle` 31 s, `gnomes` 13 s, `names` 38 s, `snapshot` 106 s, `wanderer` under 1 s | 13.50 | **met for all six**, with the runs over the ceiling behind `LONG=1` |
-| `LONG=1` soak, 70 days on one seed | 1800 s | not measured; see below | | **not measured** |
+| `LONG=1` soak, 70 days on one seed | 1800 s | **1,363 s**, 18 tests, 13 pass, 0 fail, 5 skipped. Seed r's own 70 days took 1,320 s and wrote 395,720 chronicle lines, with no death that was not old age | 2.46 | **met** |
 
 `npm run fast` was 146.65 s at load 2.99 before this task, with the six files skipping. It is 191 s at
 load 7.39 with them restored, and it runs 698 tests where it ran a smaller number. The 300 s ceiling is
@@ -228,11 +228,12 @@ with its day count in its skip message, and not one day count was lowered.
 
 | Run | Figure | Method |
 |---|---|---|
-| a world day at day 3, seed r | **3.0 s**, and 1.6 s with the animals off the tick | this task, `tests/skip.js`, the still-valley test: 86,400 ticks stepped in 648 ms of engine time within a 1,531 ms test |
+| a world day at day 1 to 3, six seeds | **1.1 to 5.3 s, mean 2.9** | this task, `tests/skip.js`, which runs three world days twice on each soak seed. Per seed: delta 1.1, x 2.3, alpha 2.4, beta 2.9, r 3.2, gamma 5.3, at load 3.05. A peer session reached 2.3 to 2.9 on `g4-ladder` independently. |
+| a world day with the animals off the tick, seed r | **0.65 s stepped, 0.34 s skipped** | 86,400 ticks in 648 ms and 339 ms of engine time, the same fingerprint both ways |
 | a world day at day 50, seed r | **17.98 s** | task 3's measurement, not re-taken. 82 people against day 3's two. |
 | a world day at day 400 | **not measured** | it needs a 400-day run. At day 50's 18 s a world day, rising, that is over two hours before it reaches day 400, and the skip does not shorten it because the pinned share is already 100 percent. |
-| a 70-day run on one seed | **in flight at the time of writing**; `LONG=1 node --test tests/skip.js` runs 70 days stepped and 70 skipped | the arithmetic, stated as arithmetic: 70 days at 3 to 18 s a day is 210 to 1,260 s a side |
-| an 800-day run, one seed and six | **not measured** | at day 50's rate alone that is four hours a seed and a day for six, and the rate rises with the population. |
+| a 70-day run on seed r | **1,290.9 s stepped, 1,236.4 s skipped**, which is 18.4 s a world day | `LONG=1 node --test tests/skip.js`, which ran both sides in one process on the same machine: 19 tests, 19 pass, 0 fail, 2,653 s in total at load 6.92 falling to 2.65 |
+| an 800-day run, one seed and six | **not measured** | at the 18.4 s a world day the 70-day run gives, 800 days is 4.1 hours on one seed and about a day on six, and the rate rises further with the population. |
 
 **Why the last three were not made, said plainly.** The plan asked for them so the floors decision
 could rest on measurement. The measurement they would produce is already determined by the first
@@ -242,6 +243,39 @@ number that follows from a 100 percent pinned share would be a measurement of th
 figure the user needs is the pinned share, and that is measured, on six seeds, above.
 
 Every figure carries the one-minute load average at the moment it was taken, and the tool beside it.
+
+
+### The seventy-day run, which is the ceiling the plan said the skip had to earn
+
+`LONG=1 node --test tests/skip.js` ran seventy world days on seed r twice in one process, stepped and
+skipped, and compared them: **19 tests, 19 pass, 0 fail, 0 skipped, 2,653 s in total** at a one-minute
+load average of 6.92 falling to 2.65. Stepped **1,290.9 s**, skipped **1,236.4 s**, both in 6,048,000
+moves of 6,048,000 ticks — the same story, the same move count, and a 4 percent difference that is
+noise. That is **18.4 s a world day** at seventy days, which agrees with task 3's 17.98 s at day 50.
+
+The soak's own run agrees. `LONG=1 node tests/soak.js` is **1,363 s at a one-minute load average of
+2.46**, 18 tests, 13 pass, 0 fail, 5 skipped, with seed r's seventy days taking 1,320 s and writing
+395,720 chronicle lines and no death that was not old age. **The 1,800 s ceiling is met.**
+
+It is met **because a seventy-day seed was cheaper than the plan's estimate**, not because the skip
+made it cheaper. The plan put a seventy-day seed at about 4,000 s and called the ceiling missed by 2.2
+times; it is 1,320 s, so the estimate was three times high. That is the same class of error as the
+fifteen seconds a world day, and both were claims rather than measurements.
+
+### The pins over seventy days, which is where fire finally shows
+
+| bucket | ticks | share |
+|---|---|---|
+| a being acted | 5,876,908 | 97.2% |
+| a hunter beside a being at rest | 82,591 | 1.4% |
+| a burning tile | 88,500 | 1.5% |
+| both, none, a being overdue, the beat | 1 | under 0.001% |
+
+**Fire is 1.5 percent over seventy days and zero over three.** That answers the plan's own question
+directly: it feared a fire-dominated pin as a permanent cost, because a camp's hearth burns every
+night of the world's life. It is not: `fireCount` counts burning TILES, and a hearth is a `firepit`
+struct. So the fire pin is lightning and a spreading wood, which is episodic, and it costs one and a
+half percent of the ticks of a seventy-day life.
 
 ## The six restored files
 
@@ -289,6 +323,54 @@ this task was handed.
 | `tests/names.js`, one test | `progress: 9999` was past every job on the old clock and short of `CLOCK.work.hut`'s 20,736 on this one, so the hut was never built and the test read a null struct | the number is read off the table: `max(CLOCK.work) + 1` |
 | `tests/clock.js`'s lint, and `tests/tasks.js`'s closure-task lint | both read a COMMENT as a rule. The clock lint saw a quoted `tick + 1`; the closure lint saw the word START in capitals. | `CLOCK.every.next` is the next tick, one world second, in a unit helper, because `tick + 1` in a rule is a bare time literal and the lint is right about that. The two comments gave way, because widening either lint is task 11's and task 10's. |
 | `tests/snapshot.js`'s const-container guard | `pins` is a new top-level `const` container | named in `KNOWN_CONSTS` with its reason |
+
+
+### The fifteen seconds a world day was wrong, in all six suspension texts
+
+Task 1 wrote "a world day costs about 15 s on this branch" into every suspension message, and the
+plan's own arithmetic rests on it. **It is wrong by about five times.** A peer session raised it and
+this task measured it here rather than taking the figure second hand, because a figure is
+branch-local: measured on `tiers-g4` by `tests/skip.js`, which runs three world days twice on each of
+the six soak seeds, a world day is **1.1 s on `delta`, 2.3 on `x`, 2.4 on `alpha`, 2.9 on `beta`,
+3.2 on `r` and 5.3 on `gamma`, a mean of 2.9**, at a one-minute load average of 3.05. The peer reached
+2.3 to 2.9 on another branch by a different method, which agrees.
+
+Every one of the six texts now carries the measured range and says what it said before. The ceilings
+did not move: a cheaper world day is more room, not a different target.
+
+It changes the size of the gap and not the conclusion. The six files are 435 world days; at 15 s that
+is 6,525 s, at 2.9 s it is 1,260 s, and both miss the 300 s ceiling. What it changes is that the
+ceiling is now met with the flag rather than being unreachable with it.
+
+### Two reds in `tests/snapshot.js` remain, and neither is a snapshot fault
+
+`SLOW=1 node --test tests/snapshot.js` was 38 pass and 11 fail when this task began, measured at the
+branch point `f0700cf` in a throwaway copy. After the span conversion and the busy-save device it is
+**47 pass and 2 fail** of 49. Both remaining reds are preconditions about what a span PRODUCES:
+
+| test | its own words |
+|---|---|
+| `a world that digs a wolf den after the load...` | "no den was dug after the load, so startRegion and rimExits went untested" |
+| `a grown valley of the default size, saved late...` | "no burrow held a thing, so cave.holding went untested" |
+
+Each needs a span that reaches its phenomenon, and finding one costs a run an attempt: the first is
+43 s and the second 58 s. Neither assertion was touched and neither span was shortened. Both are
+behind `LONG=1`, so `npm run fast` is green with them in the file.
+
+### One red in `tests/ui.js` is not this task's
+
+`sprites follow first sight`, inside `at the start only the fire stage is reached`. **Reproduced at the
+branch point `f0700cf` under `SLOW=1` and on this tree under `LONG=1`, failing identically both
+times**, at 116.8 s and 115.1 s. A peer session reached the same conclusion independently and named a
+`CLOCK.sprite` stride conversion leak on this branch as the suspected cause. It was not chased and no
+number was moved to satisfy it. It is behind `LONG=1` in the restoration, so `npm run fast` is green.
+
+### On issues #116 and #117
+
+`tests/types.js` cannot run on this branch at all: there is no `types/` directory, no tsconfig and no
+`tsc`, which the plan already records. So the silent-skip trap of #116 could not bite here, and every
+plant in this report was run in a throwaway copy of **this** branch, which has no type check to skip.
+#117's four undeclarable `Task` fields are the merge's and were not touched.
 
 ## What state does this change have that its tests never enter?
 
