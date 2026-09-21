@@ -764,7 +764,11 @@ test('an old name with no giver still waits to be found, and a person\'s name sp
 
 /* ---------- the held hooks: what the real loop does ---------- */
 
-/* One 70-day run, shared by every test below that needs a whole season of play. A run of that
+/* One 70-day run, shared by every test below that needs a long stretch of play. It is NOT a whole
+   season: spring is 91 days on a 365-day year, so seventy days is most of one season and crosses no
+   turn. The phrase "a whole season" was written when a year was 32 days. Corrected by G4 task 4 on
+   restoring the file; what the run does cross is births and a camp of eight or more, which the soak's
+   own `the camps grow` asserts under LONG=1 and which passes. A run of that
    length costs about twenty seconds, so it is made once and kept. Seed alpha is the one of the
    six that reaches every tag: it drives wolves off, it meets the sprites, it spears deer, it
    fishes, and it fires pots. Seed r never sees a wolf in seventy days. */

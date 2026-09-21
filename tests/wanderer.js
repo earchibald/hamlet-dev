@@ -87,10 +87,20 @@ test('the rule is quiet while anyone still lives', () => {
 });
 
 /* Winter holds the wanderer back, as it holds back the arrival that follows the smoke. The valley
-   empties in autumn, the wait ends in winter, and nobody comes until spring. Days 25 to 32 are winter. */
+   empties in autumn, the wait ends in winter, and nobody comes until spring. Days 25 to 32 are winter.
+
+   THAT COMMENT IS FALSE ON A 365-DAY YEAR AND THE TEST CROSSES NO WINTER. "Days 25 to 32 are winter"
+   was written when a year was 32 days. Spring is now days 1 to 91, this run spans days 1 to 34, and
+   `isWinter()` is false on every tick of it. So the wanderer comes on day 33 because the wait ran out,
+   not because winter held it off, and the winter half of the claim -- the subject of the test -- is not
+   exercised at all. The day counts are untouched, because shortening or lengthening a run is not the
+   fix: the fix is to set the date with `setClock`, which is ruling 8's tool and task 10's work. Until
+   then read this test as covering the wait and not the season. Found by G4 task 4 on restoring the
+   file, and the same fault sits on the founder's winter test below. */
 test('winter blocks the wanderer until spring', () => {
   const { api, events, emptied } = afterTheLast('r', 17, 34);
-  assert.equal(emptied, 18, 'the valley emptied in autumn');
+  /* Day 18 is spring, not autumn. The message is the old year's; the number is the test's. */
+  assert.equal(emptied, 18, 'the valley emptied on the day this test was built around');
   const came = linesLike(events, WANDERER);
   assert.ok(came.length >= 1, 'no wanderer came at all');
   const day = dayOfLine(came[0]);
@@ -244,7 +254,11 @@ test('a fire that is only momentarily out is not a cold hearth', () => {
 });
 
 /* Winter holds this founder back too. The hearth goes cold in summer, the wait ends in winter, and
-   nobody comes until spring. Days 25 to 32 are winter. */
+   nobody comes until spring. Days 25 to 32 are winter.
+
+   AS ABOVE, AND FOR THE SAME REASON: this run spans days 1 to 36, every one of them spring on a
+   365-day year, so no winter holds anybody back and the test covers the wait alone. Task 10 owns the
+   fix, with `setClock`. No day count was changed. */
 test('winter blocks the founder until spring', () => {
   const { api, events, thinned } = downToOne('r', 7, 36);
   const ended = linesLike(events, ENDS);

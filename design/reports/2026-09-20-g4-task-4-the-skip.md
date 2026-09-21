@@ -16,6 +16,7 @@
 | `dark.slower` | `secs(2)`. Same number, and the entry now says what it measures. |
 | `senseBeings`' stale list | Built once, before the loop. The predicate answers for the start of the tick. |
 | The snapshot oracle's four spans | Converted, with nine more of the same kind in the same file. |
+| What the six restored files cross | **No single run in any of them leaves spring.** Two tests in `tests/wanderer.js` pass while crossing no winter, which is their whole subject. See "What the restored files actually cross". |
 | The golden | `tests/soak-golden.json` md5 `1e1248d47dd2aabc9d430fd49275c665`, unchanged. `UPDATE_GOLDEN=1` was never run. |
 
 ## The finding that matters most
@@ -371,6 +372,94 @@ number was moved to satisfy it. It is behind `LONG=1` in the restoration, so `np
 `tsc`, which the plan already records. So the silent-skip trap of #116 could not bite here, and every
 plant in this report was run in a throwaway copy of **this** branch, which has no type check to skip.
 #117's four undeclarable `Task` fields are the merge's and were not touched.
+
+
+## What the restored files actually cross, which outranks their seconds
+
+Asked for by dev-coordinator after the merge, on the evidence of `tests/stalk.js` crossing 0 births and
+0 deaths and `tests/itemgrid.js` seeing 15 items where its comment claimed five days of play. A
+suspended file that comes back green is not evidence. Every day count in these six was written when a
+year was 32 days.
+
+**The single fact that governs all six: spring is days 1 to 91, and the longest single run in any of
+them is 70 days. So not one of them crosses a season turn.** The 202, 342 and 493 in the suspension
+texts are sums across many runs, not spans. Checked with `seasonOf` on every day count the six use —
+12, 21, 22, 24, 25, 26, 30, 34, 36, 40, 45, 48, 50, 70 — and every one returns spring.
+
+| file | what it claims to cross | what it crosses | verdict |
+|---|---|---|---|
+| `tests/wanderer.js` | winter, twice, by name: "Days 25 to 32 are winter" | days 1 to 34 and 1 to 36, **all spring**; `isWinter()` false on every tick | **passes while crossing nothing of its subject** |
+| `tests/names.js` | "a whole season of play" in 70 days | 70 days of a 91-day spring, no turn; it does cross births and a camp of 8+ | the phrase was false, the run is otherwise sound |
+| `tests/gnomes.js` | a burrow dug mid-game, reachable every day | 70 days, and it is the one of the six that already uses `setClock` | sound |
+| `tests/settle.js` | a species the gods never made never wanders in | 50 days across two runs; the claim is about species, not seasons | sound |
+| `tests/ui.js` | stages open to crafts by day 25 | 193 days across ten runs; `seasonLine()` is only matched against a country name | sound |
+| `tests/snapshot.js` | a den dug after the load, a burrow holding a thing, a storm, two camps | **asserts its own crossings, and two of them fail** | the model the other five lack |
+
+### The two that pass while crossing nothing
+
+`tests/wanderer.js`'s `winter blocks the wanderer until spring` and `winter blocks the founder until
+spring`. Both comments say "Days 25 to 32 are winter", which was true of a 32-day year. The first runs
+days 1 to 34 and the second days 1 to 36; both are entirely spring. So the wanderer arrives on day 33
+because the wait ran out, not because winter held it off, and **the winter half of each test — its
+whole subject — is not exercised.** A third line, `assert.equal(emptied, 18, 'the valley emptied in
+autumn')`, asserts a true number with a false message: day 18 is spring.
+
+No day count was changed and no assertion was weakened. Shortening or lengthening a run is not the fix;
+setting the date with `setClock` is, which is ruling 8's tool and **task 10's work**. All three comments
+now say what the span really crosses and name task 10, so the next reader cannot take the green for
+coverage. The non-winter halves — the wait, the arrival, the count of the living — are real and stay.
+
+### And the one file that cannot hide it
+
+`tests/snapshot.js` asserts what each span must produce, in its own words: "no den was dug after the
+load, so startRegion and rimExits went untested", "no burrow held a thing", "nobody was walking and
+nobody was at work at the save". That is why converting its spans produced **six red tests rather than
+six silent passes**, and why two are still red: they are crossing-failures announcing themselves. The
+other five files have no such assertion, which is the whole reason the wanderer fault survived.
+
+## The 300 s ceiling has no tie-break, and the arithmetic says it will bite
+
+dev-coordinator's sixth rule: if the fast suite exceeds 300 s with everything restored, move suites
+behind `LONG=1` in descending order of their own seconds until it fits, never shortening a run or
+lowering a day count.
+
+**It cannot be measured on this branch**, because `tests/stalk.js`, `tests/garden.js`,
+`tests/itemgrid.js`, `tests/reachable.js` and `tests/types.js` are not here; they arrive by the
+merge-back. The arithmetic, stated as arithmetic:
+
+| part | seconds | measured where |
+|---|---|---|
+| `npm run fast` on this branch, six files restored | **191** | here, load 7.39 |
+| `tests/stalk.js` | **92** | dev-coordinator, after the merge |
+| `tests/reachable.js`, `tests/itemgrid.js`, `tests/types.js` fast parts | unmeasured | — |
+| projected total | **283 plus the unmeasured three** | |
+
+So 300 s is close and probably short. The descending order I would apply, and the reason:
+
+1. **`tests/stalk.js`, 92 s** — 31 percent of the budget for one file, and the largest single cost.
+   Moving it back behind `LONG=1` is the first move by the rule's own order, and it is not an insult to
+   the merge that just added it: the rule orders by seconds and this is the biggest number.
+2. **`tests/snapshot.js`, 106 s** — the largest of my six, and already the file whose long runs are
+   flagged; its remaining fast part would go next.
+3. **`tests/ui.js`, 63 s** — third by seconds.
+
+I have not applied any of these, because the total is not measurable until the merge-back and a move
+made on a projection is a move made on a claim. **The first thing to do after the merge-back is measure
+`npm run fast` and apply that list until it fits, then report the resulting list with each file's
+seconds.** If it will not fit even with everything expensive flagged, that is a finding with a measured
+number and task 5 still removes nothing.
+
+## On the rest of dev-coordinator's merge note
+
+- **`SLOW=1 node --test tests/snapshot.js` at 49 pass, 0 fail on dev.** Here it is **47 pass, 2 fail**,
+  and the two are the crossing-failures above. I will confirm dev's figure after the merge-back rather
+  than take it, as asked; if dev reaches 49/0 then the merge found spans for the den and the burrow that
+  I did not, and that is the better answer.
+- **`dark.slower: 2` and `senseBeings`' stale `movers` were mine and are both done**, in commit
+  `8b3f14a`. The note lists them as still outstanding, which was true when it was written.
+- **`sprites follow first sight`** stays pre-existing; reproduced at the branch point and not touched.
+- **Line citations rot.** Taken: this report cites by name throughout, and the one place it gives a line
+  number it gives the assertion's text beside it.
 
 ## What state does this change have that its tests never enter?
 
