@@ -69,10 +69,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .cell.playing{background:var(--map-god);color:var(--accent-ink);border-color:var(--map-god)}
 #timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
-.strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
 .strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .strip .world{flex:none}
-.strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0;flex-wrap:nowrap}
+.strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0}
 .strip .ctl{margin-left:auto;gap:6px;flex:none}
 #clock{font-weight:700}
 #season,#weather{color:var(--muted)}
@@ -100,12 +100,18 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
 .over.tl{left:10px;top:10px} .over.tl2{left:10px;top:46px;color:var(--muted);font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 8px;border-radius:5px}
-#foot{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
+/* The foot and, above it, the act caption. Both keep clear of the drawers, so a long sentence
+   never runs under a card or off the visible edge of a canvas wider than the window. */
+.foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
+#actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
+#actCaption[hidden]{display:none}
+#foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
 /* Drawers: tabs on the right edge, open drawers stacked beside them. */
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
+#drawerTabs .btn kbd{margin-left:0;margin-inline-start:5px}
 #drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
@@ -218,13 +224,16 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     </div>
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
-      <button class="btn" id="viewBtn" title="Sector, nearby, world map">Nearby<kbd>M</kbd></button>
+      <button class="btn" id="viewBtn" title="Sector, nearby, world map, camp fire">Nearby<kbd>M</kbd></button>
       <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
     <div class="over tl2" id="where"></div>
-    <div id="foot"></div>
+    <div class="foot-stack">
+      <div id="actCaption" hidden aria-live="polite"></div>
+      <div id="foot"></div>
+    </div>
     <div id="drawerTabs"></div>
     <div id="drawers"></div>
     <div id="windows"></div>
@@ -267,7 +276,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
     <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
     <li>Nudge someone who is sitting by the fire when the woodpile is empty.</li>
-    <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view, and the world map.</li>
+    <li>Open the world map and point at sectors. People go where the resources are. M cycles the sector, the nearby view, the world map, and the camp fire. The camp fire view keeps your camp's fire in the middle.</li>
     <li>Keep the hearth lit three days straight. Watch the goal list open up: axe, logs, lean-to, waterskin, spear.</li>
     <li>Let the fire go out at night with meat in the stash. Wolves notice.</li>
     <li>Watch a winter. Berries stop, deer thin out, and only a camp with a rack and smoked meat is comfortable.</li>
@@ -7170,9 +7179,13 @@ function resetDoor(){ doorLog = []; replayHead = { seed: seedText, options }; }
    INTERFACE. Reads the simulation state and draws it.
    ============================================================ */
 const T = 26, WS = 3, MS = 9;
-/* The three views, and the order M walks them: sector, nearby, world, sector. */
-const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
-const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The four views, and the order M walks them: sector, nearby, world, camp fire, sector. The camp fire
+   view is the sector view's shape and scale, centred on the chosen camp's fire. `nextView` in derive.js
+   skips it when there is no fire to centre on. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
+/* The two views drawn tile by tile at full size: the sector, and the camp fire. */
+const closeUp = v => v === 'loc' || v === 'fire';
 /* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
@@ -7217,6 +7230,18 @@ let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSki
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
 let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
+/* Write markup only when it differs from the last string this helper sent to that element. A render
+   that rebuilds the same markup every call, with the world running, replaces an element's children
+   between a click's press and its release, and the click is lost. The check is against the string
+   this helper last wrote, held in a WeakMap keyed by the element, and not against el.innerHTML: the
+   browser re-serialises markup, so a read-back can differ from what was written even when nothing
+   changed. */
+const htmlWritten = new WeakMap();
+const setHTML = (el, html) => {
+  if (htmlWritten.get(el) === html) return;
+  htmlWritten.set(el, html);
+  el.innerHTML = html;
+};
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
@@ -7224,7 +7249,7 @@ const ui = {
   mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
   seenTick: -1,        /* the newest chronicle tick notePulses has read */
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
-  open: ['people', 'goals'], /* drawers open, in order */
+  open: [], /* drawers open, in order. Empty at the start: every tab begins closed. */
   focus: 'map',        /* 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>' */
   row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */
@@ -7806,10 +7831,34 @@ function viewKey(){
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
+/* The tile the camp fire view centres on: the chosen camp's pit, or its site before the pit is built.
+   Null with no camp, or a camp with neither, and then the view is left out of the cycle. */
+/* viewCamp can outlive the camp it points at: a camp destroyed while its fire view was on screen leaves
+   a stale reference until the next renderUI pass corrects it. camps.includes guards that the same way
+   the frame loop does before it reads viewCamp. */
+function fireCentre(){ return viewCamp && camps.includes(viewCamp) ? viewCamp.pit || viewCamp.site || null : null; }
+/* The sector that holds the fire the camp fire view centres on, or null with no fire. The view's line
+   names this sector and not the cursor's, which keyboard moves carry into the next sector. */
+function fireSector(){ const p = fireCentre(); if (!p) return null; const f = secOf(p[0], p[1]); return sectors[secIdx(f.sx, f.sy)]; }
+/* The view M goes to next from v. The camp fire view is skipped when there is no fire to centre on. */
+function nextView(v){ const n = NEXT_VIEW[v]; return n === 'fire' && !fireCentre() ? NEXT_VIEW[n] : n; }
+/* The top-left tile of the sector view and the camp fire view. Every conversion between their pixels
+   and tiles reads it: the drawing, the pointer, the cursor, and the tools. The camp fire view puts the
+   centre at the middle tile, and stops at the world's edges so it never shows past them. */
+function locOrigin(){
+  const p = view === 'fire' && fireCentre();
+  if (p) return { ox: clamp(p[0] - (LW >> 1), 0, W - LW), oy: clamp(p[1] - (LH >> 1), 0, H - LH) };
+  return { ox: cur.sx * LW, oy: cur.sy * LH };
+}
+/* Whether the tile is on screen in the sector view or the camp fire view. */
+function inLocView(x, y){ const { ox, oy } = locOrigin(); return x >= ox && x < ox + LW && y >= oy && y < oy + LH; }
+
 /* Where the cursor lands after a move. mult is a number of tiles, 'sector', or 'edge'. In the nearby and world views every step is a sector.
-   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there. */
+   'edge' goes to the sector's edge on that side, and keeps the row or the column. From the edge it goes one sector on, to the same edge there.
+   The camp fire view moves as the sector view does. */
 function cursorAfter(c, dx, dy, mult, view){
-  if (mult === 'edge' && view === 'loc'){
+  const near = closeUp(view);
+  if (mult === 'edge' && near){
     const s = secOf(c.x, c.y);
     const ex = dx < 0 ? s.sx * LW : dx > 0 ? (s.sx + 1) * LW - 1 : c.x, ey = dy < 0 ? s.sy * LH : dy > 0 ? (s.sy + 1) * LH - 1 : c.y;
     if (ex !== c.x || ey !== c.y) return { x: ex, y: ey, z: c.z };
@@ -7817,7 +7866,7 @@ function cursorAfter(c, dx, dy, mult, view){
     return nx < 0 || ny < 0 || nx >= W || ny >= H ? { x: c.x, y: c.y, z: c.z } : { x: nx, y: ny, z: c.z };
   }
   if (mult === 'edge') mult = 'sector';
-  const sx = mult === 'sector' || view !== 'loc' ? LW : mult, sy = mult === 'sector' || view !== 'loc' ? LH : mult;
+  const sx = mult === 'sector' || !near ? LW : mult, sy = mult === 'sector' || !near ? LH : mult;
   return { x: clamp(c.x + dx * sx, 0, W - 1), y: clamp(c.y + dy * sy, 0, H - 1), z: c.z };
 }
 /* The cursor when a sector opens. A cursor already in that sector stays, so a hovered centre is kept. Any other keeps its place in its own sector. */
@@ -7974,7 +8023,7 @@ const KEYMAP = [
   { key: 'h',          focus: 'any',    action: 'hurry',       label: 'Hurry to the valley', button: 'hurryBtn' },
   { key: '-',          focus: 'any',    action: 'slower',      label: 'Slower' },
   { key: '=',          focus: 'any',    action: 'faster',      label: 'Faster' },
-  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world', button: 'viewBtn' },
+  { key: 'm',          focus: 'any',    action: 'view',        label: 'Cycle sector, nearby, world map, camp fire', button: 'viewBtn' },
   { key: ']',          focus: 'any',    action: 'levelUp',     label: 'Up a level', button: 'lvUp' },
   { key: '[',          focus: 'any',    action: 'levelDown',   label: 'Down a level', button: 'lvDown' },
   { key: 't',          focus: 'any',      action: 'foldTimeline',    label: 'Fold or unfold the timeline', button: 'foldTl' },
@@ -8202,7 +8251,7 @@ const MARKS = {
 /* A wash is the act it carries: a freeze, a hiding, or a showing. */
 function markFor(kind, value){ return MARKS[kind === 'wash' ? value : kind] || null; }
 
-/* Canvas drawing for all three views: world map, nearby sectors, and the sector in view. */
+/* Canvas drawing for all four views: world map, nearby sectors, the sector in view, and the camp fire. */
 
 function readPalette(){
   const cs = getComputedStyle(document.documentElement);
@@ -8339,9 +8388,24 @@ function drawGesture(rec, f){
   else if (rec.kind === 'battle') tweenRing(q, 4 + 22 * e, P['field-scar'], 1 - e, 3);
   else if (rec.kind === 'backstop') tweenRing(q, 4 + 20 * e, P.select, 1 - e, 2);
 }
+/* The disc's own radius, the halo drawMark draws around the mark. The word beside it keeps clear of
+   this circle, so named here rather than left as a bare 34 in two places. */
+const MARK_R = 34;
+/* Where the mark's word goes: to the right of the disc, at a fixed gap past its radius, unless the
+   disc sits too close to the canvas edge for the word to fit there, when it goes to the left instead.
+   When the word fits on neither side, the side with more room still runs off the canvas less, so it
+   picks that side rather than always the left. Pure, so a test can walk every position without a canvas. */
+function markWordSide(x, textWidth, canvasWidth, gap = 8){
+  const need = MARK_R + gap + textWidth;
+  if (x + need <= canvasWidth) return 'right';
+  if (x - need >= 0) return 'left';
+  const room = { right: canvasWidth - (x + MARK_R + gap), left: x - MARK_R - gap };
+  return room.right >= room.left ? 'right' : 'left';
+}
 /* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
-   appears under it. The disc is the map's own background at just over half, so the mark reads on any
-   country and the ground still shows through. */
+   appears beside it. The disc is the map's own background at just over half, so the mark reads on any
+   country and the ground still shows through. The word sits to the side of the disc, not under it, so
+   it never lies over the god's own name. */
 function drawMark(rec, f, alpha){
   const m = markFor(rec.kind, rec.value); if (!m) return;
   const q = tileSpot(rec.to); if (!q) return;
@@ -8349,7 +8413,7 @@ function drawMark(rec, f, alpha){
   if (d <= 0) return;
   wctx.save();
   wctx.globalAlpha = alpha;
-  wctx.beginPath(); wctx.arc(q.x, q.y, 34, 0, Math.PI * 2);
+  wctx.beginPath(); wctx.arc(q.x, q.y, MARK_R, 0, Math.PI * 2);
   wctx.fillStyle = P['map-halo']; wctx.globalAlpha = alpha * 0.5; wctx.fill();
   wctx.globalAlpha = alpha;
   wctx.translate(q.x - 20, q.y - 20); wctx.scale(0.833, 0.833);
@@ -8361,9 +8425,12 @@ function drawMark(rec, f, alpha){
   wctx.save();
   wctx.globalAlpha = alpha;
   wctx.font = 'bold 17px "Atkinson Hyperlegible", system-ui, sans-serif';
-  wctx.textAlign = 'center';
-  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(m.word.toUpperCase(), q.x, q.y + 53);
-  wctx.fillStyle = P['field-line']; wctx.fillText(m.word.toUpperCase(), q.x, q.y + 53);
+  const word = m.word.toUpperCase(), gap = 8;
+  const side = markWordSide(q.x, wctx.measureText(word).width, W * WS, gap);
+  wctx.textAlign = side === 'right' ? 'left' : 'right';
+  const wx = side === 'right' ? q.x + MARK_R + gap : q.x - MARK_R - gap;
+  wctx.lineWidth = 4; wctx.strokeStyle = P.bg; wctx.strokeText(word, wx, q.y);
+  wctx.fillStyle = P['field-line']; wctx.fillText(word, wx, q.y);
   wctx.restore();
 }
 /* A line beside the ground it names, over two rows at most. It breaks on a space where it can, so the words
@@ -8492,11 +8559,10 @@ function drawField(){
     wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
   }
   wctx.globalAlpha = 1;
-  /* One caption at a time: the line the act on stage wrote. */
-  if (figures && now && f > 0){
-    const text = captionFor(now);
-    if (text) drawCaption(text, tileSpot(now.to));
-  }
+  /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
+     never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
+     could run under a drawer or off the visible edge. */
+  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
@@ -8566,9 +8632,9 @@ function drawMid(){
   }
 }
 
-/* ---- location view ---- */
+/* ---- location view: the sector in view, or the camp fire view, from the origin locOrigin gives ---- */
 function drawLoc(){
-  const ox = cur.sx * LW, oy = cur.sy * LH;
+  const { ox, oy } = locOrigin();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `500 ${T - 6}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
   const fires = [];
@@ -8614,14 +8680,14 @@ function drawLoc(){
     }
     if (below > 0){ ctx.fillStyle = P.halo; ctx.globalAlpha = 0.45; ctx.fillRect(px, py, T, T); ctx.globalAlpha = 1; }
   }
-  for (const c of camps) if (lvl === 0 && c.site && !c.pit && secOf(...c.site).sx === cur.sx && secOf(...c.site).sy === cur.sy){
+  for (const c of camps) if (lvl === 0 && c.site && !c.pit && inLocView(...c.site)){
     const [x, y] = c.site; ctx.strokeStyle = P.select; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.strokeRect((x - ox) * T + 2, (y - oy) * T + 2, T - 4, T - 4); ctx.setLineDash([]);
   }
   { ctx.fillStyle = P.corpse; for (const c of corpses){ if (c.x >= ox && c.x < ox + LW && c.y >= oy && c.y < oy + LH && c.z === lvl) ctx.fillText('x', (c.x - ox) * T + T / 2, (c.y - oy) * T + T / 2 + 1); } }
   const dark = darkness(); if (dark > 0){ ctx.fillStyle = `rgba(${P.night},${dark})`; ctx.fillRect(0, 0, LW * T, LH * T); }
   if (isWinter()){ ctx.fillStyle = P.snow; ctx.globalAlpha = 0.22; ctx.fillRect(0, 0, LW * T, LH * T); ctx.globalAlpha = 1; }
   if (weather.storm){ ctx.strokeStyle = P.rain; ctx.globalAlpha = 0.35; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 90; k++){ const x = (hash(k, 3) % (LW * T)), y = ((hash(k, 7) + tick * 9) % (LH * T)); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 9); } ctx.stroke(); ctx.globalAlpha = 1; }
-  for (const c of camps) if (lvl === 0 && c.pit && tileAt(...c.pit).struct.lit && dark > 0){ const [px, py] = c.pit; if (secOf(px, py).sx === cur.sx && secOf(px, py).sy === cur.sy){ const gr = ctx.createRadialGradient((px - ox) * T + T / 2, (py - oy) * T + T / 2, 4, (px - ox) * T + T / 2, (py - oy) * T + T / 2, T * 4); gr.addColorStop(0, `rgba(255,180,90,${dark * 0.9})`); gr.addColorStop(1, 'rgba(255,180,90,0)'); ctx.fillStyle = gr; ctx.fillRect((px - ox) * T - T * 4, (py - oy) * T - T * 4, T * 9, T * 9); } }
+  for (const c of camps) if (lvl === 0 && c.pit && tileAt(...c.pit).struct.lit && dark > 0){ const [px, py] = c.pit; if (inLocView(px, py)){ const gr = ctx.createRadialGradient((px - ox) * T + T / 2, (py - oy) * T + T / 2, 4, (px - ox) * T + T / 2, (py - oy) * T + T / 2, T * 4); gr.addColorStop(0, `rgba(255,180,90,${dark * 0.9})`); gr.addColorStop(1, 'rgba(255,180,90,0)'); ctx.fillStyle = gr; ctx.fillRect((px - ox) * T - T * 4, (py - oy) * T - T * 4, T * 9, T * 9); } }
   for (const [lx, ly, x, y] of fires){
     const fl = (tick + hash(x, y)) % 3;
     ctx.globalAlpha = 0.7 + 0.15 * fl; ctx.fillStyle = P['fire-bg']; ctx.fillRect(lx * T, ly * T, T, T); ctx.globalAlpha = 1;
@@ -8639,7 +8705,7 @@ function drawLoc(){
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
-  if (secOf(cursor.x, cursor.y).sx === cur.sx && secOf(cursor.x, cursor.y).sy === cur.sy && cursor.z === lvl){
+  if (inLocView(cursor.x, cursor.y) && cursor.z === lvl){
     const cx = (cursor.x - ox) * T, cy = (cursor.y - oy) * T;
     ctx.strokeStyle = P.select; ctx.lineWidth = 2; ctx.strokeRect(cx + 1, cy + 1, T - 2, T - 2);
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
@@ -8882,10 +8948,10 @@ function renderStrip(){
   /* The village title is not part of the name, so it is added here, not by the sim. */
   $('campName').textContent = inAges() ? 'The ages' : camp.name + (camp.village ? ', a village' : '');
   $('campName').title = inAges() ? '' : nameTitle(campNames().now);
-  $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '';
+  setHTML($('camps'), camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '');
   const g = gauges();
-  $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
-  $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
+  setHTML($('gauges'), ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join(''));
+  setHTML($('chips'), alerts().slice(0, 9).map(chipHTML).join(''));
 }
 
 /* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
@@ -8953,18 +9019,22 @@ function renderUI(force){
   camp = viewCamp;
   /* The clock and the foot run every tick. The view key does not know the wall clock. */
   renderClock(); renderFoot();
+  /* The view button names the view M goes to next. It is written on every call, before the view key,
+     because the key holds neither the view nor whether a fire exists. The camp fire view joins the cycle
+     when the camp picks its site, with the view unchanged. setHTML skips the write when nothing changed. */
+  setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   drawTimeline();
   const s = inAges() ? null : sectors[secIdx(cur.sx, cur.sy)];
   /* The world map wears the valley's name from the day a village gives it one, and only once somebody
      has read it. Until then it is the world map. */
-  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
+  $('where').textContent = inAges() ? `The field \u00b7 ${seasonLine()}` : view === 'world' ? `${valleyName() || 'World map'} \u00b7 ${camps.length} camp${camps.length > 1 ? 's' : ''}` : view === 'mid' ? `Around ${sectorLabel(s)}, sector ${s.sx},${s.sy}` : view === 'fire' ? (viewCamp && camps.includes(viewCamp) ? `The fire at ${viewCamp.name}, in ${sectorLabel(fireSector() || s)} \u00b7 ${levelName(lvl)}` : `The fire, unwatched \u00b7 ${levelName(lvl)}`) : `${sectorLabel(s)}, sector ${s.sx},${s.sy} \u00b7 ${levelName(lvl)}`;
   $('hurryBtn').hidden = !inAges(); $('hourBtn').disabled = inAges(); $('viewBtn').disabled = inAges(); $('chordBtn').disabled = inAges();
   $('overlayBtn').hidden = inAges() || view !== 'world'; $('overlayBtn').classList.toggle('on', ui.overlay);
-  $('tools').hidden = view !== 'loc';
+  $('tools').hidden = !closeUp(view);
   $('nav').hidden = view === 'world';
-  $('levels').hidden = view !== 'loc';
+  $('levels').hidden = !closeUp(view);
   $('level').textContent = levelName(lvl); $('lvUp').disabled = lvl >= ZMAX; $('lvDown').disabled = lvl <= ZMIN;
   if (view !== 'world') for (const [id, dx, dy] of [['nW', -1, 0], ['nE', 1, 0], ['nN', 0, -1], ['nS', 0, 1]]){
     const b = $(id), nx = cur.sx + dx, ny = cur.sy + dy, ok = nx >= 0 && ny >= 0 && nx < SW && ny < SH;
@@ -8985,7 +9055,7 @@ function drawerHTML(d){
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
-  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  setHTML($('drawerTabs'), DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join(''));
   const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
   for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
   docked.forEach((id, n) => {
@@ -9094,7 +9164,9 @@ function renderFoot(){
   const act = ui.timelineChip ? actCardForChip(ui.timelineChip) : null;
   const chip = act ? null : footChip();
   const e = chronicle[0];
-  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
+  /* The act caption already says this sentence, in its own place above the foot. The foot does not say it twice. */
+  const echoed = captionText && e && e.text === captionText;
+  const line = act ? actFootLine(act) : chip ? chipFootLine(chip) : (ui.open.includes('chronicle') || !e || echoed ? '' : `<span class="when">${esc(e.when)}</span><span class="k-${esc(e.kind)}">${esc(e.text)}</span>`);
   $('foot').innerHTML = `${phrase}${line ? '<span class="muted">·</span>' + line : ''}`;
 }
 
@@ -9178,6 +9250,31 @@ function openChord(){
 
 /* God actions: tools, view changes, movement, and world control. */
 
+/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
+   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
+   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
+   moved past it, the valley is made, a new world starts, or a save loads. The one writer of
+   `captionText`; every other file calls this instead of setting the field itself, the same way
+   `setFocus` is the one writer of `ui.focus`. */
+let captionText = '';
+function setActCaption(text){
+  text = text || '';
+  if (text === captionText) return;
+  captionText = text;
+  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
+     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
+     there, and the text these tests read comes straight from captionText. The text is plain narrative
+     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = $('actCaption'); if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+  /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
+     renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
+     assignment, every time the caption's text actually changes. */
+  renderFoot();
+}
+
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
@@ -9220,33 +9317,44 @@ function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; rende
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
   if (inAges()) v = 'world';
+  /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
+  const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
-  $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
-  $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
+  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
+     The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
+     opened from below ground showed the fire's tiles at the lower level, with the cursor there too. */
+  if (p){ cur = secOf(p[0], p[1]); lvl = 0; cursor = inLocView(cursor.x, cursor.y) ? { x: cursor.x, y: cursor.y, z: 0 } : { x: p[0], y: p[1], z: 0 }; }
+  $('world').hidden = v !== 'world'; $('loc').hidden = !closeUp(v); $('mid').hidden = v !== 'mid';
   renderUI(true);
 }
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
-/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
+/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
+   The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
   cursor = { x: clamp(x, 0, W - 1), y: clamp(y, 0, H - 1), z: clamp(z, ZMIN, ZMAX) };
   const s = secOf(cursor.x, cursor.y);
-  if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
-  if (view === 'loc' && cursor.z !== lvl) setLevel(cursor.z);
+  if (view === 'fire'){ if (inLocView(cursor.x, cursor.y)){ cur = s; renderUI(true); } else setView('loc', s); }
+  else if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
+  if (closeUp(view) && cursor.z !== lvl) setLevel(cursor.z);
 }
-function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
+/* A sector step or an edge step leaves the camp fire view for the sector view of the sector the cursor
+   lands in. The edge step is Alt+arrow. It lands where the same key lands in the sector view of the
+   cursor's sector: on that sector's edge, or one sector on when the cursor is already on the edge.
+   Before this, only the nav buttons left, and Alt+arrow often stayed in the camp fire view. */
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && (mult === 'sector' || mult === 'edge')) setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
   if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
-  if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
-  const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
+  if (!closeUp(view)){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
+  const { ox, oy } = locOrigin(), c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - ox, ly: cursor.y - oy };
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(nextView(view)); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
-function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
+function cellFrom(e){ const r = cv.getBoundingClientRect(), { ox, oy } = locOrigin(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: ox + lx, y: oy + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
@@ -9258,11 +9366,16 @@ function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
   startCreation(seed, {});
-  fieldKey = '';
+  fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
+     session had open: the People and Goals cards used to cover the map at the very start. Continue
+     and Load do not call this, so they keep the tabs a saved world had open. */
+  ui.open = [];
+  if (ui.savedSpeed) setSpeed(ui.savedSpeed);
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
@@ -9315,7 +9428,7 @@ function loadWorld(snapshot, note){
 /* The view after a load. Everything it remembers points at the world that was replaced, and the new
    world can be a smaller one, so this puts the view back on the ground as onSettle does. */
 function onLoad(){
-  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
@@ -9394,7 +9507,7 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   setSpeed(ui.savedSpeed || speed || 1);
@@ -9419,12 +9532,23 @@ function applyTool(c, e){
   renderUI(true);
 }
 
-/* The action table. Every key and every click ends here. The only place view state changes. */
-function openDrawer(id, on){
+/* The action table. Every key and every click ends here. The only place view state changes.
+   `enterFocus` is for a caller that deliberately takes the player into the card, such as a search
+   or a jump to a stage: it moves `ui.focus` into the drawer, and back to the map when the drawer
+   closes. Without it, the tab's own key or a click on the tab opens or closes the drawer and leaves
+   focus where it was, so the game keys keep working while the card sits open. The one case that
+   still moves focus to the map without `enterFocus` is closing the drawer the player had clicked
+   into: its card is gone, so nothing is left to hold that focus. */
+function openDrawer(id, on, enterFocus){
   const has = ui.open.includes(id), want = on === undefined ? !has : on;
   const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
-  ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
+  if (enterFocus) ui.focus = want ? `drawer:${id}` : 'map';
+  /* Below 800 px only one drawer stays open, so opening a second one (narrow ? [id] above) can close
+     the one that held the focus without touching it here. Any focus that names a drawer no longer in
+     ui.open is stale and would leave the number keys picking rows nobody can see; send it to the map. */
+  else if (ui.focus.startsWith('drawer:') && !ui.open.includes(ui.focus.slice(7))) ui.focus = 'map';
+  ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
 /* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
@@ -9473,8 +9597,8 @@ const ACTIONS = {
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
-  levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
-  levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
+  levelUp(){ if (closeUp(view)) setLevel(lvl + 1); },
+  levelDown(){ if (closeUp(view)) setLevel(lvl - 1); },
   nav([dx, dy]){ moveCursor([dx, dy, 'sector']); },
   cursor(arg){ moveCursor(arg); },
   applyAt(){ applyAt(); },
@@ -9506,7 +9630,9 @@ const ACTIONS = {
   focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
-  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. A camp
+     with no site has no fire, so setView('fire') gives the sector view instead. */
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } else if (view === 'fire') setView('fire'); renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
@@ -9546,8 +9672,8 @@ const ACTIONS = {
   continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
-    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
-    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (!closeUp(view)) setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (!closeUp(view)) setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
   },
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
@@ -9558,7 +9684,7 @@ const ACTIONS = {
   },
   /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
      rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
-  searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  searchChronicle(){ openDrawer('chronicle', true, true); const box = $('chronSearch'); if (box) box.focus(); },
   /* The one writer of the query. The box's input handler calls it, and so does Esc. A shorter list would
      leave a stale row index pointing past the end, so the row goes back to the top with every change. */
   setChronSearch(v){
@@ -9579,7 +9705,7 @@ const ACTIONS = {
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
   chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
-  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  stage(id){ closeDialogs(); openDrawer('goals', true, true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },
   unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },
@@ -9621,7 +9747,8 @@ function frame(now){
     /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
        take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
     if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
@@ -9681,10 +9808,14 @@ function initUI(){
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    /* Any click inside the drawer gives it the keys, including a click on a priority button, a
+       chronicle filter, or Show all: those still do their own thing below and return early, but the
+       focus move must happen before that, not only on the path that falls through to a row. */
+    setFocus(`drawer:${id}`);
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
+    const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });

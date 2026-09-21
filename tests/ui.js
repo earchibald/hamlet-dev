@@ -303,6 +303,122 @@ test('the dispatcher reads focus: Esc goes back, arrows move the cursor on the m
   assert.equal(keyHit(api, ev('q'), 'map'), null);
 });
 
+test('every side tab starts closed', () => {
+  const api = loadUI(['state'], ['ui']);
+  assert.deepEqual(api.ui.open, [], 'ui.open starts empty, so no card covers the map at the start');
+});
+
+/* Recommendation 15: a tab's key opens and closes the drawer, and never takes the keyboard with it.
+   The approved table: 1 opens People and the game keys still work; 1 again closes it; a click inside
+   the card gives the card the keyboard, until Esc or a click on the map gives it back to the game,
+   and the card stays open through that. */
+test('a tab’s key opens and closes the drawer, and leaves the game keys working', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  assert.equal(api.ui.focus, 'map');
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.deepEqual(api.ui.open, ['people'], 'People opens');
+  assert.equal(api.ui.focus, 'map', 'the keys still act on the game, not the card');
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.deepEqual(api.ui.open, [], 'pressing the key again closes People');
+  assert.equal(api.ui.focus, 'map');
+});
+
+test('once a click has put the keyboard on the card, Esc gives it back to the game and leaves the card open', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  withPage(() => api.ACTIONS.drawer('people'));
+  /* A click inside the card is main.js's own pointerdown handler, which calls setFocus. Here that is
+     stood in for directly, since main.js wires no DOM in this file's tests. */
+  api.ui.focus = 'drawer:people';
+  assert.deepEqual(keyHit(api, ev('2'), api.ui.focus), { action: 'rowPick', arg: 2 }, 'a number now picks a row in the card');
+  withPage(() => api.ACTIONS.back());
+  assert.equal(api.ui.focus, 'map', 'Esc returns the keys to the game');
+  assert.deepEqual(api.ui.open, ['people'], 'the card stays open');
+});
+
+/* setActCaption must refresh the foot itself: renderUI only runs every 250ms of wall time, so without
+   this the foot could go on repeating a sentence the caption above it already shows, or stay blank
+   after the caption clears, for up to that long. This also pins the foot's own de-duplication rule
+   (panels.js's `echoed`), through the one path a player would actually see it change. */
+test('setActCaption refreshes the foot, which leaves out a line the caption above already shows', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'strip', 'actions', 'panels'], [...DERIVE, 'ACTIONS', 'renderFoot', 'setActCaption']);
+  api.startWorld('r'); api.camp = api.camps[0]; api.ui.open = [];
+  const line = api.chronicle[0];
+  const els = { foot: cell(), actCaption: cell() };
+  const had = { document: globalThis.document, renderUI: globalThis.renderUI, hideTip: globalThis.hideTip };
+  globalThis.document = { getElementById: id => els[id] || cell(), querySelector: () => null, querySelectorAll: () => [] };
+  globalThis.renderUI = () => {}; globalThis.hideTip = () => {};
+  try {
+    api.renderFoot();
+    assert.ok(els.foot.innerHTML.includes(line.text), 'setup: with the chronicle drawer shut, the foot shows the newest line');
+    api.setActCaption(line.text);
+    assert.ok(!els.foot.innerHTML.includes(line.text), 'the caption now shows this line, and setActCaption refreshes the foot right away, so it does not go on repeating it');
+    api.setActCaption('A different sentence entirely, not the chronicle line.');
+    assert.ok(els.foot.innerHTML.includes(line.text), 'a caption with different text does not echo, so the same refresh brings the chronicle line back');
+  } finally {
+    for (const k of Object.keys(had)) if (had[k] === undefined) delete globalThis[k]; else globalThis[k] = had[k];
+  }
+});
+
+/* Recommendation 8: the notes said the keyboard could not reach a drawer's controls until a click. Tab
+   proves that wrong, through the same focusRing/focusStep path a window uses (see the window test near
+   line 717). This is the fact the accepted-cost bullet in design/notes.md is rewritten to. */
+test('Tab reaches an open drawer from the map, with no click needed', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  withPage(() => api.ACTIONS.drawer('people'));
+  assert.equal(api.ui.focus, 'map', 'the key that opened the drawer leaves the game holding the keys');
+  withPage(() => api.ACTIONS.focusNext());
+  assert.equal(api.ui.focus, 'drawer:people', 'Tab moves the keyboard into the open drawer');
+});
+
+/* Below 800 px wide only one drawer stays open (openDrawer's narrow branch). If the drawer that held the
+   focus is the one that gets closed to make room for the next, the focus must not be left naming a
+   drawer nobody can see: the number keys would go on picking rows in a hidden list. */
+test('below 800 px, opening a second drawer sends a focus left on the one it closed back to the map', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'ui']);
+  const had = globalThis.innerWidth;
+  globalThis.innerWidth = 700;
+  try {
+    withPage(() => api.ACTIONS.drawer('people'));
+    /* A click inside the card is main.js's own pointerdown handler, which calls setFocus. Stood in
+       for directly here, as the other focus tests in this file do. */
+    api.ui.focus = 'drawer:people';
+    withPage(() => api.ACTIONS.drawer('goals'));
+    assert.deepEqual(api.ui.open, ['goals'], 'narrow width keeps only the drawer just opened');
+    assert.equal(api.ui.focus, 'map', 'People is gone, so its stale focus does not survive it');
+  } finally {
+    if (had === undefined) delete globalThis.innerWidth; else globalThis.innerWidth = had;
+  }
+});
+
+test('opening Chronicle by / or a stage by its chord still takes the player into the card, deliberately', () => {
+  withDom(() => {
+    const api = loadUI(UI_ALL, [...KEYS, 'ui']);
+    api.startWorld('r'); api.camp = api.camps[0];
+    api.ACTIONS.searchChronicle();
+    assert.equal(api.ui.focus, 'drawer:chronicle', 'a search jump still enters the card');
+    const stageId = api.STAGES[0].id;
+    api.ACTIONS.stage(stageId);
+    assert.equal(api.ui.focus, 'drawer:goals', 'a stage jump still enters the card');
+  });
+});
+
+test('Make world and Take a god close every tab, even one a saved session had open; Continue and Load do not', () => {
+  const api = loadUI(['state', 'derive', 'actions'],
+    [...DERIVE, 'ACTIONS', 'newWorld', 'onLoad'],
+    { setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }' });
+  api.setUp();
+  withPage(() => api.newWorld('r'));
+  api.ui.open = ['people', 'goals'];
+  withPage(() => api.newWorld('r'));
+  assert.deepEqual(api.ui.open, [], 'Make world closes every tab, whatever was open before it');
+  api.ui.open = ['camp'];
+  withPage(() => api.ACTIONS.takeGod('r'));
+  assert.deepEqual(api.ui.open, [], 'and so does Take a god');
+  api.ui.open = ['camp', 'legends'];
+  withPage(() => api.onLoad());
+  assert.deepEqual(api.ui.open, ['camp', 'legends'], 'a load keeps the tabs the loaded world had open');
+});
+
 /* Buttons rendered by the interface, not by the template. */
 const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
 
@@ -847,6 +963,164 @@ test('Alt with an arrow goes to the sector\u2019s edge first, then a sector at a
   assert.deepEqual(api.cursorAfter(c, -1, 0, 'edge', 'world'), at(1 * LW + 7, 1 * LH + 4), 'in the nearby and world views it is a plain sector step');
 });
 
+/* Recommendation 8: a view on the camp fire. M walks sector, nearby, world, camp fire, and back to
+   sector. The view is the close-up's shape and scale, with the chosen camp's pit in the middle. */
+const FIRE_API = [...KEYS, 'NEXT_VIEW', 'VIEW_LABEL', 'nextView', 'locOrigin', 'cursorTo', 'cellFrom', 'W', 'H', 'LW', 'LH', 'camps', 'secOf', 'ui', 'cursorAfter', 'fireCentre', 'fireSector', 'sectors', 'secIdx'];
+const FIRE_EXTRA = { getView: '() => view', getCur: '() => cur', getCursor: '() => cursor', getLvl: '() => lvl',
+  /* pick stands in for choosing a camp to watch: it puts the given shape into camps too, marked so a
+     later pick can find and drop it, because fireCentre now checks camps.includes(viewCamp) the way
+     the frame loop does. A camp under test is a live one, not a stray reference. */
+  pick: '(c) => { camps = camps.filter(x => !x.__test); if (c){ c.__test = true; camps = camps.concat(c); } viewCamp = c || null; }',
+  /* stale stands in for a camp destroyed while its fire view is still on screen: viewCamp points at it,
+     but it never joins camps, so camps.includes(viewCamp) is false, same as after a real removal. */
+  stale: '(c) => { viewCamp = c; }',
+  go: '(v, s) => setView(v, s)',
+  setCv: '(r) => { cv = { getBoundingClientRect: () => r }; }' };
+function fireWorld(){ const api = loadUI(['state', 'derive', 'keys', 'actions'], FIRE_API, FIRE_EXTRA); api.startWorld('r'); return api; }
+
+test('M walks sector, nearby, world, camp fire, and back to sector', () => {
+  const api = fireWorld();
+  assert.deepEqual(api.NEXT_VIEW, { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' });
+  assert.equal(api.VIEW_LABEL.fire, 'Camp fire', 'the view button names the view in words a player reads');
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  const seen = [];
+  withPage(() => { api.go('loc'); for (let i = 0; i < 4; i++){ api.ACTIONS.view(); seen.push(api.getView()); } });
+  assert.deepEqual(seen, ['mid', 'world', 'fire', 'loc']);
+});
+
+test('with no camp, or a camp with neither a pit nor a site, M skips the camp fire view', () => {
+  const api = fireWorld();
+  for (const c of [null, { pit: null, site: null }]){
+    api.pick(c);
+    assert.equal(api.nextView('world'), 'loc');
+    withPage(() => { api.go('world'); api.ACTIONS.view(); });
+    assert.equal(api.getView(), 'loc', `from the world map M goes to the sector with camp ${JSON.stringify(c)}`);
+    withPage(() => api.go('fire'));
+    assert.equal(api.getView(), 'loc', 'a view with no fire to centre on falls back to the sector');
+  }
+});
+
+/* A camp destroyed while its fire view is on screen leaves viewCamp pointing at a record no longer in
+   camps, the same staleness the frame loop guards against with camps.includes before it reads camp.
+   fireCentre must not read .pit off that stale reference, and the #where line must not read .name off it. */
+test('a viewCamp not in the live camps list gives no fire to centre on', () => {
+  const api = fireWorld();
+  api.stale({ pit: [5, 5], site: [5, 5] });
+  assert.equal(api.fireCentre(), null, 'a camp not in camps is stale, so there is no centre to draw');
+});
+
+test('the camp fire view puts the pit in the middle, or the site before the pit is built', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  api.pick({ pit: [100, 50], site: [97, 48] });
+  withPage(() => api.go('fire'));
+  assert.deepEqual(api.locOrigin(), { ox: 100 - (LW >> 1), oy: 50 - (LH >> 1) }, 'the pit sits at the middle tile of the view');
+  api.pick({ pit: null, site: [97, 48] });
+  assert.deepEqual(api.locOrigin(), { ox: 97 - (LW >> 1), oy: 48 - (LH >> 1) }, 'before the pit, the site is the centre');
+  withPage(() => api.go('loc', { sx: 1, sy: 2 }));
+  assert.deepEqual(api.locOrigin(), { ox: LW, oy: 2 * LH }, 'the sector view keeps its own origin');
+});
+
+test('the camp fire view stops at the world’s edges', () => {
+  const api = fireWorld(), { LW, LH, W, H } = api;
+  withPage(() => { api.pick({ pit: [2, 3], site: [2, 3] }); api.go('fire'); });
+  assert.deepEqual(api.locOrigin(), { ox: 0, oy: 0 }, 'a fire by the top-left corner');
+  api.pick({ pit: [W - 1, H - 2], site: [W - 1, H - 2] });
+  assert.deepEqual(api.locOrigin(), { ox: W - LW, oy: H - LH }, 'a fire by the bottom-right corner');
+});
+
+test('in the camp fire view the pointer, the cursor and the levels read its origin, and leaving it opens the sector', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const { ox, oy } = api.locOrigin();
+  const k = api.getCursor();
+  assert.ok(k.x >= ox && k.x < ox + LW && k.y >= oy && k.y < oy + LH, 'entering the view puts the cursor inside it');
+  api.setCv({ left: 0, top: 0, width: LW * 10, height: LH * 10 });
+  const c = api.cellFrom({ clientX: 5, clientY: 5 });
+  assert.deepEqual([c.x, c.y], [ox, oy], 'the top-left pixel is the view’s top-left tile');
+  withPage(() => api.ACTIONS.levelDown());
+  assert.equal(api.getLvl(), -1, 'the level keys work as in the sector view');
+  withPage(() => api.ACTIONS.levelUp());
+  withPage(() => api.cursorTo(ox + LW - 1, oy, 0));
+  assert.equal(api.getView(), 'fire', 'a cursor inside the view keeps it');
+  withPage(() => api.cursorTo(ox + LW, oy, 0));
+  assert.equal(api.getView(), 'loc', 'a cursor past the edge opens the sector it is in');
+  assert.deepEqual(api.getCur(), api.secOf(ox + LW, oy));
+  withPage(() => { api.go('fire'); api.ACTIONS.nav([0, 1]); });
+  assert.equal(api.getView(), 'loc', 'a sector step leaves the camp fire view');
+  assert.deepEqual(api.getCur(), api.secOf(api.getCursor().x, api.getCursor().y));
+  /* At the world's edge a sector step cannot move the cursor, so it stays in view. The step still leaves. */
+  const { W, H } = api;
+  withPage(() => { api.pick({ pit: [W - 1, H - 1], site: [W - 1, H - 1] }); api.go('fire'); api.cursorTo(W - 1, H - 1, 0); api.ACTIONS.nav([1, 0]); });
+  assert.equal(api.getView(), 'loc', 'a sector step at the world’s edge leaves the camp fire view too');
+});
+
+test('F1 in the camp fire view centres it on that camp’s fire', () => {
+  const api = fireWorld(), { LW, LH } = api, c = api.camps[0];
+  /* A camp has no site straight after the ages. Give it one far from the first fire, so the view must move. */
+  if (!c.site) c.site = [150, 60];
+  const p = c.pit || c.site;
+  withPage(() => { api.pick({ pit: [10, 10], site: [10, 10] }); api.go('fire'); api.ACTIONS.campN(1); });
+  assert.equal(api.getView(), 'fire');
+  const { ox, oy } = api.locOrigin();
+  assert.ok(p[0] >= ox && p[0] < ox + LW && p[1] >= oy && p[1] < oy + LH, 'the new camp’s fire is in view');
+});
+
+/* Alt+arrow sends an edge step, not a sector step. The first press goes to the edge of the cursor's
+   sector, which is often still inside the camp fire view. The view must still give way to the sector view. */
+test('in the camp fire view Alt+arrow opens the sector view, where the same key in the sector view lands', () => {
+  const api = fireWorld(), { LW, LH } = api;
+  const row = api.KEYMAP.find(r => r.key === 'ArrowRight' && r.alt);
+  assert.deepEqual(row.arg, [1, 0, 'edge'], 'the Alt+arrow row sends an edge step');
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const { ox, oy } = api.locOrigin(), from = api.getCursor();
+  const want = api.cursorAfter(from, 1, 0, 'edge', 'loc');
+  /* The case that went wrong: the step lands inside the camp fire view. A landing outside it left by the old rule too. */
+  assert.ok(want.x >= ox && want.x < ox + LW && want.y >= oy && want.y < oy + LH, 'the edge step lands inside the camp fire view');
+  withPage(() => api.ACTIONS[row.action](row.arg));
+  assert.equal(api.getView(), 'loc', 'the edge step leaves the camp fire view');
+  assert.deepEqual(api.getCursor(), want, 'the cursor lands where the same key lands in the sector view');
+  assert.deepEqual(api.getCur(), api.secOf(want.x, want.y), 'the sector view is the one the cursor is in');
+});
+
+test('F1 to a camp with no site leaves the camp fire view for the sector view', () => {
+  const api = fireWorld(), c = api.camps[0];
+  c.site = null; c.pit = null;
+  withPage(() => { api.pick({ pit: [100, 50], site: [100, 50] }); api.go('fire'); });
+  assert.equal(api.getView(), 'fire');
+  withPage(() => api.ACTIONS.campN(1));
+  assert.equal(api.getView(), 'loc', 'with no fire to centre on, the view is the sector view');
+  assert.equal(api.fireCentre(), null);
+});
+
+test('entering the camp fire view from below ground puts the level and the cursor on the surface', () => {
+  const api = fireWorld();
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => { api.go('loc', api.secOf(100, 50)); api.cursorTo(100, 50, -1); });
+  assert.equal(api.getLvl(), -1, 'the setup is below ground');
+  withPage(() => api.go('fire'));
+  assert.equal(api.getLvl(), 0, 'the view opens on the surface, where the fire is');
+  assert.equal(api.getCursor().z, 0, 'the cursor is on the surface too');
+  /* A cursor off screen and below ground goes to the fire, on the surface. */
+  withPage(() => { api.go('loc', { sx: 0, sy: 0 }); api.cursorTo(0, 0, -1); api.go('fire'); });
+  assert.deepEqual(api.getCursor(), { x: 100, y: 50, z: 0 });
+  assert.equal(api.getLvl(), 0);
+});
+
+test('the camp fire view names the sector that holds the fire, not the cursor’s', () => {
+  const api = fireWorld(), { LW } = api;
+  api.pick({ pit: [100, 50], site: [100, 50] });
+  withPage(() => api.go('fire'));
+  const f = api.secOf(100, 50), { ox, oy } = api.locOrigin();
+  /* A tile in the view but in another sector than the fire. */
+  const x = f.sx * LW - 1 >= ox ? f.sx * LW - 1 : (f.sx + 1) * LW;
+  withPage(() => api.cursorTo(x, oy, 0));
+  assert.equal(api.getView(), 'fire');
+  assert.notDeepEqual(api.getCur(), f, 'the cursor is in another sector than the fire');
+  assert.equal(api.fireSector(), api.sectors[api.secIdx(f.sx, f.sy)]);
+});
+
 test('a reached stage shows when it has a row to show or a goal done, not when its only news is a folded idle goal', () => {
   const api = loadUI(['state', 'derive'], [...DERIVE, 'stagesShown', 'stageReached']);
   api.startWorld('r');
@@ -1012,6 +1286,25 @@ test('the field colour is grey with no pole, and the mean of the poles with some
   const made = api.liveRegions().filter(r => r.marks.some(m => m.kind === 'pole'));
   assert.ok(made.length >= 2);
   for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
+});
+
+test('the mark word goes right when there is room, and left when there is not', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'map'], ['markWordSide', 'MARK_R']);
+  /* Plenty of room on both sides: the word goes right, its own default side. */
+  assert.equal(api.markWordSide(200, 40, 800), 'right');
+  /* The disc sits close enough to the right edge that the word would run off there. */
+  assert.equal(api.markWordSide(780, 40, 800), 'left');
+  /* The boundary itself: a word that fits exactly still goes right. */
+  const x = 800 - api.MARK_R - 8 - 40;
+  assert.equal(api.markWordSide(x, 40, 800), 'right');
+  assert.equal(api.markWordSide(x + 1, 40, 800), 'left');
+  /* A wider word needs more room, so the same disc position can flip sides. */
+  assert.equal(api.markWordSide(700, 40, 800), 'right');
+  assert.equal(api.markWordSide(700, 90, 800), 'left');
+  /* A word too wide for either side fits on neither, so the side with more room is picked: the one
+     the word runs off the canvas the least on, not always the left. */
+  assert.equal(api.markWordSide(300, 760, 800), 'right', 'more room to the right of a disc near the left edge');
+  assert.equal(api.markWordSide(700, 760, 800), 'left', 'more room to the left of a disc near the right edge');
 });
 
 test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
@@ -1674,7 +1967,8 @@ function recordCtx(){
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
-  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+    caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
     setAcc: '(v) => { acc = v; }',
@@ -1789,15 +2083,17 @@ test('the field draws every gesture kind, including the five no seed makes, and 
   assert.equal(state(), before, 'the drawing changed the rules');
 });
 
-test('a gesture with a line and a decision draws more than one without them', () => {
+test('a gesture with a line shows it as the act caption, off the canvas, and a decision still draws more', () => {
   const { api, wctx } = fieldRig('r', 6);
   const live = api.liveRegions(), r = live[0], g = api.gods()[0];
   const head = { god: g.id, age: api.age, from: r.tiles[0], to: r.tiles[2], said: null, weighed: null, region: r.id, pole: g.pole };
   const count = rec => { api.creation.gestures.length = 0; api.creation.gestures.push(rec); api.setAcc(0.15); wctx.calls.length = 0; api.drawField(); return wctx.calls.length; };
   const plain = count({ ...head, kind: 'claim' });
+  assert.equal(api.caption(), '', 'a gesture with no line shows no act caption');
   const said = count({ ...head, kind: 'claim', said: 0 });
   assert.ok(api.legends[0], 'the creation wrote no legend to caption');
-  assert.ok(said > plain, 'a line that was written prints no caption');
+  assert.equal(api.caption(), api.legends[0].text, 'a line that was written shows as the act caption');
+  assert.equal(said, plain, 'the caption is a page element now, so it draws nothing on the canvas');
   const weighed = count({ ...head, kind: 'claim', weighed: { opts: live.slice(0, 3).map(q => ({ type: 'claim', region: q.id, score: 1 })), picked: 'claim' } });
   assert.ok(weighed > plain, 'a decision shows no intent cue at the slow tier');
   /* The cue is the first thing dropped as the pace rises. Pace 2 is the top of the ages' own ladder:
@@ -2331,6 +2627,26 @@ test('un-pausing takes over a beat the player stepped: the running clock owns it
     api.setPaused(false);
     assert.equal(api.ui.playing, false, 'un-pausing ends the stepped beat; the running clock takes the rest of it');
   });
+});
+
+test('setHTML writes an element only when the markup changed since the last write', () => {
+  const api = loadUI(['state'], ['setHTML']);
+  let writes = 0, shown = '';
+  const el = { get innerHTML(){ return shown; }, set innerHTML(v){ writes++; shown = v; } };
+  api.setHTML(el, '<b>a</b>');
+  assert.equal(writes, 1, 'the first write always lands');
+  assert.equal(shown, '<b>a</b>');
+  api.setHTML(el, '<b>a</b>');
+  assert.equal(writes, 1, 'the same string a second time is not written again');
+  api.setHTML(el, '<b>b</b>');
+  assert.equal(writes, 2, 'a changed string is written');
+  assert.equal(shown, '<b>b</b>');
+  /* A second element starts with no history of its own, even with the same string already on the
+     first element: the check is against what THIS helper wrote to THIS element. */
+  const el2 = { get innerHTML(){ return shown2; }, set innerHTML(v){ writes2++; shown2 = v; } };
+  let writes2 = 0, shown2 = '';
+  api.setHTML(el2, '<b>b</b>');
+  assert.equal(writes2, 1, 'a different element is written on its own first call');
 });
 
 module.exports = { loadUI };

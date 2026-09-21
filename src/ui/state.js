@@ -2,9 +2,13 @@
    INTERFACE. Reads the simulation state and draws it.
    ============================================================ */
 const T = 26, WS = 3, MS = 9;
-/* The three views, and the order M walks them: sector, nearby, world, sector. */
-const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'loc' };
-const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map' };
+/* The four views, and the order M walks them: sector, nearby, world, camp fire, sector. The camp fire
+   view is the sector view's shape and scale, centred on the chosen camp's fire. `nextView` in derive.js
+   skips it when there is no fire to centre on. */
+const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
+const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
+/* The two views drawn tile by tile at full size: the sector, and the camp fire. */
+const closeUp = v => v === 'loc' || v === 'fire';
 /* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
@@ -49,6 +53,18 @@ let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSki
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
 let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
+/* Write markup only when it differs from the last string this helper sent to that element. A render
+   that rebuilds the same markup every call, with the world running, replaces an element's children
+   between a click's press and its release, and the click is lost. The check is against the string
+   this helper last wrote, held in a WeakMap keyed by the element, and not against el.innerHTML: the
+   browser re-serialises markup, so a read-back can differ from what was written even when nothing
+   changed. */
+const htmlWritten = new WeakMap();
+const setHTML = (el, html) => {
+  if (htmlWritten.get(el) === html) return;
+  htmlWritten.set(el, html);
+  el.innerHTML = html;
+};
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
@@ -56,7 +72,7 @@ const ui = {
   mutes: new Set(),    /* 'type' for every camp, 'type:campId' for one */
   seenTick: -1,        /* the newest chronicle tick notePulses has read */
   lastStates: {},      /* goal id to state, to see a goal leave blocked */
-  open: ['people', 'goals'], /* drawers open, in order */
+  open: [], /* drawers open, in order. Empty at the start: every tab begins closed. */
   focus: 'map',        /* 'map', 'drawer:<id>', 'window:<n>', or 'dialog:<name>' */
   row: { people: 0, goals: 0, chronicle: 0, camp: 0, legends: 0 }, /* the focused row per drawer */
   showAll: false,      /* goals: the whole ladder */

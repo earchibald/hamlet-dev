@@ -34,7 +34,8 @@ function frame(now){
     /* The autosave, once a day, in the first frame that sees the new day. In the ages there is no world to
        take. Taking the world and writing it is about 25 ms, so it happens here and not in a timer. */
     if (!inAges() && dayOf() > ui.autosaveDay) autosave();
-    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y); if (view === 'world' || s.sx !== cur.sx || s.sy !== cur.sy) setView(view === 'world' ? 'loc' : view, s); if (view === 'loc' && a.z !== lvl) setLevel(a.z); } else followId = null; }
+    /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
+    if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
@@ -94,10 +95,14 @@ function initUI(){
   $('drawerTabs').addEventListener('click', e => { const b = e.target.closest('[data-drawer]'); if (b) ACTIONS.drawer(b.dataset.drawer); });
   $('drawers').addEventListener('pointerdown', e => {
     const sec = e.target.closest('.drawer'); if (!sec) return; const id = sec.dataset.drawer;
+    /* Any click inside the drawer gives it the keys, including a click on a priority button, a
+       chronicle filter, or Show all: those still do their own thing below and return early, but the
+       focus move must happen before that, not only on the path that falls through to a row. */
+    setFocus(`drawer:${id}`);
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
-    const row = e.target.closest('[data-i]'); setFocus(`drawer:${id}`);
+    const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
   document.querySelector('.mapbox').addEventListener('pointerdown', e => { if (!e.target.closest('#drawers, #drawerTabs, #tip, #windows') && ui.focus !== 'map'){ setFocus('map'); renderUI(true); } });

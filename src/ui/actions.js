@@ -1,5 +1,30 @@
 /* God actions: tools, view changes, movement, and world control. */
 
+/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
+   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
+   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
+   moved past it, the valley is made, a new world starts, or a save loads. The one writer of
+   `captionText`; every other file calls this instead of setting the field itself, the same way
+   `setFocus` is the one writer of `ui.focus`. */
+let captionText = '';
+function setActCaption(text){
+  text = text || '';
+  if (text === captionText) return;
+  captionText = text;
+  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
+     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
+     there, and the text these tests read comes straight from captionText. The text is plain narrative
+     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = $('actCaption'); if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+  /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
+     renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
+     assignment, every time the caption's text actually changes. */
+  renderFoot();
+}
+
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
@@ -42,33 +67,44 @@ function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; rende
 const levelName = z => z === 0 ? 'Surface' : z > 0 ? `Level +${z}` : `Level ${z}`;
 function setView(v, s){
   if (inAges()) v = 'world';
+  /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
+  const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
-  $('world').hidden = v !== 'world'; $('loc').hidden = v !== 'loc'; $('mid').hidden = v !== 'mid';
-  $('viewBtn').innerHTML = `${VIEW_LABEL[NEXT_VIEW[v]]}<kbd>M</kbd>`;
+  /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
+     The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
+     opened from below ground showed the fire's tiles at the lower level, with the cursor there too. */
+  if (p){ cur = secOf(p[0], p[1]); lvl = 0; cursor = inLocView(cursor.x, cursor.y) ? { x: cursor.x, y: cursor.y, z: 0 } : { x: p[0], y: p[1], z: 0 }; }
+  $('world').hidden = v !== 'world'; $('loc').hidden = !closeUp(v); $('mid').hidden = v !== 'mid';
   renderUI(true);
 }
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
-/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows. */
+/* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
+   The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
   cursor = { x: clamp(x, 0, W - 1), y: clamp(y, 0, H - 1), z: clamp(z, ZMIN, ZMAX) };
   const s = secOf(cursor.x, cursor.y);
-  if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
-  if (view === 'loc' && cursor.z !== lvl) setLevel(cursor.z);
+  if (view === 'fire'){ if (inLocView(cursor.x, cursor.y)){ cur = s; renderUI(true); } else setView('loc', s); }
+  else if (s.sx !== cur.sx || s.sy !== cur.sy) setView(view, s); else renderUI(true);
+  if (closeUp(view) && cursor.z !== lvl) setLevel(cursor.z);
 }
-function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); cursorTo(c.x, c.y, c.z); }
+/* A sector step or an edge step leaves the camp fire view for the sector view of the sector the cursor
+   lands in. The edge step is Alt+arrow. It lands where the same key lands in the sector view of the
+   cursor's sector: on that sector's edge, or one sector on when the cursor is already on the edge.
+   Before this, only the nav buttons left, and Alt+arrow often stayed in the camp fire view. */
+function moveCursor([dx, dy, mult]){ followId = null; const c = cursorAfter(cursor, dx, dy, mult, view); if (view === 'fire' && (mult === 'sector' || mult === 'edge')) setView('loc', secOf(c.x, c.y)); cursorTo(c.x, c.y, c.z); }
 /* The tool at the cursor. In the nearby and world views Enter opens the sector under it. */
 function applyAt(){
   if (inAges()){ openGodAt(cursor.x, cursor.y); return; }
-  if (view !== 'loc'){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
-  const c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - cur.sx * LW, ly: cursor.y - cur.sy * LH };
+  if (!closeUp(view)){ const s = secOf(cursor.x, cursor.y); goto(s.sx, s.sy); return; }
+  const { ox, oy } = locOrigin(), c = { x: cursor.x, y: cursor.y, z: cursor.z, lx: cursor.x - ox, ly: cursor.y - oy };
   const r = cv.getBoundingClientRect(); const e = { clientX: r.left + (c.lx + 0.5) * r.width / LW, clientY: r.top + (c.ly + 0.5) * r.height / LH };
   applyTool(c, e);
 }
-function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(NEXT_VIEW[view]); }
+function cycleView(){ if (inAges()){ say('The valley is not made yet. There is only the field.'); return; } followId = null; setView(nextView(view)); }
 function randomSeed(){ const a = ['amber','birch','cinder','dusk','ember','fern','gravel','hollow','iron','juniper','kestrel','lichen','moss','nettle','oak','pine'], b = ['brook','crag','dale','fen','ford','glen','hill','marsh','moor','ridge','vale','wold']; return `${a[Math.floor(Math.random() * a.length)]}-${b[Math.floor(Math.random() * b.length)]}-${Math.floor(Math.random() * 100)}`; }
-function cellFrom(e){ const r = cv.getBoundingClientRect(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: cur.sx * LW + lx, y: cur.sy * LH + ly, z: lvl }; }
+function cellFrom(e){ const r = cv.getBoundingClientRect(), { ox, oy } = locOrigin(); const lx = clamp(Math.floor((e.clientX - r.left) / r.width * LW), 0, LW - 1), ly = clamp(Math.floor((e.clientY - r.top) / r.height * LH), 0, LH - 1); return { lx, ly, x: ox + lx, y: oy + ly, z: lvl }; }
 function sectorFromMid(e){ const r = mcv.getBoundingClientRect(), { ox, oy } = midOrigin(); const s = secOf(ox + Math.floor((e.clientX - r.left) / r.width * 3 * LW), oy + Math.floor((e.clientY - r.top) / r.height * 3 * LH)); return s.sx >= 0 && s.sy >= 0 && s.sx < SW && s.sy < SH ? s : null; }
 function sectorFrom(e){ const r = wcv.getBoundingClientRect(); return { sx: clamp(Math.floor((e.clientX - r.left) / r.width * SW), 0, SW - 1), sy: clamp(Math.floor((e.clientY - r.top) / r.height * SH), 0, SH - 1) }; }
 const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX - r.left) / r.width * W), 0, W - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * H), 0, H - 1) }; };
@@ -80,11 +116,16 @@ function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
   startCreation(seed, {});
-  fieldKey = '';
+  fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore(); if (ui.savedSpeed) setSpeed(ui.savedSpeed);
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
+     session had open: the People and Goals cards used to cover the map at the very start. Continue
+     and Load do not call this, so they keep the tabs a saved world had open. */
+  ui.open = [];
+  if (ui.savedSpeed) setSpeed(ui.savedSpeed);
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
@@ -137,7 +178,7 @@ function loadWorld(snapshot, note){
 /* The view after a load. Everything it remembers points at the world that was replaced, and the new
    world can be a smaller one, so this puts the view back on the ground as onSettle does. */
 function onLoad(){
-  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = '';
+  acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
@@ -216,7 +257,7 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   setSpeed(ui.savedSpeed || speed || 1);
@@ -241,12 +282,23 @@ function applyTool(c, e){
   renderUI(true);
 }
 
-/* The action table. Every key and every click ends here. The only place view state changes. */
-function openDrawer(id, on){
+/* The action table. Every key and every click ends here. The only place view state changes.
+   `enterFocus` is for a caller that deliberately takes the player into the card, such as a search
+   or a jump to a stage: it moves `ui.focus` into the drawer, and back to the map when the drawer
+   closes. Without it, the tab's own key or a click on the tab opens or closes the drawer and leaves
+   focus where it was, so the game keys keep working while the card sits open. The one case that
+   still moves focus to the map without `enterFocus` is closing the drawer the player had clicked
+   into: its card is gone, so nothing is left to hold that focus. */
+function openDrawer(id, on, enterFocus){
   const has = ui.open.includes(id), want = on === undefined ? !has : on;
   const narrow = typeof innerWidth !== 'undefined' && innerWidth < 800;
   if (want && !has) ui.open = narrow ? [id] : ui.open.concat(id); if (!want && has) ui.open = ui.open.filter(x => x !== id);
-  ui.focus = want ? `drawer:${id}` : 'map'; ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
+  if (enterFocus) ui.focus = want ? `drawer:${id}` : 'map';
+  /* Below 800 px only one drawer stays open, so opening a second one (narrow ? [id] above) can close
+     the one that held the focus without touching it here. Any focus that names a drawer no longer in
+     ui.open is stale and would leave the number keys picking rows nobody can see; send it to the map. */
+  else if (ui.focus.startsWith('drawer:') && !ui.open.includes(ui.focus.slice(7))) ui.focus = 'map';
+  ui.row[id] = ui.row[id] || 0; persist(); renderUI(true);
 }
 const focusedDrawer = () => ui.focus.startsWith('drawer:') ? ui.focus.slice(7) : ui.focus.startsWith('window:') ? (ui.windows.find(w => w.id === Number(ui.focus.slice(7)) && w.kind === 'drawer') || {}).target || null : null;
 /* Arrows in a drawer move the row. In an inspector window there are no rows, so they scroll the body by a line. */
@@ -295,8 +347,8 @@ const ACTIONS = {
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
-  levelUp(){ if (view === 'loc') setLevel(lvl + 1); },
-  levelDown(){ if (view === 'loc') setLevel(lvl - 1); },
+  levelUp(){ if (closeUp(view)) setLevel(lvl + 1); },
+  levelDown(){ if (closeUp(view)) setLevel(lvl - 1); },
   nav([dx, dy]){ moveCursor([dx, dy, 'sector']); },
   cursor(arg){ moveCursor(arg); },
   applyAt(){ applyAt(); },
@@ -328,7 +380,9 @@ const ACTIONS = {
   focusTimeline(){ ui.focus = 'timeline'; },
   /* One act of one creation, opened into the foot. The same chip twice closes it. */
   openChip(key){ ui.timelineChip = ui.timelineChip === key ? null : key; },
-  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } renderUI(true); } },
+  /* In the camp fire view the new camp's fire becomes the centre, since the view reads viewCamp. A camp
+     with no site has no fire, so setView('fire') gives the sector view instead. */
+  campN(n){ const c = camps[n - 1]; if (c){ viewCamp = c; if (c.site){ followId = null; setView(view === 'world' ? 'loc' : view, secOf(...c.site)); } else if (view === 'fire') setView('fire'); renderUI(true); } },
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
@@ -368,8 +422,8 @@ const ACTIONS = {
   continueWorld(){ continueWorld(); },
   jumpChip(n){
     const a = alerts()[n - 1]; if (!a) return;
-    if (a.being != null){ const b = beingById(a.being); if (b){ if (view !== 'loc') setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
-    else if (a.tile){ if (view !== 'loc') setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
+    if (a.being != null){ const b = beingById(a.being); if (b){ if (!closeUp(view)) setView('loc', secOf(b.x, b.y)); cursorTo(b.x, b.y, b.z); ACTIONS.inspect(b.id); } }
+    else if (a.tile){ if (!closeUp(view)) setView('loc', secOf(a.tile[0], a.tile[1])); cursorTo(a.tile[0], a.tile[1], a.tile[2] || 0); }
   },
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
@@ -380,7 +434,7 @@ const ACTIONS = {
   },
   /* `/` opens the Chronicle drawer and puts the caret in its box. openDrawer keeps the narrow-window
      rule, the row, and storage; the box is created with the section, so it is there by the time we focus it. */
-  searchChronicle(){ openDrawer('chronicle', true); const box = $('chronSearch'); if (box) box.focus(); },
+  searchChronicle(){ openDrawer('chronicle', true, true); const box = $('chronSearch'); if (box) box.focus(); },
   /* The one writer of the query. The box's input handler calls it, and so does Esc. A shorter list would
      leave a stale row index pointing past the end, so the row goes back to the top with every change. */
   setChronSearch(v){
@@ -401,7 +455,7 @@ const ACTIONS = {
   paletteRun(){ paletteRun(); },
   palettePick(n){ paletteRun(n - 1); },
   chord(){ if (inAges()){ say('No goals yet. The valley is not made.'); return; } openChord(); },
-  stage(id){ closeDialogs(); openDrawer('goals', true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
+  stage(id){ closeDialogs(); openDrawer('goals', true, true); ui.unfold[id] = true; const i = drawerRows('goals').findIndex(r => r.kind === 'stage' && r.id === id); if (i >= 0) ui.row.goals = i; renderUI(true); },
   goalPri({ id, pri }){ say(inject({ source: 'player', act: 'priority', id, pri })); renderUI(true); },
   gotoSector({ sx, sy }){ goto(sx, sy); },
   unmute(m){ ui.mutes.delete(m); persist(); renderUI(true); },
