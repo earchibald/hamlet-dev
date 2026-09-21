@@ -4130,6 +4130,20 @@ function bodyStretch(a, lim){
       thoughtAt(a, e, 'slept', roof ? 'Slept under a roof' : warm ? 'Slept warm beside the fire' : 'Slept cold on the bare ground', roof ? 6 : warm ? 3 : -4, CLOCK.thought.slept);
     }
   }
+  /* A SLEEPER WHOSE FOOD OR WATER HAS RUN OUT WAKES. The force in `updateBeing` pulls a thirsty
+     person off their work and sends them to drink, but it never reaches a sleeper, because a
+     sleeping being returns before it. That cost nothing while water took two world days to empty:
+     no night was long enough. Task 5 gave water a rate of 17 points an hour, which empties a full
+     skin in under six hours, and a night is about six and a half, so a person could now run dry in
+     their sleep and lie there taking the starving damage until they died. One did: Iva died of
+     thirst on day 29 of seed r, asleep by the fire.
+
+     The wake goes here, after the rested wake and guarded on still being asleep, so a person roused
+     by thirst does not also get the thought that says they slept well. It adds no text of its own:
+     the `starving` thought above already says "Is dying of thirst" on this same tick, and the person
+     is then awake for the force to act on. It draws no random number, and the stretch already broke
+     on the tick the need reached zero, so the tick is the tick it always was. */
+  if (a.asleep && starving1) a.asleep = false;
   /* The life clock. Past the usual span, each day is a gift. It was rolled once a tick against a
      chance for a tick; it is rolled once a world day now, compounded over the day with `rollFor`, so
      the chance of dying in a day of world time is the chance it always was. A stretch always begins
