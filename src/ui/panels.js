@@ -38,7 +38,7 @@ function drawerHTML(d){
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
-  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  setHTML($('drawerTabs'), DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join(''));
   const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
   for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
   docked.forEach((id, n) => {

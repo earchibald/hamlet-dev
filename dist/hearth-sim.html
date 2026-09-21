@@ -69,10 +69,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .cell.playing{background:var(--map-god);color:var(--accent-ink);border-color:var(--map-god)}
 #timeline .now{flex:none;width:0;border-left:2px solid var(--major);align-self:stretch;margin:0 4px}
 /* The strip: world half, a divider, camp half, controls at the right. */
-.strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;min-width:0}
 .strip .world,.strip .camp,.strip .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .strip .world{flex:none}
-.strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0;flex-wrap:nowrap}
+.strip .camp{padding-left:14px;border-left:2px solid var(--line);flex:1 1 auto;min-width:0}
 .strip .ctl{margin-left:auto;gap:6px;flex:none}
 #clock{font-weight:700}
 #season,#weather{color:var(--muted)}
@@ -7217,6 +7217,18 @@ let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSki
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
 let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
+/* Write markup only when it differs from the last string this helper sent to that element. A render
+   that rebuilds the same markup every call, with the world running, replaces an element's children
+   between a click's press and its release, and the click is lost. The check is against the string
+   this helper last wrote, held in a WeakMap keyed by the element, and not against el.innerHTML: the
+   browser re-serialises markup, so a read-back can differ from what was written even when nothing
+   changed. */
+const htmlWritten = new WeakMap();
+const setHTML = (el, html) => {
+  if (htmlWritten.get(el) === html) return;
+  htmlWritten.set(el, html);
+  el.innerHTML = html;
+};
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
@@ -8882,10 +8894,10 @@ function renderStrip(){
   /* The village title is not part of the name, so it is added here, not by the sim. */
   $('campName').textContent = inAges() ? 'The ages' : camp.name + (camp.village ? ', a village' : '');
   $('campName').title = inAges() ? '' : nameTitle(campNames().now);
-  $('camps').innerHTML = camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '';
+  setHTML($('camps'), camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '');
   const g = gauges();
-  $('gauges').innerHTML = ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join('');
-  $('chips').innerHTML = alerts().slice(0, 9).map(chipHTML).join('');
+  setHTML($('gauges'), ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join(''));
+  setHTML($('chips'), alerts().slice(0, 9).map(chipHTML).join(''));
 }
 
 /* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
@@ -8985,7 +8997,7 @@ function drawerHTML(d){
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
 function renderDrawers(){
-  $('drawerTabs').innerHTML = DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join('');
+  setHTML($('drawerTabs'), DRAWERS.map(d => `<button class="btn ${ui.open.includes(d.id) ? 'on' : ''}" id="tab-${d.id}" data-drawer="${d.id}">${d.label}${winFind('drawer', d.id) ? ' ⧉' : ''}<kbd>${d.key}</kbd></button>`).join(''));
   const host = $('drawers'), docked = ui.open.filter(id => !winFind('drawer', id));
   for (const sec of [...host.children]) if (!docked.includes(sec.dataset.drawer)) sec.remove();
   docked.forEach((id, n) => {

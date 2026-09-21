@@ -49,6 +49,18 @@ let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSki
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
 let beatsLastFrame = 1;
 const $ = id => document.getElementById(id);
+/* Write markup only when it differs from the last string this helper sent to that element. A render
+   that rebuilds the same markup every call, with the world running, replaces an element's children
+   between a click's press and its release, and the click is lost. The check is against the string
+   this helper last wrote, held in a WeakMap keyed by the element, and not against el.innerHTML: the
+   browser re-serialises markup, so a read-back can differ from what was written even when nothing
+   changed. */
+const htmlWritten = new WeakMap();
+const setHTML = (el, html) => {
+  if (htmlWritten.get(el) === html) return;
+  htmlWritten.set(el, html);
+  el.innerHTML = html;
+};
 
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {

@@ -2333,4 +2333,24 @@ test('un-pausing takes over a beat the player stepped: the running clock owns it
   });
 });
 
+test('setHTML writes an element only when the markup changed since the last write', () => {
+  const api = loadUI(['state'], ['setHTML']);
+  let writes = 0, shown = '';
+  const el = { get innerHTML(){ return shown; }, set innerHTML(v){ writes++; shown = v; } };
+  api.setHTML(el, '<b>a</b>');
+  assert.equal(writes, 1, 'the first write always lands');
+  assert.equal(shown, '<b>a</b>');
+  api.setHTML(el, '<b>a</b>');
+  assert.equal(writes, 1, 'the same string a second time is not written again');
+  api.setHTML(el, '<b>b</b>');
+  assert.equal(writes, 2, 'a changed string is written');
+  assert.equal(shown, '<b>b</b>');
+  /* A second element starts with no history of its own, even with the same string already on the
+     first element: the check is against what THIS helper wrote to THIS element. */
+  const el2 = { get innerHTML(){ return shown2; }, set innerHTML(v){ writes2++; shown2 = v; } };
+  let writes2 = 0, shown2 = '';
+  api.setHTML(el2, '<b>b</b>');
+  assert.equal(writes2, 1, 'a different element is written on its own first call');
+});
+
 module.exports = { loadUI };
