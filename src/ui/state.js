@@ -62,25 +62,6 @@ const setHTML = (el, html) => {
   el.innerHTML = html;
 };
 
-/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
-   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
-   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
-   moved past it, the valley is made, a new world starts, or a save loads. */
-let captionText = '';
-function setActCaption(text){
-  text = text || '';
-  if (text === captionText) return;
-  captionText = text;
-  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
-     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
-     there, and the text these tests read comes straight from captionText. The text is plain narrative
-     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
-  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
-  const el = $('actCaption'); if (!el) return;
-  el.hidden = !text;
-  el.textContent = text;
-}
-
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
   pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */

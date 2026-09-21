@@ -140,9 +140,14 @@ function drawGesture(rec, f){
 const MARK_R = 34;
 /* Where the mark's word goes: to the right of the disc, at a fixed gap past its radius, unless the
    disc sits too close to the canvas edge for the word to fit there, when it goes to the left instead.
-   Pure, so a test can walk every position without a canvas. */
+   When the word fits on neither side, the side with more room still runs off the canvas less, so it
+   picks that side rather than always the left. Pure, so a test can walk every position without a canvas. */
 function markWordSide(x, textWidth, canvasWidth, gap = 8){
-  return x + MARK_R + gap + textWidth <= canvasWidth ? 'right' : 'left';
+  const need = MARK_R + gap + textWidth;
+  if (x + need <= canvasWidth) return 'right';
+  if (x - need >= 0) return 'left';
+  const room = { right: canvasWidth - (x + MARK_R + gap), left: x - MARK_R - gap };
+  return room.right >= room.left ? 'right' : 'left';
 }
 /* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
    appears beside it. The disc is the map's own background at just over half, so the mark reads on any

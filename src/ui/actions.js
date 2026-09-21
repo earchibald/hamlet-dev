@@ -1,5 +1,26 @@
 /* God actions: tools, view changes, movement, and world control. */
 
+/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
+   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
+   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
+   moved past it, the valley is made, a new world starts, or a save loads. The one writer of
+   `captionText`; every other file calls this instead of setting the field itself, the same way
+   `setFocus` is the one writer of `ui.focus`. */
+let captionText = '';
+function setActCaption(text){
+  text = text || '';
+  if (text === captionText) return;
+  captionText = text;
+  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
+     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
+     there, and the text these tests read comes straight from captionText. The text is plain narrative
+     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = $('actCaption'); if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+}
+
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }

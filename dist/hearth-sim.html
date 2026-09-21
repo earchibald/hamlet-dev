@@ -231,7 +231,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     </div>
     <div class="over tl2" id="where"></div>
     <div class="foot-stack">
-      <div id="actCaption" hidden></div>
+      <div id="actCaption" hidden aria-live="polite"></div>
       <div id="foot"></div>
     </div>
     <div id="drawerTabs"></div>
@@ -7239,25 +7239,6 @@ const setHTML = (el, html) => {
   el.innerHTML = html;
 };
 
-/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
-   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
-   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
-   moved past it, the valley is made, a new world starts, or a save loads. */
-let captionText = '';
-function setActCaption(text){
-  text = text || '';
-  if (text === captionText) return;
-  captionText = text;
-  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
-     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
-     there, and the text these tests read comes straight from captionText. The text is plain narrative
-     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
-  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
-  const el = $('actCaption'); if (!el) return;
-  el.hidden = !text;
-  el.textContent = text;
-}
-
 /* What the view model remembers between frames. `ui` is one object so the tests can reach it. */
 const ui = {
   pulses: [],          /* { text, until, being, tile } from major lines and goal unlocks */
@@ -8384,9 +8365,14 @@ function drawGesture(rec, f){
 const MARK_R = 34;
 /* Where the mark's word goes: to the right of the disc, at a fixed gap past its radius, unless the
    disc sits too close to the canvas edge for the word to fit there, when it goes to the left instead.
-   Pure, so a test can walk every position without a canvas. */
+   When the word fits on neither side, the side with more room still runs off the canvas less, so it
+   picks that side rather than always the left. Pure, so a test can walk every position without a canvas. */
 function markWordSide(x, textWidth, canvasWidth, gap = 8){
-  return x + MARK_R + gap + textWidth <= canvasWidth ? 'right' : 'left';
+  const need = MARK_R + gap + textWidth;
+  if (x + need <= canvasWidth) return 'right';
+  if (x - need >= 0) return 'left';
+  const room = { right: canvasWidth - (x + MARK_R + gap), left: x - MARK_R - gap };
+  return room.right >= room.left ? 'right' : 'left';
 }
 /* The act's face: the mark draws itself stroke by stroke over TWEEN.cue to TWEEN.draw, then the word
    appears beside it. The disc is the map's own background at just over half, so the mark reads on any
@@ -9231,6 +9217,27 @@ function openChord(){
 }
 
 /* God actions: tools, view changes, movement, and world control. */
+
+/* The act caption on stage, if any: the sentence drawField shows in the page, above the foot, clear of
+   the drawers and never on the canvas. Held here, not only written, so the foot can tell when it would
+   repeat the same sentence and stay quiet instead. Empty once no act caption is on stage: the ages
+   moved past it, the valley is made, a new world starts, or a save loads. The one writer of
+   `captionText`; every other file calls this instead of setting the field itself, the same way
+   `setFocus` is the one writer of `ui.focus`. */
+let captionText = '';
+function setActCaption(text){
+  text = text || '';
+  if (text === captionText) return;
+  captionText = text;
+  /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
+     that drives onSettle or newWorld directly may have no document at all; the page write is skipped
+     there, and the text these tests read comes straight from captionText. The text is plain narrative
+     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = $('actCaption'); if (!el) return;
+  el.hidden = !text;
+  el.textContent = text;
+}
 
 /* A said message is a note. It holds the foot for four seconds of wall time, then the chronicle line comes back. */
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;

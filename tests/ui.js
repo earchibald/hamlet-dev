@@ -1088,6 +1088,10 @@ test('the mark word goes right when there is room, and left when there is not', 
   /* A wider word needs more room, so the same disc position can flip sides. */
   assert.equal(api.markWordSide(700, 40, 800), 'right');
   assert.equal(api.markWordSide(700, 90, 800), 'left');
+  /* A word too wide for either side fits on neither, so the side with more room is picked: the one
+     the word runs off the canvas the least on, not always the left. */
+  assert.equal(api.markWordSide(300, 760, 800), 'right', 'more room to the right of a disc near the left edge');
+  assert.equal(api.markWordSide(700, 760, 800), 'left', 'more room to the left of a disc near the right edge');
 });
 
 test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
@@ -1750,7 +1754,7 @@ function recordCtx(){
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
-  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
     caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
