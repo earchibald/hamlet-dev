@@ -7,4 +7,4 @@ const page = fs.readFileSync('src/page.template.html', 'utf8')
   .replace('__UI__', () => ui.source());
 fs.mkdirSync('dist', { recursive: true });
 fs.writeFileSync('dist/hearth-sim.html', page);
-console.log('built dist/hearth-sim.html', page.length, 'bytes');
+console.log('built dist/hearth-sim.html', Buffer.byteLength(page), 'bytes');
