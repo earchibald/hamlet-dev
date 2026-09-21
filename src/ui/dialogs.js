@@ -1,7 +1,7 @@
 /* Start and help dialogs. One dialog is open at a time. Esc closes it. */
 function anyDialogOpen(){ return !!document.querySelector('dialog[open]'); }
-function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) ui.focus = 'map'; }
-function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNote(''); showContinue(); ui.focus = 'dialog:start'; $('start').showModal(); $('seed').focus(); $('seed').select(); }
+function closeDialogs(){ for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (ui.focus.startsWith('dialog')) setFocus('map'); }
+function openStart(){ closeDialogs(); $('seed').value = seedText || ''; startNote(''); showContinue(); setFocus('dialog:start'); $('start').showModal(); $('seed').focus(); $('seed').select(); }
 /* One line inside the start dialog, for an answer that the foot behind it would hide. An empty line hides it. */
 function startNote(text){ const p = $('startNote'); if (!p) return; p.textContent = text; p.hidden = !text; }
 /* The Continue button, shown only when the autosave slot holds a world. The save is outside data, so its
@@ -18,7 +18,7 @@ function showContinue(){
   b.appendChild(k);
 }
 let muteFor = null;
-function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; ui.focus = 'dialog:mute'; $('mute').showModal(); }
+function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; setFocus('dialog:mute'); $('mute').showModal(); }
 function muteChoice(k){
   if (!muteFor) return;
   if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
@@ -29,7 +29,7 @@ function muteChoice(k){
 function openHurry(){
   closeDialogs();
   $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
-  ui.focus = 'dialog:hurry';
+  setFocus('dialog:hurry');
   $('hurry').showModal();
   $('hurryGo').focus();
 }
@@ -49,12 +49,12 @@ function openHelp(){
     <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
     <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
-  ui.focus = 'dialog:help'; $('help').showModal();
+  setFocus('dialog:help'); $('help').showModal();
 }
 
 /* The command palette: every action and every named thing, one search box. */
 let palRows = [], palHit = [], palSel = 0;
-function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; ui.focus = 'dialog:palette'; $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
+function openPalette(){ closeDialogs(); palRows = paletteRows(); palSel = 0; setFocus('dialog:palette'); $('paletteInput').value = ''; $('palette').showModal(); renderPalette(); $('paletteInput').focus(); }
 function renderPalette(){
   palHit = paletteMatch($('paletteInput').value, palRows).slice(0, 40); palSel = clamp(palSel, 0, Math.max(0, palHit.length - 1));
   /* Every row's label is escaped here, once, at the one place a label becomes markup. A static label
@@ -73,5 +73,5 @@ function paletteRun(i = palSel){
 function openChord(){
   closeDialogs();
   $('chordButtons').innerHTML = STAGES.filter(s => stagesShown().includes(s.id)).map(s => `<button class="btn" id="chord-${s.id}" data-stage="${s.id}">${s.label}<kbd>${STAGE_LETTER[s.id].toUpperCase()}</kbd></button>`).join(' ');
-  ui.focus = 'dialog:chord'; $('chord').showModal();
+  setFocus('dialog:chord'); $('chord').showModal();
 }

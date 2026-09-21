@@ -39,7 +39,7 @@ function wireWindows(){
   const box = $('windows'); let drag = null;
   box.addEventListener('pointerdown', e => {
     const el = e.target.closest('.win'); if (!el) return; const w = ui.windows.find(w => w.id === Number(el.dataset.win)); if (!w) return;
-    ui.focus = `window:${w.id}`; ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
+    setFocus(`window:${w.id}`); ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
     if (e.target.closest('[data-close]')){ winClose(w.id); persist(); renderUI(true); return; }
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderUI(true); return; }
     const grip = e.target.closest('.grip'), bar = e.target.closest('.bar');

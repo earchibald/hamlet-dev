@@ -28,11 +28,17 @@ const TICKS_A_SECOND = 60;
    settle. */
 const BEAT_MS = 1000;
 const PACES = [0.25, 0.5, 1, 2];
+/* How long one frame may spend stepping the world in the days. A frame at 60 fps is 16.7 ms, so half
+   of it is left for the draw, the once-a-quarter-second interface render, and the browser's own work.
+   The world view redraws in about 0.2 ms on an M-series Mac (Safari, 2026-09-20), so the half is
+   generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
+   several milliseconds still draws: the frame drops world ticks rather than frames. */
+const STEP_BUDGET_MS = 8;
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
-   full, figure, and walk are that length in milliseconds: the least a tier of the drawing is worth. cue,
+   full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
    durations, and they stay out of src/sim/. */
-const TWEEN = { full: 1000, figure: 300, walk: 100, cue: 0.25, draw: 0.6, word: 0.85 };
+const TWEEN = { full: 1000, figure: 300, cue: 0.25, draw: 0.6, word: 0.85 };
 let pace = 1, lastEra = 'days';
 let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
@@ -76,11 +82,44 @@ const ui = {
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
 };
 const WIN_MAX = 6;
-/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold. */
-const SPEEDS = [1, 4, 16, 64];
+/* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
+
+   A rung is a multiplier on TICKS_A_SECOND, so rung v asks for v * 60 world ticks in one real second.
+   The G4 retune made a world day 86,400 ticks where it was 1,000, and a year 365 days where it was 32.
+   The old top rung, 64, asks 3,840 ticks a second, which crosses a world day in 22 s and reaches
+   winter, day 274, in about 1.7 h of watching. The rungs were raised, not counted again: four rungs
+   keep every key and every button where they are.
+
+   What each rung costs, at 86,400 ticks a world day and 31,536,000 a world year:
+
+     rung 1      60 ticks/s       a day 24 min     a year 6.1 real days
+     rung 8      480 ticks/s      a day 3 min      a year 18.3 h
+     rung 64     3,840 ticks/s    a day 22.5 s     a year 2.3 h
+     rung 256    15,360 ticks/s   a day 5.6 s      a year 34 min
+
+   The top rung was measured, not chosen by taste. Measured 2026-09-20 on this branch, on an
+   M-series Mac, in valleys grown to world day 12 (40 to 48 beings, 2,300 to 3,700 ground items; the
+   seed differs between the Node runs and the browser runs, so the counts are given as a range):
+
+     the engine alone, nothing drawn     31,000 to 37,000 ticks/s in Node
+                                         about 32,000 ticks/s in Safari
+     the page, world map, no drawer      13,943 ticks/s at 60.1 fps in Safari
+     the page, location map, two drawers  7,085 ticks/s at 60.2 fps in Safari
+
+   The page reaches less than the engine because a frame keeps STEP_BUDGET_MS and gives the rest to
+   the draw, so a costlier view buys fewer world ticks. 256 asks 15,360. The world map, which is the
+   view a player watches from while the seasons pass, meets nine tenths of it. The location map with
+   two drawers open meets under half, and the frame rate holds at 60 either way: the budget spends
+   what it has and drops the rest, so a heavy view costs world time and never the drawing.
+
+   The step from 64 is four and not eight because the machine ends the ladder there. A rung above
+   this one would only mean "as fast as this machine allows" and would make its own printed rate a
+   lie. 512 was built and measured first: the same page under it delivered 12,249 ticks a second,
+   which is 40% of what its label claims. */
+const SPEEDS = [1, 8, 64, 256];
 /* How each ladder's steps print on a button or in the help. The ages use the fraction glyphs, since the
    page is already UTF-8 and a decimal (0.25×) would sit oddly beside the days' whole numbers. */
-const SPEED_LABEL = { 1: '1×', 4: '4×', 16: '16×', 64: '64×' };
+const SPEED_LABEL = { 1: '1×', 8: '8×', 64: '64×', 256: '256×' };
 const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */

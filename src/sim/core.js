@@ -130,7 +130,14 @@ const secCenter = s => [s.sx * LW + (LW >> 1), s.sy * LH + (LH >> 1)];
 function shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = rint(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 /* World state */
-let world, levels, raised, hills, caves, sectors, beings, items, itemGrid, chronicle, corpses, tick, nextId, fireCount, seedText, camps, camp, goalPriority, namePool, resCache, weather, groves;
+let /** @type {Tile[]} */ world, /** @type {Tile[][]} */ levels, /** @type {Tile[]} */ raised,
+  /** @type {Hill[]} */ hills, /** @type {Cave[]} */ caves, /** @type {Sector[]} */ sectors,
+  /** @type {Being[]} */ beings, /** @type {GroundItem[]} */ items, /** @type {(GroundItem|null)[]} */ itemGrid,
+  /** @type {ChronicleLine[]} */ chronicle, /** @type {CorpseMarker[]} */ corpses,
+  /** @type {number} */ tick, /** @type {number} */ nextId, /** @type {number} */ fireCount, /** @type {string} */ seedText,
+  /** @type {Camp[]} */ camps, /** @type {Camp|null} */ camp, /** @type {{[goalId:string]: number}} */ goalPriority,
+  /** @type {string[]} */ namePool, /** @type {Map<any,any>} */ resCache,
+  /** @type {{storm:boolean,until:number,next:number}} */ weather, /** @type {Grove[]} */ groves;
 /* The valley after the last person. wanderAt is 0 while a person lives. It holds the tick a lone
    wanderer may arrive on once the people are gone. */
 let wanderAt = 0;

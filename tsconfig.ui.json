@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "commonjs",
+    "moduleDetection": "legacy",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/sim/**/*.js",
+    "src/ui/**/*.js",
+    "types/sim/**/*.d.ts",
+    "types/ui/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/sim/index.js"
+  ]
+}

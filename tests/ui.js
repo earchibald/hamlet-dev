@@ -331,6 +331,97 @@ test('every template button prints a key, and every keyed button id is in the te
   for (const k of api.KEYMAP) if (k.button && !RUNTIME.includes(k.button)) assert.ok(ids.has(k.button), `key map names button #${k.button}, which is not in the template`);
 });
 
+/* A click reads the template, not the constant: main.js hands `Number(b.dataset.pace)` or
+   `Number(b.dataset.speed)` to `ACTIONS.speed`. So this test reads the template too. A test that
+   walked `PACES` and `SPEEDS` again would agree with the constants and never see the template drift
+   away from them, which is how `data-pace="4"` could set an unknown pace with a green suite. */
+/* The scan is per button, not per attribute. One handler reads `data-pace` in the ages and
+   `data-speed` after, on the same click, so carrying both is a property of each button. Two flat
+   lists of attribute values cannot state it: a fifth button with `data-speed` and no `data-pace`
+   leaves both lists complete, and the button is dead in the ages. */
+/* The scan is also per place. src/ui/main.js binds the click to the #speeds span, so a button with
+   both attributes outside that span is dead in both eras. Read the span, then check that no element
+   anywhere else in the template carries either attribute. */
+test('every speed button sits in #speeds and carries both attributes, each is a rung of its ladder, and every rung has a button', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS']);
+  const html = fs.readFileSync('src/page.template.html', 'utf8');
+  const ladders = [['pace', 'PACES', api.PACES], ['speed', 'SPEEDS', api.SPEEDS]];
+  const open = html.match(/<span\b[^>]*\bid="speeds"[^>]*>/);
+  assert.ok(open, 'the template holds no <span id="speeds">; src/ui/main.js binds the speed click to that span, so this test reads nothing');
+  /* Walk to the matching close tag, counting depth. A non-greedy match would stop at a nested
+     </span> and call the buttons after it outsiders, which names the wrong fault. */
+  const from = open.index;
+  let depth = 0, to = -1;
+  for (const m of html.slice(from).matchAll(/<span\b[^>]*>|<\/span>/g)){
+    depth += m[0] === '</span>' ? -1 : 1;
+    if (depth === 0){ to = from + m.index + m[0].length; break; }
+  }
+  assert.ok(to > from, 'the template never closes <span id="speeds">, so this test cannot tell which buttons sit in it');
+  const inner = html.slice(from + open[0].length, to - '</span>'.length);
+  for (const [attr] of ladders){
+    for (const m of html.matchAll(new RegExp(`<[a-zA-Z][^>]*\\bdata-${attr}="[^"]*"[^>]*>`, 'g'))){
+      const tag = m[0], id = (tag.match(/\bid="([^"]+)"/) || [, tag])[1];
+      assert.ok(m.index >= from && m.index < to, `#${id} carries data-${attr} outside <span id="speeds">; src/ui/main.js binds the speed click to that span, so a click on this element sets no speed in either era`);
+    }
+  }
+  const buttons = [...inner.matchAll(/<button\b[^>]*>/g)].map(m => m[0]).filter(b => /\bdata-(pace|speed)="/.test(b));
+  assert.ok(buttons.length, 'the template holds no speed button, so this test reads nothing');
+  const value = (b, attr) => { const m = b.match(new RegExp(`\\bdata-${attr}="([^"]*)"`)); return m ? Number(m[1]) : undefined; };
+  for (const b of buttons){
+    const id = (b.match(/\bid="([^"]+)"/) || [, b])[1];
+    for (const [attr, name, rungs] of ladders){
+      const v = value(b, attr);
+      assert.ok(v !== undefined, `button #${id} carries no data-${attr}; one handler reads data-pace in the ages and data-speed after, so this button is dead in one era`);
+      assert.ok(rungs.includes(v), `button #${id} carries data-${attr}="${v}", which is not on ${name} (${rungs.join(', ')}); a click on it would set that value`);
+    }
+  }
+  for (const [attr, name, rungs] of ladders){
+    const found = buttons.map(b => value(b, attr));
+    for (const r of rungs) assert.ok(found.includes(r), `${name} holds ${r}, which no data-${attr} button in the template can reach`);
+  }
+  /* The handler takes the nearest `[data-speed]` ancestor, which need not be a button. Count the
+     attributes inside the span too, so one moved onto another element there is not left unread. */
+  for (const [attr] of ladders){
+    const all = [...inner.matchAll(new RegExp(`\\bdata-${attr}="`, 'g'))].length;
+    assert.equal(all, buttons.length, `<span id="speeds"> holds ${all} data-${attr} attributes and ${buttons.length} speed buttons; this test reads the buttons, so an attribute on another element goes unchecked`);
+  }
+});
+
+/* Four init sites hand a hard-coded 1 to the guarded doors:
+     src/ui/actions.js:90    setPace(1)
+     src/ui/actions.js:159   setSpeed(ui.savedSpeed || speed || 1)
+     src/ui/actions.js:222   setSpeed(ui.savedSpeed || speed || 1)
+     src/ui/main.js:142      setSpeed(1)
+   The guard throws on a value off its ladder, so a ladder edited to drop 1 does not give the player
+   a wrong speed. It gives them a blank page, because the throw lands on the startup path.
+   These two assertions are the only thing that catches that. Every other reference to either ladder
+   indexes it — PACES[1], SPEEDS[1], SPEEDS.forEach — and an index survives 1 leaving.
+   Do not delete them while removing assertions that restate a constant (issue #80). They read like
+   one and they are not: each states an assumption the init path already makes, in the one place a
+   ladder edit is read. Delete either, edit its ladder, and the suite stays green while the page
+   stops opening. */
+test('the value the init path hands each door is a rung of that door’s ladder', () => {
+  const api = loadUI(['state'], ['PACES', 'SPEEDS']);
+  assert.ok(api.PACES.includes(1), 'the ages open with setPace(1), so 1 must be a rung of PACES or the first frame throws');
+  assert.ok(api.SPEEDS.includes(1), 'the days open with setSpeed(1) and the `|| 1` fallback, so 1 must be a rung of SPEEDS or the first frame throws');
+});
+
+/* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site
+   added later. 4 is on SPEEDS and not on PACES, and 2 is on PACES and not on SPEEDS, so each case is
+   the drift between the two ladders, not a value invented for the test. */
+test('setPace and setSpeed throw on a value off the ladder, and the ladder keeps its last good value', () => {
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], ['PACES', 'SPEEDS', 'setPace', 'setSpeed'],
+    { getPace: '() => pace', getSpeed: '() => speed' });
+  withPage(() => {
+    api.setPace(api.PACES[1]); api.setSpeed(api.SPEEDS[1]);
+    const p = api.getPace(), s = api.getSpeed();
+    assert.throws(() => api.setPace(4), /setPace was given 4, which is not on the ladder PACES/);
+    assert.throws(() => api.setSpeed(2), /setSpeed was given 2, which is not on the ladder SPEEDS/);
+    assert.equal(api.getPace(), p, 'a rejected pace leaves the pace alone');
+    assert.equal(api.getSpeed(), s, 'a rejected speed leaves the speed alone');
+  });
+});
+
 const unesc = t => t.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 const ARROW = { ArrowLeft: '\u2190', ArrowRight: '\u2192', ArrowUp: '\u2191', ArrowDown: '\u2193' };
 
@@ -561,7 +652,7 @@ test('map keys: arrows move the cursor, Shift by five, Ctrl by a sector, Enter a
 const WIN = [...DERIVE, 'winOpen', 'winClose', 'winFind', 'focusRing', 'WIN_MAX'];
 
 test('windows: open reuses a window for the same target, the seventh inspector closes the oldest, and the focus ring lists map, docked drawers, then windows', () => {
-  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
   const w1 = api.winOpen('inspect', { being: 1 });
   assert.equal(api.winOpen('inspect', { being: 1 }), w1, 'same target, same window');
   const w2 = api.winOpen('inspect', { being: 2 });
@@ -580,6 +671,14 @@ test('windows: open reuses a window for the same target, the seventh inspector c
   assert.equal(ring[0], 'map'); assert.ok(ring.includes('drawer:people')); assert.ok(!ring.includes('drawer:goals'), 'a popped-out drawer is a window now');
   assert.ok(ring.filter(f => f.startsWith('window:')).length === api.ui.windows.length);
   api.winClose(api.ui.windows[0].id); assert.equal(api.ui.windows.length, api.WIN_MAX);
+});
+
+test('windows: closing the focused window sends focus back to the map', () => {
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const w1 = api.winOpen('inspect', { being: 1 });
+  api.ui.focus = `window:${w1.id}`;
+  api.winClose(w1.id);
+  assert.equal(api.ui.focus, 'map');
 });
 
 test('window keys: O pops out or docks, Esc closes a focused window, Tab walks the ring', () => {
@@ -656,7 +755,7 @@ test('the one-shot tool hints say Enter', () => {
 });
 
 test('windows: a reopened inspector takes the first free slot', () => {
-  const api = loadUI(['state', 'derive'], WIN); api.startWorld('r'); api.camp = api.camps[0];
+  const api = loadUI(['state', 'derive', 'actions'], WIN); api.startWorld('r'); api.camp = api.camps[0];
   const w1 = api.winOpen('inspect', { being: 1 }); api.winOpen('inspect', { being: 2 }); api.winOpen('inspect', { being: 3 });
   const slot = { x: w1.x, y: w1.y };
   api.winClose(w1.id);
@@ -848,9 +947,8 @@ test('after settle the view model is the day-era one again', () => {
 });
 
 test('the beat clock: a frame owes as many beats as its time buys, and carries the rest', () => {
-  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue', 'beatTier', 'BEAT_MS', 'PACES']);
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatsDue', 'beatTier', 'BEAT_MS']);
   assert.equal(api.BEAT_MS, 1000);
-  assert.deepEqual(api.PACES, [0.25, 0.5, 1, 2]);
   assert.deepEqual(api.beatsDue(0, 1000, 1), { n: 1, acc: 0 });
   assert.deepEqual(api.beatsDue(0, 500, 1), { n: 0, acc: 0.5 });
   assert.deepEqual(api.beatsDue(0.5, 500, 1), { n: 1, acc: 0 });
@@ -864,14 +962,19 @@ test('the beat clock: a tab that slept owes at most eight beats and drops the re
 });
 
 test('the tier reads the beat length, and every pace on the ladder lands where the design says', () => {
-  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatTier', 'BEAT_MS', 'PACES']);
+  const api = loadUI(['state', 'derive'], [...DERIVE, 'beatTier', 'BEAT_MS', 'PACES', 'TWEEN']);
   const tierAt = p => api.beatTier(api.BEAT_MS / p);
   assert.equal(tierAt(0.25), 'full', 'a quarter speed beat is four seconds');
   assert.equal(tierAt(0.5), 'full');
   assert.equal(tierAt(1), 'full', 'single speed is the readable default and draws everything');
   assert.equal(tierAt(2), 'figure', 'double speed drops the intent cue and keeps the figure');
-  assert.equal(api.beatTier(200), 'walk');
-  assert.equal(api.beatTier(50), 'none');
+  /* The ladder must cover the paces. beatTier ends in a catch-all return, so a pace off the bottom no
+     longer snaps: it draws a beat too short for the figure and the caption, and nothing says so. This is
+     the check that says so. The lowest pace that still passes is 3.333. */
+  for (const p of api.PACES){
+    const ms = api.BEAT_MS / p;
+    assert.ok(ms >= api.TWEEN.figure, `pace ${p} buys a beat of ${ms} ms, under the ${api.TWEEN.figure} ms the figure tier needs`);
+  }
 });
 
 test('H hurries the ages from any focus', () => {
@@ -1035,7 +1138,10 @@ test('every action holds in the ages: the view stays on the world, nothing follo
     for (let i = 0; i < 6; i++) api.step();
     assert.equal(api.era, 'gods', 'the probe must start in the ages');
     const god = api.gods()[0].id;
-    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 4, drawer: 'legends', campN: 1,
+    /* The probe runs in the ages, where `speed` sets the pace. 4 is a rung of SPEEDS and not of
+       PACES, so it is now rejected at the door; 1 is a rung of both. `speedStep` takes a place on
+       the ladder, and without an arg it indexed the ladder with NaN and handed setPace undefined. */
+    const ARG = { inspect: god, follow: god, tool: 'inspect', toolSticky: 'inspect', speed: 1, speedStep: 0, drawer: 'legends', campN: 1,
       cursor: [1, 0, 1], nav: [1, 0], stage: 'fire', goalPri: { id: 'firepit', pri: 1 }, gotoSector: { sx: 0, sy: 0 },
       jumpChip: 1, muteMenu: 1, muteChoice: 1, rowPick: 1, palettePick: 1, paletteMove: 1, unmute: 'x' };
     /* `hurryGo` is the one action left out: it runs the rest of the ages, so the era would not be 'gods' after it.
@@ -1365,12 +1471,25 @@ test('a focus left on the band does not outlive the settle, and [ changes the le
 
 /* The feedback pass, round three. */
 test('each speed button has a direct key, Shift with its place on the ladder, from every focus', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS']);
-  assert.deepEqual(api.SPEEDS, [1, 4, 16, 64]);
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...KEYS, 'SPEEDS', 'PACES']);
   const html = fs.readFileSync('src/page.template.html', 'utf8');
+  /* One key row carries both labels: keys.js:102 walks SPEEDS and reads `PACE_LABEL[PACES[i]]` at the
+     same place. So the two ladders must be the same length, and the harm runs both ways. A rung of
+     SPEEDS past the end of PACES has no pace to name. A rung of PACES past the end of SPEEDS gets no
+     key row at all, because the walk is over SPEEDS.
+     PACE_LABEL is a plain object, so the missing lookup gives undefined and the row reads
+     "Pace undefined · Speed 256×". It does not throw. It ships.
+     The template test near the top of this file fails on a ladder grown without its button, but it
+     cannot see this: a fifth button carrying data-speed and no data-pace would pass it. Nothing
+     states the relation itself. This assertion states it. */
+  assert.equal(api.SPEEDS.length, api.PACES.length, 'the ladders must be the same length, because keys.js:102 gives one key row the pace and the speed at the same place');
+  /* The test's own limit: it types the shifted digits it has characters for. A rung past the end of
+     this string reaches keyAction as an undefined key, and the test throws instead of failing. */
+  const SHIFTED = '!@#$';
+  assert.ok(api.SPEEDS.length <= SHIFTED.length, `SPEEDS has ${api.SPEEDS.length} rungs, and this test knows the shifted character for only ${SHIFTED.length} digits (${SHIFTED})`);
   api.SPEEDS.forEach((v, i) => {
     for (const focus of ['map', 'drawer:goals', 'window:2']){
-      assert.deepEqual(keyHit(api, { key: '!@#$'[i], code: `Digit${i + 1}`, shiftKey: true, ctrlKey: false, altKey: false, metaKey: false }, focus), { action: 'speedStep', arg: i }, `Shift+${i + 1} from ${focus}`);
+      assert.deepEqual(keyHit(api, { key: SHIFTED[i], code: `Digit${i + 1}`, shiftKey: true, ctrlKey: false, altKey: false, metaKey: false }, focus), { action: 'speedStep', arg: i }, `Shift+${i + 1} from ${focus}`);
     }
     const row = api.KEYMAP.find(k => k.action === 'speedStep' && k.arg === i);
     assert.equal(row.button, `speed${v}`); assert.equal(api.keyName(row), `Shift+${i + 1}`);
@@ -1410,16 +1529,11 @@ test('a folded stage names its idle goals, and says nothing more when it is unfo
 
 const TWEENS = ['beatTier', 'pointAt', 'lineSoFar', 'TWEEN', 'BEAT_MS', 'PACES'];
 
-test('the tiers of the tween come off the length in milliseconds, in order down the pace ladder', () => {
+test('the tier of the tween comes off the length in milliseconds, at the one boundary left', () => {
   const api = loadUI(['state', 'derive'], TWEENS);
-  /* Each tier holds from its own length up to the next. */
+  /* The one boundary left: full holds from its own length up, and everything under it is figure. */
   assert.equal(api.beatTier(api.TWEEN.full), 'full');
   assert.equal(api.beatTier(api.TWEEN.full - 1), 'figure');
-  assert.equal(api.beatTier(api.TWEEN.figure), 'figure');
-  assert.equal(api.beatTier(api.TWEEN.figure - 1), 'walk');
-  assert.equal(api.beatTier(api.TWEEN.walk), 'walk');
-  assert.equal(api.beatTier(api.TWEEN.walk - 1), 'none');
-  assert.equal(api.beatTier(0), 'none');
 });
 
 test('a walk and a stroke give their ends, and a gesture with no anchor draws nothing', () => {
@@ -1865,7 +1979,7 @@ test('a sector name with markup in it is escaped once it becomes markup: the pal
   const had = Object.fromEntries(['document', 'localStorage', 'window'].map(k => [k, globalThis[k]]));
   try {
     globalThis.document = doc; globalThis.localStorage = storage; globalThis.window = { innerWidth: 1200, innerHeight: 900 };
-    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs'],
+    const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions'],
       [...NAMES, 'paletteRows', 'openPalette', 'renderPalette', 'renderTip'],
       { setTip: '(t, a) => { tipTarget = t; tipAnchor = a; }' });
     api.startWorld('r'); api.camp = api.camps[0];
