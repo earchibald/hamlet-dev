@@ -312,7 +312,7 @@ test('a settle that fails is discarded, the last sleeper wakes, and the ages go 
   api.runAges();
   /* One discard is forced. Seed r's second valley may be thrown back on its own merits, so count at least one. */
   assert.ok(api.creation.discards >= 1, `${api.creation.discards} discards`);
-  assert.ok(api.legends.some(e => /would not hold a life: it lacks water/.test(e.text)), 'no legend of the forced discard');
+  assert.ok(api.legends.some(e => /not ready for people: it still lacks water close to/.test(e.text)), 'no legend of the forced discard');
   assert.equal(api.era, 'days');
   assert.ok(api.creation.settled);
   assert.ok(api.beings.some(b => b.species === 'human'), 'no first person after the second settle');
@@ -328,7 +328,7 @@ test('a world thrown back too often is settled unfinished, and the ages end', ()
   assert.equal(api.era, 'days');
   assert.ok(api.creation.settled);
   assert.equal(api.creation.discards, api.MAX_DISCARDS, `${api.creation.discards} discards`);
-  assert.ok(api.legends.some(e => /settled unfinished/.test(e.text)), 'no legend of the unfinished settle');
+  assert.ok(api.legends.some(e => /The world is left unfinished/.test(e.text)), 'no legend of the unfinished settle');
   assert.ok(api.beings.some(b => b.species === 'human'), 'no first person after the unfinished settle');
 });
 
@@ -343,7 +343,7 @@ test('a creation that runs out of ages settles unfinished at once', () => {
   assert.ok(api.creation.settled);
   /* A failed creation settles at once, so it never spends a repaint: the cap is never even approached. */
   assert.ok(api.creation.discards < api.MAX_DISCARDS, `${api.creation.discards} discards`);
-  assert.ok(api.legends.some(e => /settled unfinished/.test(e.text)), 'no legend of the unfinished settle');
+  assert.ok(api.legends.some(e => /The world is left unfinished/.test(e.text)), 'no legend of the unfinished settle');
 });
 
 /* Settle paints from `creation.gate.start`, and `unmake` can shut the gate with no god left awake, so a gate

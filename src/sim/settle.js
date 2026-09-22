@@ -3,7 +3,7 @@
    writing tiles. Settle runs outside the god stream: painting draws from the people's stream where resetState
    left it, so a seed's valley depends on its marks and its seed, never on how many ages the gods took. */
 function settle(){
-  log(`The last of the gods sleeps. The world is ${age} ages old, and holds its breath.`, [], 'major');
+  log(tell('settle', { n: age }), [], 'major');
   creation.ages = age; creation.settled = true; creation.gate = restGate();
   paintSectors();
   paintGround();
@@ -59,9 +59,9 @@ function settle(){
    has spent its repaints. The two are different endings, so they read differently. */
 function logUnfinished(lack){
   const why = creation.failed
-    ? 'there is no age left to mend it'
-    : `the world was thrown back ${MAX_DISCARDS} times and the gods will not paint it again`;
-  log(`The world is settled unfinished. It lacks ${lack}, and ${why}.`, [], 'bad');
+    ? 'no age is left to mend it'
+    : `the gods have remade it ${countWord(MAX_DISCARDS)} times and will not remake it again`;
+  log(tell('unfinished', { lack: lackWord(lack), why }), [], 'bad');
 }
 /* The real test of a world: from where the first person stands, by a real path search, water, ground to camp on,
    fuel, and food are all in reach. The gate checks marks; this checks tiles. */
@@ -110,8 +110,8 @@ function undoSettle(lack){
     last.status = 'awake'; last.asleep = false; last.needs.rest = 60;
     for (const r of liveRegions()) r.marks = r.marks.filter(m => !(m.kind === 'rest' && m.value === last.id));
     addThought(last, 'wouldnothold', 'The world would not hold', -10, CLOCK.thought.wouldnothold);
-    log(`${last.name} wakes. The world would not hold a life: it lacks ${lack}. The ages go on.`, [last], 'bad');
-  } else log(`The world would not hold a life: it lacks ${lack}. The ages go on.`, [], 'bad');
+    log(tell('thrownBack', { g: last.name, lack: lackWord(lack) }), [last], 'bad');
+  } else log(tell('thrownBackAlone', { lack: lackWord(lack) }), [], 'bad');
 }
 /* Hills from height marks: one to three per country by area, storeys from the mark up to the range. */
 function paintHeights(){
@@ -201,7 +201,7 @@ function paintCreatures(first){
     came[m.value] = liveOf(m.value);
   }
   /* One line a species, not one a making. The legends still tell of every making; this says what the valley got. */
-  for (const sp in short) log(`The ${SPECIES[sp].plural} were made in country after country. Only ${came[sp] || 0} of them came down into the valley.`, [], 'major');
+  for (const sp in short) log(tell('cap', { plural: SPECIES[sp].plural, n: came[sp] || 0 }), [], 'major');
 }
 /* How many of a species stand in the world now. The cap reads it, so a making that could not place its own
    creatures leaves room for the next one. */

@@ -52,6 +52,7 @@ const API = `return {
   startCreation, runAges, ageStep, ageBegin, ageDecide, ageEnd, endAges, settleIfDue, get agePos(){ return agePos; }, get pending(){ return pending; }, get inhabited(){ return inhabited; }, takeTurn, releaseTurn,
   GOD_BARS, barFor, openTurn, get runUntil(){ return runUntil; }, get stops(){ return stops; }, note, restGate, isStart, isLevel, startCandidates, strain, godOptions, decideGod, godNeeds, settleHome, unmake, GOD_ACTS, GOD_NAMES, EPITHET, BODY, LEAVES, SCAR_OF, MAKES, STRAIN, KINDS, polesThatMake, outgrown, REGIONS_PER_GOD,
   gods, awakeGods, godOf, makeGod, withGodRng, rint, sortLine,
+  TELL, tell, POLE_WORD, GOD_OF, LACK_WORD, BIOME_PLACE, SCAR_TEXT,
   get gestureFallbacks(){ return gestureFallbacks; },
   settle, beginCreation, paintSectors, paintGround, paintRivers, paintLakes, paintScars, paintHeights, paintDepths, placeFirstPerson, placeFirstPersonAnywhere, uplift, cutWaterCaves, rockfall, BIOMES, FEATURES, paintCreatures, wasMade, placeBodies, tileCheck, setTileCheck, discardSettle, MAX_DISCARDS, placeGrove, spawnAnimal, placeFinds, digGnomeBurrows, godsTick, SPAWN,
   get rng(){ return rng; }, get godRng(){ return godRng; },

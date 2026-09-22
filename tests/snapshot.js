@@ -929,7 +929,9 @@ const FROZEN_TABLES = new Set(['SEASON_LENGTHS', 'DIRS', 'RING', 'NEAR', 'AROUND
   'OLD_ONSETS', 'OLD_VOWELS', 'OLD_CODAS', 'OLD_FORBID', 'LAND_WORDS', 'LAND_WORD_KINDS', 'LORE_BUILT', 'LORE_TOOK', 'SKY_MEANINGS',
   'SPRITE_MEANINGS', 'OLD_CAVE_KINDS', 'BIOME_WORD', 'LAND_MARKS', 'WORD_TAIL', 'WORD_PHRASE', 'NOTABLE_TAILS',
   'CAMP_NAMED_LINES',
-  'AXIS_TRAIT', 'EVENT_NAMES', 'EVENT_KINDS', 'WORK_WORDS', 'DEED_EPITHETS', 'FATE_EPITHETS', 'DESCRIBE_KIND', 'DISTINCT_FORM']);
+  'AXIS_TRAIT', 'EVENT_NAMES', 'EVENT_KINDS', 'WORK_WORDS', 'DEED_EPITHETS', 'FATE_EPITHETS', 'DESCRIBE_KIND', 'DISTINCT_FORM',
+  /* The creation's words in gods.js. `tell` reads them and writes into none of them; the count of tellings is in `creation.told`. */
+  'POLE_WORD', 'GOD_OF', 'LACK_WORD', 'BIOME_PLACE', 'SCAR_TEXT', 'COUNT_WORD', 'TELL']);
 
 test('every top-level let or var in the sim is saved or listed with a reason', () => {
   const api = load(), saved = api.SAVED_STATE, not = api.NOT_SAVED;

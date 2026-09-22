@@ -10,7 +10,7 @@ const EPITHET = { above: 'who is Above', below: 'who is Below', wet: 'who is Wet
 /* What a god becomes when it sleeps. */
 const BODY = { above: 'a hill', below: 'the deep', wet: 'the river', dry: 'the plain', hot: 'an ember', cold: 'the frost', still: 'a lake', moving: 'the wind', light: 'the day', dark: 'a cave' };
 /* What a god leaves behind, beyond its body, when it sleeps. */
-const LEAVES = { hot: 'A spark stayed.' };
+const LEAVES = { hot: name => `One spark of ${name} stays awake.` };
 /* The scar a winner's pole leaves on what it beat. */
 const SCAR_OF = { hot: 'burned', cold: 'broken', wet: 'drowned', dry: 'burned', above: 'cut', below: 'cut', still: 'broken', moving: 'cut', light: 'broken', dark: 'broken' };
 /* Who makes what. The people are made by a mingling. */
@@ -26,6 +26,152 @@ const gods = () => beings.filter(b => b.species === 'god');
 const awakeGods = () => gods().filter(g => g.status === 'awake');
 const godOf = pole => gods().find(g => g.pole === pole && g.status !== 'dead');
 function withGodRng(fn){ const keep = rng; rng = godRng; try { return fn(); } finally { rng = keep; } }
+
+/* ---------- the creation's words ----------
+   The text the player reads in the creation. The rules never read it. A pole, a lack, and a biome are
+   rule words ("above", "start", "rocky"), and a player once read "it lacks start" in the legends, so
+   every one of them is turned into plain words here before it reaches a line.
+   A line in TELL with several wordings uses them in the listed order, one each time the line is
+   said, and starts again at the first when they run out. The playtest of 20 Sept 2026 found each
+   line repeated word for word, seven ages in a row for a god that kept splitting. The count lives in
+   `creation.told`, so a save carries it and a replay tells the same story. It draws no random number,
+   so the creation is the same as before; only the words change. */
+/* A pole as the land wears it: "the land is high". */
+const POLE_WORD = { above: 'high', below: 'low', wet: 'wet', dry: 'dry', hot: 'hot', cold: 'cold', still: 'still', moving: 'restless', light: 'bright', dark: 'dark' };
+/* A pole as a god's domain: "a god of water". */
+const GOD_OF = { above: 'the heights', below: 'the depths', wet: 'water', dry: 'dry land', hot: 'fire', cold: 'frost', still: 'stillness', moving: 'the wind', light: 'light', dark: 'darkness' };
+/* What a lack is missing, to follow "lacks". The gate's lacks come first, then the kinds of life, then
+   the lacks only the tile check at settle reports. */
+const LACK_WORD = { start: 'a dry, level place where people can begin', water: 'water', fuel: 'wood to burn', food: 'food', people: 'people', height: 'hills', depth: 'caves',
+  prey: 'animals to hunt', hunter: 'beasts that hunt', fae: 'fae folk', folk: 'a second people', ground: 'ground to camp on', room: 'room to move' };
+/* A biome as a noun and as a place: "it becomes a meadow", "sets them loose in a meadow". */
+const BIOME_PLACE = { river: ['a river valley', 'in a river valley'], wetland: ['wetland', 'in the wetlands'], forest: ['a forest', 'in a forest'], meadow: ['a meadow', 'in a meadow'], rocky: ['rocky ground', 'on rocky ground'], ash: ['ash', 'in the ashes'] };
+/* A scar as the ground is left: "the ground is left burned". */
+const SCAR_TEXT = { burned: 'burned', broken: 'broken', drowned: 'drowned', cut: 'torn open' };
+const COUNT_WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const countWord = n => COUNT_WORD[n] || String(n);
+const lackWord = lack => LACK_WORD[lack] || lack;
+const TELL = {
+  formless: [() => 'Before there was time or place, there was only the formless.'],
+  first: [v => `Out of the formless comes the first god. Its name is ${v.g}, a god of ${v.of}.`],
+  sundering: [v => `The Sundering. ${v.g} splits the formless in two, ${v.a} on one side and ${v.b} on the other. Now there is a here and a there.`],
+  pulse: [() => 'The Pulse. For the first time, something already made is changed. Now there is a before and an after, and time begins.'],
+  split: [
+    v => `${v.g} splits another stretch of land in two, ${v.a} on one side and ${v.b} on the other.`,
+    v => `${v.g} draws a line across a piece of land. One side is ${v.a}, and the other is ${v.b}.`,
+    v => `Another stretch of land is split. ${v.g} makes one half ${v.a} and leaves the other ${v.b}.`,
+    v => `${v.g} cuts a piece of land in half, and keeps the ${v.a} half.`,
+    v => `A new line runs through the land. ${v.g} is on the ${v.a} side of it, and the ${v.b} side lies beyond.`,
+    v => `${v.g} divides a stretch of land again, ${v.a} from ${v.b}.`,
+    v => `${v.g} marks a border across the land. This side is ${v.a}, and that side is ${v.b}.`,
+    v => `The land parts once more under ${v.g}. Half of it is ${v.a} now, and half is ${v.b}.`,
+  ],
+  farSide: [
+    v => `No god watches over the ${v.b} side of the line, so one wakes there. Its name is ${v.g}, a god of ${v.of}.`,
+    v => `The ${v.b} half of the land has no god. Now it has ${v.g}, a god of ${v.of}.`,
+    v => `${v.g} wakes on the ${v.b} side of the line, a god of ${v.of}. No god was there before.`,
+  ],
+  lack: [
+    v => `Nothing can live in the world yet, because it lacks ${v.lack}. So ${v.g} wakes, a god of ${v.of}.`,
+    v => `The world is not ready for life. It still lacks ${v.lack}. ${v.g}, a god of ${v.of}, wakes to help.`,
+    v => `The world still lacks ${v.lack}. A new god wakes to change that. Its name is ${v.g}, a god of ${v.of}.`,
+  ],
+  onePair: [v => `So far every god is one side of the same split, such as wet and dry. People need more than one kind of difference. So ${v.g} wakes, a god of ${v.of}.`],
+  outgrown: [
+    v => `The land is now in more pieces than its gods can watch. ${v.g} wakes, a god of ${v.of}.`,
+    v => `The world has grown too big for its gods. A new one wakes. Its name is ${v.g}, a god of ${v.of}.`,
+  ],
+  claim: [
+    v => `${v.g} spreads, and a piece of land nearby turns ${v.a}.`,
+    v => `${v.g} claims a stretch of land nearby and makes it ${v.a}.`,
+    v => `More of the land turns ${v.a} as ${v.g} reaches out.`,
+    v => `${v.g} pushes outward, and the land next to it becomes ${v.a}.`,
+    v => `The ground near ${v.g} turns ${v.a}, one more piece at a time.`,
+  ],
+  make: [
+    v => `${v.g} makes the ${v.plural} and sets them loose ${v.place}.`,
+    v => `${v.g} makes ${v.plural}, and they spread out ${v.place}.`,
+    v => `New creatures walk ${v.place}. ${v.g} has made the ${v.plural}.`,
+    v => `${v.g} shapes more ${v.plural} and turns them loose ${v.place}.`,
+  ],
+  raiseBegin: [v => `${v.g} starts to push the land up into a hill.`, v => `${v.g} begins to lift the ground.`, v => `${v.g} sets to work on a new hill.`],
+  raiseAgain: [v => `${v.g} goes back to the hill and lifts it higher.`, v => `${v.g} returns to the hill to raise it higher.`, v => `${v.g} takes up the work on the hill again.`],
+  raiseMountain: [v => `${v.g} has raised a mountain, ${v.n} storeys high.`, v => `A mountain stands where ${v.g} worked, ${v.n} storeys of stone.`],
+  raiseHill: [v => `${v.g} has raised a hill, ${v.n} ${v.one ? 'storey' : 'storeys'} high.`, v => `A hill stands where ${v.g} worked, ${v.n} ${v.one ? 'storey' : 'storeys'} high.`],
+  raiseStop: [v => `${v.g} stops, and leaves the hill half raised.`, v => `${v.g} breaks off the work. The hill stays half raised.`, v => `${v.g} turns away from the hill for now.`],
+  digBegin: [v => `${v.g} starts to dig down into the dark.`, v => `${v.g} begins to hollow out the ground.`, v => `${v.g} sets to work on a new cave.`],
+  digAgain: [v => `${v.g} goes back to the cave and digs deeper.`, v => `${v.g} returns to the cave to dig it deeper.`, v => `${v.g} takes up the digging again.`],
+  digDeep: [v => `${v.g} has dug a deep cave, ${v.n} levels down.`, v => `${v.g} has hollowed out the ground ${v.n} levels deep.`],
+  digCave: [v => `${v.g} has dug a cave, ${v.n} ${v.one ? 'level' : 'levels'} deep.`, v => `A cave opens where ${v.g} dug, ${v.n} ${v.one ? 'level' : 'levels'} deep.`],
+  digStop: [v => `${v.g} stops, and leaves the cave half dug.`, v => `${v.g} breaks off the digging. The cave stays half dug.`, v => `${v.g} turns away from the cave for now.`],
+  flow: [
+    v => `${v.g} runs across the land and leaves a winding path behind it.${v.under ? ' Part of the way, it runs under the ground.' : ''}`,
+    v => `${v.g} winds through the land, from one place to the next.${v.under ? ' For a while, it runs under the ground.' : ''}`,
+    v => `${v.g} makes a long trail across the land.${v.under ? ' Part of it goes under the ground.' : ''}`,
+    v => `A new path crosses the land where ${v.g} has passed.${v.under ? ' Some of it runs under the ground.' : ''}`,
+    v => `${v.g} finds a way through the land, and twists as it goes.${v.under ? ' For a stretch, it goes under the ground.' : ''}`,
+    v => `${v.g} sets out again and crosses more of the land.${v.under ? ' Part of the way is under the ground.' : ''}`,
+  ],
+  pool: [v => `${v.g} gathers into a still pool.`, v => `${v.g} settles into a hollow, and the water lies still.`, v => `${v.g} spreads out into a quiet pool.`, v => `A new pool lies calm where ${v.g} came to rest.`],
+  poolUnder: [v => `${v.g} makes a still pool under the ground.`, v => `${v.g} fills a hollow under the ground with still water.`],
+  burn: [
+    v => `${v.g} sets fire to another god's land, and it burns to ash.`,
+    v => `${v.g} burns a stretch of land to ash.`,
+    v => `Fire from ${v.g} sweeps across the land and leaves only ash.`,
+  ],
+  freeze: [v => `${v.g} breathes on the land, and frost settles there for good.`, v => `${v.g} freezes a stretch of land, and the frost does not leave.`],
+  hide: [v => `${v.g} pulls the dark over the land. Things can hide there now.`, v => `${v.g} covers a stretch of land in shadow, and it becomes a place to hide.`],
+  show: [v => `${v.g} fills the land with light, and it can be seen from far away.`, v => `${v.g} lights up a stretch of land, so it can be seen from a long way off.`],
+  battle: [
+    v => `${v.a} and ${v.b} fight over the same land. ${v.w} wins, and the ground is left ${v.scar}.`,
+    v => `${v.a} and ${v.b} go to war over a piece of land. ${v.w} wins it, and the ground is ${v.scar}.`,
+    v => `The rivals ${v.a} and ${v.b} clash again. ${v.w} comes out on top, and the ground is ${v.scar}.`,
+    v => `War breaks out between ${v.a} and ${v.b}. ${v.w} wins, but the land is left ${v.scar}.`,
+  ],
+  twist: [
+    v => `${v.g} changes the ${v.plural} that live on the scarred ground. They will never be quite like the others.`,
+    v => `${v.g} bends the ${v.plural} on the scarred ground out of shape. They will not be like the others.`,
+    v => `On the scarred ground, ${v.g} reshapes the ${v.plural}. They grow strange.`,
+  ],
+  mingle: [
+    v => `${v.a} and ${v.b} meet and mix. The land between them is ${v.p} and ${v.q} at once, and it becomes ${v.biome}.`,
+    v => `${v.a} and ${v.b} come together. Where they touch, the land is both ${v.p} and ${v.q}. It becomes ${v.biome}.`,
+    v => `${v.a} and ${v.b} cannot stay apart. The land where they meet turns ${v.p} and ${v.q}, and becomes ${v.biome}.`,
+    v => `Wherever ${v.a} finds ${v.b}, the ground changes. It becomes ${v.biome}.`,
+    v => `${v.a} pulls ${v.b} close, and the land between them becomes ${v.biome}.`,
+    v => `Where ${v.a} and ${v.b} linger, the land takes something from each of them. It becomes ${v.biome}.`,
+  ],
+  people: [() => 'Where they met, something stands up on two legs and looks around. The first people are made.'],
+  sleep: [
+    v => `${v.g} lies down to sleep and becomes ${v.body}.`,
+    v => `${v.g} grows tired, and lies down to become ${v.body}.`,
+    v => `${v.g} sleeps at last, and becomes ${v.body}.`,
+  ],
+  lovers: [v => `${v.a} and ${v.b} are lovers now.`, v => `${v.a} and ${v.b} fall in love.`],
+  rivals: [v => `${v.a} and ${v.b} are rivals now.`, v => `${v.a} and ${v.b} turn against each other. They are rivals now.`],
+  unmade: [v => `No land anywhere is ${v.a} now, so ${v.g} cannot go on. It fades away, and the ground where it stood is ${v.scar}.`],
+  unmadeAsleep: [v => `No land anywhere is ${v.a} now, so ${v.g} dies in its sleep. The ground where it lay is ${v.scar}.`],
+  backstop: [
+    v => `The ages drag on, and the world still lacks ${v.lack}. ${v.g} is weary, and tries to make it alone.`,
+    v => `${v.g} grows tired of waiting, and tries to give the world ${v.lack} by itself.`,
+    v => `The world still lacks ${v.lack}. ${v.g} cannot wait any longer, and tries to do it alone.`,
+    v => `${v.g} has had enough of waiting. It tries once more to give the world ${v.lack}.`,
+  ],
+  failed: [() => 'The gods are worn out. They sleep with their work unfinished, and the world is not ready.'],
+  settle: [v => `The last of the gods sleeps. After ${v.n} ages, the world is still, and waits.`],
+  thrownBack: [v => `${v.g} wakes again. The land is not ready for people: it still lacks ${v.lack} close to where the first of them would stand. The ages go on.`],
+  thrownBackAlone: [v => `The land is not ready for people: it still lacks ${v.lack} close to where the first of them would stand. The ages go on.`],
+  unfinished: [v => `The world is left unfinished. It lacks ${v.lack}, and ${v.why}.`],
+  cap: [v => `The gods made ${v.plural} in many places. ${v.n ? `Only ${countWord(v.n)} of them` : 'None of them'} came down into the valley.`],
+};
+/* The line for `key`, in the next of its wordings. It counts one telling, so call it only for a line
+   that is logged. */
+function tell(key, v = {}){
+  const told = creation.told || (creation.told = {});
+  const k = told[key] || 0; told[key] = k + 1;
+  const ways = TELL[key];
+  return ways[k % ways.length](v);
+}
 
 /* ---------- the gesture record ----------
    A gesture is what an act looked like: who acted, where it began, where it ended, the line it wrote,
@@ -88,7 +234,8 @@ function gesture(g, kind, fields){
   });
 }
 
-function makeGod(pole, region, why){
+/* `say` writes the god's first line from the god it is given, since the name is drawn here. */
+function makeGod(pole, region, say){
   beginAct();
   if (!godNamePool.length) godNamePool = shuffle(GOD_NAMES);
   const g = makeBeing('god', 0, 0, null, 0);
@@ -97,7 +244,7 @@ function makeGod(pole, region, why){
   g.needs = { expression: 60, company: 60, rest: 90, calm: 80 };
   g.skills = {}; for (const k in GOD_ACTS) g.skills[k] = 0;
   beings.push(g);
-  log(`${why} ${g.name} comes into being, ${g.epithet}.`, [g], 'major');
+  log(say(g), [g], 'major');
   /* Every god comes into being holding a country. A god born of a lack takes the largest level one, or the largest there is, and makes it its own. */
   if (!region){ const live = liveRegions(); region = live.filter(isLevel).sort((p, q) => q.area - p.area)[0] || live.slice().sort((p, q) => q.area - p.area)[0]; if (region) setPole(region, pole, g, `${g.name} came into being here.`); }
   g.region = region ? region.id : null;
@@ -130,8 +277,8 @@ function gainGodXp(g, act){ g.xp[act] = (g.xp[act] || 0) + 0.7 + g.traits.curios
 /* ---------- relations ---------- */
 function setRelation(g, o){
   const mine = g.opinions[o.id] || 0, theirs = o.opinions[g.id] || 0;
-  if (mine >= 40 && theirs >= 40 && g.rel[o.id] !== 'lover'){ g.rel[o.id] = o.rel[g.id] = 'lover'; log(`${g.name} and ${o.name} are lovers now.`, [g, o], 'good'); }
-  else if ((mine <= -40 || theirs <= -40) && g.rel[o.id] !== 'rival'){ g.rel[o.id] = o.rel[g.id] = 'rival'; log(`${g.name} and ${o.name} are rivals now.`, [g, o], 'bad'); }
+  if (mine >= 40 && theirs >= 40 && g.rel[o.id] !== 'lover'){ g.rel[o.id] = o.rel[g.id] = 'lover'; log(tell('lovers', { a: g.name, b: o.name }), [g, o], 'good'); }
+  else if ((mine <= -40 || theirs <= -40) && g.rel[o.id] !== 'rival'){ g.rel[o.id] = o.rel[g.id] = 'rival'; log(tell('rivals', { a: g.name, b: o.name }), [g, o], 'bad'); }
 }
 /* Acting beside a god you like feeds company and warms both opinions. */
 function noteBeside(g, r){
@@ -167,7 +314,13 @@ const fewStarts = () => startCandidates().length < 3;
 /* Raising and digging spend one age a storey or a level. The diligent spend more ages. */
 function spendAges(kind, verb, done){
   return {
-    apply(g, r){ const left = 1 + Math.round(g.traits.diligence * 3); g.task = { type: kind === 'height' ? 'raise' : 'dig', region: r.id, left, done: 0 }; log(`${g.name} begins to ${verb}.`, [g]); this.continue(g, g.task); return true; },
+    apply(g, r){
+      const left = 1 + Math.round(g.traits.diligence * 3); g.task = { type: kind === 'height' ? 'raise' : 'dig', region: r.id, left, done: 0 };
+      /* Work on a hill or a cave already begun says so. The words read the mark, and no rule does. */
+      const again = marksOf(r, kind).length > 0;
+      log(tell(kind === 'height' ? (again ? 'raiseAgain' : 'raiseBegin') : (again ? 'digAgain' : 'digBegin'), { g: g.name }), [g]);
+      this.continue(g, g.task); return true;
+    },
     continue(g, t){
       const r = regionById(t.region); let m = marksOf(r, kind)[0]; if (!m) m = mark(r, kind, 0, g, `${g.name} ${verb === 'raise the land' ? 'raised' : 'dug'} it.`);
       m.value++; t.done++; r.lastBy = g.id; r.lastAge = age;
@@ -189,11 +342,11 @@ const GOD_ACTS = {
       setPole(cut.a, g.pole, g, `${g.name} drew the line, and this was the near side.`);
       setPole(cut.b, other, g, `${g.name} drew the line, and this was the far side.`);
       cut.a.lastBy = g.id; cut.a.lastAge = age; g.region = cut.a.id;
-      if (wasRoot) log(`The Sundering. ${g.name} parts the formless: ${g.pole} from ${other}. There is a here and a there.`, [g], 'major');
-      else log(`${g.name} parts a country: ${g.pole} from ${other}.`, [g]);
+      if (wasRoot) log(tell('sundering', { g: g.name, a: POLE_WORD[g.pole], b: POLE_WORD[other] }), [g], 'major');
+      else log(tell('split', { g: g.name, a: POLE_WORD[g.pole], b: POLE_WORD[other] }), [g]);
       /* The cut is recorded before the far side's god, so the line is drawn before the star fades in on it. */
       gesture(g, 'split', { near: cut.a.id, far: cut.b.id, line: cut.boundary.tiles, pole: g.pole, other });
-      if (!godOf(other)) makeGod(other, cut.b, 'The far side has nobody to hold it.');
+      if (!godOf(other)) makeGod(other, cut.b, n => tell('farSide', { g: n.name, b: POLE_WORD[other], of: GOD_OF[other] }));
       return true;
     },
   },
@@ -203,7 +356,7 @@ const GOD_ACTS = {
     poles: null,
     targets(g){ const home = settleHome(g); if (!home) return []; const few = fewStarts(); return [home, ...neighboursOf(home)].filter(r => !hasPole(r, g.pole) && !r.marks.some(m => m.kind === 'rest') && !(few && isStart(r))); },
     score: (g, r) => (100 - g.needs.expression) * 0.6 + 5 + rng() * 8,
-    apply(g, r){ offend(r, g, g.contrast); const m = setPole(r, g.pole, g, `${g.name} claimed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} claims a country: it is ${g.pole} now.`, [g]); gesture(g, 'claim', { region: r.id, pole: g.pole, at: m.at }); return true; },
+    apply(g, r){ offend(r, g, g.contrast); const m = setPole(r, g.pole, g, `${g.name} claimed it.`); r.lastBy = g.id; r.lastAge = age; log(tell('claim', { g: g.name, a: POLE_WORD[g.pole] }), [g]); gesture(g, 'claim', { region: r.id, pole: g.pole, at: m.at }); return true; },
   },
   make: {
     poles: Object.keys(MAKES),
@@ -217,7 +370,7 @@ const GOD_ACTS = {
       if (!sp) return false;
       const m = mark(r, 'making', sp, g, `${g.name} made the ${SPECIES[sp].label} here.`);
       r.lastBy = g.id; r.lastAge = age;
-      log(`${g.name} makes the ${SPECIES[sp].plural}, and sets them in a ${biomeOf(r)} country.`, [g], 'major');
+      log(tell('make', { g: g.name, plural: SPECIES[sp].plural, place: BIOME_PLACE[biomeOf(r)][1] }), [g], 'major');
       gesture(g, 'make', { region: r.id, species: sp, at: m.at });
       return true;
     },
@@ -227,14 +380,14 @@ const GOD_ACTS = {
     /* The gods leave the last level countries and the last start candidates alone. */
     targets: g => { const few = fewLevel(), fewS = fewStarts(); return liveRegions().filter(r => hasPole(r, 'above') && !((few && isLevel(r)) || (fewS && isStart(r)))); },
     score: (g, r) => (100 - g.needs.expression) * 0.8 + 20 * g.traits.diligence + (marksOf(r, 'height').length ? -10 : 10) + rng() * 8,
-    ...spendAges('height', 'raise the land', (g, n) => n >= 3 ? `${g.name} has raised a mountain, ${n} storeys of stone.` : `${g.name} has raised a hill of ${n} ${n === 1 ? 'storey' : 'storeys'}.`),
+    ...spendAges('height', 'raise the land', (g, n) => tell(n >= 3 ? 'raiseMountain' : 'raiseHill', { g: g.name, n: countWord(n), one: n === 1 })),
   },
   dig: {
     poles: ['below'],
     /* The gods leave the last level countries and the last start candidates alone. */
     targets: g => { const few = fewLevel(), fewS = fewStarts(); return liveRegions().filter(r => hasPole(r, 'below') && !((few && isLevel(r)) || (fewS && isStart(r)))); },
     score: (g, r) => (100 - g.needs.expression) * 0.8 + 20 * g.traits.diligence + (marksOf(r, 'depth').length ? -10 : 10) + rng() * 8,
-    ...spendAges('depth', 'dig into the dark', (g, n) => n >= 3 ? `${g.name} has dug a deep, ${n} levels down.` : `${g.name} has dug a cave of ${n} ${n === 1 ? 'level' : 'levels'}.`),
+    ...spendAges('depth', 'dig into the dark', (g, n) => tell(n >= 3 ? 'digDeep' : 'digCave', { g: g.name, n: countWord(n), one: n === 1 })),
   },
   flow: {
     poles: ['wet', 'moving'],
@@ -248,7 +401,7 @@ const GOD_ACTS = {
       /* One anchor a country, in the order the water ran, so the view can draw the line it took. */
       const anchors = [];
       for (const p of path){ const m = mark(p, 'flow', marksOf(p, 'depth').length ? 'under' : 'surface', g, `${g.name} flowed through.`); p.lastBy = g.id; p.lastAge = age; if (m.at !== null) anchors.push(m.at); }
-      log(`${g.name} flows through ${path.length} countries${path.some(p => marksOf(p, 'depth').length) ? ', and under one of them' : ''}.`, [g], 'major');
+      log(tell('flow', { g: g.name, under: path.some(p => marksOf(p, 'depth').length) }), [g], 'major');
       gesture(g, 'flow', { path: anchors });
       return true;
     },
@@ -257,32 +410,32 @@ const GOD_ACTS = {
     poles: ['wet', 'still'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'pool') && (hasPole(r, 'wet') || hasPole(r, 'still') || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + 10 + rng() * 8,
-    apply(g, r){ const m = mark(r, 'pool', marksOf(r, 'depth').length ? 'under' : 'surface', g, `${g.name} pooled here.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} pools in a country, and the water is still.`, [g]); gesture(g, 'pool', { region: r.id, under: m.value === 'under', at: m.at }); return true; },
+    apply(g, r){ const m = mark(r, 'pool', marksOf(r, 'depth').length ? 'under' : 'surface', g, `${g.name} pooled here.`); r.lastBy = g.id; r.lastAge = age; log(tell(m.value === 'under' ? 'poolUnder' : 'pool', { g: g.name }), [g]); gesture(g, 'pool', { region: r.id, under: m.value === 'under', at: m.at }); return true; },
   },
   burn: {
     poles: ['hot'],
     /* The last start candidates are not burned while fewer than three remain, as they are not raised. */
     targets: g => { const few = fewStarts(); return liveRegions().filter(r => !marksOf(r, 'scar').length && !(few && isStart(r)) && r.marks.some(m => m.by !== null && m.by !== g.id && !m.inherited)); },
     score: (g, r) => (100 - g.needs.calm) * 0.6 + g.traits.temper * 20 - 30 + rng() * 8,
-    apply(g, r){ offend(r, g); const m = mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} burns a country to ash.`, [g], 'bad'); gesture(g, 'burn', { region: r.id, at: m.at }); return true; },
+    apply(g, r){ offend(r, g); const m = mark(r, 'scar', 'burned', g, `${g.name} burned it.`); r.lastBy = g.id; r.lastAge = age; log(tell('burn', { g: g.name }), [g], 'bad'); gesture(g, 'burn', { region: r.id, at: m.at }); return true; },
   },
   freeze: {
     poles: ['cold'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'freeze') && (marksOf(r, 'height').length || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + (marksOf(r, 'height').length ? 15 : 0) + rng() * 8,
-    apply(g, r){ const m = mark(r, 'freeze', true, g, `${g.name} froze it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} breathes on a country, and the frost stays.`, [g]); gesture(g, 'wash', { region: r.id, value: 'freeze', at: m.at }); return true; },
+    apply(g, r){ const m = mark(r, 'freeze', true, g, `${g.name} froze it.`); r.lastBy = g.id; r.lastAge = age; log(tell('freeze', { g: g.name }), [g]); gesture(g, 'wash', { region: r.id, value: 'freeze', at: m.at }); return true; },
   },
   hide: {
     poles: ['dark'],
     targets: g => liveRegions().filter(r => !hasMark(r, 'hide') && (marksOf(r, 'depth').length || r.id === g.region)),
     score: (g, r) => (100 - g.needs.expression) * 0.7 + (marksOf(r, 'depth').length ? 15 : 0) + rng() * 8,
-    apply(g, r){ const m = mark(r, 'hide', true, g, `${g.name} hid it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} draws the dark over a country, and things hide in it.`, [g]); gesture(g, 'wash', { region: r.id, value: 'hide', at: m.at }); return true; },
+    apply(g, r){ const m = mark(r, 'hide', true, g, `${g.name} hid it.`); r.lastBy = g.id; r.lastAge = age; log(tell('hide', { g: g.name }), [g]); gesture(g, 'wash', { region: r.id, value: 'hide', at: m.at }); return true; },
   },
   show: {
     poles: ['light'],
     targets: g => { const r = settleHome(g); return r ? [r, ...neighboursOf(r)].filter(q => !hasMark(q, 'show')) : []; },
     score: (g, r) => (100 - g.needs.expression) * 0.7 + rng() * 8,
-    apply(g, r){ const m = mark(r, 'show', true, g, `${g.name} showed it.`); r.lastBy = g.id; r.lastAge = age; log(`${g.name} opens a country to the light, and it can be seen from far off.`, [g]); gesture(g, 'wash', { region: r.id, value: 'show', at: m.at }); return true; },
+    apply(g, r){ const m = mark(r, 'show', true, g, `${g.name} showed it.`); r.lastBy = g.id; r.lastAge = age; log(tell('show', { g: g.name }), [g]); gesture(g, 'wash', { region: r.id, value: 'show', at: m.at }); return true; },
   },
   battle: {
     poles: null,
@@ -301,7 +454,7 @@ const GOD_ACTS = {
       lose.opinions[win.id] = clamp((lose.opinions[win.id] || 0) - 15, -100, 100); win.opinions[lose.id] = clamp((win.opinions[lose.id] || 0) - 5, -100, 100);
       win.needs.calm = clamp(win.needs.calm + 30, 0, 100); lose.needs.calm = clamp(lose.needs.calm - 20, 0, 100);
       for (const p of [g, v]) p.needs.rest = clamp(p.needs.rest - 10, 0, 100);
-      log(`${g.name} and ${v.name} fight over a country. ${win.name} wins, and the ground there is ${SCAR_OF[win.pole]}.`, [g, v], 'bad');
+      log(tell('battle', { a: g.name, b: v.name, w: win.name, scar: SCAR_TEXT[SCAR_OF[win.pole]] }), [g, v], 'bad');
       gesture(g, 'battle', { region: r.id, other: v.id, otherFrom: v.at === undefined ? null : v.at, winner: win.id, loser: lose.id, scar: SCAR_OF[win.pole], at: scar.at });
       return true;
     },
@@ -313,7 +466,7 @@ const GOD_ACTS = {
     apply(g, r){
       const m = marksOf(r, 'making').find(m => !hasMark(r, 'twist', m.value)); if (!m) return false;
       const t = mark(r, 'twist', m.value, g, `${g.name} twisted the ${SPECIES[m.value].plural} on the scar.`); r.lastBy = g.id; r.lastAge = age;
-      log(`${g.name} bends the ${SPECIES[m.value].plural} that live on the scar. They will not be quite like the others.`, [g], 'bad');
+      log(tell('twist', { g: g.name, plural: SPECIES[m.value].plural }), [g], 'bad');
       gesture(g, 'twist', { region: r.id, species: m.value, at: t.at });
       return true;
     },
@@ -333,8 +486,8 @@ const GOD_ACTS = {
       const m = setPole(r, g.pole, g, `${g.name} and ${o.name} mingled here.`); setPole(r, o.pole, o, `${g.name} and ${o.name} mingled here.`);
       r.lastBy = g.id; r.lastAge = age;
       for (const p of [g, o]) p.needs.company = clamp(p.needs.company + 30, 0, 100);
-      log(`${g.name} and ${o.name} mingle, and the country between them is ${g.pole} and ${o.pole} at once: a ${biomeOf(r)}.`, [g, o], 'major');
-      if (!liveRegions().some(q => hasMark(q, 'making', 'human'))){ mark(r, 'making', 'human', g, `Where ${g.name} and ${o.name} mingled, the people were made.`); log('Where they mingled, something stood up on two legs and looked about. The people are made.', [g, o], 'major'); }
+      log(tell('mingle', { a: g.name, b: o.name, p: POLE_WORD[g.pole], q: POLE_WORD[o.pole], biome: BIOME_PLACE[biomeOf(r)][0] }), [g, o], 'major');
+      if (!liveRegions().some(q => hasMark(q, 'making', 'human'))){ mark(r, 'making', 'human', g, `Where ${g.name} and ${o.name} mingled, the people were made.`); log(tell('people'), [g, o], 'major'); }
       gesture(g, 'mingle', { region: r.id, with: o.id, otherFrom: o.at === undefined ? null : o.at, at: m.at });
       return true;
     },
@@ -346,8 +499,8 @@ const GOD_ACTS = {
     apply(g, r){
       const m = mark(r, 'rest', g.id, g, `${g.name} sleeps here, and is ${BODY[g.pole]}.`);
       g.status = 'asleep'; g.asleep = true; g.needs.rest = 100; g.region = r.id; g.sleptAt = age; r.lastBy = g.id; r.lastAge = age;
-      log(`${g.name} lies down and sleeps, and is ${BODY[g.pole]}.`, [g], 'major');
-      if (LEAVES[g.pole]) log(LEAVES[g.pole], [g], 'major');
+      log(tell('sleep', { g: g.name, body: BODY[g.pole] }), [g], 'major');
+      if (LEAVES[g.pole]) log(LEAVES[g.pole](g.name), [g], 'major');
       gesture(g, 'sleep', { region: r.id, body: BODY[g.pole], at: m.at });
       return true;
     },
@@ -381,7 +534,7 @@ function godOptions(g){
    only the continue branch. Nothing here draws a random number. */
 function abandonUnfinished(g){
   if (!g.task) return;
-  if (g.needs.calm < 20 || g.needs.expression < 15){ log(`${g.name} leaves the ${g.task.type} unfinished.`, [g]); g.task = null; }
+  if (g.needs.calm < 20 || g.needs.expression < 15){ log(tell(g.task.type === 'raise' ? 'raiseStop' : 'digStop', { g: g.name }), [g]); g.task = null; }
 }
 
 /* The decision is kept, not only the last one. `lastChoice` is what the god's card reads now; the
@@ -442,14 +595,14 @@ function strain(lack){
     /* One difference cannot make a people. When every awake god is of one contrast, the lack strains a new one. */
     if (gs.length && gs.every(g => g.contrast === gs[0].contrast)){
       const c = Object.keys(CONTRASTS).find(c => !gods().some(g => g.contrast === c));
-      if (c) makeGod(CONTRASTS[c][0], null, 'One difference is not enough to make a people.');
+      if (c) makeGod(CONTRASTS[c][0], null, n => tell('onePair', { g: n.name, of: GOD_OF[n.pole] }));
     }
     return;
   }
   const poles = KINDS.includes(lack) ? polesThatMake(lack) : STRAIN[lack];
   const pole = poles.find(p => !godOf(p)) || poles[0];
   const g = godOf(pole);
-  if (!g) makeGod(pole, null, `The world cannot yet hold a life: it lacks ${lack}.`);
+  if (!g) makeGod(pole, null, n => tell('lack', { g: n.name, of: GOD_OF[pole], lack: lackWord(lack) }));
   /* A present god is pressed to express its pole. A lack of a kind of life is answered by making, which reads the gate itself. */
   else if (g.status === 'awake' && !KINDS.includes(lack) && lack !== 'food') g.needs.expression = Math.max(0, g.needs.expression - 10);
 }
@@ -457,8 +610,8 @@ function strain(lack){
 /* ---------- the ages ---------- */
 function firstGod(){
   const cs = Object.keys(CONTRASTS); const c = cs[rint(cs.length)]; const pole = CONTRASTS[c][rint(2)];
-  log('Before the world had time and place, all was formless.', [], 'major');
-  makeGod(pole, field.root, 'Out of the formless, a difference.');
+  log(tell('formless'), [], 'major');
+  makeGod(pole, field.root, n => tell('first', { g: n.name, of: GOD_OF[pole] }));
 }
 /* A god whose pole is gone from the whole live field is unmade. Its death is a scar. */
 function unmake(g){
@@ -467,8 +620,7 @@ function unmake(g){
   g.status = 'dead'; g.alive = false; g.asleep = false;
   const r = settleHome(g) || liveRegions()[0];
   mark(r, 'scar', SCAR_OF[g.pole], g, `${g.name} died here, unmade.`);
-  const gone = wasAsleep ? `${g.name} dies in its sleep, and where` : `${g.name} is no more, and where`;
-  log(`Nothing on the field is ${g.pole} any more. ${gone} ${g.name} stood the ground is ${SCAR_OF[g.pole]}.`, [g], 'death');
+  log(tell(wasAsleep ? 'unmadeAsleep' : 'unmade', { g: g.name, a: POLE_WORD[g.pole], scar: SCAR_TEXT[SCAR_OF[g.pole]] }), [g], 'death');
   /* The star fades out where it last stood, so the anchor it held is the anchor it keeps. */
   gesture(g, 'unmade', { region: r ? r.id : null, at: g.at });
 }
@@ -478,7 +630,7 @@ function backstop(){
   const gate = restGate(); const g = awakeGods()[0]; if (!g || gate.ok) return;
   beginAct();
   creation.backstops++;
-  log(`Wearied, ${g.name} does what has to be done. The world lacks ${gate.lack}.`, [g], 'major');
+  log(tell('backstop', { g: g.name, lack: lackWord(gate.lack) }), [g], 'major');
   const live = liveRegions();
   const starts = startCandidates();
   let pool = live.filter(r => !isStart(r));
@@ -503,7 +655,7 @@ function outgrown(){
   const living = gods().filter(g => g.status !== 'dead');
   if (liveRegions().length < REGIONS_PER_GOD * living.length) return;
   const c = Object.keys(CONTRASTS).find(c => !gods().some(g => g.contrast === c));
-  if (c) makeGod(CONTRASTS[c][0], null, 'The world has grown past its gods, and a new difference stirs in it.');
+  if (c) makeGod(CONTRASTS[c][0], null, n => tell('outgrown', { g: n.name, of: GOD_OF[n.pole] }));
 }
 /* Settle paints the ground, and painting draws from the people's stream. The age that ends the creation
    raises this flag inside the god stream; settle runs after it, outside. */
@@ -604,7 +756,7 @@ function ageBegin(){
   creation.gestures = []; creation.gestureAge = age;
   if (age === 1) firstGod();
   /* The Pulse comes in the age after the Sundering: the first age in which a made country can change. */
-  if (pulseAge === null && field.root.children){ pulseAge = age; log('The Pulse. Something already made is changed, and so there is a before and an after. Time begins.', [], 'major'); }
+  if (pulseAge === null && field.root.children){ pulseAge = age; log(tell('pulse'), [], 'major'); }
   agePos = { i: 0, list: gods(), prepared: false, opts: null };
   /* A run ends at the age it named, or at the first stop that names this age. The line says why, so
      the player is never stopped without a reason. */
@@ -676,7 +828,7 @@ function ageEnd(){
   if (!gate.ok && pulseAge !== null) strain(gate.lack);
   if (pulseAge !== null) outgrown();
   if (!awakeGods().length){ settleNow = true; return; }
-  if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log('The gods sleep unfinished. The world would not hold.', [], 'bad'); settleNow = true; return; }
+  if (age >= 2 * options.ageLimit){ creation.failed = true; for (const g of awakeGods()){ g.status = 'asleep'; g.asleep = true; } log(tell('failed'), [], 'bad'); settleNow = true; return; }
   if (age >= options.ageLimit) backstop();
 }
 
@@ -710,7 +862,7 @@ function ageStep(oneAct){
 function beginCreation(){
   era = 'gods'; age = 0; pulseAge = null; legends = []; godNamePool = []; settleNow = false;
   godRng = mulberry32(hashSeed(seedText + ':gods'));
-  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [] };
+  creation = { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [], told: {} };
   deciding = null; saidFrom = 0; gestureFallbacks = {};
   agePos = null; pending = null; inhabited = null; inhabitedTold = false; runUntil = null; stops = [];
   withGodRng(() => initField());
