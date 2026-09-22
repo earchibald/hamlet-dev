@@ -124,3 +124,49 @@ test('godIconSvg escapes a label that holds <, and marks the icon as an image', 
   assert.ok(svg.includes('aria-label="a god of &lt;cold&gt;"'));
   assert.ok(!svg.includes('<cold>'));
 });
+
+/* A canvas that draws nothing and keeps the list of what it was asked to draw, and the text of every
+   fillText/strokeText call, so a test can check that no call draws the star glyph. Copied from
+   tests/ui.js's recordCtx. */
+function recordDrawCtx(){
+  const calls = [];
+  const texts = [];
+  const note = name => (...a) => { calls.push(name); if (name === 'fillText' || name === 'strokeText') texts.push(String(a[0])); return a; };
+  const c = { calls, texts, measureText: () => ({ width: 40 }) };
+  for (const k of ['setTransform', 'clearRect', 'fillRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'scale', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = note(k);
+  for (const k of ['fillStyle', 'strokeStyle', 'globalAlpha', 'lineWidth', 'font', 'textAlign', 'textBaseline']) Object.defineProperty(c, k, { set(v){ /* ink is not drawing */ }, get(){ return ''; } });
+  return c;
+}
+
+test('drawField draws every live god through drawGodIcon, its own pole, and no fillText/strokeText call draws the star', () => {
+  /* drawField is compiled into the joined scope with a fixed reference to drawGodIcon. The `spy` extra
+     reassigns that same function-scoped variable from outside, which is the joined scope's own back
+     door: drawField's call site then resolves to the wrapper, because function declarations in one
+     shared scope are ordinary mutable bindings, not frozen at declaration. */
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'],
+    ['drawField', 'drawGodIcon', 'gods', 'startCreation'],
+    {
+      caption: '() => ""',
+      setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
+      spy: '(fn) => { drawGodIcon = fn; }',
+    });
+  const real = rig.drawGodIcon;
+  const godCalls = [];
+  rig.spy((ctx, pole, cx, cy, s) => { godCalls.push({ pole, cx, cy, s }); return real(ctx, pole, cx, cy, s); });
+  const wctx = recordDrawCtx(), octx = recordDrawCtx();
+  const ocv = { width: 100, height: 100, getContext: () => octx };
+  const P = {};
+  for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'bg', 'map-halo', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
+  global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => recordDrawCtx() }), querySelector: () => null };
+  global.Path2D = function(d){ this.d = d; };
+  rig.startCreation('gamma');
+  for (let k = 0; k < 3 && rig.era === 'gods'; k++) rig.step();
+  rig.setUp({ wctx, ocv, octx, P });
+  rig.drawField();
+  const visible = rig.gods().filter(g => g.status !== 'dead');
+  assert.ok(visible.length > 0, 'the creation has at least one live god to place');
+  assert.equal(godCalls.length, visible.length, 'drawGodIcon is called once per god drawField places');
+  const poles = godCalls.map(c => c.pole).sort();
+  assert.deepEqual(poles, visible.map(g => g.pole).sort(), 'each call carries its own god\'s pole');
+  assert.ok(!wctx.texts.includes('✶'), 'no fillText or strokeText call draws the star glyph');
+});
