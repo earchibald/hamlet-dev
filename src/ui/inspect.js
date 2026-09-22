@@ -20,7 +20,7 @@ function inspectGod(g){
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
-  return `<div class="head">${godIconSvg(g.pole, 22, null)}<strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
+  return `<div class="head"><span class="who">${godIconSvg(g.pole, 22, null)}<strong style="color:${beingColor(g)}">${g.name}</strong></span><span>${g.epithet}</span></div>
     <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
     ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
     <h3>Thoughts</h3><ul>${thoughts}</ul>

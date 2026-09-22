@@ -2225,7 +2225,7 @@ test('a god’s inspector head reads as it did before names: its name, its own e
   for (let i = 0; i < 6; i++) api.step();
   const g = api.gods()[0];
   const html = api.inspectGod(g);
-  assert.match(html, new RegExp(`<div class="head"><svg[^>]*class="godicon"[^>]*>.*?</svg><strong style="color:[^"]*">${g.name}</strong><span>${g.epithet}</span></div>`));
+  assert.match(html, new RegExp(`<div class="head"><span class="who"><svg[^>]*class="godicon"[^>]*>.*?</svg><strong style="color:[^"]*">${g.name}</strong></span><span>${g.epithet}</span></div>`));
 });
 
 test('a sector shows its own name beside the biome word once it has one, and just the biome word before that', () => {

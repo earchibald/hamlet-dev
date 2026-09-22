@@ -296,8 +296,13 @@ function drawField(){
     const s = spotOf(p);
     spots.push({ g, x: s.x, y: s.y, alpha: m ? m.alpha : g.status === 'awake' ? 1 : 0.55 });
   }
-  /* Two icons are nudged apart only when their pixels are within the icon's own 22x22 footprint. */
-  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k]; if (Math.abs(s.x - o.x) < 22 && Math.abs(s.y - o.y) < 22){ s.x = o.x + 22; s.y = o.y; } } });
+  /* Two icons are nudged apart only when their pixels are within the icon's own 22 px footprint on y,
+     and within a name-wide footprint on x: two bold names at 10 px can each run wider than the icon,
+     so the font is set before the nudge and the two names' own widths decide how far apart they land. */
+  wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k];
+    const dist = Math.max(22, (wctx.measureText(o.g.name).width + wctx.measureText(s.g.name).width) / 2) + 4;
+    if (Math.abs(s.x - o.x) < dist && Math.abs(s.y - o.y) < 22){ s.x = o.x + dist; s.y = o.y; } } });
   wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
   for (const s of spots){
     wctx.globalAlpha = clamp(s.alpha, 0, 1);

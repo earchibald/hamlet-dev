@@ -144,7 +144,7 @@ test('drawField draws every live god through drawGodIcon, its own pole, and no f
      door: drawField's call site then resolves to the wrapper, because function declarations in one
      shared scope are ordinary mutable bindings, not frozen at declaration. */
   const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'],
-    ['drawField', 'drawGodIcon', 'gods', 'startCreation'],
+    ['drawField', 'drawGodIcon', 'gods', 'startCreation', 'SPECIES'],
     {
       caption: '() => ""',
       setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
@@ -168,7 +168,42 @@ test('drawField draws every live god through drawGodIcon, its own pole, and no f
   assert.equal(godCalls.length, visible.length, 'drawGodIcon is called once per god drawField places');
   const poles = godCalls.map(c => c.pole).sort();
   assert.deepEqual(poles, visible.map(g => g.pole).sort(), 'each call carries its own god\'s pole');
-  assert.ok(!wctx.texts.includes('✶'), 'no fillText or strokeText call draws the star glyph');
+  assert.ok(!wctx.texts.includes(rig.SPECIES.god.glyph), 'no fillText or strokeText call draws the star glyph');
+});
+
+test('two gods placed on the same spot are nudged apart by at least their names\' own width, not just the icon\'s', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'],
+    ['drawField', 'drawGodIcon', 'gods', 'startCreation'],
+    {
+      caption: '() => ""',
+      setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
+      spy: '(fn) => { drawGodIcon = fn; }',
+    });
+  const real = rig.drawGodIcon;
+  const godCalls = [];
+  rig.spy((ctx, pole, cx, cy, s) => { godCalls.push({ pole, cx, cy, s }); return real(ctx, pole, cx, cy, s); });
+  const wctx = recordDrawCtx(), octx = recordDrawCtx();
+  const ocv = { width: 100, height: 100, getContext: () => octx };
+  const P = {};
+  for (const k of ['halo', 'select', 'god', 'sprite', 'void', 'bg', 'map-halo', 'field-line', 'field-scar', 'field-none', 'field-wet', 'field-cold', 'field-dark', 'field-light', 'field-above', 'field-below', 'field-hot', 'field-dry', 'field-still', 'field-moving']) P[k] = '#808080';
+  global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => recordDrawCtx() }), querySelector: () => null };
+  global.Path2D = function(d){ this.d = d; };
+  rig.startCreation('gamma');
+  for (let k = 0; k < 3 && rig.era === 'gods'; k++) rig.step();
+  const visible = rig.gods().filter(g => g.status !== 'dead');
+  assert.ok(visible.length >= 2, 'the creation has at least two live gods to place');
+  /* Put the first two live gods on the exact same tile, so drawField's nudge is the only thing that
+     can separate their centres. recordDrawCtx's measureText stub gives every name a width of 40, so
+     the expected gap is Math.max(22, (40+40)/2) + 4 = 44. */
+  const [a, b] = visible;
+  a.at = 500; b.at = 500;
+  rig.setUp({ wctx, ocv, octx, P });
+  rig.drawField();
+  const ca = godCalls.find(c => c.pole === a.pole);
+  const cb = godCalls.find(c => c.pole === b.pole);
+  assert.ok(ca && cb, 'both nudged gods were drawn');
+  const wantDist = Math.max(22, (40 + 40) / 2) + 4;
+  assert.ok(Math.abs(ca.cx - cb.cx) >= wantDist, `centres are at least ${wantDist}px apart on x (got ${Math.abs(ca.cx - cb.cx)})`);
 });
 
 /* ---- task 3: the icon in the page ---- */
@@ -247,21 +282,27 @@ test('drawTimeline puts a 14 px icon before the lane label for a single-god row,
   }
 });
 
-test('setActCaption writes the page again when only the pole changes, and the aria-live text stays the caption text alone', () => {
+test('setActCaption writes the page again when only the pole changes, and skips the write for a repeat of the same text and pole', () => {
+  /* A getter/setter pair on innerHTML, with a count of the setter's own calls, so the test can tell a
+     skipped write (the de-duplication guard) from one that reruns and happens to produce the same
+     markup. assert.equal(el.innerHTML, el.innerHTML) can never fail: it compares a value to itself. */
+  let html = '', writes = 0;
+  const el = { hidden: true, get innerHTML(){ return html; }, set innerHTML(v){ html = v; writes++; } };
   const rig = loadUI(['state', 'icons', 'derive', 'keys', 'strip', 'actions', 'panels'], ['setActCaption', 'godIconSvg', 'startWorld']);
   rig.startWorld('r');
-  const el = { hidden: true, innerHTML: '' };
   global.document = { getElementById: id => id === 'actCaption' ? el : { innerHTML: '' } };
   try {
     rig.setActCaption('A god acts.', 'hot');
+    assert.equal(writes, 1, 'the first call writes the page once');
     assert.ok(el.innerHTML.includes(rig.godIconSvg('hot', 16, null)), 'the hot icon is written');
     assert.ok(el.innerHTML.endsWith('A god acts.'), 'the caption text follows the icon');
     rig.setActCaption('A god acts.', 'cold');
-    assert.ok(el.innerHTML.includes(rig.godIconSvg('cold', 16, null)), 'a new pole with the same text writes the page again');
+    assert.equal(writes, 2, 'a new pole with the same text writes the page again');
+    assert.ok(el.innerHTML.includes(rig.godIconSvg('cold', 16, null)), 'the cold icon is written');
     assert.ok(!el.innerHTML.includes(rig.godIconSvg('hot', 16, null)), 'the old icon is gone');
     assert.ok(el.innerHTML.endsWith('A god acts.'), 'the caption text is unchanged');
     rig.setActCaption('A god acts.', 'cold');
-    assert.equal(el.innerHTML, el.innerHTML, 'the same text and pole a second time writes nothing new (no throw, no change)');
+    assert.equal(writes, 2, 'the same text and pole a second time writes nothing new');
   } finally { delete global.document; }
 });
 
