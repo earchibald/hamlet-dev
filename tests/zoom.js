@@ -69,6 +69,22 @@ test('the zoom only closes in', () => {
   }
 });
 
+test("the centre moves with the box's width, not with eased time", () => {
+  const s = { sx: 4, sy: 2 };
+  const a = api.viewFrame('world', s), b = api.viewFrame('mid', s);
+  const boxA = BOXES.world, boxB = BOXES.mid;
+  const centreA = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const centreB = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  for (const f of [0.25, 0.5, 0.75]){
+    const { cam } = api.zoomCamera(a, b, boxA, boxB, f);
+    const p = (a.w - cam.w) / (a.w - b.w);
+    const wantX = api.lerp(centreA.x, centreB.x, p);
+    const wantY = api.lerp(centreA.y, centreB.y, p);
+    closeTo(cam.x + cam.w / 2, wantX, 1e-9, `f=${f} centre x`);
+    closeTo(cam.y + cam.h / 2, wantY, 1e-9, `f=${f} centre y`);
+  }
+});
+
 test('a frame fills the box it is shown in', () => {
   const s = { sx: 4, sy: 2 };
   const a = api.viewFrame('world', s), b = api.viewFrame('mid', s);
