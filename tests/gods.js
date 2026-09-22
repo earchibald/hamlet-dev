@@ -16,7 +16,7 @@ test('a creation opens the gods era with one formless region and no god', () => 
   assert.equal(api.liveRegions().length, 1);
   assert.equal(api.gods().length, 0);
   assert.deepEqual(api.legends, []);
-  assert.deepEqual(api.creation, { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [] });
+  assert.deepEqual(api.creation, { ages: 0, backstops: 0, discards: 0, settled: false, failed: false, gate: null, made: {}, gestures: [], gestureAge: -1, choices: [], told: {} });
   assert.ok(api.godRng);
 });
 
@@ -93,7 +93,7 @@ test('a creation ends: every god sleeps, the gate passes, the era flips, and the
   assert.ok(api.liveRegions().some(r => api.hasMark(r, 'making', 'human')), 'no people were made');
   assert.ok(api.liveRegions().some(r => api.marksOf(r, 'rest').length), 'no god sleeps in a region');
   assert.ok(!api.legends.some(e => /foxs|wolfs|deers|humans/.test(e.text)));
-  const spark = api.legends.find(e => e.text === 'A spark stayed.');
+  const spark = api.legends.find(e => /^One spark of .+ stays awake\.$/.test(e.text));
   if (api.gods().some(g => g.pole === 'hot')) assert.ok(spark, 'the hot god slept without the spark');
   const again = load(); again.startCreation('r'); again.runAges();
   assert.deepEqual(again.legends.map(e => e.text), api.legends.map(e => e.text));
@@ -102,7 +102,7 @@ test('a creation ends: every god sleeps, the gate passes, the era flips, and the
 /* A god of a pole, standing in a region that carries the pole, with its needs where the test wants them. */
 function godWith(api, pole, needs = {}){
   const r = api.liveRegions()[0];
-  const g = api.withGodRng(() => api.makeGod(pole, r, 'Test.'));
+  const g = api.withGodRng(() => api.makeGod(pole, r, () => 'Test.'));
   api.setPole(r, pole, g, 'test'); Object.assign(g.needs, needs);
   return { g, r };
 }
@@ -135,7 +135,7 @@ test('flow runs through neighbouring countries, and pool marks one', () => {
   const flowedDry = api.liveRegions().filter(q => api.hasMark(q, 'flow') && dryBefore.includes(q.id));
   if (flowedDry.length) assert.ok(flowedDry.every(q => !api.hasPole(q, 'wet')), 'flow changed a dry country\'s nature');
   const p = api.liveRegions().find(q => !api.hasPole(q, 'wet')) || api.liveRegions()[0];
-  const s = api.withGodRng(() => api.makeGod('still', p, 'Test.'));
+  const s = api.withGodRng(() => api.makeGod('still', p, () => 'Test.'));
   api.setPole(p, 'still', s, 'test');
   const pWasDry = !api.hasPole(p, 'wet');
   api.withGodRng(() => { assert.ok(api.GOD_ACTS.pool.apply(s, p)); });
@@ -159,7 +159,7 @@ test('burning scars another god\'s country and offends it', () => {
   const api = load(); api.startCreation('r');
   api.step();
   const [a, b] = api.awakeGods();
-  const hot = api.withGodRng(() => api.makeGod('hot', null, 'Test.'));
+  const hot = api.withGodRng(() => api.makeGod('hot', null, () => 'Test.'));
   /* The splitter wrote the poles on both children, so burning b's country offends a, the marker. */
   const target = api.regionById(b.region);
   const calm = a.needs.calm;
@@ -231,7 +231,7 @@ test('a god whose pole is unmade from the whole field dies, and leaves a scar', 
   api.withGodRng(() => api.unmake(b));
   assert.equal(b.status, 'dead'); assert.equal(b.alive, false);
   assert.deepEqual(api.awakeGods(), [a]);
-  assert.ok(api.legends.some(e => e.text.includes(`${b.name} is no more`)));
+  assert.ok(api.legends.some(e => e.text.includes(`so ${b.name} cannot go on`)));
   assert.ok(api.liveRegions().some(q => api.marksOf(q, 'scar').some(m => m.by === b.id)), 'no scar for the dead god');
   const rec = last(api, 'unmade');
   assert.equal(rec.god, b.id); assert.equal(rec.from, rec.to, 'an unmade god walks');
@@ -240,8 +240,8 @@ test('a god whose pole is unmade from the whole field dies, and leaves a scar', 
 
 test('a country with a height pole but nothing raised or dug can be a start', () => {
   const api = load(); api.startCreation('r');
-  const above = api.withGodRng(() => api.makeGod('above', api.field.root, 'Test.'));
-  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, 'Test.'));
+  const above = api.withGodRng(() => api.makeGod('above', api.field.root, () => 'Test.'));
+  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, () => 'Test.'));
   const r = api.field.root;
   api.setPole(r, 'above', above, ''); api.setPole(r, 'dry', dry, '');
   assert.notEqual(api.restGate().lack, 'start', 'highland that nobody raised should be a start');
@@ -264,8 +264,8 @@ test('when every god is of one contrast, a lack of people strains a new one', ()
 
 test('the gods leave the last plains alone', () => {
   const api = load(); api.startCreation('r');
-  const above = api.withGodRng(() => api.makeGod('above', api.field.root, 'Test.'));
-  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, 'Test.'));
+  const above = api.withGodRng(() => api.makeGod('above', api.field.root, () => 'Test.'));
+  const dry = api.withGodRng(() => api.makeGod('dry', api.field.root, () => 'Test.'));
   const cut = api.withGodRng(() => api.splitRegion(api.field.root, dry));
   for (const r of [cut.a, cut.b]){ api.setPole(r, 'dry', dry, ''); api.setPole(r, 'above', above, ''); }
   assert.equal(api.startCandidates().length, 2);
@@ -494,4 +494,36 @@ test('the wearied god leaves a gesture like any other act', () => {
   assert.equal(typeof rec.lack, 'string');
   assert.equal(rec.weighed, null, 'the backstop is not a decision');
   assert.ok(api.regionById(rec.region).tiles.includes(rec.to));
+});
+
+/* ---------- the creation's words ---------- */
+/* The playtest of 20 Sept 2026 found each creation line repeated word for word. A line with several
+   wordings takes them in the listed order, one per telling, and starts again when they run out. This
+   asserts on the index the counter chose, not on the text, since a text can vary for other reasons. */
+test('a line takes its wordings in the listed order, and starts again after the last', () => {
+  const api = load(); api.startCreation('r');
+  const ways = api.TELL.split, v = { g: 'Kesh', a: 'dry', b: 'wet' };
+  const before = api.creation.told.split || 0;
+  const said = [];
+  for (let k = 0; k < ways.length + 1; k++) said.push(api.tell('split', v));
+  for (let k = 0; k < said.length; k++) assert.equal(said[k], ways[(before + k) % ways.length](v), `telling ${k} is not wording ${(before + k) % ways.length}`);
+  assert.equal(api.creation.told.split, before + ways.length + 1);
+  assert.ok(ways.length > 1 && new Set(said).size === ways.length, 'the wordings of split are not all different');
+});
+test('every word a rule can hand the text has plain words for it', () => {
+  const api = load();
+  for (const p in api.POLES){ assert.ok(api.POLE_WORD[p], `no land word for pole ${p}`); assert.ok(api.GOD_OF[p], `no god word for pole ${p}`); }
+  /* The gate's lacks, the kinds of life, and the two lacks only the tile check reports. */
+  for (const lack of [...Object.keys(api.STRAIN), ...api.KINDS, 'ground', 'room']) assert.ok(api.LACK_WORD[lack], `no words for the lack ${lack}`);
+  for (const b of new Set([...api.BIOME_OF.map(r => r.biome), 'meadow', 'ash'])) assert.ok(api.BIOME_PLACE[b], `no place words for the biome ${b}`);
+  for (const s of new Set(Object.values(api.SCAR_OF))) assert.ok(api.SCAR_TEXT[s], `no words for the scar ${s}`);
+});
+/* "it lacks start" and "parts a country: below from above" are what the playtester read. */
+test('no rule word reaches a legend', () => {
+  const leak = /\bcountr(y|ies)\b|\bundefined\b|\bfield\b|lacks (start|hunter|prey|fae|folk|height|depth|ground|room)\b|\b(above|below|moving)\b/;
+  for (const seed of ['r', 'x', 'amber-ford-45']){
+    const api = load(); api.startWorld(seed, {});
+    const bad = api.legends.filter(e => leak.test(e.text)).map(e => e.text);
+    assert.deepEqual(bad, [], `seed ${seed}`);
+  }
 });
