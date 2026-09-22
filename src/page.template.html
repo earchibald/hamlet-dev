@@ -58,6 +58,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .tlhead .sp{margin-left:auto;display:flex;gap:4px}
 #timeline .lane{display:flex;align-items:center;gap:4px;margin-top:2px;white-space:nowrap;overflow:hidden}
 #timeline .who{flex:none;width:96px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#timeline .who .godicon{margin-right:3px;vertical-align:middle}
 #timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
 #timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
 #timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -105,6 +106,9 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
 #actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 #actCaption[hidden]{display:none}
+/* A god's icon, wherever it sits beside a name: the card, a window title, the people row, the
+   timeline lane, the act caption. Pixel art, so it stays crisp rather than smoothed when scaled. */
+.godicon{vertical-align:-2px;image-rendering:pixelated;margin-right:3px}
 #foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
@@ -163,6 +167,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .tip .hist{max-height:150px;overflow:auto}
 .ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
 .ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}
+.ins .head .who{display:flex;align-items:center;gap:6px}
 .ins .why{display:flex;flex-wrap:wrap;gap:4px 10px} .ins .why .picked{color:var(--accent);font-weight:700} .ins .why .failed{color:var(--muted);text-decoration:line-through}
 .ins ul{list-style:none;margin:0;padding:0} .ins li{padding:1px 0}
 .chips{display:flex;flex-wrap:wrap;gap:5px} .chips .chip{color:var(--ink);border-color:var(--line)}

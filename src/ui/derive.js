@@ -435,7 +435,7 @@ function timelineModel(){
     const byAge = new Map(mine.map(r => [r.age, r]));
     const cells = [];
     for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
-    rows.push({ id: g.id, label: g.name, cells });
+    rows.push({ id: g.id, label: g.name, pole: g.pole, cells });
   }
   /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
      `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is

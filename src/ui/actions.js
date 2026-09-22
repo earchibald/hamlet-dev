@@ -7,18 +7,23 @@
    `captionText`; every other file calls this instead of setting the field itself, the same way
    `setFocus` is the one writer of `ui.focus`. */
 let captionText = '';
-function setActCaption(text){
-  text = text || '';
-  if (text === captionText) return;
-  captionText = text;
+/* The pole of the god whose act wrote captionText, kept beside it so the caption's icon changes with
+   the god on stage. null when no icon is shown: an empty caption, or a caption with no acting god. */
+let captionPole = null;
+function setActCaption(text, pole){
+  text = text || ''; pole = pole || null;
+  if (text === captionText && pole === captionPole) return;
+  captionText = text; captionPole = pole;
   /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
      that drives onSettle or newWorld directly may have no document at all; the page write is skipped
-     there, and the text these tests read comes straight from captionText. The text is plain narrative
-     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+     there, and the text these tests read comes straight from captionText. The icon markup this file
+     builds is not player text, but the caption text now sits beside it inside the same innerHTML
+     write, so esc keeps it inert on the way in, the same way every other sink in src/ui/ escapes a
+     dynamic string before it joins markup. */
   if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const el = $('actCaption'); if (!el) return;
   el.hidden = !text;
-  el.textContent = text;
+  el.innerHTML = (pole ? godIconSvg(pole, 16, null) : '') + esc(text);
   /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
      renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
      assignment, every time the caption's text actually changes. */

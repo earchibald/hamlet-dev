@@ -10,8 +10,9 @@ function readPalette(){
   worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
-/* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
-   so the thing lying in the hill reads as the god the legends name. */
+/* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own
+   glyph, drawn as its icon where the pole is known and as the star (SPECIES.god.glyph) as a fallback, so
+   the thing lying in the hill reads as the god the legends name. */
 const beingGlyph = a => a.asleep && a.species !== 'god' ? 'z' : SPECIES[a.species].glyph;
 function hash(x, y){ let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function darkness(){ const h = hourOf(); if (h >= 7 && h < 19) return 0; if (h >= 19 && h < 21) return (h - 19) / 2 * 0.45; if (h >= 5 && h < 7) return (7 - h) / 2 * 0.45; return 0.45; }
@@ -295,21 +296,31 @@ function drawField(){
     const s = spotOf(p);
     spots.push({ g, x: s.x, y: s.y, alpha: m ? m.alpha : g.status === 'awake' ? 1 : 0.55 });
   }
-  /* Two stars are nudged apart only when their pixels are within the glyph's own width. */
-  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k]; if (Math.abs(s.x - o.x) < 22 && Math.abs(s.y - o.y) < 16){ s.x = o.x + 22; s.y = o.y; } } });
+  /* Two icons are nudged apart only when their pixels are within the icon's own 22 px footprint on y,
+     and within a name-wide footprint on x: two bold names at 10 px can each run wider than the icon,
+     so the font is set before the nudge and the two names' own widths decide how far apart they land. */
+  wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k];
+    const dist = Math.max(22, (wctx.measureText(o.g.name).width + wctx.measureText(s.g.name).width) / 2) + 4;
+    if (Math.abs(s.x - o.x) < dist && Math.abs(s.y - o.y) < 22){ s.x = o.x + dist; s.y = o.y; } } });
   wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
   for (const s of spots){
     wctx.globalAlpha = clamp(s.alpha, 0, 1);
-    wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
-    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    if (!drawGodIcon(wctx, s.g.pole, s.x, s.y, 2)){
+      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    }
     wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
-    wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
+    /* The icon is 22 px square, centred on s.x,s.y, so its bottom edge sits 11 px below centre. */
+    wctx.strokeText(s.g.name, s.x, s.y + 17); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 17);
   }
   wctx.globalAlpha = 1;
   /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
      never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
-     could run under a drawer or off the visible edge. */
-  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
+     could run under a drawer or off the visible edge. Its icon is the pole of the god whose act this is;
+     the caption text already names the god, so the icon carries no label of its own. */
+  const capG = figures && now && f > 0 ? beingById(now.god) : null;
+  setActCaption(capG ? captionFor(now) : '', capG && capG.pole);
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
@@ -366,6 +377,7 @@ function drawMid(){
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
+    if (a.species === 'god' && drawGodIcon(mctx, a.pole, px, py, 1)) continue;
     if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
     mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
   }
@@ -446,8 +458,10 @@ function drawLoc(){
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
     ctx.globalAlpha = a.z === lvl ? 1 : 0.5;
     const px = (a.x - ox) * T + T / 2, py = (a.y - oy) * T + T / 2 + 1, glyph = beingGlyph(a);
-    ctx.lineWidth = 3; ctx.strokeStyle = P.halo; ctx.strokeText(glyph, px, py);
-    ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
+    if (a.species !== 'god' || !drawGodIcon(ctx, a.pole, px, py, 2)){
+      ctx.lineWidth = 3; ctx.strokeStyle = P.halo; ctx.strokeText(glyph, px, py);
+      ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
+    }
     if (a.carrying){ ctx.fillStyle = a.carrying.kind === 'rock' ? P.rock : a.carrying.kind === 'stick' || a.carrying.kind === 'spear' || a.carrying.kind === 'log' ? P.stick : a.carrying.kind === 'berries' ? P.berry : a.carrying.kind === 'ember' ? P.fire : a.carrying.kind === 'water' ? P['water-fg'] : P.carcass; ctx.fillRect((a.x - ox) * T + T - 7, (a.y - oy) * T + 2, 5, 5); }
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }

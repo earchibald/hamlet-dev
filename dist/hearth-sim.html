@@ -58,6 +58,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .tlhead .sp{margin-left:auto;display:flex;gap:4px}
 #timeline .lane{display:flex;align-items:center;gap:4px;margin-top:2px;white-space:nowrap;overflow:hidden}
 #timeline .who{flex:none;width:96px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#timeline .who .godicon{margin-right:3px;vertical-align:middle}
 #timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
 #timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
 #timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -105,6 +106,9 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
 #actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 #actCaption[hidden]{display:none}
+/* A god's icon, wherever it sits beside a name: the card, a window title, the people row, the
+   timeline lane, the act caption. Pixel art, so it stays crisp rather than smoothed when scaled. */
+.godicon{vertical-align:-2px;image-rendering:pixelated;margin-right:3px}
 #foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
@@ -163,6 +167,7 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .tip .hist{max-height:150px;overflow:auto}
 .ins h3{margin:8px 0 3px;font-size:12px;color:var(--muted);font-weight:700}
 .ins .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .ins .head strong{font-size:16px}
+.ins .head .who{display:flex;align-items:center;gap:6px}
 .ins .why{display:flex;flex-wrap:wrap;gap:4px 10px} .ins .why .picked{color:var(--accent);font-weight:700} .ins .why .failed{color:var(--muted);text-decoration:line-through}
 .ins ul{list-style:none;margin:0;padding:0} .ins li{padding:1px 0}
 .chips{display:flex;flex-wrap:wrap;gap:5px} .chips .chip{color:var(--ink);border-color:var(--line)}
@@ -7338,6 +7343,68 @@ function restore(){
   } catch (e) { /* no storage, or bad data */ }
 }
 
+/* The ten gods' icons. A god's kind is its pole (src/sim/marks.js), never its name. Pixel art, drawn
+   at integer coordinates so the edges stay sharp at 1x and 2x. The colours are fixed in both themes;
+   the outline (GOD_OUTLINE) is what keeps an icon readable on any field colour. */
+const GOD_OUTLINE = '#15171c';
+const GOD_ICONS = {
+  above:  { pal: ['#dfe6d2', '#8fa37c', '#4f5f45'], art: ['....a....', '...aab...', '...abb...', '..aabbc..', '..abbbc..', '.aabbbcc.', '.abbbbcc.', 'aabbbbbcc', 'abbbbbbcc'] },
+  below:  { pal: ['#b9a7d6', '#6a5690', '#30264a'], art: ['abbbbbbbc', '.abbbbbc.', '.abbbbbc.', '..abbbc..', '..abbbc..', '...abc...', '...abc...', '....b....', '....c....'] },
+  wet:    { pal: ['#cfe8ff', '#5d9fdc', '#2a5a94'], art: ['....a....', '....a....', '...aab...', '...abb...', '..aabbc..', '..abbbc..', '..abbbc..', '...bbc...', '.........'] },
+  dry:    { pal: ['#f1e2b3', '#c9a963', '#866a33'], art: ['.........', '......a..', '.....aaa.', '..a...a..', '.aaab....', 'aabbbbaaa', 'bbbbbbbbb', 'bcbbcbbcb', 'ccccccccc'] },
+  hot:    { pal: ['#ffe08a', '#f08a2c', '#a5361b'], art: ['....b....', '...bb....', '...bbb...', '..babb.b.', '.bbabbbb.', '.baaabbc.', '.baaaabc.', '..baabc..', '...ccc...'] },
+  cold:   { pal: ['#ffffff', '#a9d8ee', '#5b8fae'], art: ['....a....', '.b..a..b.', '..b.a.b..', '...bab...', 'aaaacaaaa', '...bab...', '..b.a.b..', '.b..a..b.', '....a....'] },
+  still:  { pal: ['#c6f0e6', '#4fae9d', '#23645b'], art: ['.........', '.........', '..aaaaa..', '.abbbbbc.', 'abbaabbbc', '.abbbbbc.', '..ccccc..', '.........', '.........'] },
+  moving: { pal: ['#ffffff', '#c9d3dc', '#7d8b98'], art: ['.........', '..aaaa...', '......ab.', 'aaaaaaab.', '.........', 'bbbbbbbc.', '.......c.', '....ccc..', '.........'] },
+  light:  { pal: ['#fffbe0', '#f4d35e', '#c99a1e'], art: ['....b....', '.b.....b.', '...aaa...', '..aaabb..', 'b.aabbc.b', '..abbbc..', '...bcc...', '.b.....b.', '....b....'] },
+  dark:   { pal: ['#9a938a', '#57514a', '#0b0a0d'], art: ['.........', '..aaaaa..', '.abbbbbb.', 'abbcccbbb', 'abcccccbb', 'abcccccbb', 'abcccccbb', 'abcccccbb', '.........'] },
+};
+/* godIconCells(pole) is read on every draw and every card, so its raster is worked out once per pole
+   and kept here. An 11 by 11 grid: the 9 by 9 art sits at offset 1,1, with a one-cell margin all round
+   for the outline to stand in. */
+const godIconCache = {};
+function godIconCells(pole){
+  if (!GOD_ICONS[pole]) return null;
+  if (godIconCache[pole]) return godIconCache[pole];
+  const { pal, art } = GOD_ICONS[pole];
+  const shade = { a: pal[0], b: pal[1], c: pal[2] };
+  const filled = (x, y) => x >= 1 && x <= 9 && y >= 1 && y <= 9 ? art[y - 1][x - 1] : '.';
+  const cells = [];
+  for (let y = 0; y <= 10; y++) for (let x = 0; x <= 10; x++){
+    const ch = filled(x, y);
+    if (ch !== '.'){ cells.push({ x, y, fill: shade[ch] }); continue; }
+    const touches = filled(x - 1, y) !== '.' || filled(x + 1, y) !== '.' || filled(x, y - 1) !== '.' || filled(x, y + 1) !== '.';
+    if (touches) cells.push({ x, y, fill: GOD_OUTLINE });
+  }
+  godIconCache[pole] = cells;
+  return cells;
+}
+/* Draws the icon centred on cx,cy at s screen pixels per art pixel. Each cell's screen box is rounded
+   at both edges, not rounded once and stretched by s, so the tiles tile with no seam and no overlap
+   even when s is not a whole number. Returns false and draws nothing for an unknown pole, so the
+   caller falls back to the star (SPECIES.god.glyph). */
+function drawGodIcon(ctx, pole, cx, cy, s){
+  const cells = godIconCells(pole);
+  if (!cells) return false;
+  const ox = cx - 11 * s / 2, oy = cy - 11 * s / 2;
+  for (const cell of cells){
+    const x0 = Math.round(ox + cell.x * s), x1 = Math.round(ox + (cell.x + 1) * s);
+    const y0 = Math.round(oy + cell.y * s), y1 = Math.round(oy + (cell.y + 1) * s);
+    ctx.fillStyle = cell.fill;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  return true;
+}
+/* An SVG version of the same icon, for the page chrome rather than the canvas. With a label it reads
+   as an image to a screen reader; without one it is decoration and stays out of the reading order. */
+function godIconSvg(pole, size, label){
+  const cells = godIconCells(pole);
+  if (!cells) return '';
+  const rects = cells.map(c => `<rect x="${c.x}" y="${c.y}" width="1" height="1" fill="${c.fill}"/>`).join('');
+  const role = label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"';
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="godicon" width="${size}" height="${size}" viewBox="0 0 11 11" shape-rendering="crispEdges" ${role}>${rects}</svg>`;
+}
+
 /* View model. Pure functions from sim state to what the strip and drawers show. No DOM.
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
@@ -7775,7 +7842,7 @@ function timelineModel(){
     const byAge = new Map(mine.map(r => [r.age, r]));
     const cells = [];
     for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
-    rows.push({ id: g.id, label: g.name, cells });
+    rows.push({ id: g.id, label: g.name, pole: g.pole, cells });
   }
   /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
      `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
@@ -8263,8 +8330,9 @@ function readPalette(){
   worldDirty = 0;
 }
 const beingColor = a => a.species === 'human' ? `hsl(${a.hue} 65% ${P.agentL})` : a.species === 'god' ? P.god : a.species === 'rabbit' ? P.rabbit : a.species === 'deer' ? P.deer : a.species === 'wolf' ? P.wolf : a.species === 'sprite' ? P.sprite : a.species === 'gnome' ? P.gnome : P.fox;
-/* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own star,
-   so the thing lying in the hill reads as the god the legends name. */
+/* A sleeping being draws a `z`, but every god sleeps, and a god is not one more sleeper: it keeps its own
+   glyph, drawn as its icon where the pole is known and as the star (SPECIES.god.glyph) as a fallback, so
+   the thing lying in the hill reads as the god the legends name. */
 const beingGlyph = a => a.asleep && a.species !== 'god' ? 'z' : SPECIES[a.species].glyph;
 function hash(x, y){ let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function darkness(){ const h = hourOf(); if (h >= 7 && h < 19) return 0; if (h >= 19 && h < 21) return (h - 19) / 2 * 0.45; if (h >= 5 && h < 7) return (7 - h) / 2 * 0.45; return 0.45; }
@@ -8548,21 +8616,31 @@ function drawField(){
     const s = spotOf(p);
     spots.push({ g, x: s.x, y: s.y, alpha: m ? m.alpha : g.status === 'awake' ? 1 : 0.55 });
   }
-  /* Two stars are nudged apart only when their pixels are within the glyph's own width. */
-  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k]; if (Math.abs(s.x - o.x) < 22 && Math.abs(s.y - o.y) < 16){ s.x = o.x + 22; s.y = o.y; } } });
+  /* Two icons are nudged apart only when their pixels are within the icon's own 22 px footprint on y,
+     and within a name-wide footprint on x: two bold names at 10 px can each run wider than the icon,
+     so the font is set before the nudge and the two names' own widths decide how far apart they land. */
+  wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
+  spots.forEach((s, i) => { for (let k = 0; k < i; k++){ const o = spots[k];
+    const dist = Math.max(22, (wctx.measureText(o.g.name).width + wctx.measureText(s.g.name).width) / 2) + 4;
+    if (Math.abs(s.x - o.x) < dist && Math.abs(s.y - o.y) < 22){ s.x = o.x + dist; s.y = o.y; } } });
   wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
   for (const s of spots){
     wctx.globalAlpha = clamp(s.alpha, 0, 1);
-    wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
-    wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    if (!drawGodIcon(wctx, s.g.pole, s.x, s.y, 2)){
+      wctx.font = '700 18px "JetBrains Mono", ui-monospace, Menlo, monospace';
+      wctx.lineWidth = 3; wctx.strokeStyle = P.halo; wctx.strokeText(SPECIES.god.glyph, s.x, s.y); wctx.fillStyle = P.god; wctx.fillText(SPECIES.god.glyph, s.x, s.y);
+    }
     wctx.font = '500 10px "JetBrains Mono", ui-monospace, Menlo, monospace';
-    wctx.strokeText(s.g.name, s.x, s.y + 14); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 14);
+    /* The icon is 22 px square, centred on s.x,s.y, so its bottom edge sits 11 px below centre. */
+    wctx.strokeText(s.g.name, s.x, s.y + 17); wctx.fillStyle = P.select; wctx.fillText(s.g.name, s.x, s.y + 17);
   }
   wctx.globalAlpha = 1;
   /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
      never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
-     could run under a drawer or off the visible edge. */
-  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
+     could run under a drawer or off the visible edge. Its icon is the pole of the god whose act this is;
+     the caption text already names the god, so the icon carries no label of its own. */
+  const capG = figures && now && f > 0 ? beingById(now.god) : null;
+  setActCaption(capG ? captionFor(now) : '', capG && capG.pole);
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
@@ -8619,6 +8697,7 @@ function drawMid(){
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
+    if (a.species === 'god' && drawGodIcon(mctx, a.pole, px, py, 1)) continue;
     if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
     mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
   }
@@ -8699,8 +8778,10 @@ function drawLoc(){
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
     ctx.globalAlpha = a.z === lvl ? 1 : 0.5;
     const px = (a.x - ox) * T + T / 2, py = (a.y - oy) * T + T / 2 + 1, glyph = beingGlyph(a);
-    ctx.lineWidth = 3; ctx.strokeStyle = P.halo; ctx.strokeText(glyph, px, py);
-    ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
+    if (a.species !== 'god' || !drawGodIcon(ctx, a.pole, px, py, 2)){
+      ctx.lineWidth = 3; ctx.strokeStyle = P.halo; ctx.strokeText(glyph, px, py);
+      ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
+    }
     if (a.carrying){ ctx.fillStyle = a.carrying.kind === 'rock' ? P.rock : a.carrying.kind === 'stick' || a.carrying.kind === 'spear' || a.carrying.kind === 'log' ? P.stick : a.carrying.kind === 'berries' ? P.berry : a.carrying.kind === 'ember' ? P.fire : a.carrying.kind === 'water' ? P['water-fg'] : P.carcass; ctx.fillRect((a.x - ox) * T + T - 7, (a.y - oy) * T + 2, 5, 5); }
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
@@ -8753,7 +8834,17 @@ function drawTimeline(){
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
     const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
-    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
+    /* The icon sits inside `.who`, before the name, so every lane's first cell starts at the same
+       x whether or not the lane has one: a sibling icon widens the god lanes only, past the gate
+       lane's fixed 96 px, and the columns stop lining up. */
+    const who = document.createElement('span'); who.className = 'who';
+    if (r.pole){
+      const icon = document.createElement('img'); icon.className = 'godicon'; icon.alt = '';
+      icon.src = 'data:image/svg+xml,' + encodeURIComponent(godIconSvg(r.pole, 14, null));
+      who.append(icon, r.label);
+    } else {
+      who.textContent = r.label;
+    }
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));
     const now = document.createElement('span'); now.className = 'now';
@@ -8799,7 +8890,7 @@ function inspectGod(g){
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
-  return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
+  return `<div class="head"><span class="who">${godIconSvg(g.pole, 22, null)}<strong style="color:${beingColor(g)}">${g.name}</strong></span><span>${g.epithet}</span></div>
     <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
     ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
@@ -8958,7 +9049,7 @@ function renderStrip(){
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.species === 'god' ? godIconSvg(a.pole, 16, null) : ''}${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
      no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
      can run past that room where the bare biome word never did, so the title keeps the biome word, as
@@ -9080,7 +9171,7 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
@@ -9257,18 +9348,23 @@ function openChord(){
    `captionText`; every other file calls this instead of setting the field itself, the same way
    `setFocus` is the one writer of `ui.focus`. */
 let captionText = '';
-function setActCaption(text){
-  text = text || '';
-  if (text === captionText) return;
-  captionText = text;
+/* The pole of the god whose act wrote captionText, kept beside it so the caption's icon changes with
+   the god on stage. null when no icon is shown: an empty caption, or a caption with no acting god. */
+let captionPole = null;
+function setActCaption(text, pole){
+  text = text || ''; pole = pole || null;
+  if (text === captionText && pole === captionPole) return;
+  captionText = text; captionPole = pole;
   /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
      that drives onSettle or newWorld directly may have no document at all; the page write is skipped
-     there, and the text these tests read comes straight from captionText. The text is plain narrative
-     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+     there, and the text these tests read comes straight from captionText. The icon markup this file
+     builds is not player text, but the caption text now sits beside it inside the same innerHTML
+     write, so esc keeps it inert on the way in, the same way every other sink in src/ui/ escapes a
+     dynamic string before it joins markup. */
   if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const el = $('actCaption'); if (!el) return;
   el.hidden = !text;
-  el.textContent = text;
+  el.innerHTML = (pole ? godIconSvg(pole, 16, null) : '') + esc(text);
   /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
      renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
      assignment, every time the caption's text actually changes. */
