@@ -18,6 +18,7 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/garden.js`: gardenLives against the old whole-map scan, for a hand-built garden and for a real run. The five hand-built cases are fast. The two real runs ask 15 world days, take 133 s, and run behind `LONG=1`. A camp plants its first garden on day 5.6, so a shorter run tests nothing and the guard says so.
 - `tests/names.js`: the name record, the two streams, the old tongue, the namer, who names what and when, epithets and fate, and the layout guard against a moved being or item. Fast.
 - `tests/ui.js`: the view model in both eras, the stages, the key map, every button has a key, the field colours, the mark rows, and that a watched creation equals an unwatched one. Run it after every change to `src/ui/`.
+- `tests/people.js`: the People drawer's two filters, camp and age. The rows each filter keeps, the camp and age cycles, the count, the labels, the window title, the empty text, the saved age, and the E and Y keys. It holds these because `tests/ui.js` runs only with `SLOW=1`. Fast.
 - `tests/icons.js`: the icons of the ten kinds of god. Their table and outline, and the helpers that draw them on a canvas and as SVG. The icon on the map, the god's card, the people list, the timeline and the caption. Fast.
 - `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
 - `tests/wanderer.js`: the valley after the last person. The line that says the people are gone, the wanderer who comes, and winter. Fast.

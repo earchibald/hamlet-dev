@@ -22,7 +22,7 @@ function withPage(fn){
 }
 
 const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'dialogs', 'actions'];
-const NAMES = ['ui', 'peopleRows', 'peopleScope', 'peopleCount', 'peopleCampLabel', 'peopleAgeLabel', 'peopleMixed', 'viewKey', 'ACTIONS'];
+const NAMES = ['ui', 'peopleRows', 'peopleScope', 'peopleCount', 'peopleCampLabel', 'peopleAgeLabel', 'peopleMixed', 'peopleCountText', 'peopleTitle', 'peopleEmptyText', 'viewKey', 'ACTIONS'];
 
 /* A valley with two camps and a stray. The first camp is the one startWorld made, with its first
    person, and it gets an old and a young member too. The second camp has one adult. One adult has no
@@ -144,6 +144,27 @@ test('the count gives the living shown and the living in the world, and the day\
   assert.deepEqual(api.peopleCount(), { shown: 2, alive: 4 }, 'the dead of the day count in neither number');
   api.ui.peopleCamp = 'all';
   assert.deepEqual(api.peopleCount(), { shown: 4, alive: 4 }, 'with nobody hidden the two agree');
+});
+
+test('the count text reads "shown of alive" when a filter hides someone, and the window title agrees', () => {
+  const { api, c1, c2 } = valley();
+  assert.equal(api.peopleCountText(), '3 of 5', 'the chosen camp hides two of the five');
+  assert.equal(api.peopleTitle(), `People \u00b7 3 of 5 \u00b7 Camp: ${c1.name} \u00b7 Age: any`, 'the window title names the count and both filters');
+  api.ui.peopleCamp = 'all';
+  assert.equal(api.peopleCountText(), '5', 'with nobody hidden the count is one number, as before');
+  api.ui.peopleAge = 'old';
+  assert.equal(api.peopleTitle(), 'People \u00b7 1 of 5 \u00b7 Everyone \u00b7 Age: old');
+  api.ui.peopleCamp = c2.id;
+  assert.equal(api.peopleCountText(), '0 of 5', 'the second camp has nobody old');
+});
+
+test('an empty list says the filters hide everyone, and says "Nobody yet." when nobody lives', () => {
+  const { api, c2 } = valley();
+  api.ui.peopleCamp = c2.id; api.ui.peopleAge = 'old';
+  assert.equal(api.peopleRows().length, 0, 'the filters hide everyone');
+  assert.equal(api.peopleEmptyText(), 'Nobody matches these filters.');
+  for (const b of api.beings) if (b.species === 'human') b.alive = false;
+  assert.equal(api.peopleEmptyText(), 'Nobody yet.', 'with nobody alive the filters are not the cause');
 });
 
 test('a filter change moves the view key, even where the rows stay the same', () => {

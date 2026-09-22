@@ -314,6 +314,13 @@ function peopleCount(){
 function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
 /* The age button's label. */
 const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* The count after the drawer's title, without its leading dot: "5 of 18" when a filter hides some
+   living people, else "18". The drawer and a popped-out window both read it, so the two agree. */
+function peopleCountText(){ const n = peopleCount(); return n.shown === n.alive ? `${n.alive}` : `${n.shown} of ${n.alive}`; }
+/* A popped-out People window has no filter row, so its title carries the count and both filters. */
+const peopleTitle = () => ['People', peopleCountText(), peopleCampLabel(), peopleAgeLabel()].join(' \u00b7 ');
+/* The text of an empty list. The filters can hide everyone while people live, and the line says so. */
+const peopleEmptyText = () => peopleCount().alive > 0 ? 'Nobody matches these filters.' : 'Nobody yet.';
 /* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
 function peopleMixed(){
   const seen = new Set(peopleRows().map(r => r.a.camp || null));
