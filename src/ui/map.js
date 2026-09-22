@@ -312,8 +312,10 @@ function drawField(){
   wctx.globalAlpha = 1;
   /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
      never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
-     could run under a drawer or off the visible edge. */
-  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
+     could run under a drawer or off the visible edge. Its icon is the pole of the god whose act this is;
+     the caption text already names the god, so the icon carries no label of its own. */
+  const capG = figures && now && f > 0 ? beingById(now.god) : null;
+  setActCaption(capG ? captionFor(now) : '', capG && capG.pole);
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){

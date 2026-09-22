@@ -38,6 +38,11 @@ function drawTimeline(){
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
     const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
+    if (r.pole){
+      const icon = document.createElement('img'); icon.className = 'godicon'; icon.alt = '';
+      icon.src = 'data:image/svg+xml,' + encodeURIComponent(godIconSvg(r.pole, 14, null));
+      lane.appendChild(icon);
+    }
     const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));

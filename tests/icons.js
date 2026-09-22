@@ -170,3 +170,111 @@ test('drawField draws every live god through drawGodIcon, its own pole, and no f
   assert.deepEqual(poles, visible.map(g => g.pole).sort(), 'each call carries its own god\'s pole');
   assert.ok(!wctx.texts.includes('✶'), 'no fillText or strokeText call draws the star glyph');
 });
+
+/* ---- task 3: the icon in the page ---- */
+
+test('inspectGod holds the god\'s own icon markup at 22 px, decoration only, no label', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'inspect'], ['inspectGod', 'gods', 'startCreation', 'step', 'godIconSvg']);
+  rig.startCreation('gamma');
+  for (let k = 0; k < 6 && rig.era === 'gods'; k++) rig.step();
+  const g = rig.gods()[0];
+  const html = rig.inspectGod(g);
+  assert.ok(html.includes(rig.godIconSvg(g.pole, 22, null)), 'the card holds the 22px icon for the god\'s own pole');
+});
+
+test('winTitle holds the god\'s own icon markup at 16 px for a god window, and none for a tile window', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'inspect', 'strip', 'windows'],
+    ['winTitle', 'gods', 'startCreation', 'step', 'godIconSvg']);
+  rig.startCreation('gamma');
+  for (let k = 0; k < 6 && rig.era === 'gods'; k++) rig.step();
+  const g = rig.gods()[0];
+  const title = rig.winTitle({ kind: 'inspect', target: { being: g.id } });
+  assert.ok(title.includes(rig.godIconSvg(g.pole, 16, null)), 'the window title holds the 16px icon for the god\'s own pole');
+});
+
+test('renderPeople holds the god\'s own icon markup at 14 px for a god row', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'inspect', 'strip', 'actions', 'panels'],
+    ['gods', 'startCreation', 'step', 'renderPeople', 'godIconSvg']);
+  rig.startCreation('gamma');
+  for (let k = 0; k < 6 && rig.era === 'gods'; k++) rig.step();
+  const g = rig.gods()[0];
+  global.document = { getElementById: () => null };
+  const el = { innerHTML: '' };
+  try { rig.renderPeople(el); } finally { delete global.document; }
+  assert.ok(el.innerHTML.includes(rig.godIconSvg(g.pole, 14, null)), 'a god row holds the 14px icon for its own pole');
+});
+
+test('timelineModel names the pole on an unfolded row for a single god, and not on the folded or gate rows', () => {
+  const rig = loadUI(['state', 'derive'], ['timelineModel', 'gods', 'startCreation', 'step', 'ui']);
+  rig.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) rig.step();
+  const folded = rig.timelineModel();
+  assert.equal(folded.rows[0].pole, undefined, 'the folded row names no single god');
+  rig.ui.timelineFold = false;
+  const m = rig.timelineModel();
+  const gate = m.rows.find(r => r.id === 'gate');
+  assert.equal(gate.pole, undefined, 'the gate row names no god');
+  const godIds = rig.gods().map(g => g.id);
+  for (const r of m.rows.filter(r => r.id !== 'gate')){
+    const g = rig.gods().find(x => x.id === r.id);
+    assert.equal(r.pole, g.pole, `row ${r.id} names its own god's pole`);
+  }
+  assert.ok(godIds.length > 0);
+});
+
+test('drawTimeline puts a 14 px icon before the lane label for a single-god row, and none for the folded or gate rows', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'timeline'], ['drawTimeline', 'gods', 'startCreation', 'step', 'ui', 'godIconSvg']);
+  rig.startCreation('gamma', {});
+  for (let n = 0; n < 8; n++) rig.step();
+  rig.ui.timelineFold = false;
+  const root = fakeEl('div');
+  global.document = { getElementById: id => id === 'timeline' ? root : null, createElement: tag => fakeEl(tag) };
+  try { rig.drawTimeline(); } finally { delete global.document; }
+  const lanes = root.children.filter(c => c.className.split(' ').includes('lane'));
+  assert.ok(lanes.length > 1, 'more than one lane: at least one god and the gate');
+  for (const lane of lanes){
+    const who = lane.children.find(c => c.className === 'who');
+    const icon = lane.children[0] !== who ? lane.children[0] : null;
+    const rowId = who.textContent;
+    const isGate = rowId === 'The gate';
+    const g = rig.gods().find(x => x.name === rowId);
+    if (g){
+      assert.ok(icon, `${rowId}'s lane holds an icon before its label`);
+      assert.equal(icon.tag, 'img', 'the timeline icon is an img element');
+      assert.equal(icon.alt, '', 'the timeline icon has an empty alt');
+      assert.equal(icon.src, 'data:image/svg+xml,' + encodeURIComponent(rig.godIconSvg(g.pole, 14, null)));
+    } else assert.ok(isGate, `an icon-less lane is the gate, not ${rowId}`);
+  }
+});
+
+test('setActCaption writes the page again when only the pole changes, and the aria-live text stays the caption text alone', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'keys', 'strip', 'actions', 'panels'], ['setActCaption', 'godIconSvg', 'startWorld']);
+  rig.startWorld('r');
+  const el = { hidden: true, innerHTML: '' };
+  global.document = { getElementById: id => id === 'actCaption' ? el : { innerHTML: '' } };
+  try {
+    rig.setActCaption('A god acts.', 'hot');
+    assert.ok(el.innerHTML.includes(rig.godIconSvg('hot', 16, null)), 'the hot icon is written');
+    assert.ok(el.innerHTML.endsWith('A god acts.'), 'the caption text follows the icon');
+    rig.setActCaption('A god acts.', 'cold');
+    assert.ok(el.innerHTML.includes(rig.godIconSvg('cold', 16, null)), 'a new pole with the same text writes the page again');
+    assert.ok(!el.innerHTML.includes(rig.godIconSvg('hot', 16, null)), 'the old icon is gone');
+    assert.ok(el.innerHTML.endsWith('A god acts.'), 'the caption text is unchanged');
+    rig.setActCaption('A god acts.', 'cold');
+    assert.equal(el.innerHTML, el.innerHTML, 'the same text and pole a second time writes nothing new (no throw, no change)');
+  } finally { delete global.document; }
+});
+
+/* A small fake DOM element for drawTimeline: real children, a real classList, so a test can walk the
+   tree it built. document.createElement returns a fresh one of these; #timeline itself is one too. */
+function fakeEl(tag){
+  const el = { tag, className: '', children: [], dataset: {}, _text: '',
+    classList: { toggle(c, on){ const has = el.className.split(' ').includes(c); const want = on === undefined ? !has : on;
+      el.className = el.className.split(' ').filter(x => x && x !== c).concat(want ? [c] : []).join(' '); } },
+    appendChild(c){ el.children.push(c); return c; },
+    append(...cs){ el.children.push(...cs); },
+    replaceChildren(){ el.children = []; },
+    get textContent(){ return el._text; }, set textContent(v){ el._text = v; },
+  };
+  return el;
+}

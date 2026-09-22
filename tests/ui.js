@@ -1967,7 +1967,7 @@ function recordCtx(){
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
-  const api = loadUI(['state', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+  const api = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
     caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
@@ -2217,13 +2217,15 @@ test('the People drawer gives a person their full name, and leaves a god’s row
 
 /* A god's inspector head is a different function, inspectGod, never touched by task 10; this locks
    that in against the same regression the People drawer had. */
-test('a god’s inspector head reads as it did before names: its name, its own epithet, nothing more', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...NAMES, 'inspectGod']);
+test('a god’s inspector head reads as it did before names: its name, its own epithet, nothing more but its icon', () => {
+  /* Task 3 (god icons) put the god's own icon before the name; the icon is the one addition this
+     regression test now allows, since the icon replaces no word and adds none. */
+  const api = loadUI(['state', 'icons', 'derive', 'keys', 'map', 'inspect'], [...NAMES, 'inspectGod']);
   api.startCreation('alpha', {}); api.camp = api.camps[0];
   for (let i = 0; i < 6; i++) api.step();
   const g = api.gods()[0];
   const html = api.inspectGod(g);
-  assert.match(html, new RegExp(`<div class="head"><strong style="color:[^"]*">${g.name}</strong><span>${g.epithet}</span></div>`));
+  assert.match(html, new RegExp(`<div class="head"><svg[^>]*class="godicon"[^>]*>.*?</svg><strong style="color:[^"]*">${g.name}</strong><span>${g.epithet}</span></div>`));
 });
 
 test('a sector shows its own name beside the biome word once it has one, and just the biome word before that', () => {

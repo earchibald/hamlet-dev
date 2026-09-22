@@ -57,5 +57,5 @@ function godIconSvg(pole, size, label){
   if (!cells) return '';
   const rects = cells.map(c => `<rect x="${c.x}" y="${c.y}" width="1" height="1" fill="${c.fill}"/>`).join('');
   const role = label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 11 11" shape-rendering="crispEdges" ${role}>${rects}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="godicon" width="${size}" height="${size}" viewBox="0 0 11 11" shape-rendering="crispEdges" ${role}>${rects}</svg>`;
 }

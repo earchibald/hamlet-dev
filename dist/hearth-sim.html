@@ -105,6 +105,9 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
 #actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 #actCaption[hidden]{display:none}
+/* A god's icon, wherever it sits beside a name: the card, a window title, the people row, the
+   timeline lane, the act caption. Pixel art, so it stays crisp rather than smoothed when scaled. */
+.godicon{vertical-align:-2px;image-rendering:pixelated;margin-right:3px}
 #foot{display:flex;gap:10px;align-items:center;padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;min-height:1.6em}
 #foot .when{color:var(--muted);font:500 11px "JetBrains Mono",monospace}
 #foot .chiprow.taken{color:var(--accent);font-weight:700}
@@ -7397,7 +7400,7 @@ function godIconSvg(pole, size, label){
   if (!cells) return '';
   const rects = cells.map(c => `<rect x="${c.x}" y="${c.y}" width="1" height="1" fill="${c.fill}"/>`).join('');
   const role = label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 11 11" shape-rendering="crispEdges" ${role}>${rects}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="godicon" width="${size}" height="${size}" viewBox="0 0 11 11" shape-rendering="crispEdges" ${role}>${rects}</svg>`;
 }
 
 /* View model. Pure functions from sim state to what the strip and drawers show. No DOM.
@@ -7837,7 +7840,7 @@ function timelineModel(){
     const byAge = new Map(mine.map(r => [r.age, r]));
     const cells = [];
     for (let a = from; a <= to; a++){ const rec = byAge.get(a); cells.push(rec ? cell(rec, false) : tlBlank(a)); }
-    rows.push({ id: g.id, label: g.name, cells });
+    rows.push({ id: g.id, label: g.name, pole: g.pole, cells });
   }
   /* The gate is what the whole creation is steering toward, so it gets a row of its own. It reads
      `ok` and `lack` and nothing else: the gate object carries a whole region inside it. Its state is
@@ -8627,8 +8630,10 @@ function drawField(){
   wctx.globalAlpha = 1;
   /* One caption at a time: the line the act on stage wrote. It shows in a page element above the foot,
      never on the canvas: the canvas is wider than the window on a 2x screen, and a caption drawn on it
-     could run under a drawer or off the visible edge. */
-  setActCaption(figures && now && f > 0 ? captionFor(now) : '');
+     could run under a drawer or off the visible edge. Its icon is the pole of the god whose act this is;
+     the caption text already names the god, so the icon carries no label of its own. */
+  const capG = figures && now && f > 0 ? beingById(now.god) : null;
+  setActCaption(capG ? captionFor(now) : '', capG && capG.pole);
   wctx.fillStyle = P.select; wctx.fillRect(cursor.x * WS, cursor.y * WS, WS, WS);
 }
 function drawWorld(){
@@ -8822,6 +8827,11 @@ function drawTimeline(){
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
     const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
+    if (r.pole){
+      const icon = document.createElement('img'); icon.className = 'godicon'; icon.alt = '';
+      icon.src = 'data:image/svg+xml,' + encodeURIComponent(godIconSvg(r.pole, 14, null));
+      lane.appendChild(icon);
+    }
     const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));
@@ -8868,7 +8878,7 @@ function inspectGod(g){
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
-  return `<div class="head"><strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
+  return `<div class="head">${godIconSvg(g.pole, 22, null)}<strong style="color:${beingColor(g)}">${g.name}</strong><span>${g.epithet}</span></div>
     <div class="muted" style="margin:1px 0 5px">A primal god of ${g.contrast}. Its pole is ${g.pole}. ${where}</div>
     ${g.status === 'dead' ? '' : Object.entries(g.needs).map(([k, v]) => need(k, v)).join('')}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
@@ -9027,7 +9037,7 @@ function renderStrip(){
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
-  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
+  if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.species === 'god' ? godIconSvg(a.pole, 16, null) : ''}${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
      no width limit and no ellipsis rule of its own. A sector's full label ("Timberground, a pine forest")
      can run past that room where the bare biome word never did, so the title keeps the biome word, as
@@ -9149,7 +9159,7 @@ function renderPeople(el){
   const rows = drawerRows('people');
   const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
@@ -9326,18 +9336,23 @@ function openChord(){
    `captionText`; every other file calls this instead of setting the field itself, the same way
    `setFocus` is the one writer of `ui.focus`. */
 let captionText = '';
-function setActCaption(text){
-  text = text || '';
-  if (text === captionText) return;
-  captionText = text;
+/* The pole of the god whose act wrote captionText, kept beside it so the caption's icon changes with
+   the god on stage. null when no icon is shown: an empty caption, or a caption with no acting god. */
+let captionPole = null;
+function setActCaption(text, pole){
+  text = text || ''; pole = pole || null;
+  if (text === captionText && pole === captionPole) return;
+  captionText = text; captionPole = pole;
   /* Some field tests stub a bare document for the canvas alone, with no getElementById, and a test
      that drives onSettle or newWorld directly may have no document at all; the page write is skipped
-     there, and the text these tests read comes straight from captionText. The text is plain narrative
-     prose with no markup of its own, so textContent is enough: nothing here needs esc. */
+     there, and the text these tests read comes straight from captionText. The icon markup this file
+     builds is not player text, but the caption text now sits beside it inside the same innerHTML
+     write, so esc keeps it inert on the way in, the same way every other sink in src/ui/ escapes a
+     dynamic string before it joins markup. */
   if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const el = $('actCaption'); if (!el) return;
   el.hidden = !text;
-  el.textContent = text;
+  el.innerHTML = (pole ? godIconSvg(pole, 16, null) : '') + esc(text);
   /* The foot's own line can repeat this same sentence, or go on showing the last one after this clears.
      renderFoot reads captionText (set above) to decide whether to echo it, so this must run after the
      assignment, every time the caption's text actually changes. */
