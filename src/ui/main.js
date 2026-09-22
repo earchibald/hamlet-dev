@@ -153,9 +153,12 @@ function initUI(){
      start a text selection on the skip line. Some browsers still fire a paired click for the same
      press even though pointerdown's propagation was stopped, so a flag marks that a skip is under
      way, and the one-shot capture listener below consumes that click too, wherever it lands.
-     When no zoom is running, neither listener does anything. */
+     When no zoom is running, neither listener does anything. Each new press clears the flag
+     first, so a press that ends with no click, such as a cancelled touch, cannot use up the next
+     click. */
   let zoomSkipConsumesClick = false;
   document.addEventListener('pointerdown', e => {
+    zoomSkipConsumesClick = false;
     if (!zoom) return;
     endZoom(); e.stopPropagation(); e.preventDefault();
     zoomSkipConsumesClick = true;
