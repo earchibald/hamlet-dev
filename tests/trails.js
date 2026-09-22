@@ -14,7 +14,7 @@ function loadUI(files, names){
   return Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'dialogs', 'actions'];
-const NAMES = ['ui', 'TRAIL', 'noteTrails', 'pruneTrails', 'trailDots', 'onLoad'];
+const NAMES = ['ui', 'TRAIL', 'noteTrails', 'pruneTrails', 'trailDots', 'onLoad', 'setView', 'ACTIONS'];
 
 /* A valley with one walker. Its trail is started at t = 0 on the square it stands on. */
 function valley(){
@@ -55,6 +55,10 @@ test('a move of three squares starts a new trail, and a run of two does not', ()
   assert.deepEqual(squares(api.ui.trails[a.id]), [[a.x, a.y, a.z]], 'a jump of three starts again at the new square');
   a.y -= 3; api.noteTrails(4);
   assert.deepEqual(squares(api.ui.trails[a.id]), [[a.x, a.y, a.z]], 'a jump of three on y starts again too');
+  a.x++; a.z += 1; api.noteTrails(5);
+  assert.equal(api.ui.trails[a.id].length, 2, 'a step onto the next level is still a walk');
+  a.z += 2; api.noteTrails(6);
+  assert.deepEqual(squares(api.ui.trails[a.id]), [[a.x, a.y, a.z]], 'a fall of two levels starts again at the new square');
 });
 
 test('an unchanged square adds nothing', () => {
@@ -107,6 +111,33 @@ test('onLoad clears every trail', () => {
   api.onLoad();
   assert.deepEqual(api.ui.trails, {});
 });
+
+/* The actions call renderUI and hideTip, which live in files that paint the page, and setPaused writes the
+   pause button. They are stubbed for one call, with a document whose elements take any write. */
+function withPage(fn){
+  const el = () => ({ innerHTML: '', classList: { toggle(){} } });
+  global.renderUI = () => {}; global.hideTip = () => {}; global.document = { getElementById: el, querySelectorAll: () => [] };
+  try { return fn(); } finally { delete global.renderUI; delete global.hideTip; delete global.document; }
+}
+
+test('leaving the world map clears every trail, and a sector change does not', () => withPage(() => {
+  const { api, a } = valley();
+  api.setView('loc'); api.noteTrails(0);
+  a.x++; api.noteTrails(1);
+  api.setView('mid');
+  assert.equal(api.ui.trails[a.id].length, 2, 'a change between the close views keeps the trail');
+  api.setView('world'); api.setView('loc');
+  assert.deepEqual(api.ui.trails, {}, 'the world map records nothing, so a trail from before it is stale');
+}));
+
+test('the Step button notes the trail of the tick it steps', () => withPage(() => {
+  const { api } = valley();
+  api.setView('loc');
+  const before = JSON.stringify(api.ui.trails);
+  let moved = false;
+  for (let k = 0; k < 600 && !moved; k++){ api.ACTIONS.step(); moved = JSON.stringify(api.ui.trails) !== before; }
+  assert.ok(moved, 'a creature moved in a stepped tick and its trail grew');
+}));
 
 test('the days step loop in main.js notes the trails after each step', () => {
   const src = fs.readFileSync(path.join(__dirname, '../src/ui/main.js'), 'utf8');

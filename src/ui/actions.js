@@ -48,14 +48,15 @@ function setFocus(v){ ui.focus = v; }
    streak across the map, so the trail starts again at the new square. Two squares is a run. */
 function noteTrails(now){
   for (const a of beings){
-    if (!a.alive || SPECIES[a.species].perTick === false) continue;
-    const tr = ui.trails[a.id], last = tr && tr[tr.length - 1];
-    if (!last){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
-    if (last[0] === a.x && last[1] === a.y && last[2] === a.z) continue;
-    if (Math.abs(a.x - last[0]) > 2 || Math.abs(a.y - last[1]) > 2 || Math.abs(a.z - last[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    const sp = SPECIES[a.species];
+    if (!a.alive || !sp || sp.perTick === false) continue;
+    const tr = ui.trails[a.id], prev = tr && tr[tr.length - 1];
+    if (!prev){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    if (prev[0] === a.x && prev[1] === a.y && prev[2] === a.z) continue;
+    if (Math.abs(a.x - prev[0]) > 2 || Math.abs(a.y - prev[1]) > 2 || Math.abs(a.z - prev[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
     /* The square left behind is stamped with the time it was left, so its dot fades from then. A
        square kept through a rest would otherwise carry its old time and show no dot at all. */
-    last[3] = now; tr.push([a.x, a.y, a.z, now]);
+    prev[3] = now; tr.push([a.x, a.y, a.z, now]);
     while (tr.length > TRAIL.max + 1) tr.shift();
   }
 }
@@ -102,6 +103,9 @@ function setView(v, s){
   if (inAges()) v = 'world';
   /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
   const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
+  /* The world map records no trail, so a trail from before it is stale. A creature that walked away and
+     back while the world map showed would leave one dot on a square it left minutes ago. */
+  if (view === 'world' && v !== 'world') ui.trails = {};
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
      The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
@@ -368,7 +372,7 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else step(); renderUI(true); },
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
   hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
