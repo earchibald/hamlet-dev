@@ -78,7 +78,7 @@ const DOOR_ACTS = {
   choose(e){
     if (!pending) return 'It is nobody\'s turn.';
     if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
-    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the land it falls on.';
     return takeTurn(e.opt);
   },
   /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the

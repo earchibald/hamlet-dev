@@ -55,11 +55,16 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'e',          focus: 'drawer', action: 'peopleCamp',  label: 'People: the next camp, then everyone', button: 'peopleCampBtn' },
+  { key: 'y',          focus: 'drawer', action: 'peopleAge',   label: 'People: the next age', button: 'peopleAgeBtn' },
   { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
   { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
   { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
   { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
+  /* A popped-out People drawer takes the same filter keys. It has no filter buttons, so these rows name none. */
+  { key: 'e',          focus: 'window', action: 'peopleCamp', label: 'People: the next camp, then everyone' },
+  { key: 'y',          focus: 'window', action: 'peopleAge',  label: 'People: the next age' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
@@ -96,7 +101,7 @@ for (const t of TOOLS){
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
-KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the borders', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
    The label names both ladders, since the same row serves the ages and the days.
    The two ladders are meant to be the same length, and tests/ui.js asserts it. A row past the end of

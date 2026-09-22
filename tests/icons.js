@@ -143,7 +143,7 @@ test('drawField draws every live god through drawGodIcon, its own pole, and no f
      reassigns that same function-scoped variable from outside, which is the joined scope's own back
      door: drawField's call site then resolves to the wrapper, because function declarations in one
      shared scope are ordinary mutable bindings, not frozen at declaration. */
-  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'],
+  const rig = loadUI(['state', 'icons', 'derive', 'preview', 'marks', 'map', 'dialogs', 'actions'],
     ['drawField', 'drawGodIcon', 'gods', 'startCreation', 'SPECIES'],
     {
       caption: '() => ""',
@@ -172,7 +172,7 @@ test('drawField draws every live god through drawGodIcon, its own pole, and no f
 });
 
 test('two gods placed on the same spot are nudged apart by at least their names\' own width, not just the icon\'s', () => {
-  const rig = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'],
+  const rig = loadUI(['state', 'icons', 'derive', 'preview', 'marks', 'map', 'dialogs', 'actions'],
     ['drawField', 'drawGodIcon', 'gods', 'startCreation'],
     {
       caption: '() => ""',

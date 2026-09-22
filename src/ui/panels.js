@@ -37,7 +37,11 @@ const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
   const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names /"></div>`
-    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
+    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>`
+    /* renderDrawers writes the labels, since they follow the filters. It writes only the inner span. A
+       click's own target must stay in the page: the map's pointer handler runs after the drawer's, and a
+       target cut out of the page by a rewrite is not inside #drawers, so the map took the focus. */
+    : d.id === 'people' ? `<div class="filter pf" id="peopleFilter"><button class="btn small" id="peopleCampBtn"><span class="lbl"></span><kbd>E</kbd></button><button class="btn small" id="peopleAgeBtn"><span class="lbl"></span><kbd>Y</kbd></button></div>` : '';
   return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
@@ -56,6 +60,17 @@ function renderDrawers(){
     const box = sec.querySelector('#chronSearch');
     if (box && box.value !== ui.chronSearch && document.activeElement !== box) box.value = ui.chronSearch;
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
+    /* The People filters. In the ages the drawer lists gods, which have no camp and no age, so the row hides.
+       A button is on when its filter is not the default: a camp other than the chosen one, or an age. */
+    const pf = sec.querySelector('#peopleFilter');
+    if (pf){
+      pf.hidden = inAges();
+      if (!pf.hidden){
+        const cb = sec.querySelector('#peopleCampBtn'), ab = sec.querySelector('#peopleAgeBtn');
+        setHTML(cb.querySelector('.lbl'), esc(peopleCampLabel())); cb.classList.toggle('on', peopleScope().camp !== chosenCamp());
+        setHTML(ab.querySelector('.lbl'), esc(peopleAgeLabel())); ab.classList.toggle('on', ui.peopleAge !== 'any');
+      }
+    }
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
@@ -65,9 +80,15 @@ function renderDrawers(){
 }
 function renderPeople(el){
   const rows = drawerRows('people');
-  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  const ages = inAges();
+  /* In the ages the list is the gods, and no filter applies. In the days the count says how many the filters show. */
+  const c = $('count-people'); if (c) c.textContent = ` · ${ages ? rows.filter(r => r.r.a.alive).length : peopleCountText()}`;
+  /* A list of more than one camp names each person's camp, in muted text rather than a tag, so that
+     "no camp" does not read as an age beside "young" and "old". */
+  const mixed = !ages && peopleMixed();
+  const home = a => `<span class="campname">${a.camp ? esc(a.camp.name) : 'no camp'}</span>`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${mixed ? home(a) : ''}${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${ages ? 'No god yet.' : peopleEmptyText()}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');

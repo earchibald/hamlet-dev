@@ -42,6 +42,35 @@ function setTool(id, sticky = false){
    A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
    every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
 function setFocus(v){ ui.focus = v; }
+/* The motion trails. The frame loop calls noteTrails after each step of the days, and pruneTrails
+   once a frame. A god does not walk (its species has perTick false), so it leaves no trail. A move of
+   more than two squares, or of more than one level, is not a walk: a load or a long jump would draw a
+   streak across the map, so the trail starts again at the new square. Two squares is a run. */
+function noteTrails(now){
+  for (const a of beings){
+    const sp = SPECIES[a.species];
+    if (!a.alive || !sp || sp.perTick === false) continue;
+    const tr = ui.trails[a.id], prev = tr && tr[tr.length - 1];
+    if (!prev){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    if (prev[0] === a.x && prev[1] === a.y && prev[2] === a.z) continue;
+    if (Math.abs(a.x - prev[0]) > 2 || Math.abs(a.y - prev[1]) > 2 || Math.abs(a.z - prev[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    /* The square left behind is stamped with the time it was left, so its dot fades from then. A
+       square kept through a rest would otherwise carry its old time and show no dot at all. */
+    prev[3] = now; tr.push([a.x, a.y, a.z, now]);
+    while (tr.length > TRAIL.max + 1) tr.shift();
+  }
+}
+/* A trail whose being is gone or dead is dropped. A trail at rest past TRAIL.ms keeps only the square
+   the being stands on, so its first step after the rest still leaves a dot. One lookup per call, since
+   beingById is a linear find. */
+function pruneTrails(now){
+  const live = {}; for (const a of beings) if (a.alive) live[a.id] = true;
+  for (const id in ui.trails){
+    const tr = ui.trails[id];
+    if (!live[id]){ delete ui.trails[id]; continue; }
+    if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
+  }
+}
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
@@ -74,6 +103,9 @@ function setView(v, s){
   if (inAges()) v = 'world';
   /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
   const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
+  /* The world map records no trail, so a trail from before it is stale. A creature that walked away and
+     back while the world map showed would leave one dot on a square it left minutes ago. */
+  if (view === 'world' && v !== 'world') ui.trails = {};
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
      The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
@@ -116,7 +148,7 @@ const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: 
 /* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
    to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
 const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
-/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+/* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
@@ -125,7 +157,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; ui.trails = {}; restore();
   /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
      session had open: the People and Goals cards used to cover the map at the very start. Continue
      and Load do not call this, so they keep the tabs a saved world had open. */
@@ -185,9 +217,11 @@ function loadWorld(snapshot, note){
 function onLoad(){
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
-  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
+  ui.peopleCamp = null;
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -262,9 +296,11 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
+  /* The camps of the days are new, so the People drawer follows the chosen camp. */
+  ui.peopleCamp = null;
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -336,8 +372,8 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
@@ -345,7 +381,7 @@ const ACTIONS = {
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
-  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
@@ -376,6 +412,20 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The People drawer's camp: the chosen camp, each other camp in order, everyone, and back. With no
+     chosen camp the list already holds everyone, so there is nothing to cycle. A value not in the
+     cycle, such as the id of a camp that has ended, counts as the chosen camp. */
+  peopleCamp(){
+    const chosen = chosenCamp(); if (!chosen) return;
+    const cycle = [null, ...camps.filter(c => c !== chosen).map(c => c.id), 'all'];
+    ui.peopleCamp = cycle[(Math.max(0, cycle.indexOf(ui.peopleCamp)) + 1) % cycle.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
+  /* The People drawer's age: any, young, adult, old, and back. */
+  peopleAge(){
+    ui.peopleAge = PEOPLE_AGES[(Math.max(0, PEOPLE_AGES.indexOf(ui.peopleAge)) + 1) % PEOPLE_AGES.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
   foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },

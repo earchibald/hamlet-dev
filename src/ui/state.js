@@ -38,6 +38,11 @@ const PACES = [0.25, 0.5, 1, 2];
    generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
    several milliseconds still draws: the frame drops world ticks rather than frames. */
 const STEP_BUDGET_MS = 8;
+/* The motion trail. A walker moves one square a tick, and at 1x that is a square a frame, so a slide
+   between squares has no frames to show. A trail of fading dots marks the squares a creature crossed
+   instead. Each dot fades out over `ms` of wall time. A creature keeps at most `max` dots. `alpha` is
+   the newest dot's opacity. Wall time is the interface's, so this lives here and not in src/sim/. */
+const TRAIL = { ms: 300, max: 8, alpha: 0.55 };
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
    full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
@@ -48,6 +53,12 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* The preview of the ground for the act on the field, or null when it must be computed again. It is a cache
+   derived from the state, not a choice the player makes. It exists because one call to previewField() cost
+   8 to 10 ms in Node at b3d7777 (seed amber-ford-45, map 280x120, 33,600 tiles, ages 4 to 21, mean of 5
+   calls per age), and 9 to 11 ms in Safari at age 21. The cache is drawn again when a cut's stroke ends,
+   and it reuses this. */
+let fieldPreview = null;
 /* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
    single act to fade from. Counting gestures cannot stand in for this: one decision can write two
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
@@ -78,6 +89,10 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The People drawer's camp: null follows the chosen camp, a number is a camp id, 'all' is everyone.
+     Left out of persist(): a camp id is valid in one world only. onLoad and onSettle set it back. */
+  peopleCamp: null,
+  peopleAge: 'any',    /* the People drawer's age: 'any', 'young', 'adult', or 'old' */
   /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
      a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
   chronSearch: '',
@@ -96,6 +111,10 @@ const ui = {
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
+  /* The motion trails: being id to a list of [x, y, z, t], oldest first. The last entry is the square
+     the being stands on. t is the wall time in ms when the being left that square. For the last
+     entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
+  trails: {},
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
@@ -141,10 +160,13 @@ const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 
+/* The age button's cycle, in order. restore() accepts these and nothing else. */
+const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -153,6 +175,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;

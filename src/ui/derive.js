@@ -2,6 +2,18 @@
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 
+/* The dots of a being's motion trail, oldest first, with the being's own square left out. A dot is
+   fainter the older its place in the list, and it fades to nothing TRAIL.ms after it was noted. */
+function trailDots(id, now){
+  const tr = ui.trails[id]; if (!tr) return [];
+  const n = tr.length - 1, dots = [];
+  for (let i = 0; i < n; i++){
+    const [x, y, z, t] = tr[i], alpha = TRAIL.alpha * (i + 1) / n * Math.max(0, 1 - (now - t) / TRAIL.ms);
+    if (alpha > 0) dots.push({ x, y, z, alpha });
+  }
+  return dots;
+}
+
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
@@ -28,10 +40,11 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
-   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
-function countryLine(r){
-  if (!r) return 'no country';
+/* The poles of a region, and the reason on its newest pole mark, with no lead-in words. The reason
+   names the god. A far side of a line takes the other pole, so the god's epithet beside the poles
+   would read as a mistake. No full stop at the end. Read this beside countryLine below: this is the
+   bare phrase a labelled row wants; countryLine adds the words a row without a label of its own needs. */
+function landPhrase(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
@@ -39,7 +52,14 @@ function countryLine(r){
   const g = m.by === null || m.by === undefined ? null : beingById(m.by);
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+  return `${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The internal name is kept: `sector.country` and `tile.country` are fields a snapshot saves, and this
+   function is still called countryLine. It says "land" to the player. */
+function countryLine(r){
+  if (!r) return 'no land';
+  const phrase = landPhrase(r);
+  return phrase === 'formless, not yet anything' ? phrase : `land that is ${phrase}`;
 }
 /* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
    both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
@@ -47,8 +67,8 @@ function countryLine(r){
    is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
    row. E3 does not store the row a player took; a later slice does.
    No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
-   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
-   already shows for a country's "Country" row. */
+   region's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a region's "Land" row. */
 function actCard(rec){
   const m = markFor(rec.kind, rec.value);
   const g = beingById(rec.god);
@@ -119,19 +139,7 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* The mean of a list of #rrggbb colours, as rgb(). */
-function mixHex(list){
-  let r = 0, g = 0, b = 0;
-  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
-  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
-}
-/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
-function fieldColor(r, pal){
-  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
-  return cs.length ? mixHex(cs) : pal['field-none'];
-}
-
-/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a region each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
@@ -155,7 +163,7 @@ function markRows(x, y, z){
     const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
     if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r) + '.']);
+  rows.push(['Land', landPhrase(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -279,16 +287,52 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+/* The camp the player has chosen, or null. `camp` can outlive a camp that is gone, so the list decides. */
+const chosenCamp = () => camp && camps.includes(camp) ? camp : null;
+/* Which camp the People drawer lists: a camp record, or null for everyone. `ui.peopleCamp` is null to
+   follow the chosen camp, a camp id, or 'all'. A camp id that is no longer in `camps` falls back to
+   the chosen camp, so a camp that ends does not leave the list empty. */
+function peopleScope(){
+  if (ui.peopleCamp === 'all') return { camp: null };
+  const picked = typeof ui.peopleCamp === 'number' ? camps.find(c => c.id === ui.peopleCamp) : null;
+  return { camp: picked || chosenCamp() };
+}
+/* People in the drawer's camp and age, trouble first. Everyone is a candidate, in any camp or none,
+   and the two filters then narrow the list. The dead stay on the list for a day after the stamp.
    `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
-   field, never for its truth. */
+   field, never for its truth. Camp order sorts after the living, so a mixed list keeps each camp
+   together, and a person with no camp goes last. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
+  const only = peopleScope().camp, age = ui.peopleAge;
+  const rows = beings.filter(b => b.species === 'human' && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))
+    && (!only || b.camp === only) && (age === 'any' || stage(b) === age)).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
-  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+  const order = b => { const i = b.camp ? camps.indexOf(b.camp) : -1; return i < 0 ? camps.length : i; };
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || (order(p.a) - order(q.a)) || p.a.name.localeCompare(q.a.name));
+}
+/* The drawer's count: the living people shown, and the living people in the world. The dead of the
+   last day are on the list but count in neither, so the two agree when no filter hides anyone. */
+function peopleCount(){
+  return { shown: peopleRows().filter(r => r.a.alive).length, alive: beings.filter(b => b.species === 'human' && b.alive).length };
+}
+/* The camp button's label. */
+function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
+/* The age button's label. */
+const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* The count after the drawer's title, without its leading dot: "5 of 18" when a filter hides some
+   living people, else "18". The drawer and a popped-out window both read it, so the two agree. */
+function peopleCountText(){ const n = peopleCount(); return n.shown === n.alive ? `${n.alive}` : `${n.shown} of ${n.alive}`; }
+/* A popped-out People window has no filter row, so its title carries the count and both filters. */
+const peopleTitle = () => ['People', peopleCountText(), peopleCampLabel(), peopleAgeLabel()].join(' \u00b7 ');
+/* The text of an empty list. The filters can hide everyone while people live, and the line says so. */
+const peopleEmptyText = () => peopleCount().alive > 0 ? 'Nobody matches these filters.' : 'Nobody yet.';
+/* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
+function peopleMixed(){
+  const seen = new Set(peopleRows().map(r => r.a.camp || null));
+  return seen.size > 1 || seen.has(null);
 }
 
 /* The state lines on a person's card: short facts about what holds them right now, one idea each.
@@ -341,7 +385,7 @@ function campSummary(){
 }
 
 function seasonLine(){
-  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
+  if (inAges()) return `${nOf(liveRegions().length, 'piece of land', 'pieces of land')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   /* The seasons are not all the same length, so the days left are counted off this season's own
      length rather than one shared number. */
   const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
@@ -484,10 +528,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 

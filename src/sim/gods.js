@@ -298,7 +298,7 @@ function offend(r, g, contrast){
   const who = new Set(r.marks.filter(mine).map(m => m.by));
   for (const id of who){ const o = beingById(id); if (!o || o.status !== 'awake') continue;
     o.needs.calm = clamp(o.needs.calm - 20, 0, 100); o.opinions[g.id] = clamp((o.opinions[g.id] || 0) - 10, -100, 100);
-    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, CLOCK.thought.over); setRelation(o, g); }
+    addThought(o, 'over' + g.id, `${g.name} marked over my land`, -10, CLOCK.thought.over); setRelation(o, g); }
 }
 
 /* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */

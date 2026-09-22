@@ -134,6 +134,8 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .gs{color:var(--muted);font-size:12px;grid-column:2/4}
 /* A folded stage's idle goals: two lines at most, the rest behind the title. */
 .row.stage .fold{grid-column:2/4;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* The camp after a name in a People list of several camps: muted text, not a tag, cut short when long. */
+.campname{display:inline-block;max-width:110px;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;color:var(--muted);font-size:11px}
 .tag{font-size:10px;border:1px solid var(--line);border-radius:10px;padding:0 5px;color:var(--muted);margin-left:5px;vertical-align:middle}
 .pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
 .pbtn{font-size:11px;padding:1px 6px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
@@ -151,6 +153,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
+/* The People filters share the row and cut a long camp name short, keeping the key. */
+.filter.pf .btn{display:inline-flex;align-items:baseline;min-width:0;max-width:65%}
+.filter.pf .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filter.pf kbd{flex:none}
 .filter input{flex:1;min-width:0;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:12px}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
 /* Floating windows. */
@@ -158,6 +164,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
 .win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The cut title gives way, so the dock hint and the close button keep their width. */
+.win .bar .title.cut + span{flex:none}
 .win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
@@ -230,7 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map, camp fire">Nearby<kbd>M</kbd></button>
-      <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
+      <button class="btn" id="overlayBtn" hidden title="Show or hide the borders the gods drew">Borders<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
@@ -5611,7 +5620,7 @@ function offend(r, g, contrast){
   const who = new Set(r.marks.filter(mine).map(m => m.by));
   for (const id of who){ const o = beingById(id); if (!o || o.status !== 'awake') continue;
     o.needs.calm = clamp(o.needs.calm - 20, 0, 100); o.opinions[g.id] = clamp((o.opinions[g.id] || 0) - 10, -100, 100);
-    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, CLOCK.thought.over); setRelation(o, g); }
+    addThought(o, 'over' + g.id, `${g.name} marked over my land`, -10, CLOCK.thought.over); setRelation(o, g); }
 }
 
 /* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */
@@ -7298,7 +7307,7 @@ const DOOR_ACTS = {
   choose(e){
     if (!pending) return 'It is nobody\'s turn.';
     if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
-    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the land it falls on.';
     return takeTurn(e.opt);
   },
   /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the
@@ -7384,6 +7393,11 @@ const PACES = [0.25, 0.5, 1, 2];
    generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
    several milliseconds still draws: the frame drops world ticks rather than frames. */
 const STEP_BUDGET_MS = 8;
+/* The motion trail. A walker moves one square a tick, and at 1x that is a square a frame, so a slide
+   between squares has no frames to show. A trail of fading dots marks the squares a creature crossed
+   instead. Each dot fades out over `ms` of wall time. A creature keeps at most `max` dots. `alpha` is
+   the newest dot's opacity. Wall time is the interface's, so this lives here and not in src/sim/. */
+const TRAIL = { ms: 300, max: 8, alpha: 0.55 };
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
    full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
@@ -7394,6 +7408,12 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* The preview of the ground for the act on the field, or null when it must be computed again. It is a cache
+   derived from the state, not a choice the player makes. It exists because one call to previewField() cost
+   8 to 10 ms in Node at b3d7777 (seed amber-ford-45, map 280x120, 33,600 tiles, ages 4 to 21, mean of 5
+   calls per age), and 9 to 11 ms in Safari at age 21. The cache is drawn again when a cut's stroke ends,
+   and it reuses this. */
+let fieldPreview = null;
 /* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
    single act to fade from. Counting gestures cannot stand in for this: one decision can write two
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
@@ -7424,6 +7444,10 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The People drawer's camp: null follows the chosen camp, a number is a camp id, 'all' is everyone.
+     Left out of persist(): a camp id is valid in one world only. onLoad and onSettle set it back. */
+  peopleCamp: null,
+  peopleAge: 'any',    /* the People drawer's age: 'any', 'young', 'adult', or 'old' */
   /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
      a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
   chronSearch: '',
@@ -7442,6 +7466,10 @@ const ui = {
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
+  /* The motion trails: being id to a list of [x, y, z, t], oldest first. The last entry is the square
+     the being stands on. t is the wall time in ms when the being left that square. For the last
+     entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
+  trails: {},
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
@@ -7487,10 +7515,13 @@ const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 
+/* The age button's cycle, in order. restore() accepts these and nothing else. */
+const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -7499,6 +7530,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
@@ -7573,6 +7605,18 @@ function godIconSvg(pole, size, label){
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 
+/* The dots of a being's motion trail, oldest first, with the being's own square left out. A dot is
+   fainter the older its place in the list, and it fades to nothing TRAIL.ms after it was noted. */
+function trailDots(id, now){
+  const tr = ui.trails[id]; if (!tr) return [];
+  const n = tr.length - 1, dots = [];
+  for (let i = 0; i < n; i++){
+    const [x, y, z, t] = tr[i], alpha = TRAIL.alpha * (i + 1) / n * Math.max(0, 1 - (now - t) / TRAIL.ms);
+    if (alpha > 0) dots.push({ x, y, z, alpha });
+  }
+  return dots;
+}
+
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
@@ -7599,10 +7643,11 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
-   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
-function countryLine(r){
-  if (!r) return 'no country';
+/* The poles of a region, and the reason on its newest pole mark, with no lead-in words. The reason
+   names the god. A far side of a line takes the other pole, so the god's epithet beside the poles
+   would read as a mistake. No full stop at the end. Read this beside countryLine below: this is the
+   bare phrase a labelled row wants; countryLine adds the words a row without a label of its own needs. */
+function landPhrase(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
@@ -7610,7 +7655,14 @@ function countryLine(r){
   const g = m.by === null || m.by === undefined ? null : beingById(m.by);
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+  return `${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The internal name is kept: `sector.country` and `tile.country` are fields a snapshot saves, and this
+   function is still called countryLine. It says "land" to the player. */
+function countryLine(r){
+  if (!r) return 'no land';
+  const phrase = landPhrase(r);
+  return phrase === 'formless, not yet anything' ? phrase : `land that is ${phrase}`;
 }
 /* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
    both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
@@ -7618,8 +7670,8 @@ function countryLine(r){
    is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
    row. E3 does not store the row a player took; a later slice does.
    No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
-   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
-   already shows for a country's "Country" row. */
+   region's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a region's "Land" row. */
 function actCard(rec){
   const m = markFor(rec.kind, rec.value);
   const g = beingById(rec.god);
@@ -7690,19 +7742,7 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* The mean of a list of #rrggbb colours, as rgb(). */
-function mixHex(list){
-  let r = 0, g = 0, b = 0;
-  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
-  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
-}
-/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
-function fieldColor(r, pal){
-  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
-  return cs.length ? mixHex(cs) : pal['field-none'];
-}
-
-/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a region each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
@@ -7726,7 +7766,7 @@ function markRows(x, y, z){
     const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
     if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r) + '.']);
+  rows.push(['Land', landPhrase(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -7850,16 +7890,52 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+/* The camp the player has chosen, or null. `camp` can outlive a camp that is gone, so the list decides. */
+const chosenCamp = () => camp && camps.includes(camp) ? camp : null;
+/* Which camp the People drawer lists: a camp record, or null for everyone. `ui.peopleCamp` is null to
+   follow the chosen camp, a camp id, or 'all'. A camp id that is no longer in `camps` falls back to
+   the chosen camp, so a camp that ends does not leave the list empty. */
+function peopleScope(){
+  if (ui.peopleCamp === 'all') return { camp: null };
+  const picked = typeof ui.peopleCamp === 'number' ? camps.find(c => c.id === ui.peopleCamp) : null;
+  return { camp: picked || chosenCamp() };
+}
+/* People in the drawer's camp and age, trouble first. Everyone is a candidate, in any camp or none,
+   and the two filters then narrow the list. The dead stay on the list for a day after the stamp.
    `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
-   field, never for its truth. */
+   field, never for its truth. Camp order sorts after the living, so a mixed list keeps each camp
+   together, and a person with no camp goes last. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
+  const only = peopleScope().camp, age = ui.peopleAge;
+  const rows = beings.filter(b => b.species === 'human' && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))
+    && (!only || b.camp === only) && (age === 'any' || stage(b) === age)).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
-  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+  const order = b => { const i = b.camp ? camps.indexOf(b.camp) : -1; return i < 0 ? camps.length : i; };
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || (order(p.a) - order(q.a)) || p.a.name.localeCompare(q.a.name));
+}
+/* The drawer's count: the living people shown, and the living people in the world. The dead of the
+   last day are on the list but count in neither, so the two agree when no filter hides anyone. */
+function peopleCount(){
+  return { shown: peopleRows().filter(r => r.a.alive).length, alive: beings.filter(b => b.species === 'human' && b.alive).length };
+}
+/* The camp button's label. */
+function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
+/* The age button's label. */
+const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* The count after the drawer's title, without its leading dot: "5 of 18" when a filter hides some
+   living people, else "18". The drawer and a popped-out window both read it, so the two agree. */
+function peopleCountText(){ const n = peopleCount(); return n.shown === n.alive ? `${n.alive}` : `${n.shown} of ${n.alive}`; }
+/* A popped-out People window has no filter row, so its title carries the count and both filters. */
+const peopleTitle = () => ['People', peopleCountText(), peopleCampLabel(), peopleAgeLabel()].join(' \u00b7 ');
+/* The text of an empty list. The filters can hide everyone while people live, and the line says so. */
+const peopleEmptyText = () => peopleCount().alive > 0 ? 'Nobody matches these filters.' : 'Nobody yet.';
+/* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
+function peopleMixed(){
+  const seen = new Set(peopleRows().map(r => r.a.camp || null));
+  return seen.size > 1 || seen.has(null);
 }
 
 /* The state lines on a person's card: short facts about what holds them right now, one idea each.
@@ -7912,7 +7988,7 @@ function campSummary(){
 }
 
 function seasonLine(){
-  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
+  if (inAges()) return `${nOf(liveRegions().length, 'piece of land', 'pieces of land')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   /* The seasons are not all the same length, so the days left are counted off this season's own
      length rather than one shared number. */
   const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
@@ -8055,10 +8131,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -8228,6 +8304,140 @@ function saveName(seed, t){
   return `hearth-${s}-day-${Math.floor(t / DAY) + 1}.json`;
 }
 
+/* ---- the preview: the ground the marks will become ---- During the ages the map has regions and marks but no
+   tiles. settle() paints the tiles later, and it draws from the people's stream to do it. The preview paints an
+   impression of that valley from the same marks, in the same order, with hashes in place of random numbers. It
+   draws no random number and writes no state, so a view can call it as often as it draws. It matches the valley
+   by kind of ground and by share, not tile by tile. No DOM. */
+
+/* Each kind the preview paints, and the palette key of its colour. The keys are ones readPalette() in map.js
+   reads, so the gods' map and the world map share one set of colours. */
+const PREVIEW_INK = {
+  formless: 'field-none', grass: 'grass', soil: 'soil', sand: 'sand', water: 'water', ash: 'ash', stone: 'stone',
+  tree: 'tree', bush: 'bush', reeds: 'reeds', boulder: 'boulder', deadpine: 'ash-fg', hill: 'hill', peak: 'hill-fg', mouth: 'hill-fg',
+};
+/* One stream of hashes per purpose. A shared salt would tie two choices together, and a tree would then always
+   stand where a hill is placed. */
+const PV = { e: 1, f: 2, h1: 3, h2: 4, h3: 5, hillJit: 6, drown: 7, hillPick: 8, lakeJit: 1000 };
+/* A hash of the seed, a salt and a tile, in [0, 1). Each input is mixed in turn, so a row or a column shows no
+   pattern. */
+function pvMix(h){ h = Math.imul(h ^ (h >>> 16), 0x7feb352d); h = Math.imul(h ^ (h >>> 15), 0x846ca68b); return h ^ (h >>> 16); }
+function pvHash(s, k, x, y){ return (pvMix(pvMix(pvMix(s ^ Math.imul(k, 0x9e3779b1)) ^ x) ^ y) >>> 0) / 4294967296; }
+/* Value noise as makeNoise builds it, with a lattice of hashes in place of a lattice of draws. */
+function pvNoise(s, k, scale){
+  const sm = t => t * t * (3 - 2 * t), v = (i, j) => pvHash(s, k, i, j);
+  return (x, y) => {
+    const fx = x / scale, fy = y / scale, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = sm(fx - x0), ty = sm(fy - y0);
+    const a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * tx, b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * tx;
+    return a + (b - a) * ty;
+  };
+}
+/* The texture of a biome on one tile, as paintTile gives it. Loose sticks and stones are too small to show. */
+function pvTile(biome, e, f, h1, h2, h3){
+  switch (biome){
+    case 'forest': return f > 0.4 && h1 < 0.55 ? 'tree' : h2 < 0.06 ? 'bush' : 'grass';
+    case 'meadow': case 'river': return f > 0.7 && h1 < 0.3 ? 'tree' : h2 < 0.045 ? 'bush' : e < 0.3 && h3 < 0.2 ? 'soil' : 'grass';
+    case 'rocky': return e > 0.55 && h1 < 0.5 ? 'boulder' : h2 < 0.3 ? 'soil' : h3 < 0.03 ? 'tree' : 'grass';
+    case 'wetland': return e < 0.42 ? 'water' : e < 0.5 && h1 < 0.5 ? 'reeds' : h2 < 0.03 ? 'bush' : h3 < 0.04 ? 'tree' : 'grass';
+    case 'ash': return 'ash';
+  }
+  return 'grass';
+}
+const PV_HILL = { hill: true, peak: true, mouth: true };
+/* The field as it stands now, one kind per surface tile. The steps run in settle's order: ground, rivers, lakes,
+   scars, hills, and cave mouths. A region with no pole is formless, and no later step paints over it, because
+   the gods have not yet said what that ground is. */
+function previewField(){
+  const out = new Array(W * H).fill('formless');
+  const s = hashSeed(seedText);
+  const at = i => [i % W, (i - i % W) / W];
+  const h = (k, i) => pvHash(s, k, i % W, (i - i % W) / W);
+  const put = (i, kind) => { if (out[i] !== 'formless') out[i] = kind; };
+  const live = liveRegions().filter(r => hasMark(r, 'pole'));
+  /* Ground. */
+  const en = pvNoise(s, PV.e, 9), fn = pvNoise(s, PV.f, 5);
+  for (const r of live){ const b = biomeOf(r); for (const i of r.tiles){ const [x, y] = at(i); out[i] = pvTile(b, en(x, y), fn(x, y), h(PV.h1, i), h(PV.h2, i), h(PV.h3, i)); } }
+  /* Rivers, as paintRivers: the line and its far side are water, a ford is sand, and the ring beside the line is sand. */
+  const river = new Uint8Array(W * H);
+  for (const b of liveBoundaries()){
+    if (b.pole !== 'wet') continue;
+    b.tiles.forEach((i, k) => {
+      const [x, y] = at(i), ford = k % 47 >= 23 && k % 47 < 26;
+      const wet = [[0, 0]].concat(DIRS.filter(([dx, dy]) => inb(x + dx, y + dy) && regionOf[idx(x + dx, y + dy)] === b.b));
+      for (const [dx, dy] of wet){ const j = idx(x + dx, y + dy); put(j, ford ? 'sand' : 'water'); river[j] = 1; }
+    });
+    for (const i of b.tiles){ const [x, y] = at(i);
+      for (const [dx, dy] of RING){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (out[j] !== 'water' && !river[j]) put(j, 'sand'); } }
+  }
+  /* Lakes, as paintLakes: a blob at the middle of a pooled region, with a sand shore inside the region. */
+  const lake = new Uint8Array(W * H);
+  for (const r of live){
+    if (!hasMark(r, 'pool', 'surface')) continue;
+    const { x0, y0, x1, y1 } = r.bbox, cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+    const rad = Math.sqrt(Math.round(r.area / 7) / Math.PI), jit = pvNoise(s, PV.lakeJit + r.id, 6);
+    for (const i of r.tiles){ const [x, y] = at(i); if (Math.hypot(x - cx, y - cy) / rad + (jit(x, y) - 0.5) * 0.6 <= 1){ put(i, 'water'); lake[i] = 1; } }
+    for (const i of r.tiles){ if (out[i] === 'water') continue; const [x, y] = at(i); if (RING.some(([dx, dy]) => inb(x + dx, y + dy) && lake[idx(x + dx, y + dy)])) put(i, 'sand'); }
+  }
+  /* Scars, by what the winner's pole left. */
+  const scar = {
+    burned: r => { for (const i of r.tiles) if (out[i] === 'grass' || out[i] === 'soil' || out[i] === 'tree' || out[i] === 'bush') out[i] = 'ash'; },
+    /* The middle line, as scarCut picks it. The three tiles at its middle are the crossing. */
+    cut: r => {
+      const { x0, y0, x1, y1 } = r.bbox, alongX = (x1 - x0) >= (y1 - y0);
+      const line = r.tiles.filter(i => { const [x, y] = at(i); return alongX ? y === ((y0 + y1) >> 1) : x === ((x0 + x1) >> 1); });
+      const gap = line.length >> 1;
+      line.forEach((i, k) => { out[i] = Math.abs(k - gap) <= 1 ? 'stone' : 'hill'; });
+    },
+    drowned: r => {
+      const picks = r.tiles.slice().sort((p, q) => h(PV.drown, p) - h(PV.drown, q) || p - q).slice(0, 3);
+      for (const c of picks){ const [cx, cy] = at(c);
+        for (const i of r.tiles){ const [x, y] = at(i), d = Math.hypot(x - cx, y - cy);
+          if (d <= 5) out[i] = 'water'; else if (d <= 7 && out[i] === 'grass' && h(PV.h1, i) < 0.5) out[i] = 'deadpine'; } }
+    },
+    broken: r => { for (const i of r.tiles) if (out[i] === 'grass' && h(PV.h1, i) < 0.34) out[i] = 'boulder'; },
+  };
+  for (const r of live) for (const m of marksOf(r, 'scar')) if (scar[m.value]) scar[m.value](r);
+  /* Hills, as uplift places them, with hashes in place of its tries. A foot keeps off the map edge and three
+     tiles from water and from sand. Returns how many hills stood up. */
+  const hillJit = pvNoise(s, PV.hillJit, 6);
+  const raise = (r, storeys, count) => {
+    const rx = Math.min(12, 4 + 2 * storeys), ry = Math.round(rx * 0.75), gap = 2 * rx + 3;
+    const dry = i => { const [x, y] = at(i); if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ if (!inb(x + dx, y + dy)) continue; const q = out[idx(x + dx, y + dy)]; if (q === 'water' || q === 'sand') return false; }
+      return true; };
+    const picks = r.tiles.filter(dry).sort((p, q) => h(PV.hillPick, p) - h(PV.hillPick, q) || p - q);
+    const made = [];
+    for (const c of picks){
+      if (made.length >= count) break;
+      const [cx, cy] = at(c);
+      if (made.some(([mx, my]) => Math.hypot(cx - mx, cy - my) < gap)) continue;
+      made.push([cx, cy]);
+      for (const i of r.tiles){ if (out[i] === 'water') continue; const [x, y] = at(i), j = (hillJit(x, y) - 0.5) * 0.5;
+        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + j > 1) continue;
+        out[i] = storeys >= 2 && ((x - cx) / (rx * 0.6)) ** 2 + ((y - cy) / (ry * 0.6)) ** 2 + j <= 1 ? 'peak' : 'hill'; }
+    }
+    return made.length;
+  };
+  for (const r of live){ const m = marksOf(r, 'height')[0]; if (m) raise(r, clamp(m.value, 1, ZMAX), clamp(Math.round(r.area / (4 * SECTOR_AREA)), 1, 3)); }
+  /* A hunter dens in a hillside, so a region where one was made, and no god raised the ground, gets a low hill. */
+  for (const r of live) if (!hasMark(r, 'height') && marksOf(r, 'making').some(m => SPAWN[m.value] && SPAWN[m.value].den)) raise(r, 1, 1);
+  /* A cave needs rock over it. Its mouth is the rim tile of the hill nearest the region's heart. */
+  for (const r of live){
+    if (!hasMark(r, 'depth')) continue;
+    if (!r.tiles.some(i => out[i] === 'hill' || out[i] === 'peak')) raise(r, 1, 1);
+    const [hx, hy] = at(heartTile(r));
+    let best = -1, bd = Infinity;
+    for (const i of r.tiles){
+      if (out[i] !== 'hill' && out[i] !== 'peak') continue;
+      const [x, y] = at(i);
+      if (!DIRS.some(([dx, dy]) => inb(x + dx, y + dy) && !PV_HILL[out[idx(x + dx, y + dy)]])) continue;
+      const d = (x - hx) ** 2 + (y - hy) ** 2; if (d < bd){ bd = d; best = i; }
+    }
+    if (best >= 0) out[best] = 'mouth';
+  }
+  return out;
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -8285,11 +8495,16 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'e',          focus: 'drawer', action: 'peopleCamp',  label: 'People: the next camp, then everyone', button: 'peopleCampBtn' },
+  { key: 'y',          focus: 'drawer', action: 'peopleAge',   label: 'People: the next age', button: 'peopleAgeBtn' },
   { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
   { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
   { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
   { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
+  /* A popped-out People drawer takes the same filter keys. It has no filter buttons, so these rows name none. */
+  { key: 'e',          focus: 'window', action: 'peopleCamp', label: 'People: the next camp, then everyone' },
+  { key: 'y',          focus: 'window', action: 'peopleAge',  label: 'People: the next age' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
@@ -8326,7 +8541,7 @@ for (const t of TOOLS){
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
-KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the borders', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
    The label names both ladders, since the same row serves the ages and the days.
    The two ladders are meant to be the same length, and tests/ui.js asserts it. A row past the end of
@@ -8517,8 +8732,9 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
-/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
-/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+/* ---- the field: the world before it has tiles. The preview paints the ground the marks will become, in the world
+   map's own colours, and the boundaries lie over it as faint lines. ---- */
+/* A boundary's ink by its pole, on the day-era overlay. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
 function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
@@ -8528,17 +8744,29 @@ function drawBoundaries(g, alpha, skip = null){
   }
   g.globalAlpha = 1;
 }
+/* How strongly a boundary shows over the preview in the ages. A line is only a hint of where one country ends. */
+const FIELD_LINE_ALPHA = 0.25;
 /* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
-   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends.
+   The preview is kept in fieldPreview and computed only when that is empty. drawField empties it when the
+   act changes, so it is computed once per act. The ground is filled one kind at a time, so each kind sets
+   its colour once. A wet boundary is not drawn as a line, because the preview already paints it as a river. */
 function drawFieldCache(skip = null){
+  if (!fieldPreview) fieldPreview = previewField();
   octx.setTransform(1, 0, 0, 1, 0, 0);
   octx.clearRect(0, 0, ocv.width, ocv.height);
-  for (const r of liveRegions()){
-    octx.fillStyle = fieldColor(r, P);
-    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
-    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  const byKind = {};
+  fieldPreview.forEach((k, i) => { (byKind[k] || (byKind[k] = [])).push(i); });
+  for (const k in byKind){
+    octx.fillStyle = P[PREVIEW_INK[k]];
+    for (const i of byKind[k]){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
   }
-  drawBoundaries(octx, 0.7, skip);
+  octx.fillStyle = P['field-line']; octx.globalAlpha = FIELD_LINE_ALPHA;
+  for (const b of liveBoundaries()){
+    if (b.pole === 'wet' || (skip && skip.has(b.id))) continue;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  octx.globalAlpha = 1;
 }
 
 /* ---- the ages in motion ----
@@ -8687,10 +8915,18 @@ function drawCaption(text, p){
   wctx.fillStyle = P.select;
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
+/* The weigh caption's own words, apart from drawField, so a test can read them without a canvas. */
+function weighCaption(godName, count){ return `${godName} weighs ${nOf(count, 'piece of land', 'pieces of land')}.`; }
 function drawField(){
   /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
      running. A running beat reads the ladder. */
   const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  /* The key trusts creation.gestures.length and creation.discards to move whenever a region's marks do.
+     In src/sim/gods.js, every mark(), setPole(), and `r.marks =` filter (battle at line 450, the start
+     branch of backstop at line 652) is followed by a gesture() call in the same act. The one other
+     writer of marks is undoSettle in src/sim/settle.js, which increments creation.discards. A load
+     clears fieldKey in src/ui/actions.js. A mark written with neither a gesture nor a discard would
+     leave this key unmoved, and the preview stale. */
   const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
@@ -8702,7 +8938,7 @@ function drawField(){
     fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null; fieldPreview = null;
   }
   const still = beatStill(anyDialogOpen());
   const f = fieldJump || still ? 1 : clamp(acc, 0, 1);
@@ -8741,7 +8977,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(weighCaption(g.name, now.weighed.opts.length), { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
@@ -8858,6 +9094,16 @@ function drawMid(){
   mctx.strokeStyle = P.grid; mctx.lineWidth = 1;
   for (let k = 1; k < 3; k++){ mctx.beginPath(); mctx.moveTo(k * LW * MS + 0.5, 0); mctx.lineTo(k * LW * MS + 0.5, MH); mctx.moveTo(0, k * LH * MS + 0.5); mctx.lineTo(MW, k * LH * MS + 0.5); mctx.stroke(); }
   mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. The nearby view has no level rule, so neither do the dots.
+     A dot is drawn when its square is in view, wherever its being stands, so a trail that leaves the view
+     fades there instead of vanishing. */
+  const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    mctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
+  }
+  mctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
@@ -8937,6 +9183,18 @@ function drawLoc(){
     ctx.fillStyle = fl === 1 ? P.fire2 : P.fire; ctx.fillText(fl === 2 ? '^' : '▲', lx * T + T / 2, ly * T + T / 2 + 1);
   }
   ctx.font = `700 ${T - 4}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. A dot takes the glyph loop's level rule on its own square,
+     and is drawn when its square is in view, wherever its being stands. */
+  const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    ctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)){
+      if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;
+      ctx.globalAlpha = d.z === lvl ? d.alpha : d.alpha / 2; ctx.beginPath(); ctx.arc((d.x - ox) * T + T / 2, (d.y - oy) * T + T / 2, T * 0.16, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
@@ -9120,11 +9378,11 @@ function inspectGod(g){
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
-  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands on ${countryLine(standsIn(g))}.`;
   else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
-  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  /* Several options share an act, one per region. Only the first that did not fail is the one picked. */
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
@@ -9205,11 +9463,11 @@ function inspectTile(x, y, z = 0){
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+/* A region of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
 function inspectRegion(r){
   if (!r) return '<div class="muted">Nothing is here.</div>';
   const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
-  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  const rows = [['Land', landPhrase(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
   if (here.length) rows.push(['Here', here.join('; ')]);
   const seen = new Set(), why = [];
   for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
@@ -9220,7 +9478,7 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
-     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     A pointer near a mark's own halo shows the act's card in place of the land under it, so a
      hover on the mark reads the act and not the ground it changed. */
   const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
     : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
@@ -9286,6 +9544,8 @@ function renderStrip(){
 /* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
+  /* A popped-out People window has no filter row, so in the days its title names the count and both filters. */
+  if (w.kind === 'drawer' && w.target === 'people' && !inAges()) return esc(peopleTitle());
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
   if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.species === 'god' ? godIconSvg(a.pole, 16, null) : ''}${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
@@ -9306,7 +9566,10 @@ function renderWindows(){
     }
     el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
     el.classList.toggle('focus', ui.focus === `window:${w.id}`);
-    el.querySelector('.title').innerHTML = winTitle(w);
+    /* The People title can hold a long camp name, so it alone is cut short, with the whole of it on hover. */
+    const title = el.querySelector('.title'), cut = w.kind === 'drawer' && w.target === 'people' && !inAges();
+    title.innerHTML = winTitle(w); title.classList.toggle('cut', cut);
+    if (cut) title.title = peopleTitle(); else title.removeAttribute('title');
     const body = el.querySelector('.body'), keep = body.scrollTop;
     body.classList.toggle('ins', w.kind === 'inspect');
     if (w.kind === 'drawer') DRAWER_RENDER[w.target](body, w.target);
@@ -9379,7 +9642,11 @@ const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
   const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names /"></div>`
-    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
+    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>`
+    /* renderDrawers writes the labels, since they follow the filters. It writes only the inner span. A
+       click's own target must stay in the page: the map's pointer handler runs after the drawer's, and a
+       target cut out of the page by a rewrite is not inside #drawers, so the map took the focus. */
+    : d.id === 'people' ? `<div class="filter pf" id="peopleFilter"><button class="btn small" id="peopleCampBtn"><span class="lbl"></span><kbd>E</kbd></button><button class="btn small" id="peopleAgeBtn"><span class="lbl"></span><kbd>Y</kbd></button></div>` : '';
   return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
@@ -9398,6 +9665,17 @@ function renderDrawers(){
     const box = sec.querySelector('#chronSearch');
     if (box && box.value !== ui.chronSearch && document.activeElement !== box) box.value = ui.chronSearch;
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
+    /* The People filters. In the ages the drawer lists gods, which have no camp and no age, so the row hides.
+       A button is on when its filter is not the default: a camp other than the chosen one, or an age. */
+    const pf = sec.querySelector('#peopleFilter');
+    if (pf){
+      pf.hidden = inAges();
+      if (!pf.hidden){
+        const cb = sec.querySelector('#peopleCampBtn'), ab = sec.querySelector('#peopleAgeBtn');
+        setHTML(cb.querySelector('.lbl'), esc(peopleCampLabel())); cb.classList.toggle('on', peopleScope().camp !== chosenCamp());
+        setHTML(ab.querySelector('.lbl'), esc(peopleAgeLabel())); ab.classList.toggle('on', ui.peopleAge !== 'any');
+      }
+    }
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
@@ -9407,9 +9685,15 @@ function renderDrawers(){
 }
 function renderPeople(el){
   const rows = drawerRows('people');
-  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  const ages = inAges();
+  /* In the ages the list is the gods, and no filter applies. In the days the count says how many the filters show. */
+  const c = $('count-people'); if (c) c.textContent = ` · ${ages ? rows.filter(r => r.r.a.alive).length : peopleCountText()}`;
+  /* A list of more than one camp names each person's camp, in muted text rather than a tag, so that
+     "no camp" does not read as an age beside "young" and "old". */
+  const mixed = !ages && peopleMixed();
+  const home = a => `<span class="campname">${a.camp ? esc(a.camp.name) : 'no camp'}</span>`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${mixed ? home(a) : ''}${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${ages ? 'No god yet.' : peopleEmptyText()}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
@@ -9621,6 +9905,35 @@ function setTool(id, sticky = false){
    A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
    every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
 function setFocus(v){ ui.focus = v; }
+/* The motion trails. The frame loop calls noteTrails after each step of the days, and pruneTrails
+   once a frame. A god does not walk (its species has perTick false), so it leaves no trail. A move of
+   more than two squares, or of more than one level, is not a walk: a load or a long jump would draw a
+   streak across the map, so the trail starts again at the new square. Two squares is a run. */
+function noteTrails(now){
+  for (const a of beings){
+    const sp = SPECIES[a.species];
+    if (!a.alive || !sp || sp.perTick === false) continue;
+    const tr = ui.trails[a.id], prev = tr && tr[tr.length - 1];
+    if (!prev){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    if (prev[0] === a.x && prev[1] === a.y && prev[2] === a.z) continue;
+    if (Math.abs(a.x - prev[0]) > 2 || Math.abs(a.y - prev[1]) > 2 || Math.abs(a.z - prev[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    /* The square left behind is stamped with the time it was left, so its dot fades from then. A
+       square kept through a rest would otherwise carry its old time and show no dot at all. */
+    prev[3] = now; tr.push([a.x, a.y, a.z, now]);
+    while (tr.length > TRAIL.max + 1) tr.shift();
+  }
+}
+/* A trail whose being is gone or dead is dropped. A trail at rest past TRAIL.ms keeps only the square
+   the being stands on, so its first step after the rest still leaves a dot. One lookup per call, since
+   beingById is a linear find. */
+function pruneTrails(now){
+  const live = {}; for (const a of beings) if (a.alive) live[a.id] = true;
+  for (const id in ui.trails){
+    const tr = ui.trails[id];
+    if (!live[id]){ delete ui.trails[id]; continue; }
+    if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
+  }
+}
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
@@ -9653,6 +9966,9 @@ function setView(v, s){
   if (inAges()) v = 'world';
   /* The camp fire view needs a fire to centre on. Without one it is the sector view. */
   const p = v === 'fire' && fireCentre(); if (v === 'fire' && !p) v = 'loc';
+  /* The world map records no trail, so a trail from before it is stale. A creature that walked away and
+     back while the world map showed would leave one dot on a square it left minutes ago. */
+  if (view === 'world' && v !== 'world') ui.trails = {};
   view = v; if (s) cur = { sx: s.sx, sy: s.sy }; hideTip(); hover = null; whover = null; mhover = null;
   /* The camp fire view opens on its fire's sector, with the cursor on the fire unless it is already in view.
      The fire is on the surface, so the view opens there, and the cursor with it. Before this, a view
@@ -9695,7 +10011,7 @@ const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: 
 /* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
    to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
 const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
-/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+/* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
@@ -9704,7 +10020,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; ui.trails = {}; restore();
   /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
      session had open: the People and Goals cards used to cover the map at the very start. Continue
      and Load do not call this, so they keep the tabs a saved world had open. */
@@ -9764,9 +10080,11 @@ function loadWorld(snapshot, note){
 function onLoad(){
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
-  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
+  ui.peopleCamp = null;
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9841,9 +10159,11 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
+  /* The camps of the days are new, so the People drawer follows the chosen camp. */
+  ui.peopleCamp = null;
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9915,8 +10235,8 @@ const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else step(); renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
@@ -9924,7 +10244,7 @@ const ACTIONS = {
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
-  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
@@ -9955,6 +10275,20 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The People drawer's camp: the chosen camp, each other camp in order, everyone, and back. With no
+     chosen camp the list already holds everyone, so there is nothing to cycle. A value not in the
+     cycle, such as the id of a camp that has ended, counts as the chosen camp. */
+  peopleCamp(){
+    const chosen = chosenCamp(); if (!chosen) return;
+    const cycle = [null, ...camps.filter(c => c !== chosen).map(c => c.id), 'all'];
+    ui.peopleCamp = cycle[(Math.max(0, cycle.indexOf(ui.peopleCamp)) + 1) % cycle.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
+  /* The People drawer's age: any, young, adult, old, and back. */
+  peopleAge(){
+    ui.peopleAge = PEOPLE_AGES[(Math.max(0, PEOPLE_AGES.indexOf(ui.peopleAge)) + 1) % PEOPLE_AGES.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
   foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },
@@ -10064,8 +10398,9 @@ function frame(now){
          The clock is read every step: performance.now() costs about 45 ns against a step's 14,000 ns,
          both measured in Safari on 2026-09-20, so reading it is 0.3% and a coarser check would only
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
-         leaves no backlog for a later one to run in one burst. */
-      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS; while (acc >= 1){ step(); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
+         leaves no backlog for a later one to run in one burst.
+         The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
@@ -10084,6 +10419,7 @@ function frame(now){
     /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
     if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    pruneTrails(now);
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
     if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
@@ -10149,6 +10485,8 @@ function initUI(){
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
+    if (e.target.closest('#peopleCampBtn')){ ACTIONS.peopleCamp(); return; }
+    if (e.target.closest('#peopleAgeBtn')){ ACTIONS.peopleAge(); return; }
     const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });

@@ -33,8 +33,9 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
-/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
-/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+/* ---- the field: the world before it has tiles. The preview paints the ground the marks will become, in the world
+   map's own colours, and the boundaries lie over it as faint lines. ---- */
+/* A boundary's ink by its pole, on the day-era overlay. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
 function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
@@ -44,17 +45,29 @@ function drawBoundaries(g, alpha, skip = null){
   }
   g.globalAlpha = 1;
 }
+/* How strongly a boundary shows over the preview in the ages. A line is only a hint of where one country ends. */
+const FIELD_LINE_ALPHA = 0.25;
 /* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
-   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends.
+   The preview is kept in fieldPreview and computed only when that is empty. drawField empties it when the
+   act changes, so it is computed once per act. The ground is filled one kind at a time, so each kind sets
+   its colour once. A wet boundary is not drawn as a line, because the preview already paints it as a river. */
 function drawFieldCache(skip = null){
+  if (!fieldPreview) fieldPreview = previewField();
   octx.setTransform(1, 0, 0, 1, 0, 0);
   octx.clearRect(0, 0, ocv.width, ocv.height);
-  for (const r of liveRegions()){
-    octx.fillStyle = fieldColor(r, P);
-    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
-    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  const byKind = {};
+  fieldPreview.forEach((k, i) => { (byKind[k] || (byKind[k] = [])).push(i); });
+  for (const k in byKind){
+    octx.fillStyle = P[PREVIEW_INK[k]];
+    for (const i of byKind[k]){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
   }
-  drawBoundaries(octx, 0.7, skip);
+  octx.fillStyle = P['field-line']; octx.globalAlpha = FIELD_LINE_ALPHA;
+  for (const b of liveBoundaries()){
+    if (b.pole === 'wet' || (skip && skip.has(b.id))) continue;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  octx.globalAlpha = 1;
 }
 
 /* ---- the ages in motion ----
@@ -203,10 +216,18 @@ function drawCaption(text, p){
   wctx.fillStyle = P.select;
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
+/* The weigh caption's own words, apart from drawField, so a test can read them without a canvas. */
+function weighCaption(godName, count){ return `${godName} weighs ${nOf(count, 'piece of land', 'pieces of land')}.`; }
 function drawField(){
   /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
      running. A running beat reads the ladder. */
   const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  /* The key trusts creation.gestures.length and creation.discards to move whenever a region's marks do.
+     In src/sim/gods.js, every mark(), setPole(), and `r.marks =` filter (battle at line 450, the start
+     branch of backstop at line 652) is followed by a gesture() call in the same act. The one other
+     writer of marks is undoSettle in src/sim/settle.js, which increments creation.discards. A load
+     clears fieldKey in src/ui/actions.js. A mark written with neither a gesture nor a discard would
+     leave this key unmoved, and the preview stale. */
   const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
@@ -218,7 +239,7 @@ function drawField(){
     fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null; fieldPreview = null;
   }
   const still = beatStill(anyDialogOpen());
   const f = fieldJump || still ? 1 : clamp(acc, 0, 1);
@@ -257,7 +278,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(weighCaption(g.name, now.weighed.opts.length), { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
@@ -374,6 +395,16 @@ function drawMid(){
   mctx.strokeStyle = P.grid; mctx.lineWidth = 1;
   for (let k = 1; k < 3; k++){ mctx.beginPath(); mctx.moveTo(k * LW * MS + 0.5, 0); mctx.lineTo(k * LW * MS + 0.5, MH); mctx.moveTo(0, k * LH * MS + 0.5); mctx.lineTo(MW, k * LH * MS + 0.5); mctx.stroke(); }
   mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. The nearby view has no level rule, so neither do the dots.
+     A dot is drawn when its square is in view, wherever its being stands, so a trail that leaves the view
+     fades there instead of vanishing. */
+  const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    mctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
+  }
+  mctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
@@ -453,6 +484,18 @@ function drawLoc(){
     ctx.fillStyle = fl === 1 ? P.fire2 : P.fire; ctx.fillText(fl === 2 ? '^' : '▲', lx * T + T / 2, ly * T + T / 2 + 1);
   }
   ctx.font = `700 ${T - 4}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. A dot takes the glyph loop's level rule on its own square,
+     and is drawn when its square is in view, wherever its being stands. */
+  const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    ctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)){
+      if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;
+      ctx.globalAlpha = d.z === lvl ? d.alpha : d.alpha / 2; ctx.beginPath(); ctx.arc((d.x - ox) * T + T / 2, (d.y - oy) * T + T / 2, T * 0.16, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
