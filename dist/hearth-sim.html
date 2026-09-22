@@ -58,6 +58,7 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 #timeline .tlhead .sp{margin-left:auto;display:flex;gap:4px}
 #timeline .lane{display:flex;align-items:center;gap:4px;margin-top:2px;white-space:nowrap;overflow:hidden}
 #timeline .who{flex:none;width:96px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#timeline .who .godicon{margin-right:3px;vertical-align:middle}
 #timeline .cell{border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer;background:none;color:inherit;font:inherit}
 #timeline .cell.major{border-color:color-mix(in srgb,var(--major) 45%,transparent);font-weight:700}
 #timeline .cell.open{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -8833,12 +8834,17 @@ function drawTimeline(){
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
     const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
+    /* The icon sits inside `.who`, before the name, so every lane's first cell starts at the same
+       x whether or not the lane has one: a sibling icon widens the god lanes only, past the gate
+       lane's fixed 96 px, and the columns stop lining up. */
+    const who = document.createElement('span'); who.className = 'who';
     if (r.pole){
       const icon = document.createElement('img'); icon.className = 'godicon'; icon.alt = '';
       icon.src = 'data:image/svg+xml,' + encodeURIComponent(godIconSvg(r.pole, 14, null));
-      lane.appendChild(icon);
+      who.append(icon, r.label);
+    } else {
+      who.textContent = r.label;
     }
-    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));
     const now = document.createElement('span'); now.className = 'now';

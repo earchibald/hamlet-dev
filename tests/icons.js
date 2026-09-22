@@ -257,7 +257,7 @@ test('timelineModel names the pole on an unfolded row for a single god, and not 
   assert.ok(godIds.length > 0);
 });
 
-test('drawTimeline puts a 14 px icon before the lane label for a single-god row, and none for the folded or gate rows', () => {
+test('drawTimeline puts a 14 px icon inside the .who span, before the label, for a single-god row, and none for the folded or gate rows; every lane\'s first child is the who span so the cells line up', () => {
   const rig = loadUI(['state', 'icons', 'derive', 'marks', 'timeline'], ['drawTimeline', 'gods', 'startCreation', 'step', 'ui', 'godIconSvg']);
   rig.startCreation('gamma', {});
   for (let n = 0; n < 8; n++) rig.step();
@@ -268,17 +268,28 @@ test('drawTimeline puts a 14 px icon before the lane label for a single-god row,
   const lanes = root.children.filter(c => c.className.split(' ').includes('lane'));
   assert.ok(lanes.length > 1, 'more than one lane: at least one god and the gate');
   for (const lane of lanes){
-    const who = lane.children.find(c => c.className === 'who');
-    const icon = lane.children[0] !== who ? lane.children[0] : null;
+    /* Every lane's direct children before the first cell must be exactly the who span. A sibling
+       icon ahead of, or beside, who would widen only the god lanes and knock the columns out of
+       line with the gate lane, which has no icon. */
+    const firstCellIdx = lane.children.findIndex(c => c.className.split(' ').includes('cell'));
+    const preCell = lane.children.slice(0, firstCellIdx);
+    assert.deepEqual(preCell.map(c => c.className), ['who'], `${JSON.stringify(preCell.map(c => c.className))}: lane's children before the first cell are exactly the who span`);
+    const who = lane.children[0];
+    assert.equal(who.className, 'who', 'the who span is the lane\'s first child');
+    const icon = who.children.find(c => c.tag === 'img');
     const rowId = who.textContent;
     const isGate = rowId === 'The gate';
     const g = rig.gods().find(x => x.name === rowId);
     if (g){
-      assert.ok(icon, `${rowId}'s lane holds an icon before its label`);
+      assert.ok(icon, `${rowId}'s who span holds an icon before its label`);
+      assert.equal(who.children[0], icon, 'the icon is the first child of who, ahead of the label text');
       assert.equal(icon.tag, 'img', 'the timeline icon is an img element');
       assert.equal(icon.alt, '', 'the timeline icon has an empty alt');
       assert.equal(icon.src, 'data:image/svg+xml,' + encodeURIComponent(rig.godIconSvg(g.pole, 14, null)));
-    } else assert.ok(isGate, `an icon-less lane is the gate, not ${rowId}`);
+    } else {
+      assert.ok(isGate, `an icon-less lane is the gate, not ${rowId}`);
+      assert.equal(icon, undefined, 'the gate row\'s who span holds no icon');
+    }
   }
 });
 
@@ -313,9 +324,12 @@ function fakeEl(tag){
     classList: { toggle(c, on){ const has = el.className.split(' ').includes(c); const want = on === undefined ? !has : on;
       el.className = el.className.split(' ').filter(x => x && x !== c).concat(want ? [c] : []).join(' '); } },
     appendChild(c){ el.children.push(c); return c; },
-    append(...cs){ el.children.push(...cs); },
+    /* `who.append(icon, r.label)` mixes an element with a plain string: wrap the string as a text
+       node, the way a real DOM does, so `who.textContent` can still read the label back. */
+    append(...cs){ el.children.push(...cs.map(c => typeof c === 'string' ? { tag: '#text', textContent: c } : c)); },
     replaceChildren(){ el.children = []; },
-    get textContent(){ return el._text; }, set textContent(v){ el._text = v; },
+    get textContent(){ return el.children.length ? el.children.map(c => c.textContent || '').join('') : el._text; },
+    set textContent(v){ el._text = v; el.children = []; },
   };
   return el;
 }

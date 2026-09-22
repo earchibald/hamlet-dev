@@ -38,12 +38,17 @@ function drawTimeline(){
   head.append(span, sp); el.appendChild(head);
   for (const r of m.rows){
     const lane = document.createElement('div'); lane.className = 'lane' + (m.folded ? '' : ' fixed');
+    /* The icon sits inside `.who`, before the name, so every lane's first cell starts at the same
+       x whether or not the lane has one: a sibling icon widens the god lanes only, past the gate
+       lane's fixed 96 px, and the columns stop lining up. */
+    const who = document.createElement('span'); who.className = 'who';
     if (r.pole){
       const icon = document.createElement('img'); icon.className = 'godicon'; icon.alt = '';
       icon.src = 'data:image/svg+xml,' + encodeURIComponent(godIconSvg(r.pole, 14, null));
-      lane.appendChild(icon);
+      who.append(icon, r.label);
+    } else {
+      who.textContent = r.label;
     }
-    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.label;
     lane.appendChild(who);
     for (const c of r.cells) lane.appendChild(tlCell(c));
     const now = document.createElement('span'); now.className = 'now';
