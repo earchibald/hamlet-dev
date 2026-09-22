@@ -38,6 +38,11 @@ const PACES = [0.25, 0.5, 1, 2];
    generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
    several milliseconds still draws: the frame drops world ticks rather than frames. */
 const STEP_BUDGET_MS = 8;
+/* The motion trail. A walker moves one square a tick, and at 1x that is a square a frame, so a slide
+   between squares has no frames to show. A trail of fading dots marks the squares a creature crossed
+   instead. Each dot fades out over `ms` of wall time. A creature keeps at most `max` dots. `alpha` is
+   the newest dot's opacity. Wall time is the interface's, so this lives here and not in src/sim/. */
+const TRAIL = { ms: 300, max: 8, alpha: 0.55 };
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
    full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
@@ -100,6 +105,10 @@ const ui = {
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
+  /* The motion trails: being id to a list of [x, y, z, t], oldest first. The last entry is the square
+     the being stands on. t is the wall time in ms when the being left that square. For the last
+     entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
+  trails: {},
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.

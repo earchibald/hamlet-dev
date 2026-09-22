@@ -42,6 +42,34 @@ function setTool(id, sticky = false){
    A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
    every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
 function setFocus(v){ ui.focus = v; }
+/* The motion trails. The frame loop calls noteTrails after each step of the days, and pruneTrails
+   once a frame. A god does not walk (its species has perTick false), so it leaves no trail. A move of
+   more than two squares, or of more than one level, is not a walk: a load or a long jump would draw a
+   streak across the map, so the trail starts again at the new square. Two squares is a run. */
+function noteTrails(now){
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    const tr = ui.trails[a.id], last = tr && tr[tr.length - 1];
+    if (!last){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    if (last[0] === a.x && last[1] === a.y && last[2] === a.z) continue;
+    if (Math.abs(a.x - last[0]) > 2 || Math.abs(a.y - last[1]) > 2 || Math.abs(a.z - last[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    /* The square left behind is stamped with the time it was left, so its dot fades from then. A
+       square kept through a rest would otherwise carry its old time and show no dot at all. */
+    last[3] = now; tr.push([a.x, a.y, a.z, now]);
+    while (tr.length > TRAIL.max + 1) tr.shift();
+  }
+}
+/* A trail whose being is gone or dead is dropped. A trail at rest past TRAIL.ms keeps only the square
+   the being stands on, so its first step after the rest still leaves a dot. One lookup per call, since
+   beingById is a linear find. */
+function pruneTrails(now){
+  const live = {}; for (const a of beings) if (a.alive) live[a.id] = true;
+  for (const id in ui.trails){
+    const tr = ui.trails[id];
+    if (!live[id]){ delete ui.trails[id]; continue; }
+    if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
+  }
+}
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
@@ -125,7 +153,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; ui.trails = {}; restore();
   /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
      session had open: the People and Goals cards used to cover the map at the very start. Continue
      and Load do not call this, so they keep the tabs a saved world had open. */
@@ -185,7 +213,7 @@ function loadWorld(snapshot, note){
 function onLoad(){
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
-  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
   /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
@@ -264,7 +292,7 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */

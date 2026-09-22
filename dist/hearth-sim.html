@@ -7393,6 +7393,11 @@ const PACES = [0.25, 0.5, 1, 2];
    generous today. It is set at half and not higher so that a machine, or a view, where the draw costs
    several milliseconds still draws: the frame drops world ticks rather than frames. */
 const STEP_BUDGET_MS = 8;
+/* The motion trail. A walker moves one square a tick, and at 1x that is a square a frame, so a slide
+   between squares has no frames to show. A trail of fading dots marks the squares a creature crossed
+   instead. Each dot fades out over `ms` of wall time. A creature keeps at most `max` dots. `alpha` is
+   the newest dot's opacity. Wall time is the interface's, so this lives here and not in src/sim/. */
+const TRAIL = { ms: 300, max: 8, alpha: 0.55 };
 /* The tween of one beat. It runs for BEAT_MS / pace, read at run time, so no number here names a pace.
    full and figure are that length in milliseconds: the least a tier of the drawing is worth. cue,
    draw and word are fractions of the beat itself, and say when each stage of it ends. These are view
@@ -7455,6 +7460,10 @@ const ui = {
   autosaveWarned: false, /* true once the page has said it cannot keep an autosave (storage failed) */
   autosaveFaultWarned: false, /* true once the page has said the world itself cannot be saved */
   playing: false,      /* a beat the player stepped is running; the frame loop drives it and then clears it */
+  /* The motion trails: being id to a list of [x, y, z, t], oldest first. The last entry is the square
+     the being stands on. t is the wall time in ms when the being left that square. For the last
+     entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
+  trails: {},
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
@@ -7589,6 +7598,18 @@ function godIconSvg(pole, size, label){
 /* View model. Pure functions from sim state to what the strip and drawers show. No DOM.
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
+
+/* The dots of a being's motion trail, oldest first, with the being's own square left out. A dot is
+   fainter the older its place in the list, and it fades to nothing TRAIL.ms after it was noted. */
+function trailDots(id, now){
+  const tr = ui.trails[id]; if (!tr) return [];
+  const n = tr.length - 1, dots = [];
+  for (let i = 0; i < n; i++){
+    const [x, y, z, t] = tr[i], alpha = TRAIL.alpha * (i + 1) / n * Math.max(0, 1 - (now - t) / TRAIL.ms);
+    if (alpha > 0) dots.push({ x, y, z, alpha });
+  }
+  return dots;
+}
 
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
@@ -8916,6 +8937,14 @@ function drawMid(){
   mctx.strokeStyle = P.grid; mctx.lineWidth = 1;
   for (let k = 1; k < 3; k++){ mctx.beginPath(); mctx.moveTo(k * LW * MS + 0.5, 0); mctx.lineTo(k * LW * MS + 0.5, MH); mctx.moveTo(0, k * LH * MS + 0.5); mctx.lineTo(MW, k * LH * MS + 0.5); mctx.stroke(); }
   mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. The nearby view has no level rule, so neither do the dots. */
+  const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false || !inMid(a.x, a.y)) continue;
+    mctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
+  }
+  mctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
@@ -8995,6 +9024,17 @@ function drawLoc(){
     ctx.fillStyle = fl === 1 ? P.fire2 : P.fire; ctx.fillText(fl === 2 ? '^' : '▲', lx * T + T / 2, ly * T + T / 2 + 1);
   }
   ctx.font = `700 ${T - 4}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. A dot takes the glyph loop's level rule on its own square. */
+  const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false || !inLoc(a.x, a.y)) continue;
+    ctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)){
+      if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;
+      ctx.globalAlpha = d.z === lvl ? d.alpha : d.alpha / 2; ctx.beginPath(); ctx.arc((d.x - ox) * T + T / 2, (d.y - oy) * T + T / 2, T * 0.16, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
@@ -9631,6 +9671,34 @@ function setTool(id, sticky = false){
    A bare function, not an `ACTIONS` member: the "every action holds in the ages" test calls
    every `ACTIONS` key blind, and `setFocus(undefined)` would corrupt `ui.focus`. */
 function setFocus(v){ ui.focus = v; }
+/* The motion trails. The frame loop calls noteTrails after each step of the days, and pruneTrails
+   once a frame. A god does not walk (its species has perTick false), so it leaves no trail. A move of
+   more than two squares, or of more than one level, is not a walk: a load or a long jump would draw a
+   streak across the map, so the trail starts again at the new square. Two squares is a run. */
+function noteTrails(now){
+  for (const a of beings){
+    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    const tr = ui.trails[a.id], last = tr && tr[tr.length - 1];
+    if (!last){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    if (last[0] === a.x && last[1] === a.y && last[2] === a.z) continue;
+    if (Math.abs(a.x - last[0]) > 2 || Math.abs(a.y - last[1]) > 2 || Math.abs(a.z - last[2]) > 1){ ui.trails[a.id] = [[a.x, a.y, a.z, now]]; continue; }
+    /* The square left behind is stamped with the time it was left, so its dot fades from then. A
+       square kept through a rest would otherwise carry its old time and show no dot at all. */
+    last[3] = now; tr.push([a.x, a.y, a.z, now]);
+    while (tr.length > TRAIL.max + 1) tr.shift();
+  }
+}
+/* A trail whose being is gone or dead is dropped. A trail at rest past TRAIL.ms keeps only the square
+   the being stands on, so its first step after the rest still leaves a dot. One lookup per call, since
+   beingById is a linear find. */
+function pruneTrails(now){
+  const live = {}; for (const a of beings) if (a.alive) live[a.id] = true;
+  for (const id in ui.trails){
+    const tr = ui.trails[id];
+    if (!live[id]){ delete ui.trails[id]; continue; }
+    if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
+  }
+}
 /* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
@@ -9714,7 +9782,7 @@ function newWorld(seed){
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; restore();
+  viewCamp = camps[0]; followId = null; lvl = 0; ui.windows = []; ui.focus = 'map'; worldDirty = 0; acc = 0; ui.pulses = []; ui.seenTick = -1; ui.lastStates = {}; ui.unfold = {}; ui.timelineChip = null; ui.trails = {}; restore();
   /* Make world and Take a god both come through here. Every tab starts closed, whatever a saved
      session had open: the People and Goals cards used to cover the map at the very start. Continue
      and Load do not call this, so they keep the tabs a saved world had open. */
@@ -9774,7 +9842,7 @@ function loadWorld(snapshot, note){
 function onLoad(){
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
-  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
+  ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
   /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
@@ -9853,7 +9921,7 @@ function continueWorld(){
 
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
-  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
+  acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
@@ -10092,8 +10160,9 @@ function frame(now){
          The clock is read every step: performance.now() costs about 45 ns against a step's 14,000 ns,
          both measured in Safari on 2026-09-20, so reading it is 0.3% and a coarser check would only
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
-         leaves no backlog for a later one to run in one burst. */
-      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS; while (acc >= 1){ step(); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
+         leaves no backlog for a later one to run in one burst.
+         The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
@@ -10112,6 +10181,7 @@ function frame(now){
     /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
     if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    pruneTrails(now);
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
     if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }

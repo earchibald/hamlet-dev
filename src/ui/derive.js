@@ -2,6 +2,18 @@
    Everything reads the current `camp` unless it says otherwise. */
 const level3 = (v, aim) => v >= aim ? 'good' : v >= aim / 4 ? 'warn' : 'bad';
 
+/* The dots of a being's motion trail, oldest first, with the being's own square left out. A dot is
+   fainter the older its place in the list, and it fades to nothing TRAIL.ms after it was noted. */
+function trailDots(id, now){
+  const tr = ui.trails[id]; if (!tr) return [];
+  const n = tr.length - 1, dots = [];
+  for (let i = 0; i < n; i++){
+    const [x, y, z, t] = tr[i], alpha = TRAIL.alpha * (i + 1) / n * Math.max(0, 1 - (now - t) / TRAIL.ms);
+    if (alpha > 0) dots.push({ x, y, z, alpha });
+  }
+  return dots;
+}
+
 /* ---- the ages ---- In the gods era there are no tiles, no sectors, no hills, and no people. Everything below
    that reads the valley asks inAges() first. */
 const inAges = () => era === 'gods';
