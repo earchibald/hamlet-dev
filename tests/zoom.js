@@ -139,14 +139,33 @@ test('the alphas', () => {
 });
 
 /* `zoom` is state.js's one declaration and actions.js's one writer (startZoom, advanceZoom, endZoom), as
-   state.js's own comment on the field says. Any other file that assigns it would move the world's clock
-   or the view behind actions.js's back. */
+   state.js's own comment on the field says. Any other file that assigns zoom itself, or a field of the
+   record zoom holds, would move the world's clock or the view behind actions.js's back. */
 test('only actions.js and state.js write zoom', () => {
   const dir = path.join(__dirname, '../src/ui');
   const writer = /\bzoom\s*=[^=]/;
-  for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))){
+  const fieldWriter = /\bzoom\.\w+\s*[-+*/]?=[^=]/;
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'));
+  for (const f of files){
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
-    if (f === 'actions.js' || f === 'state.js') continue;
+    if (f === 'actions.js'){
+      /* actions.js is the one writer: no assertion against it beyond the rest of this test's checks. */
+      continue;
+    }
+    if (f === 'state.js'){
+      /* The brief allows the one declaration in state.js, and only that one. */
+      const matches = text.match(new RegExp(writer, 'g')) || [];
+      assert.equal(matches.length, 1, `state.js should have exactly one match of the writer pattern, found ${matches.length}`);
+      const decl = /\blet zoom = null;/;
+      assert.match(text, decl, 'state.js should declare "let zoom = null;"');
+      /* The writer pattern only reaches one character past the "=", so confirm the one match sits
+         right where the declaration's "=" is, not at some other assignment. */
+      const declIndex = text.search(decl) + 'let '.length;
+      const matchIndex = text.search(writer);
+      assert.equal(matchIndex, declIndex, `state.js's one match should be the declaration, found it at index ${matchIndex} rather than ${declIndex}`);
+      continue;
+    }
     assert.doesNotMatch(text, writer, `${f} writes to zoom`);
+    assert.doesNotMatch(text, fieldWriter, `${f} writes to a field of zoom`);
   }
 });

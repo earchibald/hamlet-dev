@@ -4,7 +4,13 @@ function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
      every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
-  if (!paused){
+  /* The zoom is wall-time view motion, not sim time: a settle can land while the player is paused
+     (hurryGo runs the ages with no pause gate, and onSettle does not unpause), so the zoom must
+     advance and finish on its own clock whether or not the world is paused. The days branch below
+     stays gated on !paused and on zoom being clear, so the days still do not step while it runs. */
+  if (zoom){
+    try { advanceZoom(dt); } catch (e){ onFault(e); }
+  } else if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
@@ -19,7 +25,6 @@ function frame(now){
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
          leaves no backlog for a later one to run in one burst.
          The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
-      else if (zoom){ advanceZoom(dt); }
       else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
@@ -141,9 +146,10 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
-  /* A click during a running zoom ends it, so the click that follows lands on the view the zoom was
-     headed for rather than on the moving camera. Capture phase, so it runs before the target's own
-     pointerdown handler sees the event. */
+  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: the press
+     started on #zmap, which endZoom hides, so the view underneath never sees that same press and does
+     nothing else with it. Capture phase, so it runs before the target's own pointerdown handler
+     sees the event. */
   document.addEventListener('pointerdown', () => { if (zoom) endZoom(); }, true);
   document.addEventListener('keydown', e => {
     /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */

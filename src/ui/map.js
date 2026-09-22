@@ -515,4 +515,10 @@ function drawLoc(){
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
   }
 }
-function draw(){ if (zoom){ drawZoom(); return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+/* A throw from drawZoom would otherwise leave the page stuck on the zoom canvas forever: draw() only
+   reaches drawWorld/drawMid/drawLoc once zoom is null, and main.js's frame loop re-queues itself from a
+   finally with no catch around draw(), so the same throw would repeat every frame with no way back to a
+   view that can draw. Ending the zoom here returns the page to a view that can draw again. The error is
+   thrown again so it still reaches the browser console uncaught, exactly as any other draw() throw
+   already does; frame()'s finally has already queued the next frame by the time that happens. */
+function draw(){ if (zoom){ try { drawZoom(); } catch (e){ endZoom(); throw e; } return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }

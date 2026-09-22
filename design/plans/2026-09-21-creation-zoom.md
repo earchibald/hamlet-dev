@@ -205,8 +205,8 @@ The hooks:
   `advanceZoom(dt)` before `draw()`. The ages branch is unchanged.
 - The keydown handler in `main.js`: as its first line, `if (zoom){ e.preventDefault(); endZoom(); return; }`.
   Any key ends the zoom and is used up, so a key pressed to skip does nothing else.
-- A capture-phase `pointerdown` listener on `document` in `initUI`: `if (zoom) endZoom();`. The click then does
-  what it would do, on the view that is now shown.
+- A capture-phase `pointerdown` listener on `document` in `initUI`: `if (zoom) endZoom();`. The click only ends
+  the zoom, like a key, and does nothing else.
 - `draw()` in `map.js`: `if (zoom){ drawZoom(); return; }` at its start.
 
 The drawing, `drawZoom()` at the end of `src/ui/zoom.js`:

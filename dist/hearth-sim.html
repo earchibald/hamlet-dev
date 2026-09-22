@@ -9218,7 +9218,13 @@ function drawLoc(){
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
   }
 }
-function draw(){ if (zoom){ drawZoom(); return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+/* A throw from drawZoom would otherwise leave the page stuck on the zoom canvas forever: draw() only
+   reaches drawWorld/drawMid/drawLoc once zoom is null, and main.js's frame loop re-queues itself from a
+   finally with no catch around draw(), so the same throw would repeat every frame with no way back to a
+   view that can draw. Ending the zoom here returns the page to a view that can draw again. The error is
+   thrown again so it still reaches the browser console uncaught, exactly as any other draw() throw
+   already does; frame()'s finally has already queued the next frame by the time that happens. */
+function draw(){ if (zoom){ try { drawZoom(); } catch (e){ endZoom(); throw e; } return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
 
 /* The zoom: a camera that moves between two views, drawn on its own canvas. The settle uses it to go from the
    gods' map to the first person's sector, and any later caller can give it other stops. The functions at the
@@ -10218,7 +10224,7 @@ function startZoom(stops){
   if (typeof document === 'undefined' || !wcv) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!stops || stops.length < 2) return;
-  const pics = {}, boxes = {};
+  const pics = {}, boxes = {}, curBefore = cur;
   /* The field is the last frame of the ages: the frame loop calls onSettle before it draws, so wcv
      still shows what the ages left there. */
   pics.field = copyCanvas(wcv);
@@ -10231,6 +10237,11 @@ function startZoom(stops){
     boxes[stop.image] = { w: r.width, h: r.height };
     pics[stop.image] = copyCanvas(canvas);
   }
+  /* Put cur back to the last stop's sector, so the view the zoom ends on is the one the last stop
+     drew. When the last stop has no sector of its own (the world view), cur stays what it was
+     before the loop, since nothing in the loop set it for that stop. */
+  const lastStop = stops[stops.length - 1];
+  cur = lastStop.s ? { sx: lastStop.s.sx, sy: lastStop.s.sy } : curBefore;
   boxes.field = boxes.world;
   $('world').hidden = true; $('mid').hidden = true; $('loc').hidden = true; $('zoom').hidden = false;
   zoom = { stops, legs: zoomPlan(stops), t: 0, pics, boxes };
@@ -10477,7 +10488,13 @@ function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
      every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
-  if (!paused){
+  /* The zoom is wall-time view motion, not sim time: a settle can land while the player is paused
+     (hurryGo runs the ages with no pause gate, and onSettle does not unpause), so the zoom must
+     advance and finish on its own clock whether or not the world is paused. The days branch below
+     stays gated on !paused and on zoom being clear, so the days still do not step while it runs. */
+  if (zoom){
+    try { advanceZoom(dt); } catch (e){ onFault(e); }
+  } else if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
@@ -10492,7 +10509,6 @@ function frame(now){
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
          leaves no backlog for a later one to run in one burst.
          The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
-      else if (zoom){ advanceZoom(dt); }
       else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
@@ -10614,9 +10630,10 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
-  /* A click during a running zoom ends it, so the click that follows lands on the view the zoom was
-     headed for rather than on the moving camera. Capture phase, so it runs before the target's own
-     pointerdown handler sees the event. */
+  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: the press
+     started on #zmap, which endZoom hides, so the view underneath never sees that same press and does
+     nothing else with it. Capture phase, so it runs before the target's own pointerdown handler
+     sees the event. */
   document.addEventListener('pointerdown', () => { if (zoom) endZoom(); }, true);
   document.addEventListener('keydown', e => {
     /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */

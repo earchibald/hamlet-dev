@@ -316,7 +316,7 @@ function startZoom(stops){
   if (typeof document === 'undefined' || !wcv) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!stops || stops.length < 2) return;
-  const pics = {}, boxes = {};
+  const pics = {}, boxes = {}, curBefore = cur;
   /* The field is the last frame of the ages: the frame loop calls onSettle before it draws, so wcv
      still shows what the ages left there. */
   pics.field = copyCanvas(wcv);
@@ -329,6 +329,11 @@ function startZoom(stops){
     boxes[stop.image] = { w: r.width, h: r.height };
     pics[stop.image] = copyCanvas(canvas);
   }
+  /* Put cur back to the last stop's sector, so the view the zoom ends on is the one the last stop
+     drew. When the last stop has no sector of its own (the world view), cur stays what it was
+     before the loop, since nothing in the loop set it for that stop. */
+  const lastStop = stops[stops.length - 1];
+  cur = lastStop.s ? { sx: lastStop.s.sx, sy: lastStop.s.sy } : curBefore;
   boxes.field = boxes.world;
   $('world').hidden = true; $('mid').hidden = true; $('loc').hidden = true; $('zoom').hidden = false;
   zoom = { stops, legs: zoomPlan(stops), t: 0, pics, boxes };
