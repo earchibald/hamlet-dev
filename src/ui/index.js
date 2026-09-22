@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['state', 'icons', 'derive', 'keys', 'saves', 'marks', 'map', 'timeline', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions', 'main'];
+const FILES = ['state', 'icons', 'derive', 'keys', 'saves', 'marks', 'map', 'zoom', 'timeline', 'inspect', 'strip', 'windows', 'panels', 'dialogs', 'actions', 'main'];
 
 function source(files = FILES){
   return files.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
