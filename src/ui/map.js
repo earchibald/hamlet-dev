@@ -222,6 +222,12 @@ function drawField(){
   /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
      running. A running beat reads the ladder. */
   const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  /* The key trusts creation.gestures.length and creation.discards to move whenever a region's marks do.
+     In src/sim/gods.js, every mark(), setPole(), and `r.marks =` filter (battle at line 450, the start
+     branch of backstop at line 652) is followed by a gesture() call in the same act. The one other
+     writer of marks is undoSettle in src/sim/settle.js, which increments creation.discards. A load
+     clears fieldKey in src/ui/actions.js. A mark written with neither a gesture nor a discard would
+     leave this key unmoved, and the preview stale. */
   const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }

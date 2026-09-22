@@ -243,6 +243,7 @@ function drawRig(){
       setAcc: '(v) => { acc = v; }',
       spyPreview: '(fn) => { previewField = fn; }',
       spyCache: '(fn) => { drawFieldCache = fn; }',
+      fieldPreviewNow: '() => fieldPreview',
     });
   const P = distinctPalette(), octx = fillCtx(), wctx = fillCtx();
   global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => fillCtx() }), querySelector: () => null };
@@ -322,6 +323,16 @@ test('in the ages a boundary is a faint line in field-line, a river is not a lin
   }
 });
 
+/* A cheap stand-in for deepEqual on a field: length, then every 37th tile, then the last tile. Fast
+   enough to run inside the once-per-act test's beat loop, where a full deepEqual on 33,600 tiles would
+   add real time to every one of its 40 beats. */
+function digestOf(p){
+  let out = String(p.length);
+  for (let i = 0; i < p.length; i += 37) out += ',' + p[i];
+  if (p.length) out += ',' + p[p.length - 1];
+  return out;
+}
+
 test('drawField computes the preview once per act, and reuses it when a cut is drawn again', () => {
   const rig = drawRig(), { api } = rig;
   api.startCreation('gamma'); rig.set();
@@ -343,6 +354,12 @@ test('drawField computes the preview once per act, and reuses it when a cut is d
     assert.equal(previews, moved ? 1 : 0, `beat ${beats}: the preview was computed ${previews} times, and the act ${moved ? 'changed' : 'did not change'}`);
     assert.ok(caches <= 2, `beat ${beats}: the cache was drawn ${caches} times`);
     if (caches === 2) redrawn++;
+    /* The key did not move, so the cache must still be right: a fresh previewField() call, made
+       straight past the cache, must match what drawField left cached under the unmoved key. This is
+       the guard on the key's own claim, made in the comment beside it in src/ui/map.js: every write
+       to a region's marks is followed by a gesture in the same act, or by undoSettle's discard, or by
+       a load's clear, so an unmoved key means an unmoved field. */
+    if (!moved) assert.equal(digestOf(realPreview()), digestOf(api.fieldPreviewNow()), `beat ${beats}: the key did not move, but the field would compute differently now`);
   }
   assert.ok(acts >= 5, `${acts} acts in ${beats} beats`);
   assert.ok(redrawn >= 2, `${redrawn} acts drew the cache again for a cut, in ${beats} beats`);
