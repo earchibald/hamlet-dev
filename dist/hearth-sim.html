@@ -8942,7 +8942,7 @@ function drawMid(){
      fades there instead of vanishing. */
   const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
   for (const a of beings){
-    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    if (!a.alive || !ui.trails[a.id]) continue;
     mctx.fillStyle = beingColor(a);
     for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
   }
@@ -9030,7 +9030,7 @@ function drawLoc(){
      and is drawn when its square is in view, wherever its being stands. */
   const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
   for (const a of beings){
-    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    if (!a.alive || !ui.trails[a.id]) continue;
     ctx.fillStyle = beingColor(a);
     for (const d of trailDots(a.id, now)){
       if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;
@@ -10005,7 +10005,7 @@ const ACTIONS = {
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
   step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */

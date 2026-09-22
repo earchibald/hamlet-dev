@@ -373,7 +373,7 @@ const ACTIONS = {
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
      stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
   step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); renderUI(true); },
+  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */

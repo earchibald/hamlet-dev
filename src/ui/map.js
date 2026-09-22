@@ -379,7 +379,7 @@ function drawMid(){
      fades there instead of vanishing. */
   const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
   for (const a of beings){
-    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    if (!a.alive || !ui.trails[a.id]) continue;
     mctx.fillStyle = beingColor(a);
     for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
   }
@@ -467,7 +467,7 @@ function drawLoc(){
      and is drawn when its square is in view, wherever its being stands. */
   const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
   for (const a of beings){
-    if (!a.alive || SPECIES[a.species].perTick === false) continue;
+    if (!a.alive || !ui.trails[a.id]) continue;
     ctx.fillStyle = beingColor(a);
     for (const d of trailDots(a.id, now)){
       if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;

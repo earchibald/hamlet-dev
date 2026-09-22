@@ -130,15 +130,28 @@ test('leaving the world map clears every trail, and a sector change does not', (
   assert.deepEqual(api.ui.trails, {}, 'the world map records nothing, so a trail from before it is stale');
 }));
 
-test('the Step button notes the trail of the tick it steps', () => withPage(() => {
+test('the Step button notes the trail of the tick it steps, and not on the world map', () => withPage(() => {
   const { api } = valley();
-  api.setView('loc');
-  const before = JSON.stringify(api.ui.trails);
+  api.setView('loc'); api.noteTrails(0);
   let moved = false;
-  for (let k = 0; k < 600 && !moved; k++){ api.ACTIONS.step(); moved = JSON.stringify(api.ui.trails) !== before; }
-  assert.ok(moved, 'a creature moved in a stepped tick and its trail grew');
+  for (let k = 0; k < 600 && !moved; k++){ api.ACTIONS.step(); moved = Object.values(api.ui.trails).some(tr => tr.length >= 2); }
+  assert.ok(moved, 'a creature moved in a stepped tick and its trail grew to two squares');
+  api.setView('world');
+  const before = JSON.stringify(api.ui.trails);
+  for (let k = 0; k < 60; k++) api.ACTIONS.step();
+  assert.equal(JSON.stringify(api.ui.trails), before, 'the world map records no trail');
 }));
 
+test('the Hour button clears every trail', () => withPage(() => {
+  const { api, a } = valley();
+  api.setView('loc'); api.noteTrails(0);
+  a.x++; api.noteTrails(1);
+  api.ACTIONS.hour();
+  assert.deepEqual(api.ui.trails, {}, 'a creature back near its old square an hour later would get a stale dot');
+}));
+
+/* main.js reads the DOM when it loads, so it cannot run in Node. This test matches its source text
+   instead, and a change to the layout of the loop alone breaks it. */
 test('the days step loop in main.js notes the trails after each step', () => {
   const src = fs.readFileSync(path.join(__dirname, '../src/ui/main.js'), 'utf8');
   assert.match(src, /while \(acc >= 1\)\{ step\(\); if \(trails\) noteTrails\(now\);/, 'noteTrails follows step() inside the while loop');
