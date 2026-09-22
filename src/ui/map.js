@@ -33,8 +33,9 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
-/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
-/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+/* ---- the field: the world before it has tiles. The preview paints the ground the marks will become, in the world
+   map's own colours, and the boundaries lie over it as faint lines. ---- */
+/* A boundary's ink by its pole, on the day-era overlay. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
 function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
@@ -44,17 +45,29 @@ function drawBoundaries(g, alpha, skip = null){
   }
   g.globalAlpha = 1;
 }
+/* How strongly a boundary shows over the preview in the ages. A line is only a hint of where one country ends. */
+const FIELD_LINE_ALPHA = 0.25;
 /* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
-   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends.
+   The preview is kept in fieldPreview and computed only when that is empty. drawField empties it when the
+   act changes, so it is computed once per act. The ground is filled one kind at a time, so each kind sets
+   its colour once. A wet boundary is not drawn as a line, because the preview already paints it as a river. */
 function drawFieldCache(skip = null){
+  if (!fieldPreview) fieldPreview = previewField();
   octx.setTransform(1, 0, 0, 1, 0, 0);
   octx.clearRect(0, 0, ocv.width, ocv.height);
-  for (const r of liveRegions()){
-    octx.fillStyle = fieldColor(r, P);
-    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
-    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  const byKind = {};
+  fieldPreview.forEach((k, i) => { (byKind[k] || (byKind[k] = [])).push(i); });
+  for (const k in byKind){
+    octx.fillStyle = P[PREVIEW_INK[k]];
+    for (const i of byKind[k]){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
   }
-  drawBoundaries(octx, 0.7, skip);
+  octx.fillStyle = P['field-line']; octx.globalAlpha = FIELD_LINE_ALPHA;
+  for (const b of liveBoundaries()){
+    if (b.pole === 'wet' || (skip && skip.has(b.id))) continue;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  octx.globalAlpha = 1;
 }
 
 /* ---- the ages in motion ----
@@ -218,7 +231,7 @@ function drawField(){
     fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null; fieldPreview = null;
   }
   const still = beatStill(anyDialogOpen());
   const f = fieldJump || still ? 1 : clamp(acc, 0, 1);

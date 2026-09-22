@@ -1274,20 +1274,6 @@ test('a creation watched age by age, or act by act, is the creation that startWo
   assert.equal(c.creation.ages, a.creation.ages, 'and on the same count of ages');
 });
 
-const PAL = { 'field-none': '#808080', 'field-wet': '#0000ff', 'field-dry': '#ffff00', 'field-hot': '#ff0000', 'field-cold': '#00ffff', 'field-above': '#ffffff', 'field-below': '#000000', 'field-light': '#ffffff', 'field-dark': '#000000', 'field-still': '#00ff00', 'field-moving': '#ff00ff' };
-
-test('the field colour is grey with no pole, and the mean of the poles with some', () => {
-  const api = loadUI(['state', 'derive'], ['mixHex', 'fieldColor']);
-  assert.equal(api.mixHex(['#000000', '#ffffff']), 'rgb(128,128,128)');
-  assert.equal(api.mixHex(['#ff0000']), 'rgb(255,0,0)');
-  api.startCreation('alpha', {});
-  assert.equal(api.fieldColor(api.liveRegions()[0], PAL), '#808080', 'the formless is grey');
-  for (let i = 0; i < 8; i++) api.step();
-  const made = api.liveRegions().filter(r => r.marks.some(m => m.kind === 'pole'));
-  assert.ok(made.length >= 2);
-  for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
-});
-
 test('the mark word goes right when there is room, and left when there is not', () => {
   const api = loadUI(['state', 'derive', 'keys', 'map'], ['markWordSide', 'MARK_R']);
   /* Plenty of room on both sides: the word goes right, its own default side. */
@@ -1358,7 +1344,7 @@ test('a scarred country says who fought over it', () => {
 });
 
 /* The final fix wave. */
-const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'fieldColor', 'ui'])];
+const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'ui'])];
 
 test('the view model answers at every age of a creation that throws its valley back', () => {
   const api = loadUI(['state', 'icons', 'derive', 'keys', 'map', 'inspect'], WATCH);
@@ -1371,7 +1357,7 @@ test('the view model answers at every age of a creation that throws its valley b
       api.viewKey(); api.cursorPhrase(); api.seasonLine(); api.gauges(); api.alerts(); api.paletteRows(); api.notePulses();
       for (const id of ['people', 'goals', 'chronicle', 'camp', 'legends']) api.drawerRows(id);
       for (const g of api.gods()) api.inspectGod(g);
-      for (const r of api.liveRegions()){ api.inspectRegion(r); api.fieldColor(r, PAL); }
+      for (const r of api.liveRegions()) api.inspectRegion(r);
     }, `age ${api.age}`);
   }
   assert.equal(api.era, 'days', 'the creation must reach the valley');
@@ -1967,7 +1953,7 @@ function recordCtx(){
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
-  const api = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+  const api = loadUI(['state', 'icons', 'derive', 'preview', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
     caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',

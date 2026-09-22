@@ -119,18 +119,6 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* The mean of a list of #rrggbb colours, as rgb(). */
-function mixHex(list){
-  let r = 0, g = 0, b = 0;
-  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
-  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
-}
-/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
-function fieldColor(r, pal){
-  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
-  return cs.length ? mixHex(cs) : pal['field-none'];
-}
-
 /* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };

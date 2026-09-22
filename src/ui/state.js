@@ -48,6 +48,10 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* The preview of the ground for the act on the field, or null when it must be computed again. It is a cache
+   derived from the state, not a choice the player makes. It exists because one call to previewField() took
+   130 to 240 ms at 33,600 tiles. The cache is drawn again when a cut's stroke ends, and it reuses this. */
+let fieldPreview = null;
 /* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
    single act to fade from. Counting gestures cannot stand in for this: one decision can write two
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */

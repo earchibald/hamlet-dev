@@ -112,8 +112,7 @@ test('an act that gives ground its first pole shows at once', () => {
    first cut is a dry god's. A wet god cuts one half, so that line is a river that no later split retires. A dry
    god cuts the other half. Each of the four regions gets the marks one painter reads. A burned scar is not here,
    because biomeOf already makes that ground ash. */
-test('each painter shows on a hand-built field', () => {
-  const api = fresh(); api.startCreation('r');
+function handBuilt(api){
   const god = pole => ({ id: 0, pole, traits: { patience: 1 } });
   const first = api.splitRegion(api.field.root, god('dry'));
   const a = api.splitRegion(first.a, god('wet')), b = api.splitRegion(first.b, god('dry'));
@@ -123,6 +122,11 @@ test('each painter shows on a hand-built field', () => {
   api.mark(den, 'making', 'wolf', null, 'A test.');
   api.mark(cut, 'scar', 'cut', null, 'A test.'); api.mark(cut, 'scar', 'broken', null, 'A test.');
   api.mark(drowned, 'scar', 'drowned', null, 'A test.'); api.mark(drowned, 'height', 2, null, 'A test.'); api.mark(drowned, 'depth', 1, null, 'A test.');
+  return { lake, den, cut, drowned };
+}
+test('each painter shows on a hand-built field', () => {
+  const api = fresh(); api.startCreation('r');
+  const { lake, den, cut, drowned } = handBuilt(api);
   const p = api.previewField(), W = api.W;
   const count = (r, kind) => r.tiles.filter(i => p[i] === kind).length;
   const rivers = api.liveBoundaries().filter(x => x.pole === 'wet');
@@ -150,9 +154,8 @@ test('each painter shows on a hand-built field', () => {
   assert.equal(count(drowned, 'mouth'), 1, 'the depth mark opens one mouth');
 });
 
-test('every kind has an ink, and every ink is a palette key readPalette reads', () => {
-  const api = fresh();
-  /* The key lists of readPalette(), from its source text, so a key it never reads fails here. */
+/* The key lists of readPalette(), from its source text, so a key it never reads is not in the set. */
+function paletteKeys(){
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'map.js'), 'utf8');
   const from = src.indexOf('function readPalette'), body = src.slice(from, src.indexOf('\n}', from));
   const lists = [...body.matchAll(/for \(const k of \[([^\]]*)\]\) P\[(k|'field-' \+ k)\]/g)];
@@ -160,6 +163,11 @@ test('every kind has an ink, and every ink is a palette key readPalette reads', 
   const keys = new Set();
   for (const [, list, into] of lists) for (const k of list.match(/'([^']+)'/g).map(q => q.slice(1, -1))) keys.add(into === 'k' ? k : 'field-' + k);
   assert.ok(keys.has('grass') && keys.has('field-none'), 'the parse found both lists');
+  return keys;
+}
+test('every kind has an ink, and every ink is a palette key readPalette reads', () => {
+  const api = fresh();
+  const keys = paletteKeys();
   for (const [kind, key] of Object.entries(api.PREVIEW_INK)) assert.ok(keys.has(key), `${kind} is inked with ${key}, which readPalette reads`);
   const kinds = new Set();
   for (const seed of SEEDS) for (const k of settledOf(seed).field) kinds.add(k);
@@ -205,4 +213,137 @@ for (const seed of SEEDS) test(`seed ${seed}: the preview looks like the valley`
   assert.ok(hill && rock, 'both maps hold hills');
   const factor = Math.max(hill / rock, rock / hill);
   assert.ok(factor <= FLOOR.hillFactor, `hill and peak tiles ${hill} against rock tiles ${rock}: a factor of ${factor.toFixed(2)}`);
+});
+
+/* ---- the gods' map, drawn from the preview ---- */
+
+/* A 2D context that draws nothing. It keeps each fill with its place, its colour and its alpha, and every colour
+   set as fillStyle, in order. The setters stand in for the canvas state, as in tests/icons.js. */
+function fillCtx(){
+  const c = { fills: [], styles: [], ink: '', alpha: 1, measureText: () => ({ width: 40 }) };
+  for (const k of ['setTransform', 'clearRect', 'strokeRect', 'drawImage', 'beginPath', 'arc', 'stroke', 'fill', 'save', 'restore', 'translate', 'rotate', 'scale', 'fillText', 'strokeText', 'closePath', 'moveTo', 'lineTo']) c[k] = () => {};
+  c.fillRect = (x, y) => { c.fills.push({ x, y, style: c.ink, alpha: c.alpha }); };
+  Object.defineProperty(c, 'fillStyle', { set(v){ c.ink = v; c.styles.push(v); }, get(){ return c.ink; } });
+  Object.defineProperty(c, 'globalAlpha', { set(v){ c.alpha = v; }, get(){ return c.alpha; } });
+  return c;
+}
+/* A palette with a colour of its own for every key, so a fill names the one key it came from. */
+function distinctPalette(){
+  const P = {};
+  [...paletteKeys(), 'void', 'bg', 'map-halo'].forEach((k, n) => { P[k] = '#' + (n + 1).toString(16).padStart(6, '0'); });
+  return P;
+}
+/* The field and the map code in one scope, with the view globals drawField reads. The two spies reassign a
+   function declared in the joined scope, so the code that calls it by name reaches the wrapper. */
+function drawRig(){
+  const api = loadUI(['state', 'icons', 'derive', 'preview', 'marks', 'map', 'dialogs', 'actions'],
+    ['PREVIEW_INK', 'previewField', 'drawFieldCache', 'drawField', 'WS'], {
+      setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; fieldPreview = null; }',
+      fieldKeyNow: '() => fieldKey',
+      setAcc: '(v) => { acc = v; }',
+      spyPreview: '(fn) => { previewField = fn; }',
+      spyCache: '(fn) => { drawFieldCache = fn; }',
+    });
+  const P = distinctPalette(), octx = fillCtx(), wctx = fillCtx();
+  global.document = { createElement: () => ({ width: 0, height: 0, getContext: () => fillCtx() }), querySelector: () => null };
+  global.Path2D = function(d){ this.d = d; };
+  return { api, P, octx, set: () => api.setUp({ wctx, octx, ocv: { width: 100, height: 100 }, P }) };
+}
+/* The colour of each tile after the ground pass. The ground is the fills at full alpha; the lines are fainter. */
+function groundOf(rig){
+  const { api, octx } = rig, at = new Map();
+  for (const f of octx.fills) if (f.alpha === 1) at.set((f.y / api.WS) * api.W + f.x / api.WS, f.style);
+  return at;
+}
+/* Three fields: the one grey field before the first act, a hand-built field that reaches every painter, and a
+   real creation four ages in. */
+const FIELDS = {
+  'the first field': api => {},
+  'the hand-built field': api => { handBuilt(api); },
+  'seed r at age 4': api => { for (let k = 0; k < 4 && api.era === 'gods'; k++) api.step(); },
+};
+
+test('drawFieldCache fills each tile with the colour of its preview kind, and sets each colour once', () => {
+  for (const [name, make] of Object.entries(FIELDS)){
+    const rig = drawRig(), { api, P, octx } = rig;
+    api.startCreation('r'); make(api); rig.set();
+    api.drawFieldCache();
+    const p = api.previewField(), at = groundOf(rig);
+    const fills = octx.fills.filter(f => f.alpha === 1).length;
+    assert.equal(fills, p.length, `${name}: the ground pass fills every tile once (${fills} fills for ${p.length} tiles)`);
+    const kinds = [...new Set(p)];
+    for (const kind of kinds){
+      const tiles = p.map((k, i) => k === kind ? i : -1).filter(i => i >= 0), step = Math.max(1, Math.floor(tiles.length / 40));
+      for (let n = 0; n < tiles.length; n += step){
+        const i = tiles[n];
+        assert.equal(at.get(i), P[api.PREVIEW_INK[kind]], `${name}: tile ${i} is ${kind}, and it was filled with ${at.get(i)}, not ${P[api.PREVIEW_INK[kind]]}`);
+      }
+    }
+    /* One colour per kind for the ground, then the one line colour. */
+    assert.equal(octx.styles.length, kinds.length + 1, `${name}: ${octx.styles.length} colours set for ${kinds.length} kinds and the lines`);
+    if (name === 'the hand-built field') assert.ok(kinds.length >= 8, `the hand-built field holds ${kinds.length} kinds`);
+  }
+});
+
+test('drawFieldCache sets no field colour but field-none and field-line', () => {
+  let none = 0;
+  for (const [name, make] of Object.entries(FIELDS)){
+    const rig = drawRig(), { api, P, octx } = rig;
+    api.startCreation('r'); make(api); rig.set();
+    api.drawFieldCache();
+    const banned = new Map(Object.keys(P).filter(k => k.startsWith('field-') && k !== 'field-none' && k !== 'field-line').map(k => [P[k], k]));
+    assert.ok(banned.size >= 10, `${banned.size} field colours are banned`);
+    for (const s of octx.styles) assert.ok(!banned.has(s), `${name}: drawFieldCache set ${banned.get(s)} as a fill`);
+    if (octx.styles.includes(P['field-none'])) none++;
+  }
+  assert.ok(none >= 1, 'the first field is filled with field-none');
+});
+
+test('in the ages a boundary is a faint line in field-line, a river is not a line, and a skipped cut is not drawn', () => {
+  for (const name of ['the hand-built field', 'seed r at age 4']){
+    const rig = drawRig(), { api, P, octx } = rig;
+    api.startCreation('r'); FIELDS[name](api); rig.set();
+    const live = api.liveBoundaries(), dry = live.filter(b => b.pole !== 'wet');
+    assert.ok(dry.length >= 1, `${name} has a dry boundary`);
+    if (name === 'the hand-built field') assert.ok(live.some(b => b.pole === 'wet'), 'the hand-built field has a wet boundary');
+    const lined = skip => {
+      octx.fills.length = 0; api.drawFieldCache(skip);
+      const lines = octx.fills.filter(f => f.alpha !== 1);
+      for (const f of lines){
+        assert.equal(f.alpha, 0.25, 'a line is drawn at alpha 0.25');
+        assert.equal(f.style, P['field-line'], 'a line is drawn in field-line');
+      }
+      return new Set(lines.map(f => (f.y / api.WS) * api.W + f.x / api.WS));
+    };
+    const want = bs => new Set(bs.flatMap(b => b.tiles));
+    assert.deepEqual(lined(null), want(dry), `${name}: the lines are the tiles of every dry boundary, and no other tile`);
+    const cut = dry[dry.length - 1];
+    assert.deepEqual(lined(new Set([cut.id])), want(dry.slice(0, -1)), `${name}: a skipped boundary is not drawn`);
+  }
+});
+
+test('drawField computes the preview once per act, and reuses it when a cut is drawn again', () => {
+  const rig = drawRig(), { api } = rig;
+  api.startCreation('gamma'); rig.set();
+  const realPreview = api.previewField, realCache = api.drawFieldCache;
+  let previews = 0, caches = 0;
+  api.spyPreview(() => { previews++; return realPreview(); });
+  api.spyCache(skip => { caches++; return realCache(skip); });
+  let beats = 0, acts = 0, redrawn = 0;
+  while (api.era === 'gods' && beats < 40 && (acts < 5 || redrawn < 2)){
+    /* A beat can end an age and write no gesture. Its field key is the same, and so is its field. */
+    const key = api.fieldKeyNow();
+    api.step(true); beats++;
+    previews = 0; caches = 0;
+    /* Mid-beat, twice, as two frames. Then the end of the beat, where a cut's stroke is done. */
+    api.setAcc(0.5); api.drawField(); api.drawField();
+    api.setAcc(1); api.drawField();
+    const moved = api.fieldKeyNow() !== key;
+    if (moved) acts++;
+    assert.equal(previews, moved ? 1 : 0, `beat ${beats}: the preview was computed ${previews} times, and the act ${moved ? 'changed' : 'did not change'}`);
+    assert.ok(caches <= 2, `beat ${beats}: the cache was drawn ${caches} times`);
+    if (caches === 2) redrawn++;
+  }
+  assert.ok(acts >= 5, `${acts} acts in ${beats} beats`);
+  assert.ok(redrawn >= 2, `${redrawn} acts drew the cache again for a cut, in ${beats} beats`);
 });
