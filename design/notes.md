@@ -261,7 +261,16 @@ The page opens in the gods era. The player watches the creation age by age. The 
 
 A god has no place in the ages, so a follow is refused. The foot says there is nothing to follow.
 
-At settle the view moves to the first person, the saved speed returns, and the foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
+At settle a zoom carries the view from the gods' map to the first person's sector. It has four stops: the finished gods' map, the world map, the nine sectors around that person, and the person's own sector. `startZoom(stops)` takes any list of stops, and settle is only its first caller.
+
+| Leg | Duration |
+|---|---|
+| Fade, gods' map to world map | 1,000 ms |
+| Hold at a stop | 350 ms |
+| Zoom to the nine sectors | 1,600 ms |
+| Zoom to the person's sector | 1,100 ms |
+
+The world waits while the zoom runs, and the beat clock starts from zero once it ends. A key or a click skips it, and reduced motion skips it before it starts. Once it ends, the saved speed returns, and the foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
 
 The field on the world map, in the order it is drawn:
 
