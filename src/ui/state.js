@@ -78,6 +78,10 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The People drawer's camp: null follows the chosen camp, a number is a camp id, 'all' is everyone.
+     Left out of persist(): a camp id is valid in one world only. onLoad and onSettle set it back. */
+  peopleCamp: null,
+  peopleAge: 'any',    /* the People drawer's age: 'any', 'young', 'adult', or 'old' */
   /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
      a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
   chronSearch: '',
@@ -141,10 +145,13 @@ const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 
+/* The age button's cycle, in order. restore() accepts these and nothing else. */
+const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -153,6 +160,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;

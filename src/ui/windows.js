@@ -1,6 +1,8 @@
 /* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
+  /* A popped-out People window has no filter row, so in the days its title names the count and both filters. */
+  if (w.kind === 'drawer' && w.target === 'people' && !inAges()) return esc(peopleTitle());
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
   if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.species === 'god' ? godIconSvg(a.pole, 16, null) : ''}${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
@@ -21,7 +23,10 @@ function renderWindows(){
     }
     el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
     el.classList.toggle('focus', ui.focus === `window:${w.id}`);
-    el.querySelector('.title').innerHTML = winTitle(w);
+    /* The People title can hold a long camp name, so it alone is cut short, with the whole of it on hover. */
+    const title = el.querySelector('.title'), cut = w.kind === 'drawer' && w.target === 'people' && !inAges();
+    title.innerHTML = winTitle(w); title.classList.toggle('cut', cut);
+    if (cut) title.title = peopleTitle(); else title.removeAttribute('title');
     const body = el.querySelector('.body'), keep = body.scrollTop;
     body.classList.toggle('ins', w.kind === 'inspect');
     if (w.kind === 'drawer') DRAWER_RENDER[w.target](body, w.target);

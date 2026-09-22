@@ -188,6 +188,8 @@ function onLoad(){
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
+  ui.peopleCamp = null;
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -265,6 +267,8 @@ function onSettle(){
   acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
+  /* The camps of the days are new, so the People drawer follows the chosen camp. */
+  ui.peopleCamp = null;
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -376,6 +380,20 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The People drawer's camp: the chosen camp, each other camp in order, everyone, and back. With no
+     chosen camp the list already holds everyone, so there is nothing to cycle. A value not in the
+     cycle, such as the id of a camp that has ended, counts as the chosen camp. */
+  peopleCamp(){
+    const chosen = chosenCamp(); if (!chosen) return;
+    const cycle = [null, ...camps.filter(c => c !== chosen).map(c => c.id), 'all'];
+    ui.peopleCamp = cycle[(Math.max(0, cycle.indexOf(ui.peopleCamp)) + 1) % cycle.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
+  /* The People drawer's age: any, young, adult, old, and back. */
+  peopleAge(){
+    ui.peopleAge = PEOPLE_AGES[(Math.max(0, PEOPLE_AGES.indexOf(ui.peopleAge)) + 1) % PEOPLE_AGES.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
   foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },

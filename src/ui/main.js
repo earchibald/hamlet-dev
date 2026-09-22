@@ -102,6 +102,8 @@ function initUI(){
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
+    if (e.target.closest('#peopleCampBtn')){ ACTIONS.peopleCamp(); return; }
+    if (e.target.closest('#peopleAgeBtn')){ ACTIONS.peopleAge(); return; }
     const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });

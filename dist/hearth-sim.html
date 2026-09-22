@@ -134,6 +134,8 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .gs{color:var(--muted);font-size:12px;grid-column:2/4}
 /* A folded stage's idle goals: two lines at most, the rest behind the title. */
 .row.stage .fold{grid-column:2/4;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* The camp after a name in a People list of several camps: muted text, not a tag, cut short when long. */
+.campname{display:inline-block;max-width:110px;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;color:var(--muted);font-size:11px}
 .tag{font-size:10px;border:1px solid var(--line);border-radius:10px;padding:0 5px;color:var(--muted);margin-left:5px;vertical-align:middle}
 .pri{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex:none}
 .pbtn{font-size:11px;padding:1px 6px;border:0;background:none;cursor:pointer;border-right:1px solid var(--line)}
@@ -151,6 +153,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #legends li.age{border-bottom:0;padding-top:9px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .k-good{color:var(--good)} .k-bad{color:var(--bad)} .k-death{color:var(--bad);font-weight:700} .k-major{font-weight:700;color:var(--major)}
 .filter{display:flex;gap:4px;padding:6px 10px 0}
+/* The People filters share the row and cut a long camp name short, keeping the key. */
+.filter.pf .btn{display:inline-flex;align-items:baseline;min-width:0;max-width:65%}
+.filter.pf .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filter.pf kbd{flex:none}
 .filter input{flex:1;min-width:0;padding:2px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:12px}
 table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding:2px 4px;border-bottom:1px solid var(--line)} table.kv td:first-child{color:var(--muted);width:34%}
 /* Floating windows. */
@@ -158,6 +164,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
 .win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The cut title gives way, so the dock hint and the close button keep their width. */
+.win .bar .title.cut + span{flex:none}
 .win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
@@ -7424,6 +7433,10 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The People drawer's camp: null follows the chosen camp, a number is a camp id, 'all' is everyone.
+     Left out of persist(): a camp id is valid in one world only. onLoad and onSettle set it back. */
+  peopleCamp: null,
+  peopleAge: 'any',    /* the People drawer's age: 'any', 'young', 'adult', or 'old' */
   /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
      a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
   chronSearch: '',
@@ -7487,10 +7500,13 @@ const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 
+/* The age button's cycle, in order. restore() accepts these and nothing else. */
+const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -7499,6 +7515,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
@@ -7850,16 +7867,52 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+/* The camp the player has chosen, or null. `camp` can outlive a camp that is gone, so the list decides. */
+const chosenCamp = () => camp && camps.includes(camp) ? camp : null;
+/* Which camp the People drawer lists: a camp record, or null for everyone. `ui.peopleCamp` is null to
+   follow the chosen camp, a camp id, or 'all'. A camp id that is no longer in `camps` falls back to
+   the chosen camp, so a camp that ends does not leave the list empty. */
+function peopleScope(){
+  if (ui.peopleCamp === 'all') return { camp: null };
+  const picked = typeof ui.peopleCamp === 'number' ? camps.find(c => c.id === ui.peopleCamp) : null;
+  return { camp: picked || chosenCamp() };
+}
+/* People in the drawer's camp and age, trouble first. Everyone is a candidate, in any camp or none,
+   and the two filters then narrow the list. The dead stay on the list for a day after the stamp.
    `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
-   field, never for its truth. */
+   field, never for its truth. Camp order sorts after the living, so a mixed list keeps each camp
+   together, and a person with no camp goes last. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
+  const only = peopleScope().camp, age = ui.peopleAge;
+  const rows = beings.filter(b => b.species === 'human' && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))
+    && (!only || b.camp === only) && (age === 'any' || stage(b) === age)).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
-  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+  const order = b => { const i = b.camp ? camps.indexOf(b.camp) : -1; return i < 0 ? camps.length : i; };
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || (order(p.a) - order(q.a)) || p.a.name.localeCompare(q.a.name));
+}
+/* The drawer's count: the living people shown, and the living people in the world. The dead of the
+   last day are on the list but count in neither, so the two agree when no filter hides anyone. */
+function peopleCount(){
+  return { shown: peopleRows().filter(r => r.a.alive).length, alive: beings.filter(b => b.species === 'human' && b.alive).length };
+}
+/* The camp button's label. */
+function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
+/* The age button's label. */
+const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* The count after the drawer's title, without its leading dot: "5 of 18" when a filter hides some
+   living people, else "18". The drawer and a popped-out window both read it, so the two agree. */
+function peopleCountText(){ const n = peopleCount(); return n.shown === n.alive ? `${n.alive}` : `${n.shown} of ${n.alive}`; }
+/* A popped-out People window has no filter row, so its title carries the count and both filters. */
+const peopleTitle = () => ['People', peopleCountText(), peopleCampLabel(), peopleAgeLabel()].join(' \u00b7 ');
+/* The text of an empty list. The filters can hide everyone while people live, and the line says so. */
+const peopleEmptyText = () => peopleCount().alive > 0 ? 'Nobody matches these filters.' : 'Nobody yet.';
+/* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
+function peopleMixed(){
+  const seen = new Set(peopleRows().map(r => r.a.camp || null));
+  return seen.size > 1 || seen.has(null);
 }
 
 /* The state lines on a person's card: short facts about what holds them right now, one idea each.
@@ -8055,10 +8108,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -8285,11 +8338,16 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'e',          focus: 'drawer', action: 'peopleCamp',  label: 'People: the next camp, then everyone', button: 'peopleCampBtn' },
+  { key: 'y',          focus: 'drawer', action: 'peopleAge',   label: 'People: the next age', button: 'peopleAgeBtn' },
   { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
   { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
   { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
   { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
+  /* A popped-out People drawer takes the same filter keys. It has no filter buttons, so these rows name none. */
+  { key: 'e',          focus: 'window', action: 'peopleCamp', label: 'People: the next camp, then everyone' },
+  { key: 'y',          focus: 'window', action: 'peopleAge',  label: 'People: the next age' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },
@@ -9212,6 +9270,8 @@ function renderStrip(){
 /* Floating windows. The DOM follows ui.windows: one .win per entry, kept across renders so scroll and drag survive.
    A drawer window's body is rendered by the drawer's own renderer. An inspector's body is the card. */
 function winTitle(w){
+  /* A popped-out People window has no filter row, so in the days its title names the count and both filters. */
+  if (w.kind === 'drawer' && w.target === 'people' && !inAges()) return esc(peopleTitle());
   if (w.kind === 'drawer') return DRAWERS.find(d => d.id === w.target).label + `<span class="k">${drawerRows(w.target).length}</span>`;
   if (w.target.being != null){ const a = beingById(w.target.being); return a ? `${a.species === 'god' ? godIconSvg(a.pole, 16, null) : ''}${esc(a.name)} <span class="k">${a.species === 'god' ? esc(a.status) : moodWord(a, mood(a))}</span>` : 'Gone'; }
   /* A tile window's title bar shares the row with the drag handle, a hint, and the close button, with
@@ -9232,7 +9292,10 @@ function renderWindows(){
     }
     el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
     el.classList.toggle('focus', ui.focus === `window:${w.id}`);
-    el.querySelector('.title').innerHTML = winTitle(w);
+    /* The People title can hold a long camp name, so it alone is cut short, with the whole of it on hover. */
+    const title = el.querySelector('.title'), cut = w.kind === 'drawer' && w.target === 'people' && !inAges();
+    title.innerHTML = winTitle(w); title.classList.toggle('cut', cut);
+    if (cut) title.title = peopleTitle(); else title.removeAttribute('title');
     const body = el.querySelector('.body'), keep = body.scrollTop;
     body.classList.toggle('ins', w.kind === 'inspect');
     if (w.kind === 'drawer') DRAWER_RENDER[w.target](body, w.target);
@@ -9305,7 +9368,11 @@ const rowNum = (id, i) => focusedDrawer() === id && i < 9 ? i + 1 : '';
 /* The header and the filter row of a drawer. Built once, then kept. */
 function drawerHTML(d){
   const filter = d.id === 'chronicle' ? `<div class="filter"><button class="btn small" data-filter="all">All</button><button class="btn small" data-filter="major">Major</button><input id="chronSearch" autocomplete="off" placeholder="Search names /"></div>`
-    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>` : '';
+    : d.id === 'goals' ? `<div class="filter"><button class="btn small" id="showAllBtn">All<kbd>A</kbd></button></div>`
+    /* renderDrawers writes the labels, since they follow the filters. It writes only the inner span. A
+       click's own target must stay in the page: the map's pointer handler runs after the drawer's, and a
+       target cut out of the page by a rewrite is not inside #drawers, so the map took the focus. */
+    : d.id === 'people' ? `<div class="filter pf" id="peopleFilter"><button class="btn small" id="peopleCampBtn"><span class="lbl"></span><kbd>E</kbd></button><button class="btn small" id="peopleAgeBtn"><span class="lbl"></span><kbd>Y</kbd></button></div>` : '';
   return `<h2><span>${d.label}<span class="muted" id="count-${d.id}"></span></span><span class="k">${d.key} \u00b7 \u2191\u2193 \u00b7 \u23ce</span></h2>${filter}<div class="body" id="body-${d.id}"></div>`;
 }
 /* Sections are kept across renders. A rebuilt drawer loses the scroll, the selection, and any text the player is selecting. */
@@ -9324,6 +9391,17 @@ function renderDrawers(){
     const box = sec.querySelector('#chronSearch');
     if (box && box.value !== ui.chronSearch && document.activeElement !== box) box.value = ui.chronSearch;
     const all = sec.querySelector('#showAllBtn'); if (all) all.classList.toggle('on', ui.showAll);
+    /* The People filters. In the ages the drawer lists gods, which have no camp and no age, so the row hides.
+       A button is on when its filter is not the default: a camp other than the chosen one, or an age. */
+    const pf = sec.querySelector('#peopleFilter');
+    if (pf){
+      pf.hidden = inAges();
+      if (!pf.hidden){
+        const cb = sec.querySelector('#peopleCampBtn'), ab = sec.querySelector('#peopleAgeBtn');
+        setHTML(cb.querySelector('.lbl'), esc(peopleCampLabel())); cb.classList.toggle('on', peopleScope().camp !== chosenCamp());
+        setHTML(ab.querySelector('.lbl'), esc(peopleAgeLabel())); ab.classList.toggle('on', ui.peopleAge !== 'any');
+      }
+    }
   });
   for (const id of docked){
     const el = $(`body-${id}`), keep = el.scrollTop;
@@ -9333,9 +9411,15 @@ function renderDrawers(){
 }
 function renderPeople(el){
   const rows = drawerRows('people');
-  const c = $('count-people'); if (c) c.textContent = ` · ${rows.filter(r => r.r.a.alive).length}`;
+  const ages = inAges();
+  /* In the ages the list is the gods, and no filter applies. In the days the count says how many the filters show. */
+  const c = $('count-people'); if (c) c.textContent = ` · ${ages ? rows.filter(r => r.r.a.alive).length : peopleCountText()}`;
+  /* A list of more than one camp names each person's camp, in muted text rather than a tag, so that
+     "no camp" does not read as an age beside "young" and "old". */
+  const mixed = !ages && peopleMixed();
+  const home = a => `<span class="campname">${a.camp ? esc(a.camp.name) : 'no camp'}</span>`;
   el.innerHTML = rows.map((r, i) => { const a = r.r.a, st = a.species === 'god' ? 'adult' : stage(a), label = esc(r.label);
-    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${inAges() ? 'No god yet.' : 'Nobody yet.'}</div>`;
+    return `<div class="row ${rowClass('people', i)} ${r.r.trouble ? 'trouble' : ''} ${a.alive ? '' : 'dead'}" data-being="${a.id}" data-i="${i}"><span class="n">${rowNum('people', i)}</span><span><b style="color:${beingColor(a)}">${a.species === 'god' ? godIconSvg(a.pole, 14, null) : ''}${label}</b>${mixed ? home(a) : ''}${st === 'young' ? '<span class="tag">young</span>' : st === 'old' ? '<span class="tag">old</span>' : ''}<span class="bar mood"><i style="width:${clamp(r.r.m, 0, 100)}%;background:${needColor(r.r.m)}"></i></span></span><span class="st">${esc(r.r.status)}</span></div>`; }).join('') || `<div class="muted">${ages ? 'No god yet.' : peopleEmptyText()}</div>`;
 }
 function renderGoals(el){
   const rows = drawerRows('goals');
@@ -9693,6 +9777,8 @@ function onLoad(){
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
+  ui.peopleCamp = null;
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9770,6 +9856,8 @@ function onSettle(){
   acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
+  /* The camps of the days are new, so the People drawer follows the chosen camp. */
+  ui.peopleCamp = null;
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9881,6 +9969,20 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The People drawer's camp: the chosen camp, each other camp in order, everyone, and back. With no
+     chosen camp the list already holds everyone, so there is nothing to cycle. A value not in the
+     cycle, such as the id of a camp that has ended, counts as the chosen camp. */
+  peopleCamp(){
+    const chosen = chosenCamp(); if (!chosen) return;
+    const cycle = [null, ...camps.filter(c => c !== chosen).map(c => c.id), 'all'];
+    ui.peopleCamp = cycle[(Math.max(0, cycle.indexOf(ui.peopleCamp)) + 1) % cycle.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
+  /* The People drawer's age: any, young, adult, old, and back. */
+  peopleAge(){
+    ui.peopleAge = PEOPLE_AGES[(Math.max(0, PEOPLE_AGES.indexOf(ui.peopleAge)) + 1) % PEOPLE_AGES.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
   foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },
@@ -10075,6 +10177,8 @@ function initUI(){
     const pri = e.target.closest('[data-goal][data-pri]'); if (pri){ say(inject({ source: 'player', act: 'priority', id: pri.dataset.goal, pri: Number(pri.dataset.pri) })); renderUI(true); return; }
     const f = e.target.closest('[data-filter]'); if (f){ ui.chronFilter = f.dataset.filter; ui.row.chronicle = 0; persist(); renderUI(true); return; }
     if (e.target.closest('#showAllBtn')){ ACTIONS.showAll(); return; }
+    if (e.target.closest('#peopleCampBtn')){ ACTIONS.peopleCamp(); return; }
+    if (e.target.closest('#peopleAgeBtn')){ ACTIONS.peopleAge(); return; }
     const row = e.target.closest('[data-i]');
     if (row){ ui.row[id] = Number(row.dataset.i); rowOpen(); } else renderUI(true);
   });
