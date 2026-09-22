@@ -395,6 +395,16 @@ function drawMid(){
   mctx.strokeStyle = P.grid; mctx.lineWidth = 1;
   for (let k = 1; k < 3; k++){ mctx.beginPath(); mctx.moveTo(k * LW * MS + 0.5, 0); mctx.lineTo(k * LW * MS + 0.5, MH); mctx.moveTo(0, k * LH * MS + 0.5); mctx.lineTo(MW, k * LH * MS + 0.5); mctx.stroke(); }
   mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.font = `700 ${MS + 2}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. The nearby view has no level rule, so neither do the dots.
+     A dot is drawn when its square is in view, wherever its being stands, so a trail that leaves the view
+     fades there instead of vanishing. */
+  const inMid = (x, y) => x >= ox && x < ox + 3 * LW && y >= oy && y < oy + 3 * LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    mctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
+  }
+  mctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
@@ -474,6 +484,18 @@ function drawLoc(){
     ctx.fillStyle = fl === 1 ? P.fire2 : P.fire; ctx.fillText(fl === 2 ? '^' : '▲', lx * T + T / 2, ly * T + T / 2 + 1);
   }
   ctx.font = `700 ${T - 4}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  /* The motion trails, under the glyphs. A dot takes the glyph loop's level rule on its own square,
+     and is drawn when its square is in view, wherever its being stands. */
+  const inLoc = (x, y) => x >= ox && x < ox + LW && y >= oy && y < oy + LH, now = uiNow();
+  for (const a of beings){
+    if (!a.alive || !ui.trails[a.id]) continue;
+    ctx.fillStyle = beingColor(a);
+    for (const d of trailDots(a.id, now)){
+      if (!inLoc(d.x, d.y) || (d.z !== lvl && !(d.z < lvl && !tileAt(d.x, d.y, lvl)))) continue;
+      ctx.globalAlpha = d.z === lvl ? d.alpha : d.alpha / 2; ctx.beginPath(); ctx.arc((d.x - ox) * T + T / 2, (d.y - oy) * T + T / 2, T * 0.16, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
