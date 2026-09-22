@@ -29,8 +29,8 @@ const NAMES = ['ui', 'peopleRows', 'peopleScope', 'peopleCount', 'peopleCampLabe
    camp. Every need is full, so nobody is in trouble and the sort is by camp order, then name.
    Every name is fixed, the first person's too, so a sort by name alone gives a different order from
    a sort by camp. The namer's pick for the first person could otherwise hide a missing camp order. */
-function valley(){
-  const api = loadUI(FILES, NAMES);
+function valley(files = FILES, names = NAMES){
+  const api = loadUI(files, names);
   api.startWorld('r');
   const c1 = api.camp, first = api.beings.find(b => b.species === 'human');
   const c2 = api.makeCamp('The second camp');
@@ -220,4 +220,39 @@ test('E and Y fire the two filters with a drawer or a window focused, and not wi
   assert.equal(row('peopleAge').button, 'peopleAgeBtn');
   assert.equal(typeof api.ACTIONS.peopleCamp, 'function');
   assert.equal(typeof api.ACTIONS.peopleAge, 'function');
+});
+
+/* The call sites. The tests above hold the helpers. These hold that renderPeople in panels.js and
+   winTitle in windows.js use them: a review broke all three call sites at once, and the tests above
+   still passed. renderPeople finds the drawer head with $, which is document.getElementById, so a
+   small document stub hands out one element per id and keeps each for the test to read. */
+const PAGE_FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'strip', 'inspect', 'windows', 'panels', 'dialogs', 'actions'];
+const PAGE_NAMES = [...NAMES, 'renderPeople', 'winTitle', 'inAges'];
+function paintPeople(api){
+  const els = {}, body = { innerHTML: '' }, had = globalThis.document;
+  globalThis.document = { getElementById: id => els[id] || (els[id] = { textContent: '', innerHTML: '' }) };
+  try { api.renderPeople(body); } finally { if (had === undefined) delete globalThis.document; else globalThis.document = had; }
+  return { count: els['count-people'] && els['count-people'].textContent, body: body.innerHTML };
+}
+
+test('renderPeople writes the count text into the drawer head', () => {
+  const { api } = valley(PAGE_FILES, PAGE_NAMES);
+  assert.equal(paintPeople(api).count, ' · 3 of 5', 'the chosen camp shows three of the five living');
+  api.ui.peopleCamp = 'all';
+  assert.equal(paintPeople(api).count, ' · 5', 'with nobody hidden the head shows one number');
+});
+
+test('renderPeople says the filters hide everyone, or "Nobody yet." when nobody lives', () => {
+  const { api, c2 } = valley(PAGE_FILES, PAGE_NAMES);
+  api.ui.peopleCamp = c2.id; api.ui.peopleAge = 'old';
+  assert.equal(paintPeople(api).body, '<div class="muted">Nobody matches these filters.</div>', 'the filters hide all five');
+  /* A death with no diedAt is not one of the day's dead, so the list is empty and not a list of the dead. */
+  for (const b of api.beings) if (b.species === 'human') b.alive = false;
+  assert.equal(paintPeople(api).body, '<div class="muted">Nobody yet.</div>', 'with nobody alive the filters are not the cause');
+});
+
+test('winTitle gives a popped-out People window the count and both filters in the days', () => {
+  const { api, c1 } = valley(PAGE_FILES, PAGE_NAMES);
+  assert.equal(api.inAges(), false, 'setup: the valley is in the days');
+  assert.equal(api.winTitle({ kind: 'drawer', target: 'people' }), `People · 3 of 5 · Camp: ${c1.name} · Age: any`);
 });
