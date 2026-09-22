@@ -261,7 +261,7 @@ The page opens in the gods era. The player watches the creation age by age. The 
 
 A god has no place in the ages, so a follow is refused. The foot says there is nothing to follow.
 
-At settle, the view zooms from the gods' map to the first person's sector. The zoom has four stops: the finished gods' map, the world map, the nine sectors around that person, and that person's sector. `startZoom(stops)` takes any list of stops. Settle is its first caller.
+At settle, the view zooms from the gods' map to the first person's sector. The zoom has four stops: the finished gods' map, the world map, the nine sectors around that person, and that person's sector. `startZoom(stops)` takes any list of stops. Settle is its first caller. A settle with no first person stops at the world map. The view only fades from the gods' map to it.
 
 | Leg | Duration |
 |---|---|

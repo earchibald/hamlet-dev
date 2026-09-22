@@ -239,7 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
       <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
-      <div class="map-wrap" id="zoom" hidden><canvas id="zmap" aria-label="The view moving from the world to the valley"></canvas><div id="zoomSkip">Press any key, or click, to go straight to the valley.</div></div>
+      <div class="map-wrap" id="zoom" hidden><canvas id="zmap" aria-label="The view zooms from the world down to the valley"></canvas><div id="zoomSkip">Press any key, or click, to go straight to the valley.</div></div>
     </div>
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
@@ -10643,7 +10643,8 @@ function initUI(){
      way, and the one-shot capture listener below consumes that click too, wherever it lands.
      When no zoom is running, neither listener does anything. Each new press clears the flag
      first, so a press that ends with no click, such as a cancelled touch, cannot use up the next
-     click. */
+     click. The keydown handler below clears it too, so a key pressed after a cancelled touch is
+     not swallowed by a stale click either. */
   let zoomSkipConsumesClick = false;
   document.addEventListener('pointerdown', e => {
     zoomSkipConsumesClick = false;
@@ -10657,8 +10658,12 @@ function initUI(){
     e.stopPropagation(); e.preventDefault();
   }, true);
   document.addEventListener('keydown', e => {
-    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */
-    if (zoom){ e.preventDefault(); endZoom(); return; }
+    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else.
+       This also clears the skip flag, so a keyboard press right after a cancelled touch is not
+       swallowed by a stale click. A chord held with Meta, Ctrl, or Alt still ends the zoom but skips
+       preventDefault, so the browser's own shortcut for that chord, such as Cmd+R, still runs rather
+       than being blocked for up to the zoom's whole length. A plain key still calls preventDefault. */
+    if (zoom){ zoomSkipConsumesClick = false; if (!(e.metaKey || e.ctrlKey || e.altKey)) e.preventDefault(); endZoom(); return; }
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
        that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
        plain key let through, and only as the way out of the chronicle's search box. */

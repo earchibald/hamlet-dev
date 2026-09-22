@@ -155,7 +155,8 @@ function initUI(){
      way, and the one-shot capture listener below consumes that click too, wherever it lands.
      When no zoom is running, neither listener does anything. Each new press clears the flag
      first, so a press that ends with no click, such as a cancelled touch, cannot use up the next
-     click. */
+     click. The keydown handler below clears it too, so a key pressed after a cancelled touch is
+     not swallowed by a stale click either. */
   let zoomSkipConsumesClick = false;
   document.addEventListener('pointerdown', e => {
     zoomSkipConsumesClick = false;
@@ -169,8 +170,12 @@ function initUI(){
     e.stopPropagation(); e.preventDefault();
   }, true);
   document.addEventListener('keydown', e => {
-    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */
-    if (zoom){ e.preventDefault(); endZoom(); return; }
+    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else.
+       This also clears the skip flag, so a keyboard press right after a cancelled touch is not
+       swallowed by a stale click. A chord held with Meta, Ctrl, or Alt still ends the zoom but skips
+       preventDefault, so the browser's own shortcut for that chord, such as Cmd+R, still runs rather
+       than being blocked for up to the zoom's whole length. A plain key still calls preventDefault. */
+    if (zoom){ zoomSkipConsumesClick = false; if (!(e.metaKey || e.ctrlKey || e.altKey)) e.preventDefault(); endZoom(); return; }
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
        that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
        plain key let through, and only as the way out of the chronicle's search box. */
