@@ -17,8 +17,9 @@ function frame(now){
          The clock is read every step: performance.now() costs about 45 ns against a step's 14,000 ns,
          both measured in Safari on 2026-09-20, so reading it is 0.3% and a coarser check would only
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
-         leaves no backlog for a later one to run in one burst. */
-      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS; while (acc >= 1){ step(); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
+         leaves no backlog for a later one to run in one burst.
+         The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
+      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
@@ -37,6 +38,7 @@ function frame(now){
     /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
     if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    pruneTrails(now);
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
     if (now - lastUi > 250){ notePulses(); renderUI(false); lastUi = now; }
