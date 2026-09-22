@@ -152,6 +152,7 @@ const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x:
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
+  endZoom();
   startCreation(seed, {});
   fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
@@ -215,6 +216,7 @@ function loadWorld(snapshot, note){
 /* The view after a load. Everything it remembers points at the world that was replaced, and the new
    world can be a smaller one, so this puts the view back on the ground as onSettle does. */
 function onLoad(){
+  endZoom();
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
@@ -294,6 +296,56 @@ function continueWorld(){
   if (loadWorld(lastSave, startNote)) closeDialogs();
 }
 
+/* ---------- the zoom ----------
+   The camera that carries the player from the gods' map to the first person's sector at settle. The pure
+   model lives in zoom.js; these three functions are its one writer, as state.js's comment on `zoom` says. */
+
+/* A copy of a canvas, pixel for pixel, so a later draw to the source canvas cannot change the picture. */
+function copyCanvas(src){
+  const c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+/* The canvas a view draws on. */
+const canvasFor = v => v === 'world' ? wcv : v === 'mid' ? mcv : cv;
+
+/* Start a zoom along the given stops. Returns without doing anything when there is no page, when the
+   player asked for less motion, or when there are fewer than two stops to move between. */
+function startZoom(stops){
+  if (typeof document === 'undefined' || !wcv) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!stops || stops.length < 2) return;
+  const pics = {}, boxes = {};
+  /* The field is the last frame of the ages: the frame loop calls onSettle before it draws, so wcv
+     still shows what the ages left there. */
+  pics.field = copyCanvas(wcv);
+  for (const stop of stops){
+    if (stop.image === 'field' || pics[stop.image]) continue;
+    $('world').hidden = stop.view !== 'world'; $('mid').hidden = stop.view !== 'mid'; $('loc').hidden = stop.view !== 'loc';
+    if (stop.s) cur = { sx: stop.s.sx, sy: stop.s.sy };
+    if (stop.view === 'world') drawWorld(); else if (stop.view === 'mid') drawMid(); else drawLoc();
+    const canvas = canvasFor(stop.view), r = canvas.getBoundingClientRect();
+    boxes[stop.image] = { w: r.width, h: r.height };
+    pics[stop.image] = copyCanvas(canvas);
+  }
+  boxes.field = boxes.world;
+  $('world').hidden = true; $('mid').hidden = true; $('loc').hidden = true; $('zoom').hidden = false;
+  zoom = { stops, legs: zoomPlan(stops), t: 0, pics, boxes };
+}
+/* One frame of a running zoom. Ends it once the plan is over. */
+function advanceZoom(dt){
+  zoom.t += dt;
+  if (zoomAt(zoom.legs, zoom.t) === null) endZoom();
+}
+/* Leaves the zoom and shows the view it was headed for. acc is cleared so the days do not open with a
+   backlog of ticks the frame loop never ran while the zoom held the world still. */
+function endZoom(){
+  if (!zoom) return;
+  zoom = null; $('zoom').hidden = true; acc = 0;
+  setView(view, cur);
+}
+
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
   acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
@@ -311,6 +363,7 @@ function onSettle(){
   if (ui.focus === 'timeline') ui.focus = 'map';
   const a = firstPerson();
   if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
+  startZoom(settleStops(a ? secOf(a.x, a.y) : null));
   say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
 }
 function applyTool(c, e){

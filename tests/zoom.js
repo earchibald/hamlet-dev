@@ -1,6 +1,8 @@
 // The pure zoom model: frames, camera, plan, clock, and alphas. Fast.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const sim = require('../src/sim');
 const ui = require('../src/ui');
 
@@ -26,6 +28,11 @@ test('the three frames', () => {
   assert.deepEqual(api.viewFrame('world'), { x: 0, y: 0, w: 280, h: 120 });
   assert.deepEqual(api.viewFrame('mid', { sx: 4, sy: 2 }), { x: 84, y: 20, w: 84, h: 60 });
   assert.deepEqual(api.viewFrame('loc', { sx: 4, sy: 2 }), { x: 112, y: 40, w: 28, h: 20 });
+  /* A sector at the world's edge (column 0, row 0). drawMid's midOrigin, in src/ui/map.js, gives the
+     same starting tile with no clamp: `{ ox: (cur.sx - 1) * LW, oy: (cur.sy - 1) * LH }`. The block it
+     draws starts before the world's own edge, and viewFrame must give the same block for the zoom's
+     pictures to line up with what the player already saw there. */
+  assert.deepEqual(api.viewFrame('mid', { sx: 0, sy: 0 }), { x: -28, y: -20, w: 84, h: 60 });
 });
 
 const BOXES = { world: { w: 280, h: 120 }, mid: { w: 168, h: 120 }, loc: { w: 168, h: 120 } };
@@ -129,4 +136,17 @@ test('the alphas', () => {
 
   const holdAny = api.legAlphas(hold, 0.5);
   assert.deepEqual(holdAny, { from: 1, to: 0 });
+});
+
+/* `zoom` is state.js's one declaration and actions.js's one writer (startZoom, advanceZoom, endZoom), as
+   state.js's own comment on the field says. Any other file that assigns it would move the world's clock
+   or the view behind actions.js's back. */
+test('only actions.js and state.js write zoom', () => {
+  const dir = path.join(__dirname, '../src/ui');
+  const writer = /\bzoom\s*=[^=]/;
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))){
+    const text = fs.readFileSync(path.join(dir, f), 'utf8');
+    if (f === 'actions.js' || f === 'state.js') continue;
+    assert.doesNotMatch(text, writer, `${f} writes to zoom`);
+  }
 });

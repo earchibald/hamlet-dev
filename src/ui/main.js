@@ -19,6 +19,7 @@ function frame(now){
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
          leaves no backlog for a later one to run in one burst.
          The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
+      else if (zoom){ advanceZoom(dt); }
       else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
@@ -51,6 +52,7 @@ function initUI(){
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
   wcv = $('wmap'); wctx = wcv.getContext('2d');
   mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
+  zcv = $('zmap'); zctx = zcv.getContext('2d');
   ocv = document.createElement('canvas'); octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
@@ -139,7 +141,13 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
+  /* A click during a running zoom ends it, so the click that follows lands on the view the zoom was
+     headed for rather than on the moving camera. Capture phase, so it runs before the target's own
+     pointerdown handler sees the event. */
+  document.addEventListener('pointerdown', () => { if (zoom) endZoom(); }, true);
   document.addEventListener('keydown', e => {
+    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */
+    if (zoom){ e.preventDefault(); endZoom(); return; }
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
        that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
        plain key let through, and only as the way out of the chronicle's search box. */

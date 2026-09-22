@@ -71,3 +71,38 @@ function settleStops(s){
   if (s) stops.push({ view: 'mid', s, image: 'mid' }, { view: 'loc', s, image: 'loc' });
   return stops;
 }
+
+/* The drawing. Reads `zoom`, which only actions.js writes: startZoom took the pictures and their boxes
+   while the world stood still, and everything below is arithmetic on them, at the fraction of the plan
+   the wall clock has now reached. */
+function drawZoom(){
+  const at = zoomAt(zoom.legs, zoom.t);
+  if (!at) return;
+  const leg = zoom.legs[at.i], A = zoom.stops[leg.from], B = zoom.stops[leg.to];
+  const frameA = viewFrame(A.view, A.s), frameB = viewFrame(B.view, B.s);
+  const boxA = zoom.boxes[A.image], boxB = zoom.boxes[B.image];
+  const { box, cam } = zoomCamera(frameA, frameB, boxA, boxB, at.f);
+  const w = Math.round(box.w * dpr), h = Math.round(box.h * dpr);
+  if (zcv.width !== w || zcv.height !== h){ zcv.width = w; zcv.height = h; }
+  zcv.style.width = box.w + 'px'; zcv.style.height = box.h + 'px';
+  zctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  zctx.imageSmoothingEnabled = false;
+  zctx.fillStyle = P.void; zctx.fillRect(0, 0, box.w, box.h);
+  /* A zoom leg crosses ground the two pictures do not share, so the world cache stands under them: the
+     land the camera passes over between the country it left and the sector it is bound for. A fade
+     never leaves its view, so it has none to show. */
+  if (leg.kind === 'zoom'){
+    const r = frameInBox(viewFrame('world'), cam, box);
+    zctx.drawImage(ocv, r.x, r.y, r.w, r.h);
+  }
+  const alphas = legAlphas(leg, at.f);
+  if (alphas.from > 0){
+    const r = frameInBox(frameA, cam, box);
+    zctx.globalAlpha = alphas.from; zctx.drawImage(zoom.pics[A.image], r.x, r.y, r.w, r.h);
+  }
+  if (alphas.to > 0){
+    const r = frameInBox(frameB, cam, box);
+    zctx.globalAlpha = alphas.to; zctx.drawImage(zoom.pics[B.image], r.x, r.y, r.w, r.h);
+  }
+  zctx.globalAlpha = 1;
+}

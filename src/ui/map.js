@@ -515,4 +515,4 @@ function drawLoc(){
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
   }
 }
-function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+function draw(){ if (zoom){ drawZoom(); return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
