@@ -367,8 +367,9 @@ function playerText(){
   /* In the ages: the status line, and every live region's and every god's own card, taken once the
      first regions and gods exist. Every gesture's card, taken across the whole creation, since
      creation.gestures holds only the age now playing. */
-  const api = loadUI(['state', 'icons', 'marks', 'derive', 'keys', 'map', 'inspect'],
-    ['seasonLine', 'countryLine', 'inspectRegion', 'inspectGod', 'actCard', 'markRows', 'KEYMAP']);
+  const api = loadUI(['state', 'icons', 'marks', 'derive', 'keys', 'map', 'inspect', 'actions'],
+    ['seasonLine', 'countryLine', 'inspectRegion', 'inspectGod', 'actCard', 'markRows', 'KEYMAP', 'ACTIONS', 'weighCaption'],
+    { spySay: '(fn) => { say = fn; }' });
   api.startCreation('r');
   const seenGestures = new Set();
   let capturedAges = false;
@@ -380,6 +381,16 @@ function playerText(){
       sources.countryLine = api.liveRegions().map(r => api.countryLine(r));
       sources.inspectRegion = api.liveRegions().map(r => api.inspectRegion(r));
       sources.inspectGod = api.gods().map(g => api.inspectGod(g));
+      /* ACTIONS.overlay(), said while in the ages: the one line the toolbar's overlay button
+         speaks before the valley is made, read by wrapping say() in this same scope. */
+      const said = [];
+      api.spySay(msg => said.push(msg));
+      api.ACTIONS.overlay();
+      sources.overlaySay = said;
+      /* The intent-cue caption drawField shows above a weighing god, as its own words: see
+         weighCaption in map.js. Driven directly, with a made-up name and count, since the pure
+         words do not depend on a real god or a real weighed count. */
+      sources.weighCaption = [api.weighCaption('A test god', 2), api.weighCaption('A test god', 1)];
       capturedAges = true;
     }
   }

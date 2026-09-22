@@ -8892,6 +8892,8 @@ function drawCaption(text, p){
   wctx.fillStyle = P.select;
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
+/* The weigh caption's own words, apart from drawField, so a test can read them without a canvas. */
+function weighCaption(godName, count){ return `${godName} weighs ${nOf(count, 'piece of land', 'pieces of land')}.`; }
 function drawField(){
   /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
      running. A running beat reads the ladder. */
@@ -8946,7 +8948,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'piece of land', 'pieces of land')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(weighCaption(g.name, now.weighed.opts.length), { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
