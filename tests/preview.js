@@ -65,13 +65,23 @@ test('previewField writes no state and draws no random number, at the start, in 
   const checkAt = new Set([0, acts >> 1, acts - 1]);
   let checked = 0;
   for (let n = 0; api.era === 'gods'; n++){
-    if (checkAt.has(n)){ const before = stateOf(api); api.previewField(); assert.equal(stateOf(api), before, `act ${n} of ${acts}: previewField moved nothing`); checked++; }
+    if (checkAt.has(n)){
+      const before = stateOf(api);
+      const p1 = api.previewField();
+      assert.equal(stateOf(api), before, `act ${n} of ${acts}: previewField moved nothing`);
+      const p2 = api.previewField();
+      assert.deepEqual(p2, p1, `act ${n} of ${acts}: two calls to previewField returned different fields`);
+      checked++;
+    }
     api.step(true);
   }
   assert.equal(checked, 3, 'the start, the middle, and the last act were each checked');
   /* After the settle the real snapshot can be taken, and it holds the streams. */
-  const snap = JSON.stringify(api.takeSnapshot()); api.previewField();
+  const snap = JSON.stringify(api.takeSnapshot());
+  const p1 = api.previewField();
   assert.equal(JSON.stringify(api.takeSnapshot()), snap, 'after the settle, previewField moved nothing');
+  const p2 = api.previewField();
+  assert.deepEqual(p2, p1, 'after the settle, two calls to previewField returned different fields');
 });
 
 /* No region takes its first pole in place. The first act splits the one formless region, and both children are
