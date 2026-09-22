@@ -40,10 +40,11 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
-   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
-function countryLine(r){
-  if (!r) return 'no country';
+/* The poles of a region, and the reason on its newest pole mark, with no lead-in words. The reason
+   names the god. A far side of a line takes the other pole, so the god's epithet beside the poles
+   would read as a mistake. No full stop at the end. Read this beside countryLine below: this is the
+   bare phrase a labelled row wants; countryLine adds the words a row without a label of its own needs. */
+function landPhrase(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
@@ -51,7 +52,14 @@ function countryLine(r){
   const g = m.by === null || m.by === undefined ? null : beingById(m.by);
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+  return `${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The internal name is kept: `sector.country` and `tile.country` are fields a snapshot saves, and this
+   function is still called countryLine. It says "land" to the player. */
+function countryLine(r){
+  if (!r) return 'no land';
+  const phrase = landPhrase(r);
+  return phrase === 'formless, not yet anything' ? phrase : `land that is ${phrase}`;
 }
 /* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
    both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
@@ -59,8 +67,8 @@ function countryLine(r){
    is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
    row. E3 does not store the row a player took; a later slice does.
    No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
-   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
-   already shows for a country's "Country" row. */
+   region's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a region's "Land" row. */
 function actCard(rec){
   const m = markFor(rec.kind, rec.value);
   const g = beingById(rec.god);
@@ -131,19 +139,7 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* The mean of a list of #rrggbb colours, as rgb(). */
-function mixHex(list){
-  let r = 0, g = 0, b = 0;
-  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
-  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
-}
-/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
-function fieldColor(r, pal){
-  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
-  return cs.length ? mixHex(cs) : pal['field-none'];
-}
-
-/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a region each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
@@ -167,7 +163,7 @@ function markRows(x, y, z){
     const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
     if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r) + '.']);
+  rows.push(['Land', landPhrase(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -389,7 +385,7 @@ function campSummary(){
 }
 
 function seasonLine(){
-  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
+  if (inAges()) return `${nOf(liveRegions().length, 'piece of land', 'pieces of land')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   /* The seasons are not all the same length, so the days left are counted off this season's own
      length rather than one shared number. */
   const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];

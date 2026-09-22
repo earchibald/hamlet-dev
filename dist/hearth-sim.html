@@ -239,7 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map, camp fire">Nearby<kbd>M</kbd></button>
-      <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
+      <button class="btn" id="overlayBtn" hidden title="Show or hide the borders the gods drew">Borders<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
@@ -5620,7 +5620,7 @@ function offend(r, g, contrast){
   const who = new Set(r.marks.filter(mine).map(m => m.by));
   for (const id of who){ const o = beingById(id); if (!o || o.status !== 'awake') continue;
     o.needs.calm = clamp(o.needs.calm - 20, 0, 100); o.opinions[g.id] = clamp((o.opinions[g.id] || 0) - 10, -100, 100);
-    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, CLOCK.thought.over); setRelation(o, g); }
+    addThought(o, 'over' + g.id, `${g.name} marked over my land`, -10, CLOCK.thought.over); setRelation(o, g); }
 }
 
 /* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */
@@ -7307,7 +7307,7 @@ const DOOR_ACTS = {
   choose(e){
     if (!pending) return 'It is nobody\'s turn.';
     if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
-    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the land it falls on.';
     return takeTurn(e.opt);
   },
   /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the
@@ -7408,6 +7408,12 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* The preview of the ground for the act on the field, or null when it must be computed again. It is a cache
+   derived from the state, not a choice the player makes. It exists because one call to previewField() cost
+   8 to 10 ms in Node at b3d7777 (seed amber-ford-45, map 280x120, 33,600 tiles, ages 4 to 21, mean of 5
+   calls per age), and 9 to 11 ms in Safari at age 21. The cache is drawn again when a cut's stroke ends,
+   and it reuses this. */
+let fieldPreview = null;
 /* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
    single act to fade from. Counting gestures cannot stand in for this: one decision can write two
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */
@@ -7637,10 +7643,11 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
-   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
-function countryLine(r){
-  if (!r) return 'no country';
+/* The poles of a region, and the reason on its newest pole mark, with no lead-in words. The reason
+   names the god. A far side of a line takes the other pole, so the god's epithet beside the poles
+   would read as a mistake. No full stop at the end. Read this beside countryLine below: this is the
+   bare phrase a labelled row wants; countryLine adds the words a row without a label of its own needs. */
+function landPhrase(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
@@ -7648,7 +7655,14 @@ function countryLine(r){
   const g = m.by === null || m.by === undefined ? null : beingById(m.by);
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+  return `${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The internal name is kept: `sector.country` and `tile.country` are fields a snapshot saves, and this
+   function is still called countryLine. It says "land" to the player. */
+function countryLine(r){
+  if (!r) return 'no land';
+  const phrase = landPhrase(r);
+  return phrase === 'formless, not yet anything' ? phrase : `land that is ${phrase}`;
 }
 /* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
    both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
@@ -7656,8 +7670,8 @@ function countryLine(r){
    is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
    row. E3 does not store the row a player took; a later slice does.
    No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
-   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
-   already shows for a country's "Country" row. */
+   region's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a region's "Land" row. */
 function actCard(rec){
   const m = markFor(rec.kind, rec.value);
   const g = beingById(rec.god);
@@ -7728,19 +7742,7 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* The mean of a list of #rrggbb colours, as rgb(). */
-function mixHex(list){
-  let r = 0, g = 0, b = 0;
-  for (const h of list){ const n = parseInt(h.slice(1), 16); r += n >> 16; g += (n >> 8) & 255; b += n & 255; }
-  const k = list.length; return `rgb(${Math.round(r / k)},${Math.round(g / k)},${Math.round(b / k)})`;
-}
-/* A country's colour on the field: grey with no pole, else the mean of its poles. pal is the palette, passed in so this stays pure. */
-function fieldColor(r, pal){
-  const cs = marksOf(r, 'pole').map(m => pal['field-' + m.value]).filter(Boolean);
-  return cs.length ? mixHex(cs) : pal['field-none'];
-}
-
-/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a region each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
@@ -7764,7 +7766,7 @@ function markRows(x, y, z){
     const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
     if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r) + '.']);
+  rows.push(['Land', landPhrase(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -7986,7 +7988,7 @@ function campSummary(){
 }
 
 function seasonLine(){
-  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
+  if (inAges()) return `${nOf(liveRegions().length, 'piece of land', 'pieces of land')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   /* The seasons are not all the same length, so the days left are counted off this season's own
      length rather than one shared number. */
   const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
@@ -8302,6 +8304,140 @@ function saveName(seed, t){
   return `hearth-${s}-day-${Math.floor(t / DAY) + 1}.json`;
 }
 
+/* ---- the preview: the ground the marks will become ---- During the ages the map has regions and marks but no
+   tiles. settle() paints the tiles later, and it draws from the people's stream to do it. The preview paints an
+   impression of that valley from the same marks, in the same order, with hashes in place of random numbers. It
+   draws no random number and writes no state, so a view can call it as often as it draws. It matches the valley
+   by kind of ground and by share, not tile by tile. No DOM. */
+
+/* Each kind the preview paints, and the palette key of its colour. The keys are ones readPalette() in map.js
+   reads, so the gods' map and the world map share one set of colours. */
+const PREVIEW_INK = {
+  formless: 'field-none', grass: 'grass', soil: 'soil', sand: 'sand', water: 'water', ash: 'ash', stone: 'stone',
+  tree: 'tree', bush: 'bush', reeds: 'reeds', boulder: 'boulder', deadpine: 'ash-fg', hill: 'hill', peak: 'hill-fg', mouth: 'hill-fg',
+};
+/* One stream of hashes per purpose. A shared salt would tie two choices together, and a tree would then always
+   stand where a hill is placed. */
+const PV = { e: 1, f: 2, h1: 3, h2: 4, h3: 5, hillJit: 6, drown: 7, hillPick: 8, lakeJit: 1000 };
+/* A hash of the seed, a salt and a tile, in [0, 1). Each input is mixed in turn, so a row or a column shows no
+   pattern. */
+function pvMix(h){ h = Math.imul(h ^ (h >>> 16), 0x7feb352d); h = Math.imul(h ^ (h >>> 15), 0x846ca68b); return h ^ (h >>> 16); }
+function pvHash(s, k, x, y){ return (pvMix(pvMix(pvMix(s ^ Math.imul(k, 0x9e3779b1)) ^ x) ^ y) >>> 0) / 4294967296; }
+/* Value noise as makeNoise builds it, with a lattice of hashes in place of a lattice of draws. */
+function pvNoise(s, k, scale){
+  const sm = t => t * t * (3 - 2 * t), v = (i, j) => pvHash(s, k, i, j);
+  return (x, y) => {
+    const fx = x / scale, fy = y / scale, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = sm(fx - x0), ty = sm(fy - y0);
+    const a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * tx, b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * tx;
+    return a + (b - a) * ty;
+  };
+}
+/* The texture of a biome on one tile, as paintTile gives it. Loose sticks and stones are too small to show. */
+function pvTile(biome, e, f, h1, h2, h3){
+  switch (biome){
+    case 'forest': return f > 0.4 && h1 < 0.55 ? 'tree' : h2 < 0.06 ? 'bush' : 'grass';
+    case 'meadow': case 'river': return f > 0.7 && h1 < 0.3 ? 'tree' : h2 < 0.045 ? 'bush' : e < 0.3 && h3 < 0.2 ? 'soil' : 'grass';
+    case 'rocky': return e > 0.55 && h1 < 0.5 ? 'boulder' : h2 < 0.3 ? 'soil' : h3 < 0.03 ? 'tree' : 'grass';
+    case 'wetland': return e < 0.42 ? 'water' : e < 0.5 && h1 < 0.5 ? 'reeds' : h2 < 0.03 ? 'bush' : h3 < 0.04 ? 'tree' : 'grass';
+    case 'ash': return 'ash';
+  }
+  return 'grass';
+}
+const PV_HILL = { hill: true, peak: true, mouth: true };
+/* The field as it stands now, one kind per surface tile. The steps run in settle's order: ground, rivers, lakes,
+   scars, hills, and cave mouths. A region with no pole is formless, and no later step paints over it, because
+   the gods have not yet said what that ground is. */
+function previewField(){
+  const out = new Array(W * H).fill('formless');
+  const s = hashSeed(seedText);
+  const at = i => [i % W, (i - i % W) / W];
+  const h = (k, i) => pvHash(s, k, i % W, (i - i % W) / W);
+  const put = (i, kind) => { if (out[i] !== 'formless') out[i] = kind; };
+  const live = liveRegions().filter(r => hasMark(r, 'pole'));
+  /* Ground. */
+  const en = pvNoise(s, PV.e, 9), fn = pvNoise(s, PV.f, 5);
+  for (const r of live){ const b = biomeOf(r); for (const i of r.tiles){ const [x, y] = at(i); out[i] = pvTile(b, en(x, y), fn(x, y), h(PV.h1, i), h(PV.h2, i), h(PV.h3, i)); } }
+  /* Rivers, as paintRivers: the line and its far side are water, a ford is sand, and the ring beside the line is sand. */
+  const river = new Uint8Array(W * H);
+  for (const b of liveBoundaries()){
+    if (b.pole !== 'wet') continue;
+    b.tiles.forEach((i, k) => {
+      const [x, y] = at(i), ford = k % 47 >= 23 && k % 47 < 26;
+      const wet = [[0, 0]].concat(DIRS.filter(([dx, dy]) => inb(x + dx, y + dy) && regionOf[idx(x + dx, y + dy)] === b.b));
+      for (const [dx, dy] of wet){ const j = idx(x + dx, y + dy); put(j, ford ? 'sand' : 'water'); river[j] = 1; }
+    });
+    for (const i of b.tiles){ const [x, y] = at(i);
+      for (const [dx, dy] of RING){ const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (out[j] !== 'water' && !river[j]) put(j, 'sand'); } }
+  }
+  /* Lakes, as paintLakes: a blob at the middle of a pooled region, with a sand shore inside the region. */
+  const lake = new Uint8Array(W * H);
+  for (const r of live){
+    if (!hasMark(r, 'pool', 'surface')) continue;
+    const { x0, y0, x1, y1 } = r.bbox, cx = (x0 + x1) >> 1, cy = (y0 + y1) >> 1;
+    const rad = Math.sqrt(Math.round(r.area / 7) / Math.PI), jit = pvNoise(s, PV.lakeJit + r.id, 6);
+    for (const i of r.tiles){ const [x, y] = at(i); if (Math.hypot(x - cx, y - cy) / rad + (jit(x, y) - 0.5) * 0.6 <= 1){ put(i, 'water'); lake[i] = 1; } }
+    for (const i of r.tiles){ if (out[i] === 'water') continue; const [x, y] = at(i); if (RING.some(([dx, dy]) => inb(x + dx, y + dy) && lake[idx(x + dx, y + dy)])) put(i, 'sand'); }
+  }
+  /* Scars, by what the winner's pole left. */
+  const scar = {
+    burned: r => { for (const i of r.tiles) if (out[i] === 'grass' || out[i] === 'soil' || out[i] === 'tree' || out[i] === 'bush') out[i] = 'ash'; },
+    /* The middle line, as scarCut picks it. The three tiles at its middle are the crossing. */
+    cut: r => {
+      const { x0, y0, x1, y1 } = r.bbox, alongX = (x1 - x0) >= (y1 - y0);
+      const line = r.tiles.filter(i => { const [x, y] = at(i); return alongX ? y === ((y0 + y1) >> 1) : x === ((x0 + x1) >> 1); });
+      const gap = line.length >> 1;
+      line.forEach((i, k) => { out[i] = Math.abs(k - gap) <= 1 ? 'stone' : 'hill'; });
+    },
+    drowned: r => {
+      const picks = r.tiles.slice().sort((p, q) => h(PV.drown, p) - h(PV.drown, q) || p - q).slice(0, 3);
+      for (const c of picks){ const [cx, cy] = at(c);
+        for (const i of r.tiles){ const [x, y] = at(i), d = Math.hypot(x - cx, y - cy);
+          if (d <= 5) out[i] = 'water'; else if (d <= 7 && out[i] === 'grass' && h(PV.h1, i) < 0.5) out[i] = 'deadpine'; } }
+    },
+    broken: r => { for (const i of r.tiles) if (out[i] === 'grass' && h(PV.h1, i) < 0.34) out[i] = 'boulder'; },
+  };
+  for (const r of live) for (const m of marksOf(r, 'scar')) if (scar[m.value]) scar[m.value](r);
+  /* Hills, as uplift places them, with hashes in place of its tries. A foot keeps off the map edge and three
+     tiles from water and from sand. Returns how many hills stood up. */
+  const hillJit = pvNoise(s, PV.hillJit, 6);
+  const raise = (r, storeys, count) => {
+    const rx = Math.min(12, 4 + 2 * storeys), ry = Math.round(rx * 0.75), gap = 2 * rx + 3;
+    const dry = i => { const [x, y] = at(i); if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ if (!inb(x + dx, y + dy)) continue; const q = out[idx(x + dx, y + dy)]; if (q === 'water' || q === 'sand') return false; }
+      return true; };
+    const picks = r.tiles.filter(dry).sort((p, q) => h(PV.hillPick, p) - h(PV.hillPick, q) || p - q);
+    const made = [];
+    for (const c of picks){
+      if (made.length >= count) break;
+      const [cx, cy] = at(c);
+      if (made.some(([mx, my]) => Math.hypot(cx - mx, cy - my) < gap)) continue;
+      made.push([cx, cy]);
+      for (const i of r.tiles){ if (out[i] === 'water') continue; const [x, y] = at(i), j = (hillJit(x, y) - 0.5) * 0.5;
+        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + j > 1) continue;
+        out[i] = storeys >= 2 && ((x - cx) / (rx * 0.6)) ** 2 + ((y - cy) / (ry * 0.6)) ** 2 + j <= 1 ? 'peak' : 'hill'; }
+    }
+    return made.length;
+  };
+  for (const r of live){ const m = marksOf(r, 'height')[0]; if (m) raise(r, clamp(m.value, 1, ZMAX), clamp(Math.round(r.area / (4 * SECTOR_AREA)), 1, 3)); }
+  /* A hunter dens in a hillside, so a region where one was made, and no god raised the ground, gets a low hill. */
+  for (const r of live) if (!hasMark(r, 'height') && marksOf(r, 'making').some(m => SPAWN[m.value] && SPAWN[m.value].den)) raise(r, 1, 1);
+  /* A cave needs rock over it. Its mouth is the rim tile of the hill nearest the region's heart. */
+  for (const r of live){
+    if (!hasMark(r, 'depth')) continue;
+    if (!r.tiles.some(i => out[i] === 'hill' || out[i] === 'peak')) raise(r, 1, 1);
+    const [hx, hy] = at(heartTile(r));
+    let best = -1, bd = Infinity;
+    for (const i of r.tiles){
+      if (out[i] !== 'hill' && out[i] !== 'peak') continue;
+      const [x, y] = at(i);
+      if (!DIRS.some(([dx, dy]) => inb(x + dx, y + dy) && !PV_HILL[out[idx(x + dx, y + dy)]])) continue;
+      const d = (x - hx) ** 2 + (y - hy) ** 2; if (d < bd){ bd = d; best = i; }
+    }
+    if (best >= 0) out[best] = 'mouth';
+  }
+  return out;
+}
+
 /* The key map and the dispatcher. No DOM.
    One table. Every clickable thing has a row here, and the button prints the key.
    focus: 'any' fires everywhere, 'map' only with the map focused, 'drawer' only with a drawer focused,
@@ -8405,7 +8541,7 @@ for (const t of TOOLS){
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
-KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the borders', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
    The label names both ladders, since the same row serves the ages and the days.
    The two ladders are meant to be the same length, and tests/ui.js asserts it. A row past the end of
@@ -8596,8 +8732,9 @@ function drawWorldCache(){
     octx.fillStyle = c; octx.fillRect(x * WS, y * WS, WS, WS);
   }
 }
-/* ---- the field: the world before it has tiles. One grey region, then boundaries, then poles as colour, then scars. ---- */
-/* A boundary's ink by its pole. A pole in the table draws in its own colour at full alpha. */
+/* ---- the field: the world before it has tiles. The preview paints the ground the marks will become, in the world
+   map's own colours, and the boundaries lie over it as faint lines. ---- */
+/* A boundary's ink by its pole, on the day-era overlay. A pole in the table draws in its own colour at full alpha. */
 const BOUNDARY_INK = { wet: 'water-fg' };
 function drawBoundaries(g, alpha, skip = null){
   for (const b of liveBoundaries()){
@@ -8607,17 +8744,29 @@ function drawBoundaries(g, alpha, skip = null){
   }
   g.globalAlpha = 1;
 }
+/* How strongly a boundary shows over the preview in the ages. A line is only a hint of where one country ends. */
+const FIELD_LINE_ALPHA = 0.25;
 /* The cache holds a whole state of the field, so a dropped frame never leaves it half drawn. A cut that its
-   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends. */
+   own gesture is still stroking is held out, and the cache is drawn again without it when the stroke ends.
+   The preview is kept in fieldPreview and computed only when that is empty. drawField empties it when the
+   act changes, so it is computed once per act. The ground is filled one kind at a time, so each kind sets
+   its colour once. A wet boundary is not drawn as a line, because the preview already paints it as a river. */
 function drawFieldCache(skip = null){
+  if (!fieldPreview) fieldPreview = previewField();
   octx.setTransform(1, 0, 0, 1, 0, 0);
   octx.clearRect(0, 0, ocv.width, ocv.height);
-  for (const r of liveRegions()){
-    octx.fillStyle = fieldColor(r, P);
-    for (const i of r.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
-    if (marksOf(r, 'scar').length){ octx.fillStyle = P['field-scar']; for (const i of r.tiles){ const x = i % W, y = (i - x) / W; if ((x + y) % 4 === 0) octx.fillRect(x * WS, y * WS, WS, WS); } }
+  const byKind = {};
+  fieldPreview.forEach((k, i) => { (byKind[k] || (byKind[k] = [])).push(i); });
+  for (const k in byKind){
+    octx.fillStyle = P[PREVIEW_INK[k]];
+    for (const i of byKind[k]){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
   }
-  drawBoundaries(octx, 0.7, skip);
+  octx.fillStyle = P['field-line']; octx.globalAlpha = FIELD_LINE_ALPHA;
+  for (const b of liveBoundaries()){
+    if (b.pole === 'wet' || (skip && skip.has(b.id))) continue;
+    for (const i of b.tiles){ const x = i % W, y = (i - x) / W; octx.fillRect(x * WS, y * WS, WS, WS); }
+  }
+  octx.globalAlpha = 1;
 }
 
 /* ---- the ages in motion ----
@@ -8766,10 +8915,18 @@ function drawCaption(text, p){
   wctx.fillStyle = P.select;
   rows.forEach((t, k) => wctx.fillText(t, x, y - h / 2 + 9 + k * 14));
 }
+/* The weigh caption's own words, apart from drawField, so a test can read them without a canvas. */
+function weighCaption(godName, count){ return `${godName} weighs ${nOf(count, 'piece of land', 'pieces of land')}.`; }
 function drawField(){
   /* A stepped beat always plays at the full tier: Step is the reading mode, and the pace buttons govern
      running. A running beat reads the ladder. */
   const span = ui.playing ? TWEEN.full : BEAT_MS / pace, tier = beatTier(span);
+  /* The key trusts creation.gestures.length and creation.discards to move whenever a region's marks do.
+     In src/sim/gods.js, every mark(), setPole(), and `r.marks =` filter (battle at line 450, the start
+     branch of backstop at line 652) is followed by a gesture() call in the same act. The one other
+     writer of marks is undoSettle in src/sim/settle.js, which increments creation.discards. A load
+     clears fieldKey in src/ui/actions.js. A mark written with neither a gesture nor a discard would
+     leave this key unmoved, and the preview stale. */
   const key = [seedText, age, creation.gestures.length, creation.discards, liveRegions().length].join(':');
   if (!ocv2){ ocv2 = document.createElement('canvas'); octx2 = ocv2.getContext('2d'); }
   if (ocv2.width !== ocv.width || ocv2.height !== ocv.height){ ocv2.width = ocv.width; ocv2.height = ocv.height; }
@@ -8781,7 +8938,7 @@ function drawField(){
     fieldJump = !fieldKey || creation.discards !== fieldDiscards || (age !== fieldAge && age !== fieldAge + 1) || beatsLastFrame > 1;
     if (!fieldJump){ octx2.setTransform(1, 0, 0, 1, 0, 0); octx2.clearRect(0, 0, ocv2.width, ocv2.height); octx2.drawImage(ocv, 0, 0); }
     godLast = godEnds; godEnds = new Map();
-    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null;
+    fieldKey = key; fieldAge = age; fieldGestures = creation.gestures.length; fieldDiscards = creation.discards; fieldSkip = null; fieldPreview = null;
   }
   const still = beatStill(anyDialogOpen());
   const f = fieldJump || still ? 1 : clamp(acc, 0, 1);
@@ -8820,7 +8977,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(weighCaption(g.name, now.weighed.opts.length), { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
@@ -9147,11 +9304,11 @@ function inspectGod(g){
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
-  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands on ${countryLine(standsIn(g))}.`;
   else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
-  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  /* Several options share an act, one per region. Only the first that did not fail is the one picked. */
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
@@ -9232,11 +9389,11 @@ function inspectTile(x, y, z = 0){
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+/* A region of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
 function inspectRegion(r){
   if (!r) return '<div class="muted">Nothing is here.</div>';
   const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
-  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  const rows = [['Land', landPhrase(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
   if (here.length) rows.push(['Here', here.join('; ')]);
   const seen = new Set(), why = [];
   for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
@@ -9247,7 +9404,7 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
-     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     A pointer near a mark's own halo shows the act's card in place of the land under it, so a
      hover on the mark reads the act and not the ground it changed. */
   const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
     : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
@@ -9780,7 +9937,7 @@ const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: 
 /* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
    to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
 const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
-/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+/* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
@@ -10013,7 +10170,7 @@ const ACTIONS = {
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
-  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },

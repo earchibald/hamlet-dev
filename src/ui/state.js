@@ -53,6 +53,12 @@ let fieldKey = '';     /* what the cached field was drawn from */
 /* The field as it stood before this age, and what the field cache holds. The cross-fade draws the old
    field and the new one over it, so only the countries that changed appear to change. */
 let ocv2, octx2, fieldAge = -1, fieldGestures = -1, fieldDiscards = -1, fieldSkip = null, fieldJump = true;
+/* The preview of the ground for the act on the field, or null when it must be computed again. It is a cache
+   derived from the state, not a choice the player makes. It exists because one call to previewField() cost
+   8 to 10 ms in Node at b3d7777 (seed amber-ford-45, map 280x120, 33,600 tiles, ages 4 to 21, mean of 5
+   calls per age), and 9 to 11 ms in Safari at age 21. The cache is drawn again when a cut's stroke ends,
+   and it reuses this. */
+let fieldPreview = null;
 /* How many beats the last frame ran. The field snaps when a frame ran two or more, because there is no
    single act to fade from. Counting gestures cannot stand in for this: one decision can write two
    gestures — a split that also gives birth — and that is one beat, with an act to draw. */

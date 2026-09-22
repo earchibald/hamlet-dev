@@ -1170,7 +1170,7 @@ test('in the ages the view model holds: no gauges, no chips, no goals, and the g
   assert.ok(people.every(r => r.kind === 'person' && r.r.a.species === 'god'));
   assert.doesNotThrow(() => api.notePulses());
   assert.doesNotThrow(() => api.paletteRows());
-  assert.match(api.seasonLine(), /countr/);
+  assert.match(api.seasonLine(), /piece of land|pieces of land/);
   assert.equal(typeof api.cursorPhrase(), 'string');
 });
 
@@ -1274,20 +1274,6 @@ test('a creation watched age by age, or act by act, is the creation that startWo
   assert.equal(c.creation.ages, a.creation.ages, 'and on the same count of ages');
 });
 
-const PAL = { 'field-none': '#808080', 'field-wet': '#0000ff', 'field-dry': '#ffff00', 'field-hot': '#ff0000', 'field-cold': '#00ffff', 'field-above': '#ffffff', 'field-below': '#000000', 'field-light': '#ffffff', 'field-dark': '#000000', 'field-still': '#00ff00', 'field-moving': '#ff00ff' };
-
-test('the field colour is grey with no pole, and the mean of the poles with some', () => {
-  const api = loadUI(['state', 'derive'], ['mixHex', 'fieldColor']);
-  assert.equal(api.mixHex(['#000000', '#ffffff']), 'rgb(128,128,128)');
-  assert.equal(api.mixHex(['#ff0000']), 'rgb(255,0,0)');
-  api.startCreation('alpha', {});
-  assert.equal(api.fieldColor(api.liveRegions()[0], PAL), '#808080', 'the formless is grey');
-  for (let i = 0; i < 8; i++) api.step();
-  const made = api.liveRegions().filter(r => r.marks.some(m => m.kind === 'pole'));
-  assert.ok(made.length >= 2);
-  for (const r of made) assert.match(api.fieldColor(r, PAL), /^rgb\(\d+,\d+,\d+\)$/);
-});
-
 test('the mark word goes right when there is room, and left when there is not', () => {
   const api = loadUI(['state', 'derive', 'keys', 'map'], ['markWordSide', 'MARK_R']);
   /* Plenty of room on both sides: the word goes right, its own default side. */
@@ -1307,12 +1293,12 @@ test('the mark word goes right when there is room, and left when there is not', 
   assert.equal(api.markWordSide(700, 760, 800), 'left', 'more room to the left of a disc near the right edge');
 });
 
-test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
+test('the region card names the land, what it is becoming, and every reason a god left on it', () => {
   const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], ['inspectRegion']);
   api.startCreation('alpha', {}); for (let i = 0; i < 10; i++) api.step();
   const r = api.liveRegions().slice().sort((p, q) => q.marks.length - p.marks.length)[0];
   const html = api.inspectRegion(r);
-  assert.ok(html.includes('Country') && html.includes('Becoming'));
+  assert.ok(html.includes('Land') && html.includes('Becoming'));
   assert.ok(r.marks.every(m => html.includes(m.why)), 'every why is on the card');
 });
 
@@ -1324,7 +1310,7 @@ test('C shows and hides the countries from any focus', () => {
   assert.equal(api.ui.overlay, false);
 });
 
-test('a hill says who raised it, a cave says who dug it, and every surface tile names its country', () => {
+test('a hill says who raised it, a cave says who dug it, and every surface tile names its land', () => {
   const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'godLine']);
   api.startWorld('alpha');
   const names = api.gods().map(g => g.name);
@@ -1338,7 +1324,7 @@ test('a hill says who raised it, a cave says who dug it, and every surface tile 
   assert.match(raised[1], /Age \d+|Before time/i);
   assert.ok(!/raised it/i.test(raised[1]), 'the label says Raised by, so the row does not say it again');
   assert.ok(hr.filter(r => r[0] === 'Made here').length <= 1, 'the makings share one row');
-  assert.ok(hr.some(r => r[0] === 'Country'));
+  assert.ok(hr.some(r => r[0] === 'Land'));
   const cave = api.caves.find(c => c.mark && c.deep);
   const cr = api.markRows(cave.deep.x, cave.deep.y, cave.deep.z);
   assert.ok(cr.some(r => r[0] === 'Dug by' && names.some(n => r[1].includes(n))), JSON.stringify(cr));
@@ -1358,7 +1344,7 @@ test('a scarred country says who fought over it', () => {
 });
 
 /* The final fix wave. */
-const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'fieldColor', 'ui'])];
+const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'ui'])];
 
 test('the view model answers at every age of a creation that throws its valley back', () => {
   const api = loadUI(['state', 'icons', 'derive', 'keys', 'map', 'inspect'], WATCH);
@@ -1371,7 +1357,7 @@ test('the view model answers at every age of a creation that throws its valley b
       api.viewKey(); api.cursorPhrase(); api.seasonLine(); api.gauges(); api.alerts(); api.paletteRows(); api.notePulses();
       for (const id of ['people', 'goals', 'chronicle', 'camp', 'legends']) api.drawerRows(id);
       for (const g of api.gods()) api.inspectGod(g);
-      for (const r of api.liveRegions()){ api.inspectRegion(r); api.fieldColor(r, PAL); }
+      for (const r of api.liveRegions()) api.inspectRegion(r);
     }, `age ${api.age}`);
   }
   assert.equal(api.era, 'days', 'the creation must reach the valley');
@@ -1967,7 +1953,7 @@ function recordCtx(){
 }
 /* The field drawn in Node: a real creation, a recording canvas, and the few view globals drawField reads. */
 function fieldRig(seed, ages, perBeat){
-  const api = loadUI(['state', 'icons', 'derive', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
+  const api = loadUI(['state', 'icons', 'derive', 'preview', 'marks', 'map', 'dialogs', 'actions'], ['drawField', 'drawGesture', 'standsIn', 'markFor', 'PACES', ...TWEENS], {
     caption: '() => captionText',
     setUp: '(o) => { wctx = o.wctx; ocv = o.ocv; octx = o.octx; dpr = 1; P = o.P; pace = 1; acc = 0; paused = false; ui.playing = false; beatsLastFrame = 1; }',
     setPace: '(v) => { pace = v; }',
