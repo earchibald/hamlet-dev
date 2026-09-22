@@ -261,7 +261,7 @@ The page opens in the gods era. The player watches the creation age by age. The 
 
 A god has no place in the ages, so a follow is refused. The foot says there is nothing to follow.
 
-At settle a zoom carries the view from the gods' map to the first person's sector. It has four stops: the finished gods' map, the world map, the nine sectors around that person, and the person's own sector. `startZoom(stops)` takes any list of stops, and settle is only its first caller.
+At settle, the view zooms from the gods' map to the first person's sector. The zoom has four stops: the finished gods' map, the world map, the nine sectors around that person, and that person's sector. `startZoom(stops)` takes any list of stops. Settle is its first caller.
 
 | Leg | Duration |
 |---|---|
@@ -270,7 +270,7 @@ At settle a zoom carries the view from the gods' map to the first person's secto
 | Zoom to the nine sectors | 1,600 ms |
 | Zoom to the person's sector | 1,100 ms |
 
-The world waits while the zoom runs, and the beat clock starts from zero once it ends. A key or a click skips it, and reduced motion skips it before it starts. Once it ends, the saved speed returns, and the foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
+The world does not step while the zoom runs. The zoom runs in wall time, so it also runs when the game is paused. A paused game is still paused after it. The beat clock starts from zero when the zoom ends. A key or a click ends the zoom at once. That key or click does nothing else. With reduced motion, the zoom does not run. At settle, the saved speed returns. The foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
 
 The field on the world map, in the order it is drawn:
 
