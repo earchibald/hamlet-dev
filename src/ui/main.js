@@ -146,11 +146,25 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
-  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: the press
-     started on #zmap, which endZoom hides, so the view underneath never sees that same press and does
-     nothing else with it. Capture phase, so it runs before the target's own pointerdown handler
-     sees the event. */
-  document.addEventListener('pointerdown', () => { if (zoom) endZoom(); }, true);
+  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: this
+     handler stops the pointerdown so it never reaches the target's own pointerdown handler, and
+     never bubbles to .mapbox's pointerdown handler, which would otherwise move focus to 'map'.
+     Capture phase, so it runs before any of that. preventDefault too, so the press cannot also
+     start a text selection on the skip line. Some browsers still fire a paired click for the same
+     press even though pointerdown's propagation was stopped, so a flag marks that a skip is under
+     way, and the one-shot capture listener below consumes that click too, wherever it lands.
+     When no zoom is running, neither listener does anything. */
+  let zoomSkipConsumesClick = false;
+  document.addEventListener('pointerdown', e => {
+    if (!zoom) return;
+    endZoom(); e.stopPropagation(); e.preventDefault();
+    zoomSkipConsumesClick = true;
+  }, true);
+  document.addEventListener('click', e => {
+    if (!zoomSkipConsumesClick) return;
+    zoomSkipConsumesClick = false;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
   document.addEventListener('keydown', e => {
     /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else. */
     if (zoom){ e.preventDefault(); endZoom(); return; }
