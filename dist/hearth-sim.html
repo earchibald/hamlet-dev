@@ -8165,6 +8165,9 @@ const KEYMAP = [
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
   { key: 'ArrowDown',  focus: 'window', action: 'rowDown',   label: 'Row down' },
   { key: 'Enter',      focus: 'window', action: 'rowOpen',   label: 'Open row' },
+  /* A popped-out People drawer takes the same filter keys. It has no filter buttons, so these rows name none. */
+  { key: 'e',          focus: 'window', action: 'peopleCamp', label: 'People: the next camp, then everyone' },
+  { key: 'y',          focus: 'window', action: 'peopleAge',  label: 'People: the next age' },
   { key: '?',          shift: true, focus: 'any', action: 'help', label: 'Help', button: 'helpBtn' },
   { key: 'F1',         focus: 'any',    action: 'campN', arg: 1, label: 'Camp 1' },
   { key: 'F2',         focus: 'any',    action: 'campN', arg: 2, label: 'Camp 2' },

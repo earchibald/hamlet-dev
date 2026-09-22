@@ -26,7 +26,9 @@ const NAMES = ['ui', 'peopleRows', 'peopleScope', 'peopleCount', 'peopleCampLabe
 
 /* A valley with two camps and a stray. The first camp is the one startWorld made, with its first
    person, and it gets an old and a young member too. The second camp has one adult. One adult has no
-   camp. Every need is full, so nobody is in trouble and the sort is by camp order, then name. */
+   camp. Every need is full, so nobody is in trouble and the sort is by camp order, then name.
+   Every name is fixed, the first person's too, so a sort by name alone gives a different order from
+   a sort by camp. The namer's pick for the first person could otherwise hide a missing camp order. */
 function valley(){
   const api = loadUI(FILES, NAMES);
   api.startWorld('r');
@@ -36,9 +38,9 @@ function valley(){
     const b = api.makeBeing('human', first.x, first.y, name, 0);
     b.camp = home; b.born = api.tick - years * api.DAY; api.beings.push(b); return b;
   };
-  const young = person('Young one', c1, 5), old = person('Old one', c1, 70);
-  const other = person('Other camp', c2, 30), stray = person('Stray', null, 30);
-  first.born = api.tick - 30 * api.DAY;
+  const young = person('Tam', c1, 5), old = person('Wren', c1, 70);
+  const other = person('Ada', c2, 30), stray = person('Bo', null, 30);
+  first.name = 'Sol'; first.born = api.tick - 30 * api.DAY;
   const all = [first, young, old, other, stray];
   for (const b of all){ for (const k in b.needs) b.needs[k] = 95; b.hp = 100; }
   assert.deepEqual(all.map(b => api.stage(b)), ['adult', 'young', 'old', 'adult', 'adult'], 'the hand-built ages are the stages the tests name');
@@ -61,8 +63,10 @@ test('with no chosen camp the list holds every person, in camp order, and the st
   const { api, first, young, old, other, stray } = valley();
   api.camp = null;
   assert.equal(api.peopleScope().camp, null);
-  const c1rows = [first, young, old].sort((p, q) => p.name.localeCompare(q.name)).map(b => b.id);
-  assert.deepEqual(ids(api), [...c1rows, other.id, stray.id], 'every person: the first camp, then the second, then no camp');
+  const byName = [first, young, old, other, stray].sort((p, q) => p.name.localeCompare(q.name)).map(b => b.id);
+  const byCamp = [first.id, young.id, old.id, other.id, stray.id];
+  assert.notDeepEqual(byName, byCamp, 'the fixed names put the camps out of order, so the name sort alone cannot pass');
+  assert.deepEqual(ids(api), byCamp, 'every person: the first camp, then the second, then no camp, each by name');
   assert.equal(api.peopleCampLabel(), 'Everyone');
   assert.equal(api.peopleMixed(), true, 'a list over two camps and a stray names each row\'s camp');
 });
@@ -120,6 +124,18 @@ test('the age button cycles any, young, adult, old, and each stage keeps only th
   assert.deepEqual(ids(api), [first.id]);
 });
 
+test('each filter press puts the People row back at the top', () => {
+  const { api } = valley();
+  withPage(() => {
+    api.ui.row.people = 2;
+    api.ACTIONS.peopleAge();
+    assert.equal(api.ui.row.people, 0, 'the age button resets the row');
+    api.ui.row.people = 2;
+    api.ACTIONS.peopleCamp();
+    assert.equal(api.ui.row.people, 0, 'the camp button resets the row');
+  });
+});
+
 test('the count gives the living shown and the living in the world, and the day\'s dead count in neither', () => {
   const { api, young } = valley();
   assert.deepEqual(api.peopleCount(), { shown: 3, alive: 5 }, 'three in the chosen camp, five in the world');
@@ -161,16 +177,22 @@ test('restore() accepts the four ages and rejects any other value, and persist()
   assert.ok(!('peopleCamp' in saved), 'persist leaves the camp out, since a camp id is valid in one world only');
 });
 
-test('E and Y fire the two filters with a drawer focused, and not with the map focused', () => {
+test('E and Y fire the two filters with a drawer or a window focused, and not with the map focused', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['KEYMAP', 'keyAction', 'ACTIONS']);
   const press = (key, focus) => { const h = api.keyAction({ key, code: 'Key' + key.toUpperCase(), shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, focus); return h && h.action; };
-  for (const focus of ['drawer:people', 'drawer:goals']){
+  /* A popped-out drawer has the focus 'window:<n>', and keyAction reads only the window rows there. */
+  for (const focus of ['drawer:people', 'drawer:goals', 'window:1']){
     assert.equal(press('e', focus), 'peopleCamp', `E with ${focus}`);
     assert.equal(press('y', focus), 'peopleAge', `Y with ${focus}`);
   }
   assert.notEqual(press('e', 'map'), 'peopleCamp', 'E is a drawer key');
   assert.notEqual(press('y', 'map'), 'peopleAge', 'Y is a drawer key');
-  const row = a => api.KEYMAP.find(k => k.action === a);
+  const row = a => api.KEYMAP.find(k => k.action === a && k.focus === 'drawer');
+  for (const a of ['peopleCamp', 'peopleAge']){
+    const win = api.KEYMAP.find(k => k.action === a && k.focus === 'window');
+    assert.equal(win.label, row(a).label, `the window row for ${a} has the drawer row's label`);
+    assert.equal(win.button, undefined, 'a popped-out window has no filter buttons');
+  }
   assert.equal(row('peopleCamp').label, 'People: the next camp, then everyone');
   assert.equal(row('peopleCamp').button, 'peopleCampBtn');
   assert.equal(row('peopleAge').label, 'People: the next age');
