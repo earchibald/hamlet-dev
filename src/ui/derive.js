@@ -279,16 +279,45 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+/* The camp the player has chosen, or null. `camp` can outlive a camp that is gone, so the list decides. */
+const chosenCamp = () => camp && camps.includes(camp) ? camp : null;
+/* Which camp the People drawer lists: a camp record, or null for everyone. `ui.peopleCamp` is null to
+   follow the chosen camp, a camp id, or 'all'. A camp id that is no longer in `camps` falls back to
+   the chosen camp, so a camp that ends does not leave the list empty. */
+function peopleScope(){
+  if (ui.peopleCamp === 'all') return { camp: null };
+  const picked = typeof ui.peopleCamp === 'number' ? camps.find(c => c.id === ui.peopleCamp) : null;
+  return { camp: picked || chosenCamp() };
+}
+/* People in the drawer's camp and age, trouble first. Everyone is a candidate, in any camp or none,
+   and the two filters then narrow the list. The dead stay on the list for a day after the stamp.
    `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
-   field, never for its truth. */
+   field, never for its truth. Camp order sorts after the living, so a mixed list keeps each camp
+   together, and a person with no camp goes last. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
+  const only = peopleScope().camp, age = ui.peopleAge;
+  const rows = beings.filter(b => b.species === 'human' && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))
+    && (!only || b.camp === only) && (age === 'any' || stage(b) === age)).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
-  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+  const order = b => { const i = b.camp ? camps.indexOf(b.camp) : -1; return i < 0 ? camps.length : i; };
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || (order(p.a) - order(q.a)) || p.a.name.localeCompare(q.a.name));
+}
+/* The drawer's count: the living people shown, and the living people in the world. The dead of the
+   last day are on the list but count in neither, so the two agree when no filter hides anyone. */
+function peopleCount(){
+  return { shown: peopleRows().filter(r => r.a.alive).length, alive: beings.filter(b => b.species === 'human' && b.alive).length };
+}
+/* The camp button's label. */
+function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
+/* The age button's label. */
+const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
+function peopleMixed(){
+  const seen = new Set(peopleRows().map(r => r.a.camp || null));
+  return seen.size > 1 || seen.has(null);
 }
 
 /* The state lines on a person's card: short facts about what holds them right now, one idea each.
@@ -484,10 +513,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 

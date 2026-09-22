@@ -420,7 +420,7 @@ test('Make world and Take a god close every tab, even one a saved session had op
 });
 
 /* Buttons rendered by the interface, not by the template. */
-const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
+const RUNTIME = ['tab-people', 'tab-goals', 'tab-chronicle', 'tab-camp', 'tab-legends', 'showAllBtn', 'peopleCampBtn', 'peopleAgeBtn', 'chord-fire', 'chord-food', 'chord-tools', 'chord-shelter', 'chord-crafts', 'chord-sprites', 'chord-settlement', 'foldTl', 'tlOut', 'tlIn'];
 
 test('every template button prints a key, and every keyed button id is in the template', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], KEYS);

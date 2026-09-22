@@ -7260,6 +7260,10 @@ const ui = {
   showAll: false,      /* goals: the whole ladder */
   unfold: {},          /* stage id to true when the player unfolded it */
   chronFilter: 'all',  /* 'all' or 'major' */
+  /* The People drawer's camp: null follows the chosen camp, a number is a camp id, 'all' is everyone.
+     Left out of persist(): a camp id is valid in one world only. onLoad and onSettle set it back. */
+  peopleCamp: null,
+  peopleAge: 'any',    /* the People drawer's age: 'any', 'young', 'adult', or 'old' */
   /* The chronicle's search, '' for everything. It is deliberately left out of persist() and restore():
      a query is a thing of the moment, and a reload that hid most of the chronicle would look broken. */
   chronSearch: '',
@@ -7323,10 +7327,13 @@ const PACE_LABEL = { 0.25: '¼×', 0.5: '½×', 1: '1×', 2: '2×' };
 /* The tile cursor, in world coordinates. Arrows move it. Enter applies the tool at it. The mouse moves it too. */
 let cursor = { x: SW * LW >> 1, y: SH * LH >> 1, z: 0 };
 
+/* The age button's cycle, in order. restore() accepts these and nothing else. */
+const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
+
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -7335,6 +7342,7 @@ function restore(){
     if (Array.isArray(s.mutes)) ui.mutes = new Set(s.mutes);
     if (typeof s.showAll === 'boolean') ui.showAll = s.showAll;
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
+    if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
@@ -7686,16 +7694,45 @@ const foldLine = (s, unfolded) => unfolded || !s.idleTitles.length ? '' : `Idle:
 /* The stages the Goals drawer shows now. The chord and the palette offer these and no others. */
 const stagesShown = () => stages(ui.showAll).map(s => s.id);
 
-/* People of the current camp, trouble first. The dead stay on the list for a day after the stamp.
+/* The camp the player has chosen, or null. `camp` can outlive a camp that is gone, so the list decides. */
+const chosenCamp = () => camp && camps.includes(camp) ? camp : null;
+/* Which camp the People drawer lists: a camp record, or null for everyone. `ui.peopleCamp` is null to
+   follow the chosen camp, a camp id, or 'all'. A camp id that is no longer in `camps` falls back to
+   the chosen camp, so a camp that ends does not leave the list empty. */
+function peopleScope(){
+  if (ui.peopleCamp === 'all') return { camp: null };
+  const picked = typeof ui.peopleCamp === 'number' ? camps.find(c => c.id === ui.peopleCamp) : null;
+  return { camp: picked || chosenCamp() };
+}
+/* People in the drawer's camp and age, trouble first. Everyone is a candidate, in any camp or none,
+   and the two filters then narrow the list. The dead stay on the list for a day after the stamp.
    `makeBeing` leaves `diedAt` undefined, and a death at tick 0 stamps a 0, so the test is for the
-   field, never for its truth. */
+   field, never for its truth. Camp order sorts after the living, so a mixed list keeps each camp
+   together, and a person with no camp goes last. */
 function peopleRows(){
-  const rows = beings.filter(b => b.species === 'human' && b.camp === camp && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))).map(a => {
+  const only = peopleScope().camp, age = ui.peopleAge;
+  const rows = beings.filter(b => b.species === 'human' && (b.alive || (b.diedAt !== undefined && b.diedAt !== null && tick - b.diedAt < DAY))
+    && (!only || b.camp === only) && (age === 'any' || stage(b) === age)).map(a => {
     const m = a.alive ? mood(a) : 0;
     const bad = a.alive && (a.needs.warmth < 30 || a.needs.food < 25 || a.needs.water < 25 || a.hp < 50);
     return { a, m, trouble: !!bad, status: a.alive ? a.status : 'Dead' };
   });
-  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || p.a.name.localeCompare(q.a.name));
+  const order = b => { const i = b.camp ? camps.indexOf(b.camp) : -1; return i < 0 ? camps.length : i; };
+  return rows.sort((p, q) => (q.trouble - p.trouble) || (q.a.alive - p.a.alive) || (order(p.a) - order(q.a)) || p.a.name.localeCompare(q.a.name));
+}
+/* The drawer's count: the living people shown, and the living people in the world. The dead of the
+   last day are on the list but count in neither, so the two agree when no filter hides anyone. */
+function peopleCount(){
+  return { shown: peopleRows().filter(r => r.a.alive).length, alive: beings.filter(b => b.species === 'human' && b.alive).length };
+}
+/* The camp button's label. */
+function peopleCampLabel(){ const c = peopleScope().camp; return c ? `Camp: ${c.name}` : 'Everyone'; }
+/* The age button's label. */
+const peopleAgeLabel = () => `Age: ${ui.peopleAge}`;
+/* True when the list shows more than one camp, or a person with no camp. Then each row names its camp. */
+function peopleMixed(){
+  const seen = new Set(peopleRows().map(r => r.a.camp || null));
+  return seen.size > 1 || seen.has(null);
 }
 
 /* The state lines on a person's card: short facts about what holds them right now, one idea each.
@@ -7891,10 +7928,10 @@ function footChip(){
 
 /* A short string that changes when anything the strip or drawers show changes. */
 function viewKey(){
-  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
+  if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
   return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
-    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, JSON.stringify(ui.unfold),
+    peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
 
@@ -8121,6 +8158,8 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'e',          focus: 'drawer', action: 'peopleCamp',  label: 'People: the next camp, then everyone', button: 'peopleCampBtn' },
+  { key: 'y',          focus: 'drawer', action: 'peopleAge',   label: 'People: the next age', button: 'peopleAgeBtn' },
   { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
   { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
@@ -9529,6 +9568,8 @@ function onLoad(){
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {};
   /* A row index, a followed person, and an open card all name a being of the old world. */
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
+  /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
+  ui.peopleCamp = null;
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9606,6 +9647,8 @@ function onSettle(){
   acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = [];
   /* Eight gods become one person, so a row index from the ages would point past the list. */
   followId = null; ui.row.people = 0; ui.row.goals = 0;
+  /* The camps of the days are new, so the People drawer follows the chosen camp. */
+  ui.peopleCamp = null;
   setSpeed(ui.savedSpeed || speed || 1);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -9717,6 +9760,20 @@ const ACTIONS = {
   priorityUp(){ setPriority(1); },
   priorityDown(){ setPriority(-1); },
   showAll(){ ui.showAll = !ui.showAll; persist(); renderUI(true); },
+  /* The People drawer's camp: the chosen camp, each other camp in order, everyone, and back. With no
+     chosen camp the list already holds everyone, so there is nothing to cycle. A value not in the
+     cycle, such as the id of a camp that has ended, counts as the chosen camp. */
+  peopleCamp(){
+    const chosen = chosenCamp(); if (!chosen) return;
+    const cycle = [null, ...camps.filter(c => c !== chosen).map(c => c.id), 'all'];
+    ui.peopleCamp = cycle[(Math.max(0, cycle.indexOf(ui.peopleCamp)) + 1) % cycle.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
+  /* The People drawer's age: any, young, adult, old, and back. */
+  peopleAge(){
+    ui.peopleAge = PEOPLE_AGES[(Math.max(0, PEOPLE_AGES.indexOf(ui.peopleAge)) + 1) % PEOPLE_AGES.length];
+    ui.row.people = 0; persist(); renderUI(true);
+  },
   /* The timeline. Folded it is one row of the creation; unfolded it is a row for each god. The zoom
      is on its own time axis and never touches the map's levels. */
   foldTimeline(){ ui.timelineFold = !ui.timelineFold; persist(); renderUI(true); },

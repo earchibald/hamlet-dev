@@ -55,6 +55,8 @@ const KEYMAP = [
   { key: 'ArrowRight', focus: 'drawer', action: 'priorityUp',  label: 'Goal priority up' },
   { key: 'Enter',      focus: 'drawer', action: 'rowOpen',     label: 'Open row' },
   { key: 'a',          focus: 'drawer', action: 'showAll',     label: 'Goals: show the whole ladder', button: 'showAllBtn' },
+  { key: 'e',          focus: 'drawer', action: 'peopleCamp',  label: 'People: the next camp, then everyone', button: 'peopleCampBtn' },
+  { key: 'y',          focus: 'drawer', action: 'peopleAge',   label: 'People: the next age', button: 'peopleAgeBtn' },
   { key: 'o',          focus: 'drawer', action: 'popOut',    label: 'Pop the drawer out into a window' },
   { key: 'o',          focus: 'window', action: 'popOut',    label: 'Dock the window back' },
   { key: 'ArrowUp',    focus: 'window', action: 'rowUp',     label: 'Row up' },
