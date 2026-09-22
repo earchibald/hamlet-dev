@@ -12,11 +12,11 @@ function inspectGod(g){
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
-  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands on ${countryLine(standsIn(g))}.`;
   else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
-  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  /* Several options share an act, one per region. Only the first that did not fail is the one picked. */
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
@@ -97,11 +97,11 @@ function inspectTile(x, y, z = 0){
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+/* A region of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
 function inspectRegion(r){
   if (!r) return '<div class="muted">Nothing is here.</div>';
   const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
-  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  const rows = [['Land', landPhrase(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
   if (here.length) rows.push(['Here', here.join('; ')]);
   const seen = new Set(), why = [];
   for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
@@ -112,7 +112,7 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
-     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     A pointer near a mark's own halo shows the act's card in place of the land under it, so a
      hover on the mark reads the act and not the ground it changed. */
   const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
     : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))

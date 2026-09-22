@@ -101,7 +101,7 @@ for (const t of TOOLS){
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
-KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the borders', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
    The label names both ladders, since the same row serves the ages and the days.
    The two ladders are meant to be the same length, and tests/ui.js asserts it. A row past the end of

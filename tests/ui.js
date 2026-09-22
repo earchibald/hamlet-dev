@@ -1170,7 +1170,7 @@ test('in the ages the view model holds: no gauges, no chips, no goals, and the g
   assert.ok(people.every(r => r.kind === 'person' && r.r.a.species === 'god'));
   assert.doesNotThrow(() => api.notePulses());
   assert.doesNotThrow(() => api.paletteRows());
-  assert.match(api.seasonLine(), /countr/);
+  assert.match(api.seasonLine(), /piece of land|pieces of land/);
   assert.equal(typeof api.cursorPhrase(), 'string');
 });
 
@@ -1293,12 +1293,12 @@ test('the mark word goes right when there is room, and left when there is not', 
   assert.equal(api.markWordSide(700, 760, 800), 'left', 'more room to the left of a disc near the right edge');
 });
 
-test('the region card names the country, what it is becoming, and every reason a god left on it', () => {
+test('the region card names the land, what it is becoming, and every reason a god left on it', () => {
   const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], ['inspectRegion']);
   api.startCreation('alpha', {}); for (let i = 0; i < 10; i++) api.step();
   const r = api.liveRegions().slice().sort((p, q) => q.marks.length - p.marks.length)[0];
   const html = api.inspectRegion(r);
-  assert.ok(html.includes('Country') && html.includes('Becoming'));
+  assert.ok(html.includes('Land') && html.includes('Becoming'));
   assert.ok(r.marks.every(m => html.includes(m.why)), 'every why is on the card');
 });
 
@@ -1310,7 +1310,7 @@ test('C shows and hides the countries from any focus', () => {
   assert.equal(api.ui.overlay, false);
 });
 
-test('a hill says who raised it, a cave says who dug it, and every surface tile names its country', () => {
+test('a hill says who raised it, a cave says who dug it, and every surface tile names its land', () => {
   const api = loadUI(['state', 'derive', 'keys'], ['markRows', 'godLine']);
   api.startWorld('alpha');
   const names = api.gods().map(g => g.name);
@@ -1324,7 +1324,7 @@ test('a hill says who raised it, a cave says who dug it, and every surface tile 
   assert.match(raised[1], /Age \d+|Before time/i);
   assert.ok(!/raised it/i.test(raised[1]), 'the label says Raised by, so the row does not say it again');
   assert.ok(hr.filter(r => r[0] === 'Made here').length <= 1, 'the makings share one row');
-  assert.ok(hr.some(r => r[0] === 'Country'));
+  assert.ok(hr.some(r => r[0] === 'Land'));
   const cave = api.caves.find(c => c.mark && c.deep);
   const cr = api.markRows(cave.deep.x, cave.deep.y, cave.deep.z);
   assert.ok(cr.some(r => r[0] === 'Dug by' && names.some(n => r[1].includes(n))), JSON.stringify(cr));

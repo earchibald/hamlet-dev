@@ -347,3 +347,92 @@ test('drawField computes the preview once per act, and reuses it when a cut is d
   assert.ok(acts >= 5, `${acts} acts in ${beats} beats`);
   assert.ok(redrawn >= 2, `${redrawn} acts drew the cache again for a cut, in ${beats} beats`);
 });
+
+/* The player never sees a country. This sweep collects every kind of text a player can read and
+   keeps the source with each string, so a match names where it came from. Each source is checked
+   for the internal word before it is checked against the rest: a source that collects nothing would
+   otherwise pass for the same reason a true absence does. */
+function playerText(){
+  const sources = {};
+
+  /* One creation run to the first day, on seed r. watchChronicle takes every line as it is
+     written, because the chronicle itself keeps only its last 300. */
+  const chronApi = sim.load();
+  const events = [];
+  chronApi.watchChronicle(events);
+  chronApi.startWorld('r');
+  for (let i = 0; i < chronApi.DAY; i++) chronApi.step();
+  sources.chronicle = events.map(e => e.text);
+
+  /* In the ages: the status line, and every live region's and every god's own card, taken once the
+     first regions and gods exist. Every gesture's card, taken across the whole creation, since
+     creation.gestures holds only the age now playing. */
+  const api = loadUI(['state', 'icons', 'marks', 'derive', 'keys', 'map', 'inspect'],
+    ['seasonLine', 'countryLine', 'inspectRegion', 'inspectGod', 'actCard', 'markRows', 'KEYMAP']);
+  api.startCreation('r');
+  const seenGestures = new Set();
+  let capturedAges = false;
+  while (api.era === 'gods'){
+    api.step();
+    for (const rec of api.creation.gestures) seenGestures.add(rec);
+    if (!capturedAges && api.liveRegions().length && api.gods().length){
+      sources.seasonLine = [api.seasonLine()];
+      sources.countryLine = api.liveRegions().map(r => api.countryLine(r));
+      sources.inspectRegion = api.liveRegions().map(r => api.inspectRegion(r));
+      sources.inspectGod = api.gods().map(g => api.inspectGod(g));
+      capturedAges = true;
+    }
+  }
+  sources.actCard = [...seenGestures].flatMap(rec => {
+    const card = api.actCard(rec);
+    return [card.head, ...card.rows.map(r => String(r.value))];
+  });
+
+  /* After settle: markRows of one surface tile of each region. */
+  sources.markRows = api.liveRegions().flatMap(r => {
+    for (const i of r.tiles){
+      const x = i % api.W, y = (i - x) / api.W;
+      if (api.hasTile(x, y, 0)) return api.markRows(x, y, 0).map(row => String(row[1]));
+    }
+    return [];
+  });
+
+  /* The label of every KEYMAP row. */
+  sources.keymapLabels = api.KEYMAP.map(row => row.label);
+
+  /* The page shell: the title of every element, and its text with the tags taken out. */
+  const pageHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'page.template.html'), 'utf8');
+  sources.pageTitles = [...pageHtml.matchAll(/title="([^"]*)"/g)].map(m => m[1]);
+  sources.pageText = pageHtml.replace(/<[^>]*>/g, ' ').split(/\s{2,}|\n/).map(s => s.trim()).filter(Boolean);
+
+  /* The label of the thought a god gets when another god marks over its land, read from the raw
+     source text of gods.js, so nothing needs to be run to see the template. */
+  const godsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'sim', 'gods.js'), 'utf8');
+  const thoughtMatch = godsSrc.match(/addThought\(o, 'over' \+ g\.id, `([^`]*)`/);
+  assert.ok(thoughtMatch, 'the marked-over thought was not found in gods.js');
+  sources.markedOverThought = [thoughtMatch[1]];
+
+  /* The text inject() returns for a choose act whose option names no type. Become the first god,
+     step until its turn opens a pending matrix, then choose an empty option. */
+  const doorApi = sim.load();
+  doorApi.startCreation('r');
+  let guard = 0;
+  while (!doorApi.gods().length && guard++ < 50) doorApi.step();
+  assert.ok(doorApi.gods().length, 'no god was born to become');
+  const g = doorApi.gods()[0];
+  doorApi.inject({ source: 'player', act: 'become', id: g.id });
+  guard = 0;
+  while (!doorApi.pending && doorApi.era === 'gods' && guard++ < 2000) doorApi.step();
+  assert.ok(doorApi.pending, 'never opened a turn to test choose() with no type');
+  sources.doorNoType = [doorApi.inject({ source: 'player', act: 'choose', opt: {} })];
+
+  return sources;
+}
+
+test('no text the player reads says "country", and every source in the sweep is not empty', () => {
+  const sources = playerText();
+  for (const [name, list] of Object.entries(sources)){
+    assert.ok(Array.isArray(list) && list.length > 0, `${name} collected nothing`);
+    for (const text of list) assert.doesNotMatch(String(text), /countr/i, `${name}: "${text}"`);
+  }
+});

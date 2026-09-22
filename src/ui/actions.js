@@ -116,7 +116,7 @@ const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: 
 /* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
    to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
 const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
-/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+/* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
@@ -349,7 +349,7 @@ const ACTIONS = {
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
-  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },

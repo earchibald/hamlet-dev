@@ -270,7 +270,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'piece of land', 'pieces of land')}.`, { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over

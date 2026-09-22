@@ -239,7 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
       <button class="btn" id="viewBtn" title="Sector, nearby, world map, camp fire">Nearby<kbd>M</kbd></button>
-      <button class="btn" id="overlayBtn" hidden title="Show or hide the countries the gods made">Countries<kbd>C</kbd></button>
+      <button class="btn" id="overlayBtn" hidden title="Show or hide the borders the gods drew">Borders<kbd>C</kbd></button>
       <span id="nav"><button class="btn small" id="nW">◀<kbd>Alt+←</kbd></button><button class="btn small" id="nN">▲<kbd>Alt+↑</kbd></button><button class="btn small" id="nS">▼<kbd>Alt+↓</kbd></button><button class="btn small" id="nE">▶<kbd>Alt+→</kbd></button></span>
       <span id="levels"><button class="btn small" id="lvDown" title="Down a level">▽<kbd>[</kbd></button><span id="level" class="muted"></span><button class="btn small" id="lvUp" title="Up a level">△<kbd>]</kbd></button></span>
     </div>
@@ -5620,7 +5620,7 @@ function offend(r, g, contrast){
   const who = new Set(r.marks.filter(mine).map(m => m.by));
   for (const id of who){ const o = beingById(id); if (!o || o.status !== 'awake') continue;
     o.needs.calm = clamp(o.needs.calm - 20, 0, 100); o.opinions[g.id] = clamp((o.opinions[g.id] || 0) - 10, -100, 100);
-    addThought(o, 'over' + g.id, `${g.name} marked over my country`, -10, CLOCK.thought.over); setRelation(o, g); }
+    addThought(o, 'over' + g.id, `${g.name} marked over my land`, -10, CLOCK.thought.over); setRelation(o, g); }
 }
 
 /* Level: nothing raised and nothing dug. The height pole alone is highland or lowland, still walkable. */
@@ -7307,7 +7307,7 @@ const DOOR_ACTS = {
   choose(e){
     if (!pending) return 'It is nobody\'s turn.';
     if (e.id !== undefined && e.id !== pending.god) return 'That is not whose turn it is.';
-    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the country it falls on.';
+    if (!e.opt || typeof e.opt.type !== 'string') return 'An option is an act and the land it falls on.';
     return takeTurn(e.opt);
   },
   /* Run: the god chooses for itself until the mark named, or until a stop is reached. Autopilot is the
@@ -7620,10 +7620,11 @@ function standsIn(g){
   while (r && r.children){ const kids = r.children.map(regionById); r = kids.find(k => hasPole(k, g.pole)) || kids[0]; }
   return r || null;
 }
-/* One phrase for a country: its poles, and the reason on its newest pole mark. The reason names the god. A far side of a
-   line takes the other pole, so the god's epithet beside the country's poles would read as a mistake. No full stop at the end. */
-function countryLine(r){
-  if (!r) return 'no country';
+/* The poles of a region, and the reason on its newest pole mark, with no lead-in words. The reason
+   names the god. A far side of a line takes the other pole, so the god's epithet beside the poles
+   would read as a mistake. No full stop at the end. Read this beside countryLine below: this is the
+   bare phrase a labelled row wants; countryLine adds the words a row without a label of its own needs. */
+function landPhrase(r){
   const poles = marksOf(r, 'pole');
   if (!poles.length) return 'formless, not yet anything';
   const m = poles.slice().sort((p, q) => q.age - p.age)[0];
@@ -7631,7 +7632,14 @@ function countryLine(r){
   const g = m.by === null || m.by === undefined ? null : beingById(m.by);
   const why = m.why.replace(/\.$/, '');
   const named = g && !why.includes(g.name) ? `${why}, by ${g.name} ${g.epithet}` : why;
-  return `a country that is ${poles.map(p => p.value).join(' and ')}. ${named}`;
+  return `${poles.map(p => p.value).join(' and ')}. ${named}`;
+}
+/* The internal name is kept: `sector.country` and `tile.country` are fields a snapshot saves, and this
+   function is still called countryLine. It says "land" to the player. */
+function countryLine(r){
+  if (!r) return 'no land';
+  const phrase = landPhrase(r);
+  return phrase === 'formless, not yet anything' ? phrase : `land that is ${phrase}`;
 }
 /* The card an act shows on hover, and the card its cell in the timeline opens. It is the same card from
    both, so an act stays readable long after its mark has faded. The weighed row is withheld for a record
@@ -7639,8 +7647,8 @@ function countryLine(r){
    is exact; takeTurn applies any row by name and marks only that one, so the rule would point at the wrong
    row. E3 does not store the row a player took; a later slice does.
    No helper named `regionName` exists in the shared scope (checked by grep before writing this); the
-   country's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
-   already shows for a country's "Country" row. */
+   region's own line, `countryLine`, is used for the where row instead, the same string inspectRegion
+   already shows for a region's "Land" row. */
 function actCard(rec){
   const m = markFor(rec.kind, rec.value);
   const g = beingById(rec.god);
@@ -7711,7 +7719,7 @@ function lineSoFar(line, f){
   return line.slice(0, Math.round(clamp(f, 0, 1) * line.length));
 }
 
-/* ---- marks on the made world ---- A hill, a cave, a scar, and a country each hold the mark of the god that made them. */
+/* ---- marks on the made world ---- A hill, a cave, a scar, and a region each hold the mark of the god that made them. */
 const SCAR_WORD = { burned: 'Burned ground', cut: 'A cut in the earth', drowned: 'Drowned ground', broken: 'Broken ground' };
 const godLine = id => { const g = id === null || id === undefined ? null : beingById(id); return g ? `${g.name} ${g.epithet}` : 'a god no one names now'; };
 const markWhen = m => `${godLine(m.by)}, ${ageName(m.age) === 'Before time' ? 'before time' : 'in ' + ageName(m.age).toLowerCase()}.`;
@@ -7735,7 +7743,7 @@ function markRows(x, y, z){
     const made = []; for (const m of marksOf(r, 'making')){ if (seen.has(m.why)) continue; seen.add(m.why); made.push(m.why); }
     if (made.length) rows.push(['Made here', made.join(' ')]);
   }
-  rows.push(['Country', countryLine(r) + '.']);
+  rows.push(['Land', landPhrase(r) + '.']);
   if (r.god != null) rows.push(['Sleeping here', godLine(r.god)]);
   return rows;
 }
@@ -7957,7 +7965,7 @@ function campSummary(){
 }
 
 function seasonLine(){
-  if (inAges()) return `${nOf(liveRegions().length, 'country', 'countries')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
+  if (inAges()) return `${nOf(liveRegions().length, 'piece of land', 'pieces of land')}, ${nOf(awakeGods().length, 'god', 'gods')} awake`;
   /* The seasons are not all the same length, so the days left are counted off this season's own
      length rather than one shared number. */
   const s = seasonOf(), i = SEASONS.indexOf(s), next = SEASONS[(i + 1) % 4];
@@ -8510,7 +8518,7 @@ for (const t of TOOLS){
   if (t.oneShot) KEYMAP.push({ key: t.key, shift: true, focus: 'any', action: 'toolSticky', arg: t.id, label: `${t.label}, and keep it` });
 }
 /* After the stage rows, so that under the chord dialog C is still Crafts. */
-KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the countries', button: 'overlayBtn' });
+KEYMAP.push({ key: 'c', focus: 'any', action: 'overlay', label: 'Show or hide the borders', button: 'overlayBtn' });
 /* Shift with a digit sets a speed by its place on the ladder. Plain digits belong to the drawers and their rows.
    The label names both ladders, since the same row serves the ages and the days.
    The two ladders are meant to be the same length, and tests/ui.js asserts it. A row past the end of
@@ -8938,7 +8946,7 @@ function drawField(){
     }
     wctx.globalAlpha = 1;
     const g = beingById(now.god), p = tileSpot(now.from === null ? now.to : now.from);
-    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'country', 'countries')}.`, { x: p.x, y: p.y - 44 });
+    if (g && p) drawCaption(`${g.name} weighs ${nOf(now.weighed.opts.length, 'piece of land', 'pieces of land')}.`, { x: p.x, y: p.y - 44 });
   }
 
   /* The act's own figure, at the fraction of its own beat that has run. The act before it fades out over
@@ -9243,11 +9251,11 @@ function inspectGod(g){
   const need = (k, v) => `<div class="need"><span>${NEED_LABEL[k]}</span>${bar(v, needColor(v))}<span class="num">${Math.round(v)}</span></div>`;
   let where;
   if (g.status === 'dead') where = 'Unmade. Nothing on the field was its pole any more.';
-  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands in ${countryLine(standsIn(g))}.`;
+  else if (inAges() || g.status === 'awake') where = `${g.status === 'awake' ? 'Awake' : 'Asleep'} since ${ageName(g.status === 'awake' ? g.born : g.sleptAt || g.born).toLowerCase()}. It stands on ${countryLine(standsIn(g))}.`;
   else { const s = secOf(g.x, g.y); where = `Asleep since ${ageName(g.sleptAt || g.born).toLowerCase()}. ${g.name} lies down and is ${BODY[g.pole]}, in ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${g.x - s.sx * LW},${g.y - s.sy * LH}.`; }
   const thoughts = g.thoughts.slice().sort((x, y) => Math.abs(y.value) - Math.abs(x.value)).slice(0, 4).map(t => `<li class="${t.value >= 0 ? 'pos' : 'neg'}"><b>${t.value > 0 ? '+' : ''}${t.value}</b> ${t.text}</li>`).join('') || '<li class="muted">No strong thoughts right now.</li>';
   const opinions = Object.entries(g.opinions || {}).map(([id, v]) => { const o = beingById(Number(id)); return o ? `${o.name} (${v > 0 ? '+' : ''}${v})` : ''; }).filter(Boolean).join(', ') || 'No opinion of another god yet.';
-  /* Several options share an act, one per country. Only the first that did not fail is the one picked. */
+  /* Several options share an act, one per region. Only the first that did not fail is the one picked. */
   let marked = false;
   const why = g.lastChoice && g.lastChoice.opts.length ? `<div class="why">${g.lastChoice.opts.slice(0, 6).map(o => { const on = !marked && !o.failed && o.type === g.lastChoice.picked; if (on) marked = true; return `<span class="${on ? 'picked' : o.failed ? 'failed' : ''}">${o.label} ${o.score}</span>`; }).join('')}</div>` : '<span class="muted">No decision yet.</span>';
   const said = g.history.slice(0, 8).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
@@ -9328,11 +9336,11 @@ function inspectTile(x, y, z = 0){
   camp = saved;
   return `<table class="kv">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
-/* A country of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
+/* A region of the field: what it is, what it will be at settle, who stands in it, and every reason a god left on it. */
 function inspectRegion(r){
   if (!r) return '<div class="muted">Nothing is here.</div>';
   const here = gods().filter(g => g.status !== 'dead' && standsIn(g) === r).map(g => `${g.name} ${g.epithet}, ${g.status}`);
-  const rows = [['Country', countryLine(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
+  const rows = [['Land', landPhrase(r) + '.'], ['Size', nOf(Math.max(1, Math.round(r.area / SECTOR_AREA)), 'sector', 'sectors')], ['Becoming', biomeOf(r)]];
   if (here.length) rows.push(['Here', here.join('; ')]);
   const seen = new Set(), why = [];
   for (const m of r.marks.slice().sort((p, q) => p.age - q.age)){ const k = m.age + m.why; if (seen.has(k)) continue; seen.add(k); why.push(`<li><span class="muted">${ageName(m.age)}</span> ${m.why}</li>`); }
@@ -9343,7 +9351,7 @@ function renderTip(){
   if (!tipTarget || !tipAnchor){ tip.hidden = true; return; }
   const oldHist = tip.querySelector('.hist'), scroll = oldHist ? oldHist.scrollTop : 0;
   /* The tile, not the region id: a split makes that id a parent, and the card would go stale.
-     A pointer near a mark's own halo shows the act's card in place of the country under it, so a
+     A pointer near a mark's own halo shows the act's card in place of the land under it, so a
      hover on the mark reads the act and not the ground it changed. */
   const body = tipTarget.act ? actCardHTML(actCard(tipTarget.act))
     : tipTarget.field ? inspectRegion(regionAt(tipTarget.field[0], tipTarget.field[1]))
@@ -9844,7 +9852,7 @@ const tileFromWorld = e => { const r = wcv.getBoundingClientRect(); return { x: 
 /* The pointer's place in the field canvas's own drawing space, the one tileSpot answers in. Proportional
    to the rect the same way tileFromWorld is, so it holds regardless of how the canvas is laid out on the page. */
 const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W * WS, y: (e.clientY - r.top) / r.height * H * WS }; };
-/* In the ages, Enter or a click opens the first god that stands in the country under the cursor. */
+/* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
@@ -10077,7 +10085,7 @@ const ACTIONS = {
   speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
-  overlay(){ if (inAges()){ say('The field is all there is. The countries show after the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
+  overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
   inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
