@@ -106,6 +106,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
 #actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 #actCaption[hidden]{display:none}
+/* The zoom's own skip line, over the bottom edge of its canvas. It shows only while #zoom is not
+   hidden, since it is one of that wrap's own children. */
+#zoom{position:relative}
+#zoomSkip{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 /* A god's icon, wherever it sits beside a name: the card, a window title, the people row, the
    timeline lane, the act caption. Pixel art, so it stays crisp rather than smoothed when scaled. */
 .godicon{vertical-align:-2px;image-rendering:pixelated;margin-right:3px}
@@ -235,6 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
       <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
+      <div class="map-wrap" id="zoom" hidden><canvas id="zmap" aria-label="The view zooms from the world down to the valley"></canvas><div id="zoomSkip">Press any key, or click, to go straight to the valley.</div></div>
     </div>
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
@@ -7374,7 +7379,10 @@ const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solita
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief', expression: 'Expression', company: 'Company', calm: 'Calm' };
 let viewCamp = null;
 let lvl = 0;
-let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+/* The zoom that is running, or null. { stops, legs, t, pics, boxes }. Only actions.js writes it: startZoom,
+   advanceZoom and endZoom. The world does not step while it is set. */
+let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
@@ -9214,7 +9222,122 @@ function drawLoc(){
     ctx.strokeStyle = P.halo; ctx.lineWidth = 1; ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
   }
 }
-function draw(){ if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+/* A throw from drawZoom would otherwise leave the page stuck on the zoom canvas forever: draw() only
+   reaches drawWorld/drawMid/drawLoc once zoom is null, and main.js's frame loop re-queues itself from a
+   finally with no catch around draw(), so the same throw would repeat every frame with no way back to a
+   view that can draw. Ending the zoom here returns the page to a view that can draw again. The error is
+   thrown again so it still reaches the browser console uncaught, exactly as any other draw() throw
+   already does; frame()'s finally has already queued the next frame by the time that happens. */
+function draw(){ if (zoom){ try { drawZoom(); } catch (e){ endZoom(); throw e; } return; } if (view === 'world') drawWorld(); else if (view === 'mid') drawMid(); else drawLoc(); }
+
+/* The zoom: a camera that moves between two views, drawn on its own canvas. The settle uses it to go from the
+   gods' map to the first person's sector, and any later caller can give it other stops. The functions at the
+   top are pure and run in Node under tests/zoom.js. The drawing below them reads `zoom`, which only
+   actions.js writes. */
+
+/* The zoom's durations, in milliseconds of wall time. They are view durations and stay out of src/sim/.
+   fade is the cross-fade from the gods' map to the world map, hold is the pause at each stop, and the two
+   zoom legs are named by the view they arrive at. */
+const ZOOM = { fade: 1000, hold: 350, mid: 1600, loc: 1100 };
+
+/* The tiles a view shows, in world tiles: { x, y, w, h }. `s` is the sector the view is on. */
+function viewFrame(v, s){
+  if (v === 'mid') return { x: (s.sx - 1) * LW, y: (s.sy - 1) * LH, w: 3 * LW, h: 3 * LH };
+  if (v === 'loc') return { x: s.sx * LW, y: s.sy * LH, w: LW, h: LH };
+  return { x: 0, y: 0, w: W, h: H };
+}
+const zoomEase = f => f * f * (3 - 2 * f);
+const lerp = (a, b, f) => a + (b - a) * f;
+/* The camera at fraction f of a leg from frame a to frame b. The box, in CSS pixels, moves in a straight
+   line from boxA to boxB. The camera's width moves geometrically, so each moment of the zoom multiplies the
+   scale by the same amount. Its height follows the box's aspect, so the picture never stretches. The centre
+   moves in step with the zoom, so the frame being arrived at grows steadily on screen. */
+function zoomCamera(a, b, boxA, boxB, f){
+  const e = zoomEase(clamp(f, 0, 1));
+  const box = { w: lerp(boxA.w, boxB.w, e), h: lerp(boxA.h, boxB.h, e) };
+  const w = Math.pow(a.w, 1 - e) * Math.pow(b.w, e), h = w * box.h / box.w;
+  const p = a.w === b.w ? e : (a.w - w) / (a.w - b.w);
+  const cx = lerp(a.x + a.w / 2, b.x + b.w / 2, p), cy = lerp(a.y + a.h / 2, b.y + b.h / 2, p);
+  return { box, cam: { x: cx - w / 2, y: cy - h / 2, w, h } };
+}
+/* Where a frame lands in the box, in CSS pixels, when the camera shows `cam`. */
+function frameInBox(frame, cam, box){
+  const k = box.w / cam.w;
+  return { x: (frame.x - cam.x) * k, y: (frame.y - cam.y) * k, w: frame.w * k, h: frame.h * k };
+}
+/* The legs between a list of stops. A stop is { view, s, image }: the view, its sector, and the key of the
+   picture it shows. Two stops of the same view make a fade; two views make a zoom. A hold sits between two
+   legs. Each leg keeps the stops' indexes, so the drawing finds their pictures. */
+function zoomPlan(stops){
+  const legs = [];
+  for (let i = 1; i < stops.length; i++){
+    if (legs.length) legs.push({ kind: 'hold', from: i - 1, to: i - 1, ms: ZOOM.hold });
+    const same = stops[i].view === stops[i - 1].view;
+    legs.push({ kind: same ? 'fade' : 'zoom', from: i - 1, to: i, ms: same ? ZOOM.fade : ZOOM[stops[i].view] });
+  }
+  return legs;
+}
+/* The leg that runs t ms into a plan, and the fraction of it that has run. Null once the plan is over. */
+function zoomAt(legs, t){
+  let start = 0;
+  for (let i = 0; i < legs.length; i++){
+    if (t < start + legs[i].ms) return { i, f: (t - start) / legs[i].ms };
+    start += legs[i].ms;
+  }
+  return null;
+}
+const zoomLength = legs => legs.reduce((n, l) => n + l.ms, 0);
+/* How strongly each stop's picture shows at fraction f of a leg. A fade crosses the whole leg. In a zoom the
+   picture left behind goes in the first part, and the picture arrived at comes in the last half, so the
+   middle of the flight shows only the world's own ground. A hold shows its one stop. */
+function legAlphas(leg, f){
+  const e = zoomEase(clamp(f, 0, 1));
+  if (leg.kind === 'hold') return { from: 1, to: 0 };
+  if (leg.kind === 'fade') return { from: 1, to: e };
+  return { from: 1 - clamp(f / 0.4, 0, 1), to: zoomEase(clamp((f - 0.5) / 0.5, 0, 1)) };
+}
+/* The settle's stops: the finished gods' map, the world map, the nine sectors around the first person, and
+   that person's sector. A settle with no one in it ends on the world map. */
+function settleStops(s){
+  const stops = [{ view: 'world', image: 'field' }, { view: 'world', image: 'world' }];
+  if (s) stops.push({ view: 'mid', s, image: 'mid' }, { view: 'loc', s, image: 'loc' });
+  return stops;
+}
+
+/* The drawing. Reads `zoom`, which only actions.js writes: startZoom took the pictures and their boxes
+   while the world stood still, and everything below is arithmetic on them, at the fraction of the plan
+   the wall clock has now reached. */
+function drawZoom(){
+  const at = zoomAt(zoom.legs, zoom.t);
+  if (!at) return;
+  const leg = zoom.legs[at.i], A = zoom.stops[leg.from], B = zoom.stops[leg.to];
+  const frameA = viewFrame(A.view, A.s), frameB = viewFrame(B.view, B.s);
+  const boxA = zoom.boxes[A.image], boxB = zoom.boxes[B.image];
+  const { box, cam } = zoomCamera(frameA, frameB, boxA, boxB, at.f);
+  const w = Math.round(box.w * dpr), h = Math.round(box.h * dpr);
+  if (zcv.width !== w || zcv.height !== h){ zcv.width = w; zcv.height = h; }
+  zcv.style.width = box.w + 'px'; zcv.style.height = box.h + 'px';
+  zctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  zctx.imageSmoothingEnabled = false;
+  zctx.fillStyle = P.void; zctx.fillRect(0, 0, box.w, box.h);
+  /* A zoom leg crosses ground the two pictures do not share, so the world cache stands under them: the
+     land the camera passes over between the country it left and the sector it is bound for. A fade
+     never leaves its view, so it has none to show. */
+  if (leg.kind === 'zoom'){
+    const r = frameInBox(viewFrame('world'), cam, box);
+    zctx.drawImage(ocv, r.x, r.y, r.w, r.h);
+  }
+  const alphas = legAlphas(leg, at.f);
+  if (alphas.from > 0){
+    const r = frameInBox(frameA, cam, box);
+    zctx.globalAlpha = alphas.from; zctx.drawImage(zoom.pics[A.image], r.x, r.y, r.w, r.h);
+  }
+  if (alphas.to > 0){
+    const r = frameInBox(frameB, cam, box);
+    zctx.globalAlpha = alphas.to; zctx.drawImage(zoom.pics[B.image], r.x, r.y, r.w, r.h);
+  }
+  zctx.globalAlpha = 1;
+}
 
 /* The timeline: the record of the creation, laid flat under the map. It draws the model and nothing
    else. It builds nodes and sets textContent, so no string out of the simulation is ever parsed as
@@ -9941,6 +10064,7 @@ const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x:
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
 function newWorld(seed){
+  endZoom();
   startCreation(seed, {});
   fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
@@ -10004,6 +10128,7 @@ function loadWorld(snapshot, note){
 /* The view after a load. Everything it remembers points at the world that was replaced, and the new
    world can be a smaller one, so this puts the view back on the ground as onSettle does. */
 function onLoad(){
+  endZoom();
   acc = 0; worldDirty = 0; fieldKey = ''; chronKey = ''; setActCaption('');
   viewCamp = camps[0]; camp = camps[0];
   ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.unfold = {}; ui.trails = {};
@@ -10083,6 +10208,61 @@ function continueWorld(){
   if (loadWorld(lastSave, startNote)) closeDialogs();
 }
 
+/* ---------- the zoom ----------
+   The camera that carries the player from the gods' map to the first person's sector at settle. The pure
+   model lives in zoom.js; these three functions are its one writer, as state.js's comment on `zoom` says. */
+
+/* A copy of a canvas, pixel for pixel, so a later draw to the source canvas cannot change the picture. */
+function copyCanvas(src){
+  const c = document.createElement('canvas');
+  c.width = src.width; c.height = src.height;
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+/* The canvas a view draws on. */
+const canvasFor = v => v === 'world' ? wcv : v === 'mid' ? mcv : cv;
+
+/* Start a zoom along the given stops. Returns without doing anything when there is no page, when the
+   player asked for less motion, or when there are fewer than two stops to move between. */
+function startZoom(stops){
+  if (typeof document === 'undefined' || !wcv) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!stops || stops.length < 2) return;
+  const pics = {}, boxes = {}, curBefore = cur;
+  /* The field is the last frame of the ages: the frame loop calls onSettle before it draws, so wcv
+     still shows what the ages left there. */
+  pics.field = copyCanvas(wcv);
+  for (const stop of stops){
+    if (stop.image === 'field' || pics[stop.image]) continue;
+    $('world').hidden = stop.view !== 'world'; $('mid').hidden = stop.view !== 'mid'; $('loc').hidden = stop.view !== 'loc';
+    if (stop.s) cur = { sx: stop.s.sx, sy: stop.s.sy };
+    if (stop.view === 'world') drawWorld(); else if (stop.view === 'mid') drawMid(); else drawLoc();
+    const canvas = canvasFor(stop.view), r = canvas.getBoundingClientRect();
+    boxes[stop.image] = { w: r.width, h: r.height };
+    pics[stop.image] = copyCanvas(canvas);
+  }
+  /* Put cur back to the last stop's sector, so the view the zoom ends on is the one the last stop
+     drew. When the last stop has no sector of its own (the world view), cur stays what it was
+     before the loop, since nothing in the loop set it for that stop. */
+  const lastStop = stops[stops.length - 1];
+  cur = lastStop.s ? { sx: lastStop.s.sx, sy: lastStop.s.sy } : curBefore;
+  boxes.field = boxes.world;
+  $('world').hidden = true; $('mid').hidden = true; $('loc').hidden = true; $('zoom').hidden = false;
+  zoom = { stops, legs: zoomPlan(stops), t: 0, pics, boxes };
+}
+/* One frame of a running zoom. Ends it once the plan is over. */
+function advanceZoom(dt){
+  zoom.t += dt;
+  if (zoomAt(zoom.legs, zoom.t) === null) endZoom();
+}
+/* Leaves the zoom and shows the view it was headed for. acc is cleared so the days do not open with a
+   backlog of ticks the frame loop never ran while the zoom held the world still. */
+function endZoom(){
+  if (!zoom) return;
+  zoom = null; $('zoom').hidden = true; acc = 0;
+  setView(view, cur);
+}
+
 /* The flip. The frame calls this once, in the first frame that sees the days after the ages. */
 function onSettle(){
   acc = 0; worldDirty = 0; setActCaption(''); viewCamp = camps[0]; camp = camps[0]; ui.seenTick = -1; ui.lastStates = {}; ui.pulses = []; ui.trails = {};
@@ -10100,6 +10280,7 @@ function onSettle(){
   if (ui.focus === 'timeline') ui.focus = 'map';
   const a = firstPerson();
   if (a){ cursor = { x: a.x, y: a.y, z: a.z }; setView('loc', secOf(a.x, a.y)); } else setView('world');
+  startZoom(settleStops(a ? secOf(a.x, a.y) : null));
   say(creation.failed ? 'The gods sleep unfinished. The valley is what it is.' : 'The gods sleep. The valley is made, and one person wakes in it.');
 }
 function applyTool(c, e){
@@ -10311,7 +10492,13 @@ function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
      every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
-  if (!paused){
+  /* The zoom is wall-time view motion, not sim time: a settle can land while the player is paused
+     (hurryGo runs the ages with no pause gate, and onSettle does not unpause), so the zoom must
+     advance and finish on its own clock whether or not the world is paused. The days branch below
+     stays gated on !paused and on zoom being clear, so the days still do not step while it runs. */
+  if (zoom){
+    try { advanceZoom(dt); } catch (e){ onFault(e); }
+  } else if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
@@ -10358,6 +10545,7 @@ function initUI(){
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
   wcv = $('wmap'); wctx = wcv.getContext('2d');
   mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
+  zcv = $('zmap'); zctx = zcv.getContext('2d');
   ocv = document.createElement('canvas'); octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
@@ -10446,7 +10634,40 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
+  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: this
+     handler stops the pointerdown so it never reaches the target's own pointerdown handler, and
+     never bubbles to .mapbox's pointerdown handler, which would otherwise move focus to 'map'.
+     Capture phase, so it runs before any of that. preventDefault too, so the press cannot also
+     start a text selection on the skip line. Some browsers still fire a paired click for the same
+     press even though pointerdown's propagation was stopped, so a flag marks that a skip is under
+     way, and the one-shot capture listener below consumes that click too, wherever it lands.
+     When no zoom is running, neither listener does anything. Each new press clears the flag
+     first, so a press that ends with no click, such as a cancelled touch, cannot use up the next
+     click. The keydown handler below clears it too, so a key pressed after a cancelled touch is
+     not swallowed by a stale click either. */
+  let zoomSkipConsumesClick = false;
+  document.addEventListener('pointerdown', e => {
+    zoomSkipConsumesClick = false;
+    if (!zoom) return;
+    endZoom(); e.stopPropagation(); e.preventDefault();
+    zoomSkipConsumesClick = true;
+  }, true);
+  document.addEventListener('click', e => {
+    if (!zoomSkipConsumesClick) return;
+    zoomSkipConsumesClick = false;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
   document.addEventListener('keydown', e => {
+    /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
+       through pointercancel, with no paired click. That leaves the flag set after zoom is already
+       null, so a later Enter on a focused button, which raises a click with no pointerdown, would
+       otherwise be swallowed by the stale flag. */
+    zoomSkipConsumesClick = false;
+    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else.
+       A chord held with Meta, Ctrl, or Alt still ends the zoom but skips preventDefault, so the
+       browser's own shortcut for that chord, such as Cmd+R, still runs when the chord was already
+       held as the zoom began. A plain key still calls preventDefault. */
+    if (zoom){ if (!(e.metaKey || e.ctrlKey || e.altKey)) e.preventDefault(); endZoom(); return; }
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
        that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
        plain key let through, and only as the way out of the chronicle's search box. */

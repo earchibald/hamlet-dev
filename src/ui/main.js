@@ -4,7 +4,13 @@ function frame(now){
   const dt = Math.min(250, now - (last || now)); last = now;
   /* A step can throw: a save file is outside data, and the loader closes the crashes it can show, not
      every one. A throw stops the world and says so. The frame loop runs on, so the page stays usable. */
-  if (!paused){
+  /* The zoom is wall-time view motion, not sim time: a settle can land while the player is paused
+     (hurryGo runs the ages with no pause gate, and onSettle does not unpause), so the zoom must
+     advance and finish on its own clock whether or not the world is paused. The days branch below
+     stays gated on !paused and on zoom being clear, so the days still do not step while it runs. */
+  if (zoom){
+    try { advanceZoom(dt); } catch (e){ onFault(e); }
+  } else if (!paused){
     try {
       /* The ages wait while a dialog is open, so the creation does not pass behind the start dialog. */
       if (inAges()){ if (!anyDialogOpen()){ const d = beatsDue(acc, dt, pace); acc = d.acc; if (d.n) beatsLastFrame = d.n; for (let k = 0; k < d.n && inAges(); k++) step(true); } }
@@ -51,6 +57,7 @@ function initUI(){
   cv = $('map'); ctx = cv.getContext('2d'); cv.width = LW * T * dpr; cv.height = LH * T * dpr;
   wcv = $('wmap'); wctx = wcv.getContext('2d');
   mcv = $('mmap'); mctx = mcv.getContext('2d'); mcv.width = 3 * LW * MS * dpr; mcv.height = 3 * LH * MS * dpr;
+  zcv = $('zmap'); zctx = zcv.getContext('2d');
   ocv = document.createElement('canvas'); octx = ocv.getContext('2d');
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
@@ -139,7 +146,40 @@ function initUI(){
   });
   mcv.addEventListener('pointerleave', () => { mhover = null; hideTip(); });
   mcv.addEventListener('pointerdown', e => { const s = sectorFromMid(e); if (s) goto(s.sx, s.sy); });
+  /* A click during a running zoom ends it. Like a key, the click is used up by the skip: this
+     handler stops the pointerdown so it never reaches the target's own pointerdown handler, and
+     never bubbles to .mapbox's pointerdown handler, which would otherwise move focus to 'map'.
+     Capture phase, so it runs before any of that. preventDefault too, so the press cannot also
+     start a text selection on the skip line. Some browsers still fire a paired click for the same
+     press even though pointerdown's propagation was stopped, so a flag marks that a skip is under
+     way, and the one-shot capture listener below consumes that click too, wherever it lands.
+     When no zoom is running, neither listener does anything. Each new press clears the flag
+     first, so a press that ends with no click, such as a cancelled touch, cannot use up the next
+     click. The keydown handler below clears it too, so a key pressed after a cancelled touch is
+     not swallowed by a stale click either. */
+  let zoomSkipConsumesClick = false;
+  document.addEventListener('pointerdown', e => {
+    zoomSkipConsumesClick = false;
+    if (!zoom) return;
+    endZoom(); e.stopPropagation(); e.preventDefault();
+    zoomSkipConsumesClick = true;
+  }, true);
+  document.addEventListener('click', e => {
+    if (!zoomSkipConsumesClick) return;
+    zoomSkipConsumesClick = false;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
   document.addEventListener('keydown', e => {
+    /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
+       through pointercancel, with no paired click. That leaves the flag set after zoom is already
+       null, so a later Enter on a focused button, which raises a click with no pointerdown, would
+       otherwise be swallowed by the stale flag. */
+    zoomSkipConsumesClick = false;
+    /* Any key ends a running zoom and is used up, so a key pressed to skip it does nothing else.
+       A chord held with Meta, Ctrl, or Alt still ends the zoom but skips preventDefault, so the
+       browser's own shortcut for that chord, such as Cmd+R, still runs when the chord was already
+       held as the zoom began. A plain key still calls preventDefault. */
+    if (zoom){ if (!(e.metaKey || e.ctrlKey || e.altKey)) e.preventDefault(); endZoom(); return; }
     /* A text box takes the plain keys. A chord with Ctrl, Alt, or Command is not text, so it still fires:
        that is how Alt+C continues the last world while the cursor sits in the seed box. Esc is the one
        plain key let through, and only as the way out of the chronicle's search box. */

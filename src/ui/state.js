@@ -19,7 +19,10 @@ const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solita
 const NEED_LABEL = { food: 'Food', water: 'Water', rest: 'Rest', social: 'Company', warmth: 'Warmth', glow: 'Glow', play: 'Mischief', expression: 'Expression', company: 'Company', calm: 'Calm' };
 let viewCamp = null;
 let lvl = 0;
-let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'inspect', view = 'world', cur = { sx: SW >> 1, sy: SH >> 1 }, followId = null;
+/* The zoom that is running, or null. { stops, legs, t, pics, boxes }. Only actions.js writes it: startZoom,
+   advanceZoom and endZoom. The world does not step while it is set. */
+let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
 let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,

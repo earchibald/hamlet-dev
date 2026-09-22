@@ -106,6 +106,10 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 .foot-stack{position:absolute;left:10px;bottom:10px;right:400px;z-index:2;display:flex;flex-direction:column;gap:6px}
 #actCaption{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 #actCaption[hidden]{display:none}
+/* The zoom's own skip line, over the bottom edge of its canvas. It shows only while #zoom is not
+   hidden, since it is one of that wrap's own children. */
+#zoom{position:relative}
+#zoomSkip{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px}
 /* A god's icon, wherever it sits beside a name: the card, a window title, the people row, the
    timeline lane, the act caption. Pixel art, so it stays crisp rather than smoothed when scaled. */
 .godicon{vertical-align:-2px;image-rendering:pixelated;margin-right:3px}
@@ -235,6 +239,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
       <div class="map-wrap" id="world"><canvas id="wmap" aria-label="World map"></canvas></div>
       <div class="map-wrap" id="mid" hidden><canvas id="mmap" aria-label="Nearby map: the sector and its eight neighbours"></canvas></div>
       <div class="map-wrap" id="loc" hidden><canvas id="map" aria-label="Location map"></canvas></div>
+      <div class="map-wrap" id="zoom" hidden><canvas id="zmap" aria-label="The view zooms from the world down to the valley"></canvas><div id="zoomSkip">Press any key, or click, to go straight to the valley.</div></div>
     </div>
     <div class="over tl">
       <span id="tools" role="toolbar" aria-label="Tools"></span>
