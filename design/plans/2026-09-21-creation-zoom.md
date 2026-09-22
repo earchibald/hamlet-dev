@@ -15,6 +15,19 @@ Playtest recommendation 6, from the "Hearth Playtest Notes" page (seed amber-for
 | 2 | The zoom layer on the page: its canvas, its state, start, advance, skip and end, the drawing, the hook at settle, the held world, and the reduced-motion rule. | `src/page.template.html`, `src/ui/state.js`, `src/ui/actions.js`, `src/ui/zoom.js`, `src/ui/map.js`, `src/ui/main.js` |
 | 3 | The one line of player text, the design notes, and the project test list. The review panel reads the text. | `src/page.template.html`, `design/notes.md`, `CLAUDE.md` |
 
+## After recommendation 1
+
+Recommendation 1 (PR #127, merged into dev at 7600299) draws the gods' map from `previewField()` in
+`src/ui/preview.js`, in the world map's own colours. This branch merged it at 684c2d4. It changes this plan in
+four places.
+
+| Point | Ruling |
+|---|---|
+| The fade from the gods' map to the world map | It stays, at `ZOOM.fade` = 1000 ms, and Task 1 is unchanged. The two maps share their colours and their shares of each kind, but not their tiles. In `tests/preview.js`, only 0.315 to 0.448 of the preview's water tiles are water in the world, and a region's tree share differs by up to 0.172. A cut would move two thirds of the pools at once. The fade shows it as the ground settling. |
+| The picture `field` | `drawField` still draws on `wcv`, and the frame loop still calls `onSettle` before it draws. So the copy of `wcv` holds the last frame of the ages. That frame can hold the act caption and the faint border lines in `field-line`. Look for both in the screenshot of the fade, and report what shows. |
+| The word "country" | Recommendation 1 removed it from the player's text, and `tests/preview.js` fails on any `/countr/i` in `src/page.template.html`. The new canvas label and the skip line do not use it. |
+| The zoom legs | Recommendation 1 does not change them. |
+
 ## Global constraints
 
 - `src/ui/` files are plain scripts in one scope. No `import` and no `export`.
@@ -27,8 +40,8 @@ Playtest recommendation 6, from the "Hearth Playtest Notes" page (seed amber-for
   today. A settle with no first person ends on the world view, as today.
 - The zoom is reusable: `startZoom(stops)` takes any list of stops, and nothing in the zoom code names the
   settle, except `settleStops`.
-- Run `node build.js` after every change to `src/`. Run `node --test tests/zoom.js tests/icons.js tests/build.js`
-  and `npm run fast` before each commit.
+- Run `node build.js` after every change to `src/`. Run
+  `node --test tests/zoom.js tests/icons.js tests/build.js tests/preview.js` and `npm run fast` before each commit.
 
 ## Sizes that the design rests on
 
@@ -212,7 +225,16 @@ The drawing, `drawZoom()` at the end of `src/ui/zoom.js`:
 Before the report, check the page in a browser. Serve `dist/hearth-sim.html` and start seed amber-ford-45.
 Press `H`, and see the fade, the two zooms, and the arrival in the sector view. Press a key in the middle and see the
 sector view at once. Check that the day clock in the strip does not move until the zoom ends. Take three
-screenshots in the middle of the zoom, one for each leg, and name their paths in the report.
+screenshots in the middle of the zoom, one for each leg, and name their paths in the report. Since
+recommendation 1, the gods' map is drawn from `previewField()` in `src/ui/preview.js`, in the world map's
+colours. The fade joins two maps that differ only in where the pools and trees are. In the fade's screenshot, look for the act
+caption and the faint border lines in `field-line` from the last frame of the ages. Say whether each shows. Do
+not remove either without asking: report it.
+
+Check `viewFrame('mid', s)` at the world's edge. For a sector in column 0 or row 0, it gives a block that
+starts at a negative tile. Read `drawMid` in `src/ui/map.js` and find which tiles it shows for that sector. If
+the two differ, make `viewFrame` give what `drawMid` shows, and add an edge sector to the test "the three
+frames". Say in the report which case held.
 
 Add one test to `tests/zoom.js` for the writer rule. It reads each file in `src/ui/`. It asserts that the
 pattern `/\bzoom\s*=[^=]/` appears in no file except `actions.js` and the one declaration in `state.js`. Plant a `zoom = null` in `map.js` and watch it go red.
