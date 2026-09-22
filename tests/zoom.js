@@ -140,21 +140,22 @@ test('the alphas', () => {
 
 /* `zoom` is state.js's one declaration and actions.js's one writer (startZoom, advanceZoom, endZoom), as
    state.js's own comment on the field says. Any other file that assigns zoom itself, or a field of the
-   record zoom holds, would move the world's clock or the view behind actions.js's back. */
+   record zoom holds, would move the world's clock or the view behind actions.js's back.
+   No pattern here can see a write made through an alias or through Object.assign; both stay invisible
+   to source-text matching. Also, derive.js's timelineSpan(zoom, now) names its own parameter zoom, so a
+   plain write to that parameter, such as zoom.t = 0 inside timelineSpan, would raise a false alarm here. */
 test('only actions.js and state.js write zoom', () => {
   const dir = path.join(__dirname, '../src/ui');
   const writer = /\bzoom\s*=[^=]/;
-  /* A dotted field, plain or compound assign: zoom.t = , zoom.t += . Excludes == and ===, since the
-     character right after the "=" must not itself be "=". */
-  const fieldWriter = /\bzoom\.\w+\s*[-+*/]?=[^=]/;
-  /* A bracketed field assign: zoom.pics[k] = c. A bare read, zoom.pics[k] alone, has no "=" after the
-     "]" and so does not match. */
-  const bracketWriter = /\bzoom\.\w+\[[^\]]*\]\s*=[^=]/;
+  /* A field write at any depth of dotted or bracketed access, plain or compound assign: zoom.t = ,
+     zoom.t += , zoom.pics.field = c, zoom.boxes.world.w ||= 3, zoom['t'] = 0. Excludes == and ===,
+     since the character right after the "=" must not itself be "=". */
+  const fieldWriter = /\bzoom(?:\.\w+|\[[^\]]*\])+\s*(?:\*\*|<<|>>>?|\?\?|&&|\|\||[-+*/%&|^])?=(?!=)/;
   /* A dotted field's own increment or decrement, prefix or postfix: zoom.t++, ++zoom.t, zoom.t--. */
   const incDec = /\bzoom\.\w+\s*(\+\+|--)|(\+\+|--)\s*zoom\.\w+\b/;
-  /* A method that changes the array or object a field holds, called straight off that field: e.g.
-     zoom.legs.push(x). Covers every mutator the brief names. */
-  const mutMethod = /\bzoom\.\w+\.(push|pop|splice|shift|unshift|sort|reverse)\s*\(/;
+  /* A method that changes the array or object a field holds, called off a field at any depth: e.g.
+     zoom.legs.push(x), zoom.legs.fill(0). Covers every mutator the brief names. */
+  const mutMethod = /\bzoom(?:\.\w+|\[[^\]]*\])*\.(push|pop|splice|shift|unshift|sort|reverse|fill)\s*\(/;
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'));
   for (const f of files){
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
@@ -177,7 +178,6 @@ test('only actions.js and state.js write zoom', () => {
     }
     assert.doesNotMatch(text, writer, `${f} writes to zoom`);
     assert.doesNotMatch(text, fieldWriter, `${f} writes to a field of zoom`);
-    assert.doesNotMatch(text, bracketWriter, `${f} writes to a bracketed field of zoom`);
     assert.doesNotMatch(text, incDec, `${f} increments or decrements a field of zoom`);
     assert.doesNotMatch(text, mutMethod, `${f} calls a mutating method on a field of zoom`);
   }
@@ -195,10 +195,19 @@ test('the frame loop only steps the world in the branch where no zoom is running
     'if (zoom) with advanceZoom must be followed by else if (!paused)');
 });
 
-test("the keydown handler's first statement ends a running zoom", () => {
+test('the keydown handler clears the skip flag before it checks zoom, and ends a running zoom', () => {
   const src = fs.readFileSync(path.join(__dirname, '../src/ui/main.js'), 'utf8');
-  /* Guards against a later statement being added ahead of the zoom check, or the check being
-     dropped, either of which would let a key do something else while a zoom is still running. */
-  assert.match(src, /addEventListener\('keydown', e => \{(?:\s*\/\*[\s\S]*?\*\/)?\s*if \(zoom\)\{[\s\S]*?endZoom\(\);[\s\S]*?return;\s*\}/,
-    'keydown must open with if (zoom){ ... endZoom(); ... return; }');
+  /* A block comment or a // line comment may sit ahead of the flag clear, or between it and the
+     zoom check, so a reflow of the handler's own comments does not turn this red. */
+  const comment = '(?:\\s*(?:/\\*[\\s\\S]*?\\*/|//[^\\n]*))*';
+  /* Guards against a statement being added ahead of the flag clear or the zoom check, and against
+     the flag clear or the check being dropped. The if (zoom) block itself is matched with [^{}]*,
+     not [\\s\\S]*?, so it cannot run on past its own closing brace to a later, unrelated return;
+     that would otherwise let a dropped return still look present. */
+  const re = new RegExp(
+    `addEventListener\\('keydown', e => \\{${comment}\\s*zoomSkipConsumesClick = false;${comment}` +
+    `\\s*if \\(zoom\\)\\{[^{}]*endZoom\\(\\);[^{}]*return;\\s*\\}`
+  );
+  assert.match(src, re,
+    "keydown must open with zoomSkipConsumesClick = false; then if (zoom){ ... endZoom(); ... return; }");
 });
