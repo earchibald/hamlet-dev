@@ -65,14 +65,15 @@ Files: `src/ui/state.js`, `src/ui/derive.js`, `src/ui/actions.js`, `src/ui/keys.
 
 ## Task 2: the drawer
 
-Files: `src/ui/panels.js`, `src/ui/main.js`, `CLAUDE.md`, `dist/hearth-sim.html` (built).
+Files: `src/ui/panels.js`, `src/ui/main.js`, `src/ui/windows.js`, `CLAUDE.md`, `dist/hearth-sim.html` (built).
 
 1. In `drawerHTML`, give the People drawer a filter row: `<div class="filter"><button class="btn small" id="peopleCampBtn">…<kbd>E</kbd></button><button class="btn small" id="peopleAgeBtn">…<kbd>Y</kbd></button></div>`.
 2. In `renderDrawers`, write each button's label with `setHTML`, from `peopleCampLabel()` and `peopleAgeLabel()`, with the `<kbd>`. Mark a button `on` when its filter is not the default. Hide the filter row in the ages (`inAges()`).
 3. In `renderPeople`, write the count from `peopleCount()`: ` · shown of alive` when they differ, else ` · alive`. When `peopleMixed()` is true, add the person's camp name, or `no camp`, after the name, in a muted span with its own class (not `tag`), with an ellipsis for a long name. Give the two filter buttons an ellipsis too. Show the empty text `Nobody matches these filters.` when the filters hide everyone and people exist.
 4. In the drawer pointer handler in `src/ui/main.js`, call `ACTIONS.peopleCamp()` and `ACTIONS.peopleAge()` for clicks on the two buttons, next to `#showAllBtn`. The handler must not write `ui` itself.
-5. Add a `tests/people.js` entry to `CLAUDE.md` (Layout list), in the style of the other entries.
-6. Run `node build.js`, `npm run fast`, and check the page in Safari (safaridriver MCP) at seed amber-ford-45 with more than one camp.
+5. A popped-out People window has no filter row, but E and Y work there (task 1 added `window` rows). In `src/ui/windows.js` line 4, for the People window, write the title as `People`, then the count from `peopleCount()` in the drawer's form, then the two labels, joined by ` · `. The count must agree with the drawer's.
+6. Add a `tests/people.js` entry to `CLAUDE.md` (Layout list), in the style of the other entries.
+7. Run `node build.js`, `npm run fast`, and check the page in Safari (safaridriver MCP) at seed amber-ford-45 with more than one camp.
 
 ## At the end
 
