@@ -1152,7 +1152,7 @@ test('the legends drawer lists every line of the creation, oldest first', () => 
 
 const AGES = [...DERIVE, 'inAges', 'ageName', 'nOf', 'standsIn', 'countryLine', 'godRows', 'cursorPhrase', 'paletteRows'];
 function inTheAges(seed = 'alpha', n = 6){
-  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], [...AGES, 'inspectGod']);
+  const api = loadUI(['state', 'icons', 'derive', 'keys', 'map', 'inspect'], [...AGES, 'inspectGod']);
   api.startCreation(seed, {}); api.camp = api.camps[0];
   for (let i = 0; i < n; i++) api.step();
   assert.equal(api.era, 'gods', 'the probe must still be in the ages');
@@ -1361,7 +1361,7 @@ test('a scarred country says who fought over it', () => {
 const WATCH = [...new Set([...AGES, 'inspectGod', 'inspectRegion', 'fieldColor', 'ui'])];
 
 test('the view model answers at every age of a creation that throws its valley back', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'map', 'inspect'], WATCH);
+  const api = loadUI(['state', 'icons', 'derive', 'keys', 'map', 'inspect'], WATCH);
   api.startCreation('gamma', {}); api.camp = api.camps[0];
   let n = 0;
   while (api.era === 'gods' && n++ < 1000){
