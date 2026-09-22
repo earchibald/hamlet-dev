@@ -496,6 +496,36 @@ test('the wearied god leaves a gesture like any other act', () => {
   assert.ok(api.regionById(rec.region).tiles.includes(rec.to));
 });
 
+/* Fuel is a forest within two of the start. The backstop once made the start hot for a lack of fuel,
+   and dry and hot is a meadow, so on seed s5 it tried four ages running and supplied no wood. Every
+   forest is taken off the field here, the start is given water, and one backstop must then leave a
+   forest in reach without spoiling the start or its water. */
+test('the backstop answers a lack of fuel with a forest in reach of the start', () => {
+  const api = load(); api.startCreation('r');
+  let guard = 0;
+  while (guard++ < 40 && !(api.pulseAge !== null && api.startCandidates().length >= 2)) api.step();
+  assert.ok(api.startCandidates().length >= 2, 'no two start candidates to set the stage on');
+  const god = api.awakeGods()[0];
+  for (const r of api.liveRegions()){
+    r.marks = r.marks.filter(m => m.kind !== 'hide');
+    /* Dry and cold is a forest, and so is dry and dark, whatever its heat. */
+    if (api.hasPole(r, 'dry')){ api.setPole(r, 'hot', god, 'test'); api.setPole(r, 'light', god, 'test'); }
+  }
+  assert.ok(!api.liveRegions().some(r => api.biomeOf(r) === 'forest'), 'a forest is left on the stage');
+  const start = api.restGate().start;
+  if (!api.ring(start, 1).some(r => api.hasPole(r, 'wet'))) api.setPole(api.neighboursOf(start)[0], 'wet', god, 'test');
+  const gate = api.restGate();
+  assert.equal(gate.lack, 'fuel', `the stage lacks ${gate.lack}, not fuel`);
+  const wetBefore = api.liveRegions().filter(r => api.hasPole(r, 'wet')).map(r => r.id);
+  api.withGodRng(() => api.backstop());
+  const after = api.restGate();
+  assert.ok(api.ring(gate.start, 2).some(r => api.biomeOf(r) === 'forest'), 'no forest within two of the start');
+  assert.notEqual(after.lack, 'fuel', 'the world still lacks fuel after the backstop');
+  assert.ok(api.isStart(gate.start), 'the backstop spoiled the start');
+  assert.notEqual(api.biomeOf(gate.start), 'forest', 'the backstop planted the forest on the start itself');
+  assert.deepEqual(api.liveRegions().filter(r => api.hasPole(r, 'wet')).map(r => r.id), wetBefore, 'the backstop dried a wet country');
+});
+
 /* ---------- the creation's words ---------- */
 /* The playtest of 20 Sept 2026 found each creation line repeated word for word. A line with several
    wordings takes them in the listed order, one per telling, and starts again when they run out. This

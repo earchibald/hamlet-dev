@@ -624,6 +624,18 @@ function unmake(g){
   /* The star fades out where it last stood, so the anchor it held is the anchor it keeps. */
   gesture(g, 'unmade', { region: r ? r.id : null, at: g.at });
 }
+/* Where the backstop grows the forest a lack of fuel asks for. Fuel is a forest within two of the
+   start, and dry and cold is a forest. The backstop once made the start hot, and dry and hot is a
+   meadow, so on seed s5 it tried four ages running and supplied no wood. It picks a country near the
+   start, largest first: a dry one that is not a start, then any dry one, then one with no water pole.
+   It never dries a wet country, because that may be the start's water. A burned country is ash
+   whatever its poles, so it is passed over. The start itself is the last choice: dry and cold, it
+   stays a start. Nothing here draws a random number. */
+function forestFor(start){
+  const near = ring(start, 2).filter(r => r !== start && !hasMark(r, 'scar', 'burned'));
+  const largest = rs => rs.slice().sort((p, q) => q.area - p.area)[0];
+  return largest(near.filter(r => hasPole(r, 'dry') && !isStart(r))) || largest(near.filter(r => hasPole(r, 'dry'))) || largest(near.filter(r => !hasPole(r, 'wet'))) || start;
+}
 /* Past the age limit the eldest awake god does what has to be done, once an age, and every awake god
    wearies. At twice the limit the creation fails and everyone sleeps. */
 function backstop(){
@@ -639,7 +651,7 @@ function backstop(){
   let on = null, m = null;
   if (gate.lack === 'start'){ const r = live.slice().sort((p, q) => q.area - p.area)[0]; r.marks = r.marks.filter(m => !(m.kind === 'pole' && POLES[m.value].contrast === 'height') && m.kind !== 'scar' && m.kind !== 'height' && m.kind !== 'depth'); on = r; m = setPole(r, 'dry', g, 'Made dry so the world could hold a life.'); }
   else if (gate.lack === 'water'){ const n = neighboursOf(gate.start)[0] || gate.start; on = n; m = setPole(n, 'wet', g, 'Made wet so the world could hold a life.'); }
-  else if (gate.lack === 'fuel'){ on = gate.start; m = setPole(gate.start, 'hot', g, 'Made warm so things would grow.'); }
+  else if (gate.lack === 'fuel'){ const r = forestFor(gate.start); on = r; if (!hasPole(r, 'dry')) setPole(r, 'dry', g, 'Made dry so a forest could grow.'); m = setPole(r, 'cold', g, 'Made cold so a forest could grow.'); }
   else if (gate.lack === 'food'){ on = gate.start; m = mark(gate.start, 'making', 'rabbit', g, 'Rabbits, so the world could hold a life.'); }
   else if (gate.lack === 'people'){ on = gate.start; m = mark(gate.start, 'making', 'human', g, 'The people, made alone.'); }
   else if (gate.lack === 'height'){ const r = pool.slice().sort((p, q) => q.area - p.area)[0]; on = r; m = mark(r, 'height', 1, g, 'Raised so the world could hold a life.'); }
