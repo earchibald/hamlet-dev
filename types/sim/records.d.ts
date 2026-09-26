@@ -332,6 +332,8 @@ interface Camp {
   wolfLogged: number;
   guardLogged: number;
   fished: number;
+  /* True once this camp has felled its first pine, so "Logs at last" is said once (tasks.js). */
+  hadLogs: boolean;
   founded: number;
   /* Set right after makeCamp()'s literal (camps.js), not in it, so tsc sees them as optional:
      they are always there by the time anything else runs, but not in the one statement that

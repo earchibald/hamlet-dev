@@ -32,7 +32,7 @@ const API = `return {
   get lastLoadFault(){ return lastLoadFault; }, get inhabitedTold(){ return inhabitedTold; },
   startWorld, step, inject, DOOR_ACTS, DOOR_SOURCES, lightTile, poke, pitLit, goalState, GOALS, STAGES, stageReached, log, SPECIES, GROUND, ITEMS, LIFE,
   CLOCK, CELLULAR, beats, DAY, SEASONS, SEASON_LENGTHS, YEAR_DAYS, ticks, strides, tickRate, strideRate, lookRate, stock, secs, mins, hours, days, years, perHour, rollFor,
-  seasonOf, dayOf, dayOfYear, yearOf, hourOf, isNight, isWinter, stage, ageDays, mood, threatsFor, sourcesNow,
+  seasonOf, dayOf, dayOfYear, yearOf, hourOf, isNight, isWinter, stage, ageDays, nOf, mood, threatsFor, sourcesNow,
   RECIPES, recipeGoal, placeFor, offersFor, setSite, chooseSite, startClearDen, startDeliver, startFoundCamp, addItem, removeItem, rebuildItemGrid, stashAdd, gardenLives, DIRS,
   TASKS, startTask, setTask, taskStop, goTo, workKind,
   runTask, updateBeing, catchUp, bodyBreak, bodyStretch, nextAct, senseBeings, thoughtAt, die, dropCarried, makeBeing, makeCamp, checkPitfall, denTick, gnomeTick, digGnomeBurrow, adoptDen, spawnWildlife, withBrand, failTask, foundingSites, campSites, CAMPS_APART, sectorCount, looseCount,

@@ -94,9 +94,13 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
-.mapbox{position:relative;overflow:hidden;background:var(--panel)}
-/* The map is pinned left, so it holds still when a drawer opens or shuts. */
-.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start}
+.mapbox{position:relative;overflow:hidden;background:var(--panel);--drawer-w:330px;--drawer-right:52px;--drawer-gap:10px}
+/* The map is centred in the room left of the drawer column, open or shut, so it holds still when a
+   drawer opens or shuts and a drawer does not cover it. The room is made by a spacer as wide as the
+   column. The spacer reads the same custom properties as #drawers, so the two cannot drift apart. It
+   gives up its width first, so on a narrow page the map moves left before it is cut. */
+.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox .views::after{content:"";flex:0 1000 calc(var(--drawer-w) + var(--drawer-right) + var(--drawer-gap))}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -120,9 +124,14 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
 #drawerTabs .btn kbd{margin-left:0;margin-inline-start:5px}
-#drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+#drawers{position:absolute;right:var(--drawer-right);top:10px;bottom:10px;width:var(--drawer-w);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.drawer{flex:1 1 0;min-height:70px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
+/* Every drawer keeps 70 px, room for its header and its filter row, so on a short page with every
+   drawer open none of them shrinks away. With every drawer open, Goals shrank until its first goal's
+   detail line was cut in half. It keeps room for the filter row, a stage heading, and one goal whose
+   detail runs to three lines, but never more than 28% of the page height, so it cannot starve the rest. */
+.drawer[data-drawer="goals"]{min-height:min(190px,28vh)}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
@@ -167,11 +176,15 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
-.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
-.win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The title bar shares the class name .bar with the progress bars, whose rule sets a 7 px height and
+   hides the overflow. Without this reset the title bar was squashed and its title cut in half. The
+   rules name the window's own child, .win > .bar: a need bar in an inspector's card is a .bar inside
+   the window too, and the old .win .bar rule took its height and hid its fill. */
+.win > .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win > .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The cut title gives way, so the dock hint and the close button keep their width. */
-.win .bar .title.cut + span{flex:none}
-.win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
+.win > .bar .title.cut + span{flex:none}
+.win > .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
 /* The hover card. */
@@ -492,9 +505,14 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
+/* An age's number, counted from the Pulse. An age before the Pulse has no number. This is the one place
+   the count is made: the chronicle's stamp below, and the strip, the timeline, the act card, the foot and
+   the Hurry dialog in src/ui/derive.js, all read it. The timeline once printed the absolute age and said
+   "Age 1 to 11" while the strip above it said "Age 10". */
+const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
-  if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
+  if (era === 'gods') return ageNumber(age) === null ? 'Before time' : `Age ${ageNumber(age)}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
 /* A test seam, and the only way to see every line. `chronicle` keeps its last 300 and drops the
@@ -507,6 +525,11 @@ function stamp(){
    number, and it is in `NOT_SAVED`, so a loaded save cannot install one. A harness may observe more
    than the player. It must not make the world it observes a different world. */
 let chronicleSink = null, chronicleWritten = 0;
+
+/* A count and its noun: "1 day", "2 days". The one plural helper for the sim and the page, which
+   share one scope. It lives here so goal texts can use it; it moved from src/ui/derive.js. */
+/** @param {number} n @param {string} one @param {string} many */
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
    for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
@@ -2665,6 +2688,11 @@ function reachable(sx, sy, sz, cap = 4000){
   }
   return new Set(q);
 }
+/* Water close enough to drink from or to fill a waterskin at. */
+function besideWater(x, y, z){ return !!nearFind(x, y, t => t.ground === 'water', NEAR, z); }
+/* A camp can stand far from any water. When the near search fails, search the whole world once and walk
+   the first stretch of 48 steps, as pathToStop does. Drinking and filling the waterskin both use it. */
+function pathToFarWater(a){ const q = bfs(a.x, a.y, a.z, besideWater, NZ * W * H, a); return q ? q.slice(0, 48) : null; }
 /* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
 function pathToStop(a, tx, ty, within, tz = 0){
   if (nearAt(a, tx, ty, tz) <= within) return [];
@@ -2681,7 +2709,7 @@ function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, hadLogs: false, founded: tick };
   /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
      gets its first name record once someone is there to give it one: at the site (`setSite`),
      or, failing that, at the hearth (`nameCampAtHearth`). A placeholder such as "The first camp"
@@ -3606,7 +3634,9 @@ TASKS.cutTree = { type: 'work',
     t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
     if (t.progress < CLOCK.work.cutTree) return 'continue';
     tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    /* "Logs at last" is news once per camp: the first pine felled. Every later tree was said again,
+       four times in one hour on day 15 of a playtest, while the woodpile goal already counts the logs. */
+    gainXp(a, 'woodcut'); if (!camp.hadLogs){ camp.hadLogs = true; log(`${a.name} fells a pine. Logs at last.`, [a]); }
     const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
@@ -3614,10 +3644,15 @@ TASKS.cutTree = { type: 'work',
 TASKS.fillWater = { type: 'gather',
   begin(a, args){
     if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, tl => tl.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    return { label: 'Going to fill the waterskin', path: p, progress: 0 };
+    /* The near search first. A camp 90 tiles from the river once failed this search on 268 of 280 tries,
+       and its stash stood empty for most of 16 days, so a failed near search walks the whole world once. */
+    let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+    if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
+    return { label: far ? 'Walking a long way to fill the waterskin' : 'Going to fill the waterskin', path: p, progress: 0 };
   },
-  stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
+  stops: [(a, t) => {
+    if (!besideWater(a.x, a.y, a.z)){ const q = pathToFarWater(a); if (!q) return 'fail'; t.path = q; t.label = 'Walking a long way to fill the waterskin'; return 'continue'; }
+    t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
 
 function takeName(){ if (!namePool.length) namePool = shuffle(NAMES); return namePool.pop(); }
 
@@ -3738,24 +3773,20 @@ Object.assign(TASKS, {
       }
       /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
          world once and covers the first stretch, the same way pathToStop does. Thirst must never have no answer. */
-      const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
-      const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-      let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
-      if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+      let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+      if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
       if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, CLOCK.thought.farwater);
       return { label: far ? 'Walking a long way for water' : 'Going to drink', path: p };
     },
     stops: [(a, t) => {
-      const wet = (x, y, z) => !!nearFind(x, y, w => w.ground === 'water', NEAR, z);
       if (t.args.at){
         const [sx, sy] = t.args.at;
         const g = goTo(a, t, sx, sy, 1); if (g) return g;
         if (camp.stash.water <= 0) return 'fail';
         camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done';
       }
-      if (!wet(a.x, a.y, a.z)){
-        const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-        const q = walkFar(a); if (!q) return 'fail';
+      if (!besideWater(a.x, a.y, a.z)){
+        const q = pathToFarWater(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
       a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
@@ -4873,7 +4904,7 @@ const GOALS = [
     state(){
       const t = pitTile(); if (!t) return { s: 'blocked', text: 'There is no fire pit yet.' };
       const p = t.struct;
-      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${camp.stash.stick} sticks${camp.stash.log ? `, ${camp.stash.log} logs` : ''}.` };
+      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${nOf(camp.stash.stick, 'stick', 'sticks')}${camp.stash.log ? `, ${nOf(camp.stash.log, 'log', 'logs')}` : ''}.` };
       const blaze = nearbyBlaze();
       if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
       return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
@@ -5004,7 +5035,7 @@ const GOALS = [
     offers(a){ if (!camp.fae.known || camp.ward || !camp.pit || !pitLit() || camp.fae.favor > -10) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the ward posts', score: 28, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 3, 5); if (!site) return [];
       return [{ label: 'set the ward posts', score: camp.fae.favor < -20 ? 55 : 30, task: { kind: 'setWardPosts', args: { at: site } } }]; } },
   { id: 'faefight', title: 'Drive off the sprites', stage: 'sprites', after: 'fae', standing: true,
-    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nearAt(sp, ...camp.pit)} tiles from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
+    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nOf(nearAt(sp, ...camp.pit), 'tile', 'tiles')} from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
     offers(a){ const sp = spriteNear(); if (!sp || camp.fae.favor >= -30 || !camp.tools.spear || a.traits.bravery < 0.5) return []; return [{ label: 'drive off the sprite with the spear', score: 60 + a.traits.bravery * 15, task: { kind: 'fightSprite', args: { sprite: sp.id } } }]; } },
   { id: 'waterskin', title: 'Sew a waterskin', stage: 'tools', after: 'cook', need: { hide: 2 },
     state(){
@@ -5021,7 +5052,7 @@ const GOALS = [
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, task: { kind: 'makeSpear', args: { at: camp.stashTile } } }]; return [{ label: 'gather a rock for the spear', score: 40, task: { kind: 'gather', args: { item: camp.stash.rock < 1 ? 'rock' : 'stick' } } }]; } },
   { id: 'deer', title: 'Hunt deer', stage: 'food', after: 'spear', standing: true,
-    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nearAt(d, ...camp.site)} tiles. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
+    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nOf(nearAt(d, ...camp.site), 'tile', 'tiles')}. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
     offers(a){ const d = deerNear(); if (!d || !camp.tools.spear || a.traits.bravery < 0.4 || camp.stash.venison > 0) return []; return [{ label: 'hunt a deer', score: 48 + a.skills.hunt * 5 + (stashFood() < 4 ? 15 : 0), task: { kind: 'huntDeer', args: { deer: d.id } } }]; } },
   { id: 'rack', title: 'Build a drying rack', stage: 'food', after: 'firepit', need: { stick: 6 },
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
@@ -5041,7 +5072,7 @@ const GOALS = [
       return out;
     } },
   { id: 'guard', title: 'Keep wolves off', stage: 'settlement', after: 'fire', standing: true,
-    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nearAt(w, ...camp.pit)} tiles from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
+    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nOf(nearAt(w, ...camp.pit), 'tile', 'tiles')} from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
     offers(a){ const w = wolfNear(); if (!w || !pitLit() || a.traits.bravery < 0.35) return []; return [{ label: 'drive off the wolf with a firebrand', score: 72 + a.traits.bravery * 20, task: { kind: 'driveOff', args: { wolf: w.id, at: camp.pit } } }]; } },
   { id: 'scout', title: 'Found a second camp', stage: 'settlement', after: 'shelter',
     state(){
@@ -7395,7 +7426,13 @@ let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'in
    advanceZoom and endZoom. The world does not step while it is set. */
 let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
-let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The speed the days open at when the player has none saved. At 1x a world day takes 24 real minutes
+   and the first fire pit about 4, so a new player waited through a still valley. 8x brings the pit in
+   about half a minute and a day in 3 minutes. It is not 64x, because at 64x a chronicle line is gone in
+   about a second, and the first fire is the line a new player must not miss. A speed the player chose
+   wins over this one: see ui.speedChosen. It must be a rung of SPEEDS, or setSpeed throws. */
+const DAYS_SPEED = 8;
+let speed = DAYS_SPEED, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
    so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the
@@ -7472,6 +7509,11 @@ const ui = {
   chronSearch: '',
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
+  /* True once the player picks a days speed with a key, a button, or the palette. Only ACTIONS.speed sets
+     it, and restore() reads it back. Before this marker, every page load saved speed 1 on its own, and
+     that 1 was never the player's choice. A record from then has no marker. restore() keeps its speed
+     unless it is 1, since only a click could have saved 8, 64, or 256. */
+  speedChosen: false,
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
@@ -7540,7 +7582,7 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -7552,7 +7594,8 @@ function restore(){
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
-    if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
+    const chosen = s.speedChosen === true || (s.speedChosen === undefined && s.speed !== 1);
+    if (chosen && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
@@ -7642,9 +7685,18 @@ const inAges = () => era === 'gods';
 /* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
    of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
 function ladder(){ return inAges() ? PACES : SPEEDS; }
-/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
-const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
-const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse,
+   through `ageNumber` in src/sim/core.js, which the chronicle's stamp reads too. */
+const ageName = n => ageNumber(n) === null ? 'Before time' : `Age ${ageNumber(n)}`;
+/* A run of ages, from and to both absolute, named the way ageName names one. */
+function ageSpanName(from, to){
+  const a = ageNumber(from), b = ageNumber(to);
+  if (b === null) return 'Before time';
+  if (a === null) return `Before time to age ${b}`;
+  return a === b ? `Age ${a}` : `Age ${a} to ${b}`;
+}
+/* The strip's clock. In the ages it is the age now playing, named by ageName; in the days it is the stamp. */
+const clockText = () => inAges() ? ageName(age) : stamp();
 /* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
@@ -7696,7 +7748,7 @@ function actCard(rec){
   const g = beingById(rec.god);
   const said = captionFor(rec);
   const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
-  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const rows = [{ label: 'when', value: ageName(rec.age) }];
   const r = regionById(rec.region !== undefined ? rec.region : rec.near);
   if (r) rows.push({ label: 'where', value: countryLine(r) });
   if (rec.weighed && !rec.byPlayer){
@@ -7799,7 +7851,7 @@ function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
-  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${Math.floor(wood)} days of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
+  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
   const meals = stashFood() + camp.stash.fish * 2, aim = foodTarget();
   const food = !camp.site ? null : { v: Math.min(1, meals / aim), text: `${meals} of ${aim}`, level: level3(meals, aim) };
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
@@ -7996,6 +8048,24 @@ function sectorLabel(s){
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. The seasons are counted off the
+   calendar's own lengths, SEASON_LENGTHS, not an average: with an average of 91.25 days, day 182
+   read "1 season" though the calendar had turned twice. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days));
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  let seasons = 0, end = 0;
+  for (const len of SEASON_LENGTHS){ end += len; if (d >= end) seasons++; else break; }
+  return seasons ? nOf(seasons, 'season', 'seasons') : nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. The help page's
+   valley line follows the same rule. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
@@ -8065,10 +8135,11 @@ function tlCellText(rec, withWho){
 const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
-  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, head: '', rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const head = now === 0 ? 'Before the first age' : ageSpanName(from, to);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
   /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
      more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
@@ -8088,7 +8159,7 @@ function timelineModel(){
   const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
   const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
-    return { shown: true, folded: true, from, to, now, marks: [],
+    return { shown: true, folded: true, from, to, now, head, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
   /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
@@ -8112,7 +8183,7 @@ function timelineModel(){
     gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
-  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+  return { shown: true, folded: false, from, to, now, head, rows, marks: [] };
 }
 
 /* One chip, opened. The matrix is the record's own, in the record's own order. */
@@ -8145,7 +8216,7 @@ function footChip(){
   const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
   const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
   const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+  return { head: `${ageName(m.age)}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
@@ -8221,12 +8292,29 @@ function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && s
 /* Inspectors share one saved rect, so each new one steps 24 px down and across, into the first slot no open inspector holds.
    A drawer window keeps one rect per drawer id and opens where it was left. */
 const WIN_STEP = 24;
-function winOpen(kind, target){
+/* A window's title bar is its only handle. A bar pushed off the page cannot be dragged back, so every
+   window is kept where its whole bar shows: on open, on drag, and when the page is resized. `area` is
+   the window layer's size in px, from winArea() in actions.js. The window may hang off the bottom, but
+   never by its bar. From the grip the corner stays on the page, so the window can always be shrunk.
+   With no area (the tests that drive winOpen in Node) the rect is left as it is. */
+const WIN_MIN_W = 220, WIN_MIN_H = 120, WIN_BAR = 32;
+function winClamp(r, area, grip){
+  if (!area) return { ...r };
+  let { x, y, w, h } = r;
+  if (grip){ w = Math.max(WIN_MIN_W, Math.min(w, area.w - x)); h = Math.max(WIN_MIN_H, Math.min(h, area.h - y)); }
+  w = Math.max(WIN_MIN_W, Math.min(w, area.w)); h = Math.max(WIN_MIN_H, Math.min(h, area.h));
+  x = Math.max(0, Math.min(x, area.w - w)); y = Math.max(0, Math.min(y, area.h - WIN_BAR));
+  return { x, y, w, h };
+}
+function winOpen(kind, target, area){
   const have = winFind(kind, target); if (have) return have;
   const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
-  const held = (n) => ui.windows.some(w => w.kind === 'inspect' && w.x === saved.x + WIN_STEP * n && w.y === saved.y + WIN_STEP * n);
-  let n = 0; if (kind === 'inspect') while (held(n)) n++;
-  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
+  /* The step is taken before the clamp, and a slot is held when a window sits at its clamped place.
+     Near an edge several steps clamp to one place, so the search stops after WIN_MAX steps. */
+  const at = (n) => winClamp({ x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h }, area);
+  const held = (n) => { const p = at(n); return ui.windows.some(w => w.kind === 'inspect' && w.x === p.x && w.y === p.y); };
+  let n = 0; if (kind === 'inspect') while (n < WIN_MAX && held(n)) n++;
+  const r = at(n);
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
@@ -9383,7 +9471,7 @@ function drawTimeline(){
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
-  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
+  const span = document.createElement('span'); span.textContent = m.head;
   const sp = document.createElement('span'); sp.className = 'sp';
   sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
             tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
@@ -9475,7 +9563,7 @@ function inspectBeing(a, full = false){
   const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
-    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
+    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${ageText(ageDays(a))}. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
@@ -9507,7 +9595,7 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'storehouse') rows.push(['Storehouse', 'the stash on stilts. Food keeps twice as long, and wolves cannot reach it.']);
   if (t.struct && t.struct.type === 'workshop') rows.push(['Workshop', 'a roofed bench. Cord, baskets, rods, and clothes are made here, faster than by the fire.']);
   if (t.struct && t.struct.type === 'kiln') rows.push(['Kiln', `a dome of rock and clay. ${t.struct.fired || 0} pots fired here.`]);
-  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
+  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', ageText((tick - (t.planted || 0)) / DAY)]);
   if (t.garden) rows.push(['Garden', `planted by ${t.garden.name}. Rabbits like it too.`]);
   if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);
@@ -9561,7 +9649,7 @@ function hideTip(){ tipTarget = null; tipAnchor = null; renderTip(); }
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
-  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
+  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile }, winArea());
   setFocus(`window:${w.id}`); hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
@@ -9586,7 +9674,7 @@ function chipHTML(a){
 }
 /* The clock runs on every gate tick, not on the view key, so the time never freezes. */
 function renderClock(){
-  $('clock').textContent = stamp();
+  $('clock').textContent = clockText();
   $('season').textContent = seasonLine();
   const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
@@ -9650,14 +9738,14 @@ function wireWindows(){
     setFocus(`window:${w.id}`); ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
     if (e.target.closest('[data-close]')){ winClose(w.id); persist(); renderUI(true); return; }
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderUI(true); return; }
-    const grip = e.target.closest('.grip'), bar = e.target.closest('.bar');
+    const grip = e.target.closest('.grip'), bar = e.target.closest('.win > .bar');
     if (!grip && !bar) return;
     drag = { w, grip: !!grip, x0: e.clientX, y0: e.clientY, x: w.x, y: w.y, wd: w.w, ht: w.h }; el.setPointerCapture(e.pointerId); e.preventDefault();
   });
   box.addEventListener('pointermove', e => {
     if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-    if (drag.grip){ drag.w.w = Math.max(220, drag.wd + dx); drag.w.h = Math.max(120, drag.ht + dy); }
-    else { drag.w.x = Math.max(0, drag.x + dx); drag.w.y = Math.max(0, drag.y + dy); }
+    const r = drag.grip ? { x: drag.w.x, y: drag.w.y, w: drag.wd + dx, h: drag.ht + dy } : { x: drag.x + dx, y: drag.y + dy, w: drag.w.w, h: drag.w.h };
+    Object.assign(drag.w, winClamp(r, winArea(), drag.grip));
     renderWindows();
   });
   box.addEventListener('pointerup', () => { if (!drag) return; const w = drag.w; ui.rects[w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect'] = { x: w.x, y: w.y, w: w.w, h: w.h }; persist(); drag = null; });
@@ -9779,13 +9867,13 @@ function renderChronicle(el){
 function renderCamp(el){
   if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
   const c = campSummary();
-  const nm = campNames();
+  const nm = campNames(), vrow = campValleyRow();
   const past = nm.past.map(r => `<span title="${esc(nameTitle(r))}">${esc(r.text)}, day ${Math.floor(r.since / DAY) + 1}${r.why ? `, ${esc(r.why)}` : ''}</span>`).join('; ');
   const kv = [
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
-    ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    vrow ? [vrow[0], esc(vrow[1])] : null,
+    ['Age', ageText(c.age)], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => nOf(n, SPECIES[sp].label, SPECIES[sp].plural)).join(', ')], c.burning ? ['Burning', nOf(c.burning, 'tile', 'tiles')] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
@@ -9873,7 +9961,7 @@ function muteChoice(k){
    is open, as they hold behind any dialog. */
 function openHurry(){
   closeDialogs();
-  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  $('hurryLeft').textContent = `${ageName(age)}. ${awakeGods().length} gods are still awake.`;
   setFocus('dialog:hurry');
   $('hurry').showModal();
   $('hurryGo').focus();
@@ -9892,7 +9980,7 @@ function openHelp(){
     <li>What took them: ${esc(lore.took)}.</li>
     <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
     <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
-    <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
+    ${valleyName() ? `<li>This valley: ${esc(valleyName())}.</li>` : ''}
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   setFocus('dialog:help'); $('help').showModal();
 }
@@ -9994,7 +10082,7 @@ function pruneTrails(now){
     if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
   }
 }
-/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+/* The template's speed labels are only right for the days; showLadder relabels them, not the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
   document.querySelectorAll('#speeds .btn').forEach(b => {
@@ -10016,8 +10104,16 @@ function relabelSpeeds(labels, key){
 function onLadder(rungs, v, fn, name){
   if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
 }
-function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* The buttons show the ladder of the era that runs, whichever setter was called. setSpeed is called in
+   the ages too: initUI sets the days' speed after newWorld has begun the ages, and it used to relabel the
+   buttons 1× to 256× and light the first one while the ages ran at single pace behind the start dialog. */
+function showLadder(){
+  const ages = inAges(), key = ages ? 'pace' : 'speed', now = ages ? pace : speed;
+  relabelSpeeds(ages ? PACE_LABEL : SPEED_LABEL, key);
+  document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset[key]) === now));
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; showLadder(); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; showLadder(); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -10040,6 +10136,12 @@ function setView(v, s){
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* The size of the layer the windows sit in, which winClamp keeps every title bar inside. It is null
+   when the layer has no size, or no page at all (a test rig in Node), and then nothing is clamped. */
+function winArea(){ const box = typeof document !== 'undefined' && document.getElementById ? $('windows') : null; return box && box.clientWidth > 0 && box.clientHeight > 0 ? { w: box.clientWidth, h: box.clientHeight } : null; }
+/* On a page resize every open window is pulled back until its title bar shows. Only the place moves:
+   a window keeps its size, so it is whole again when the page grows back. */
+function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows){ const c = winClamp(w, area); w.x = c.x; w.y = c.y; } renderWindows(); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
    The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
@@ -10161,7 +10263,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -10281,7 +10383,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
@@ -10359,13 +10461,16 @@ const ACTIONS = {
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
-  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  /* A speed key, a speed button, and the palette all end here, so this is the one place a days speed
+     counts as the player's choice. savedSpeed follows it, or a load would go back to the speed read at
+     page load. The pace of the ages is not a days speed and sets no marker. */
+  speed(s){ if (inAges()) setPace(s); else { ui.speedChosen = true; ui.savedSpeed = s; setSpeed(s); } setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }, winArea()); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
@@ -10464,7 +10569,7 @@ const ACTIONS = {
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
   popOut(){
-    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id, winArea()); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
@@ -10668,6 +10773,7 @@ function initUI(){
     zoomSkipConsumesClick = false;
     e.stopPropagation(); e.preventDefault();
   }, true);
+  window.addEventListener('resize', fitWindows);
   document.addEventListener('keydown', e => {
     /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
        through pointercancel, with no paired click. That leaves the flag set after zoom is already
@@ -10697,7 +10803,7 @@ function initUI(){
   });
   setTool('inspect');
   newWorld(randomSeed());
-  if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  if (!ui.savedSpeed) setSpeed(DAYS_SPEED); /* newWorld's restore() must read storage before any persist() can overwrite it */
   /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
   offerContinue();
   openStart();

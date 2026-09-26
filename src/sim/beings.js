@@ -117,24 +117,20 @@ Object.assign(TASKS, {
       }
       /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
          world once and covers the first stretch, the same way pathToStop does. Thirst must never have no answer. */
-      const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
-      const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-      let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
-      if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+      let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+      if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
       if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, CLOCK.thought.farwater);
       return { label: far ? 'Walking a long way for water' : 'Going to drink', path: p };
     },
     stops: [(a, t) => {
-      const wet = (x, y, z) => !!nearFind(x, y, w => w.ground === 'water', NEAR, z);
       if (t.args.at){
         const [sx, sy] = t.args.at;
         const g = goTo(a, t, sx, sy, 1); if (g) return g;
         if (camp.stash.water <= 0) return 'fail';
         camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done';
       }
-      if (!wet(a.x, a.y, a.z)){
-        const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-        const q = walkFar(a); if (!q) return 'fail';
+      if (!besideWater(a.x, a.y, a.z)){
+        const q = pathToFarWater(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
       a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
