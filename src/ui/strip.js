@@ -14,7 +14,7 @@ function chipHTML(a){
 }
 /* The clock runs on every gate tick, not on the view key, so the time never freezes. */
 function renderClock(){
-  $('clock').textContent = stamp();
+  $('clock').textContent = clockText();
   $('season').textContent = seasonLine();
   const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);

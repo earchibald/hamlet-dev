@@ -159,9 +159,14 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
+/* An age's number, counted from the Pulse. An age before the Pulse has no number. This is the one place
+   the count is made: the chronicle's stamp below, and the strip, the timeline, the act card, the foot and
+   the Hurry dialog in src/ui/derive.js, all read it. The timeline once printed the absolute age and said
+   "Age 1 to 11" while the strip above it said "Age 10". */
+const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
-  if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
+  if (era === 'gods') return ageNumber(age) === null ? 'Before time' : `Age ${ageNumber(age)}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
 /* A test seam, and the only way to see every line. `chronicle` keeps its last 300 and drops the

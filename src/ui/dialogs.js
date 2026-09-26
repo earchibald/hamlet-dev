@@ -28,7 +28,7 @@ function muteChoice(k){
    is open, as they hold behind any dialog. */
 function openHurry(){
   closeDialogs();
-  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  $('hurryLeft').textContent = `${ageName(age)}. ${awakeGods().length} gods are still awake.`;
   setFocus('dialog:hurry');
   $('hurry').showModal();
   $('hurryGo').focus();
