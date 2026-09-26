@@ -489,12 +489,11 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
   }
 });
 
-/* Four init sites hand a hard-coded 1 to the guarded doors:
-     src/ui/actions.js:90    setPace(1)
-     src/ui/actions.js:159   setSpeed(ui.savedSpeed || speed || 1)
-     src/ui/actions.js:222   setSpeed(ui.savedSpeed || speed || 1)
-     src/ui/main.js:142      setSpeed(1)
-   The guard throws on a value off its ladder, so a ladder edited to drop 1 does not give the player
+/* Three init sites hand a hard-coded value to the guarded doors, 1 to the pace and DAYS_SPEED to the speed:
+     src/ui/actions.js       setPace(1)                                   in newWorld
+     src/ui/state.js         let speed = DAYS_SPEED                       read by onLoad and onSettle
+     src/ui/main.js          setSpeed(DAYS_SPEED)                         in initUI
+   The guard throws on a value off its ladder, so a ladder edited to drop that value does not give the player
    a wrong speed. It gives them a blank page, because the throw lands on the startup path.
    These two assertions are the only thing that catches that. Every other reference to either ladder
    indexes it — PACES[1], SPEEDS[1], SPEEDS.forEach — and an index survives 1 leaving.
@@ -503,9 +502,9 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
    ladder edit is read. Delete either, edit its ladder, and the suite stays green while the page
    stops opening. */
 test('the value the init path hands each door is a rung of that door’s ladder', () => {
-  const api = loadUI(['state'], ['PACES', 'SPEEDS']);
+  const api = loadUI(['state'], ['PACES', 'SPEEDS', 'DAYS_SPEED']);
   assert.ok(api.PACES.includes(1), 'the ages open with setPace(1), so 1 must be a rung of PACES or the first frame throws');
-  assert.ok(api.SPEEDS.includes(1), 'the days open with setSpeed(1) and the `|| 1` fallback, so 1 must be a rung of SPEEDS or the first frame throws');
+  assert.ok(api.SPEEDS.includes(api.DAYS_SPEED), 'the days open with setSpeed(DAYS_SPEED), and speed starts at DAYS_SPEED, so DAYS_SPEED must be a rung of SPEEDS or the first frame throws');
 });
 
 /* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site
@@ -1546,16 +1545,18 @@ test('the timeline lights nothing on an age-end beat: unmake and backstop run af
 });
 
 test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
-  const api = loadUI(['state', 'derive'], TL_API);
+  const api = loadUI(['state', 'derive'], [...TL_API, 'ageSpanName']);
   api.startCreation('gamma', {});
   const before = api.timelineModel();
   assert.equal(before.now, 0, 'no age has run yet');
   assert.equal(before.from, 1); assert.equal(before.to, 1);
+  assert.equal(before.head, 'Before the first age', 'the head says so plainly before the first age');
   for (let n = 0; n < 8; n++) api.step();
   const after = api.timelineModel();
   assert.equal(after.to, after.now, 'to is the live age once the creation has run');
+  assert.equal(after.head, api.ageSpanName(after.from, after.to), 'the head names the span, counted from the Pulse');
   const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
-  assert.match(src, /m\.now === 0 \? 'Before the first age' : `Age \$\{m\.from\} to \$\{m\.to\}`/, 'the head prints the span, and says so plainly before the first age');
+  assert.match(src, /span\.textContent = m\.head;/, 'timeline.js draws the model head');
 });
 
 test('a chip opens the matrix that produced it, unsorted and unscored by the view', () => {
@@ -1572,14 +1573,14 @@ test('a chip opens the matrix that produced it, unsorted and unscored by the vie
 });
 
 test('an opened chip says who weighed what, and what it took', () => {
-  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation', 'step']);
+  const api = loadUI(['state', 'derive'], ['footChip', 'ageName', 'ui', 'creation', 'startCreation', 'step']);
   api.startCreation('gamma', {});
   for (let n = 0; n < 8; n++) api.step();
   assert.equal(api.footChip(), null, 'nothing is open');
   const rec = api.creation.choices.find(c => !c.continued && c.picked && c.opts.length > 1);
   api.ui.timelineChip = `${rec.age}:${rec.god}`;
   const f = api.footChip();
-  assert.match(f.head, new RegExp(`Age ${rec.age}`));
+  assert.ok(f.head.startsWith(`${api.ageName(rec.age)}. `), f.head);
   assert.match(f.head, new RegExp(rec.picked));
   assert.equal(f.rows.length, Math.min(4, rec.opts.length), 'at most four rows');
   assert.equal(f.rows[0].type, rec.opts[0].type, "in the record's own order");

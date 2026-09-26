@@ -71,7 +71,7 @@ function pruneTrails(now){
     if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
   }
 }
-/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+/* The template's speed labels are only right for the days; showLadder relabels them, not the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
   document.querySelectorAll('#speeds .btn').forEach(b => {
@@ -93,8 +93,16 @@ function relabelSpeeds(labels, key){
 function onLadder(rungs, v, fn, name){
   if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
 }
-function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* The buttons show the ladder of the era that runs, whichever setter was called. setSpeed is called in
+   the ages too: initUI sets the days' speed after newWorld has begun the ages, and it used to relabel the
+   buttons 1× to 256× and light the first one while the ages ran at single pace behind the start dialog. */
+function showLadder(){
+  const ages = inAges(), key = ages ? 'pace' : 'speed', now = ages ? pace : speed;
+  relabelSpeeds(ages ? PACE_LABEL : SPEED_LABEL, key);
+  document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset[key]) === now));
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; showLadder(); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; showLadder(); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -244,7 +252,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -364,7 +372,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
@@ -442,7 +450,10 @@ const ACTIONS = {
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
-  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  /* A speed key, a speed button, and the palette all end here, so this is the one place a days speed
+     counts as the player's choice. savedSpeed follows it, or a load would go back to the speed read at
+     page load. The pace of the ages is not a days speed and sets no marker. */
+  speed(s){ if (inAges()) setPace(s); else { ui.speedChosen = true; ui.savedSpeed = s; setSpeed(s); } setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },

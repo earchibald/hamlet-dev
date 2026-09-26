@@ -20,9 +20,18 @@ const inAges = () => era === 'gods';
 /* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
    of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
 function ladder(){ return inAges() ? PACES : SPEEDS; }
-/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
-const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
-const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse,
+   through `ageNumber` in src/sim/core.js, which the chronicle's stamp reads too. */
+const ageName = n => ageNumber(n) === null ? 'Before time' : `Age ${ageNumber(n)}`;
+/* A run of ages, from and to both absolute, named the way ageName names one. */
+function ageSpanName(from, to){
+  const a = ageNumber(from), b = ageNumber(to);
+  if (b === null) return 'Before time';
+  if (a === null) return `Before time to age ${b}`;
+  return a === b ? `Age ${a}` : `Age ${a} to ${b}`;
+}
+/* The strip's clock. In the ages it is the age now playing, named by ageName; in the days it is the stamp. */
+const clockText = () => inAges() ? ageName(age) : stamp();
 /* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
@@ -74,7 +83,7 @@ function actCard(rec){
   const g = beingById(rec.god);
   const said = captionFor(rec);
   const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
-  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const rows = [{ label: 'when', value: ageName(rec.age) }];
   const r = regionById(rec.region !== undefined ? rec.region : rec.near);
   if (r) rows.push({ label: 'where', value: countryLine(r) });
   if (rec.weighed && !rec.byPlayer){
@@ -177,7 +186,7 @@ function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
-  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${Math.floor(wood)} days of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
+  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
   const meals = stashFood() + camp.stash.fish * 2, aim = foodTarget();
   const food = !camp.site ? null : { v: Math.min(1, meals / aim), text: `${meals} of ${aim}`, level: level3(meals, aim) };
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
@@ -374,6 +383,24 @@ function sectorLabel(s){
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. The seasons are counted off the
+   calendar's own lengths, SEASON_LENGTHS, not an average: with an average of 91.25 days, day 182
+   read "1 season" though the calendar had turned twice. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days));
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  let seasons = 0, end = 0;
+  for (const len of SEASON_LENGTHS){ end += len; if (d >= end) seasons++; else break; }
+  return seasons ? nOf(seasons, 'season', 'seasons') : nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. The help page's
+   valley line follows the same rule. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
@@ -443,10 +470,11 @@ function tlCellText(rec, withWho){
 const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
-  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, head: '', rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const head = now === 0 ? 'Before the first age' : ageSpanName(from, to);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
   /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
      more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
@@ -466,7 +494,7 @@ function timelineModel(){
   const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
   const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
-    return { shown: true, folded: true, from, to, now, marks: [],
+    return { shown: true, folded: true, from, to, now, head, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
   /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
@@ -490,7 +518,7 @@ function timelineModel(){
     gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
-  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+  return { shown: true, folded: false, from, to, now, head, rows, marks: [] };
 }
 
 /* One chip, opened. The matrix is the record's own, in the record's own order. */
@@ -523,7 +551,7 @@ function footChip(){
   const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
   const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
   const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+  return { head: `${ageName(m.age)}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */

@@ -77,6 +77,8 @@ Skills: gather, build, cook, trap, craft, woodcut, hunt, wary. Animals use hunt 
 
 Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way. The search for water stopped after 3000 tiles, and a camp founded 59 steps from the nearest river let two people die of thirst beside a full stash; a failed near search now walks the whole world once and covers the first stretch, as pathToStop does.
 
+Filling the waterskin had the same fault, and now has the same fix. A camp 90 tiles from the river (seed moss-crag-87) failed the fill search on 268 of 280 tries. Its stash was empty for most of 16 days.
+
 ## 6. Daily rhythms
 
 - Rabbits and deer move at dawn and dusk, 05:00 to 09:00 and 16:00 to 21:00.
@@ -271,6 +273,10 @@ At settle, the view zooms from the gods' map to the first person's sector. The z
 | Zoom to the person's sector | 1,100 ms |
 
 The world does not step while the zoom runs. The zoom runs in wall time, so it also runs when the game is paused. A paused game is still paused after it. The beat clock starts from zero when the zoom ends. A key or a click ends the zoom at once. That key or click does nothing else. With reduced motion, the zoom does not run. At settle, the saved speed returns. The foot says the gods sleep and one person wakes. A god's card closes, because it would cover the valley at the moment it first shows. Drawer windows stay. The Legends drawer keeps the creation. Pace and hurry are view state and do not pass the door. A creation watched age by age is the creation `startWorld` runs, and `tests/ui.js` holds that.
+
+The days open at 8x. At 1x the first fire pit took about 4 real minutes. At 64x a chronicle line is gone in about a second.
+
+When the player picks a speed with a key, a button, or the palette, the page keeps it and saves a marker, `speedChosen`. Older pages saved speed 1 on every load, with no marker. So an old record of 1 with no marker opens at 8x. An old record of 8, 64, or 256 is kept, because only a click could save those speeds. A load keeps the speed the player picked last.
 
 The field on the world map, in the order it is drawn:
 

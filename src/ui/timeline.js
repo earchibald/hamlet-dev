@@ -31,7 +31,7 @@ function drawTimeline(){
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
-  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
+  const span = document.createElement('span'); span.textContent = m.head;
   const sp = document.createElement('span'); sp.className = 'sp';
   sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
             tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));

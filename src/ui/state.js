@@ -24,7 +24,13 @@ let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'in
    advanceZoom and endZoom. The world does not step while it is set. */
 let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
-let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The speed the days open at when the player has none saved. At 1x a world day takes 24 real minutes
+   and the first fire pit about 4, so a new player waited through a still valley. 8x brings the pit in
+   about half a minute and a day in 3 minutes. It is not 64x, because at 64x a chronicle line is gone in
+   about a second, and the first fire is the line a new player must not miss. A speed the player chose
+   wins over this one: see ui.speedChosen. It must be a rung of SPEEDS, or setSpeed throws. */
+const DAYS_SPEED = 8;
+let speed = DAYS_SPEED, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
    so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the
@@ -101,6 +107,11 @@ const ui = {
   chronSearch: '',
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
+  /* True once the player picks a days speed with a key, a button, or the palette. Only ACTIONS.speed sets
+     it, and restore() reads it back. Before this marker, every page load saved speed 1 on its own, and
+     that 1 was never the player's choice. A record from then has no marker. restore() keeps its speed
+     unless it is 1, since only a click could have saved 8, 64, or 256. */
+  speedChosen: false,
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
@@ -169,7 +180,7 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -181,7 +192,8 @@ function restore(){
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
-    if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
+    const chosen = s.speedChosen === true || (s.speedChosen === undefined && s.speed !== 1);
+    if (chosen && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
