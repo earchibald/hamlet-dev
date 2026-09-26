@@ -2748,11 +2748,17 @@ function setSite(x, y){
      never overridden here. */
   if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
-/* How far from a camp's site, in a straight line, a fire counts as near enough to fetch an ember from. */
+/* How far from a camp's site a fire counts as near enough to fetch an ember from. `dist` counts tiles across
+   plus tiles down, not the straight line. */
 const BLAZE_RANGE = 60;
-/* The ground people can walk to from the camp's site, out to about BLAZE_RANGE steps: the search stops after
-   as many tiles as a disc of that radius holds. It draws no random number. It is kept for one tick and one
-   camp. A load always falls between two ticks, so a loaded world and an unbroken one read the same ground. */
+/* The ground people can walk to from the camp's site. The search stops after as many tiles as a disc of
+   radius BLAZE_RANGE holds. A walk moves in four directions, so on open ground that reaches about 75 steps
+   from the site; a narrow way reaches further. It draws no random number.
+   The result is kept for one tick and one camp, because a goal asks for it many times in a tick. A door act
+   can change the ground inside a tick: a player's strike sets a tile burning, and a burning tile cannot be
+   walked. A load puts back a tick and camp ids that the cache may already hold, from another world. So
+   `inject` clears it before every act, and `loadSnapshot` and `startWorld` clear it too. Before that, a load
+   at the same tick kept the old ground, and the goal did not offer an ember that a fresh load offered. */
 let blazeReach = null;
 function campReach(){
   if (blazeReach && blazeReach.at === tick && blazeReach.camp === camp.id) return blazeReach.set;
@@ -4762,14 +4768,15 @@ TASKS.feedFire = workKind({ label: 'Feeding the fire', amount: CLOCK.work.feedFi
 TASKS.strikeSparks = workKind({ label: 'Striking sparks into the tinder', amount: CLOCK.work.strikeSparks, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || p.fuel <= 0) return;
-  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
+  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ const first = !camp.everLit; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand; if (first) log(`${a.name} coaxes a spark into flame. The wood catches, and the camp has a hearth.`, campHumans(), 'major'); else log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
   else { addThought(a, 'sparks', 'Sparks, but no flame', -3, CLOCK.thought.sparks); a.cooldown['strike sparks'] = tick + CLOCK.cooldown.sparks; }
 } });
 TASKS.lightWithMoss = workKind({ label: 'Blowing on the glowing moss', amount: CLOCK.work.mossLight, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || camp.stash.moss <= 0 || p.fuel <= 0) return;
+  const first = !camp.everLit;
   camp.stash.moss--; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
-  log(`${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
+  log(first ? `${a.name} tucks the glowing moss into the pit and blows. The fire takes, and the camp has a hearth.` : `${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
   for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
 } });
 TASKS.layFire = workKind({ label: 'Laying the fire', amount: CLOCK.work.layFire, effect(a, args){
@@ -5344,12 +5351,13 @@ function tryLightning(){
     if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
-      /* A strike near a camp takes a pine an ember can be fetched from: near the site, with open ground beside
-         it that people reach from the site. So a lone tree or the edge of a wood, and not a pine deep in a wood,
-         on an island, or in a clearing closed in by trees. On seed moss-crag-87 every strike near the camp in
-         twenty days fell inside the pine wood, and the lone founder waited by a cold pit until they died. The
-         check draws no random number, but a pine it turns down costs the draws of another try. */
-      const reach = campReach(), fetchable = t => t.fire <= 0 && canFetchFrom(t, reach);
+      /* With the pit cold, a strike near a camp takes a pine an ember can be fetched from: near the site, with
+         open ground beside it that people reach from the site. So a lone tree or the edge of a wood, and not a
+         pine deep in a wood, on an island, or in a clearing closed in by trees. On seed moss-crag-87 the first
+         strike near the cold camp, on day 8.00, fell deep inside the pine wood, where nobody could stand beside
+         it. The check draws no random number, but a pine it turns down costs the draws of another try. With the
+         pit lit, nobody needs the ember, so the pick is the old one and so is the random stream. */
+      const reach = out ? campReach() : null, fetchable = t => t.fire <= 0 && (!out || canFetchFrom(t, reach));
       for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && fetchable(t)) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && fetchable(t)) hit = t; }
       if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
@@ -6521,6 +6529,7 @@ function resetState(seed, opts){
 }
 /* Every world begins with its creation. The ages run to settle, and settle paints the valley and opens the days. */
 function startWorld(seed, opts = {}){
+  blazeReach = null;
   resetState(seed, opts);
   beginCreation();
   runAges();
@@ -6919,7 +6928,7 @@ const NOT_SAVED = {
   threatSourcesAt: 'the tick that list was built on',
   threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
   threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
-  blazeReach: "the ground walkable from a camp's site, for nearbyBlaze; kept for one tick",
+  blazeReach: "a cache of the ground walkable from a camp's site, for nearbyBlaze; cleared by every door act, every load, and every new world, and rebuilt on the next call",
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
@@ -7184,7 +7193,7 @@ let lastLoadFault = null;
 
 /* Load a whole world from a snapshot. Returns null when it loaded, or the sentence that says why not. */
 function loadSnapshot(snap){
-  lastLoadFault = null;
+  lastLoadFault = null; blazeReach = null;
   if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return 'This save cannot be read.';
   if (snap.version !== SNAPSHOT_VERSION){
     if (typeof snap.version !== 'number' || !Number.isFinite(snap.version)) return 'This file is not a save this world can read.';
@@ -7383,6 +7392,8 @@ DOOR_ACTS.load.replacesWorld = true;
 function inject(event){
   const act = DOOR_ACTS[event.act];
   if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
+  /* An act can change the ground, and a load replaces the world, inside one tick. See campReach. */
+  blazeReach = null;
   if (act.replacesWorld){
     const refusal = act(event);
     if (refusal !== null) return refusal;

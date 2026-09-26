@@ -109,6 +109,8 @@ DOOR_ACTS.load.replacesWorld = true;
 function inject(event){
   const act = DOOR_ACTS[event.act];
   if (!act || !DOOR_SOURCES.includes(event.source)) return 'Nothing answers.';
+  /* An act can change the ground, and a load replaces the world, inside one tick. See campReach. */
+  blazeReach = null;
   if (act.replacesWorld){
     const refusal = act(event);
     if (refusal !== null) return refusal;

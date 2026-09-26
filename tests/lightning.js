@@ -17,8 +17,13 @@ const { collect } = require('./lib/run');
      - during a storm, a strike near a cold camp comes at `rate.lightningOut` a tick, so a storm of average
        length brings one with the chance 1 - (1 - rate)^length, about 0.65;
      - so a storm that brings a strike comes about once in 5.8 world days.
-   The bound is three of those gaps after the pit is laid. Before the fix this seed never lit: every strike
-   near the camp fell on a pine deep inside a wood, where nobody can stand beside the fire. */
+   The bound is three of those gaps after the pit is laid.
+   On the code before PR 135 this seed never lit in twenty days. At each of the four strikes near the camp,
+   on days 8.00, 12.40, 19.14 and 19.16, the founder had no path to any tile beside the fire, measured at
+   the moment of the strike. The second task review measured more. The day-8.00 fire later spread to the edge
+   of the wood. With only the new nearbyBlaze and emberPath, and the old pick, the camp lit on day 8.04.
+   The day-12.40 strike failed because the founder was too far away for the old 3,500-tile search. So this
+   run needs the far search, and the pick then makes it light sooner. */
 function strikeGapDays(api){
   const { storm, rate } = api.CLOCK;
   const length = storm.length + storm.lengthSpread / 2, cycle = storm.gap + storm.gapSpread / 2 + length;
@@ -50,6 +55,8 @@ test('the bound reads the code\'s own rate: a storm with a strike about once in 
   assert.ok(gap > 5 && gap < 7, `the gap is ${gap.toFixed(2)} days; if the rates were retuned, rewrite the comment above strikeGapDays`);
 });
 
+/* The run that arrives by simulating. It does not tell which part of the fix it needs; the hand-built tests
+   below check each part alone. */
 test('a camp left alone gets its first fire from lightning, on seed moss-crag-87', () => {
   const { api, events, laidAt, limit } = leftAlone('moss-crag-87');
   const at = re => events.findIndex(e => re.test(e.text));
@@ -181,4 +188,79 @@ test('a founder far from the camp still sets out for the ember, and takes it', (
   const budget = api.CLOCK.limit.task;
   for (let k = 0; k < budget && a.task && !a.carrying; k++){ api.camp = a.camp; api.updateBeing(a); api.tick = api.tick + 1; }
   assert.ok(a.carrying && a.carrying.kind === 'ember', `the founder did not reach the fire; now at ${a.x},${a.y}, ${a.task ? a.task.label : 'no task'}`);
+});
+
+/* The reach behind nearbyBlaze is kept for a tick. A door act and a load can both change the ground inside
+   one tick, so neither may leave the old ground in place: a watched run and its replay would then offer
+   different work, draw different numbers, and tell different stories. Built on the second task review's
+   probe (staleload.js). */
+test('a load at the same tick reads the loaded ground, as a fresh sim loaded from the same save does', () => {
+  const { api, a, c } = coldCamp();
+  const [sx, sy] = c.site;
+  for (let dx = -1; dx <= 11; dx++) for (let dy = -2; dy <= 2; dy++){ const q = api.tileAt(sx + dx, sy + dy); if (q.struct) continue; q.ground = 'soil'; q.feature = null; q.fire = 0; q.slope = false; }
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++){ const q = api.tileAt(sx + 12 + dx, sy + dy); q.ground = 'grass'; q.feature = 'tree'; q.fire = 0; q.slope = false; }
+  /* One grass tile is the only way to stand beside the pine. */
+  const side = api.tileAt(sx + 11, sy); side.feature = null; side.ground = 'grass';
+  const pine = api.tileAt(sx + 12, sy);
+  api.tick = api.tick + 1;
+  api.inject({ source: 'player', act: 'light', x: pine.x, y: pine.y, z: 0 });
+  const snap = JSON.parse(JSON.stringify(api.takeSnapshot()));
+  /* The player sets the grass beside the pine alight, at the same tick. The pine can no longer be reached,
+     because a burning tile cannot be walked; the burning grass itself can. */
+  api.inject({ source: 'player', act: 'light', x: side.x, y: side.y, z: 0 });
+  const lit = api.nearbyBlaze();
+  assert.deepEqual(lit && [lit.x, lit.y], [side.x, side.y], 'after the second strike the goal should see the burning grass');
+  /* The player loads the save, still at the same tick. */
+  api.inject({ source: 'player', act: 'load', snapshot: snap });
+  const api2 = load(); api2.startWorld('r'); api2.inject({ source: 'player', act: 'load', snapshot: snap });
+  const after = api.nearbyBlaze(), fresh = api2.nearbyBlaze();
+  assert.ok(fresh, 'the fresh sim sees no blaze, so this test proves nothing');
+  assert.deepEqual(after && [after.x, after.y], [fresh.x, fresh.y], 'after a same-tick load the goal reads the ground from before the load');
+  const offered = s => s.offersFor(s.beingById(a.id)).some(o => o.label.startsWith('fetch an ember'));
+  assert.equal(offered(api), offered(api2), 'the loaded world and a fresh load of the same save offer different work');
+  /* The same again through loadSnapshot itself, which the tests and the door both call. */
+  api.inject({ source: 'player', act: 'light', x: side.x, y: side.y, z: 0 });
+  assert.deepEqual((t => t && [t.x, t.y])(api.nearbyBlaze()), [side.x, side.y]);
+  assert.equal(api.loadSnapshot(JSON.parse(JSON.stringify(snap))), null);
+  const direct = api.nearbyBlaze();
+  assert.deepEqual(direct && [direct.x, direct.y], [fresh.x, fresh.y], 'after loadSnapshot at the same tick the goal reads the ground from before the load');
+});
+
+test('a first fire from moss or firestones says the camp has a hearth; a relight does not', () => {
+  for (const [how, setup, label, first, again] of [
+    ['moss', (a, c) => { c.stash.moss = 1; }, 'light the pit with glowing moss', /tucks the glowing moss into the pit and blows\. The fire takes, and the camp has a hearth\./, /blows\. The fire takes\. No lightning, no sky\./],
+    ['firestones', (a, c) => { c.tools.firestones = 1; a.skills.craft = 10; a.traits.patience = 1; }, 'strike sparks', /coaxes a spark into flame\. The wood catches, and the camp has a hearth\./, /coaxes a spark into flame\. The fire is back\./],
+  ]){
+    for (const everLit of [false, true]){
+      const { api, a, c } = coldCamp(); c.everLit = everLit; setup(a, c);
+      const from = api.chronicle.length;
+      doOffer(api, a, label, api.CLOCK.work.mossLight * 20);
+      const line = api.chronicle.slice(0, api.chronicle.length - from).find(e => (everLit ? again : first).test(e.text));
+      assert.ok(line, `${how}, ${everLit ? 'a relight' : 'the first fire'}: no fitting line in ${api.chronicle.slice(0, 3).map(e => e.text).join(' / ')}`);
+      assert.equal(line.kind, everLit && how === 'firestones' ? 'good' : 'major', `${how}: the line is ${line.kind}`);
+    }
+  }
+});
+
+test('a strike through the door inside a tick changes what the goal can reach at once', () => {
+  const { api, c } = coldCamp();
+  const [sx, sy] = c.site;
+  const set = (dx, dy, ground, feature = null) => { const q = api.tileAt(sx + dx, sy + dy); if (q.struct) return q; q.ground = ground; q.feature = feature; q.fire = 0; q.slope = false; return q; };
+  /* Rock all round, the site's own ring left open, and one winding way out to a pine. */
+  for (let dx = -2; dx <= 15; dx++) for (let dy = -8; dy <= 3; dy++) set(dx, dy, Math.max(Math.abs(dx), Math.abs(dy)) <= 1 ? 'soil' : 'rock');
+  for (let dx = 2; dx <= 10; dx++) set(dx, 0, 'soil');
+  for (let dy = -5; dy <= 0; dy++) set(10, dy, 'soil');
+  for (let dx = 10; dx <= 12; dx++) set(dx, -5, 'grass');
+  for (let dy = -5; dy <= 0; dy++) set(12, dy, 'soil');
+  const pine = set(13, 0, 'grass', 'tree');
+  const gate = api.tileAt(sx + 11, sy - 5);   // on the only way to the pine, and further from the site than the pine
+  api.tick = api.tick + 1;
+  api.inject({ source: 'player', act: 'light', x: pine.x, y: pine.y, z: 0 });
+  assert.equal(api.nearbyBlaze(), pine, 'the pine at the end of the way is not a blaze to fetch from');
+  /* The player sets the way alight, at the same tick. A burning tile cannot be walked, so the pine is cut off.
+     The burning grass on the way is still a blaze to fetch from. */
+  api.inject({ source: 'player', act: 'light', x: gate.x, y: gate.y, z: 0 });
+  assert.ok(gate.fire > 0, 'the grass on the way did not catch');
+  const now = api.nearbyBlaze();
+  assert.deepEqual(now && [now.x, now.y], [gate.x, gate.y], 'the goal still reads the ground from before the strike');
 });

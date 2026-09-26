@@ -81,11 +81,17 @@ function setSite(x, y){
      never overridden here. */
   if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
-/* How far from a camp's site, in a straight line, a fire counts as near enough to fetch an ember from. */
+/* How far from a camp's site a fire counts as near enough to fetch an ember from. `dist` counts tiles across
+   plus tiles down, not the straight line. */
 const BLAZE_RANGE = 60;
-/* The ground people can walk to from the camp's site, out to about BLAZE_RANGE steps: the search stops after
-   as many tiles as a disc of that radius holds. It draws no random number. It is kept for one tick and one
-   camp. A load always falls between two ticks, so a loaded world and an unbroken one read the same ground. */
+/* The ground people can walk to from the camp's site. The search stops after as many tiles as a disc of
+   radius BLAZE_RANGE holds. A walk moves in four directions, so on open ground that reaches about 75 steps
+   from the site; a narrow way reaches further. It draws no random number.
+   The result is kept for one tick and one camp, because a goal asks for it many times in a tick. A door act
+   can change the ground inside a tick: a player's strike sets a tile burning, and a burning tile cannot be
+   walked. A load puts back a tick and camp ids that the cache may already hold, from another world. So
+   `inject` clears it before every act, and `loadSnapshot` and `startWorld` clear it too. Before that, a load
+   at the same tick kept the old ground, and the goal did not offer an ember that a fresh load offered. */
 let blazeReach = null;
 function campReach(){
   if (blazeReach && blazeReach.at === tick && blazeReach.camp === camp.id) return blazeReach.set;

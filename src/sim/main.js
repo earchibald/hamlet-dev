@@ -14,6 +14,7 @@ function resetState(seed, opts){
 }
 /* Every world begins with its creation. The ages run to settle, and settle paints the valley and opens the days. */
 function startWorld(seed, opts = {}){
+  blazeReach = null;
   resetState(seed, opts);
   beginCreation();
   runAges();
