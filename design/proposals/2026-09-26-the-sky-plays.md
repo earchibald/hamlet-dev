@@ -73,7 +73,7 @@ The best part of this loop is that the simulation's own growth is the difficulty
 | Belief fades | 1 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. No loss takes belief under the floor. That holds for the daily fade, for a prayer the sky left unanswered, and for a trouble the people met by their own hands. Seeing a miracle, or an answered prayer, can lift belief again. |
 | Seeing a miracle | +2 belief, at most once a day for each person | A person who stands within 10 tiles sees it. Two Sparks in one evening do not buy belief twice. |
 | Grace at the start | 30 | Enough for one Spark, so the first fire prayer can be answered. At 0, the founder had only 4 grace by the first evening, and the first prayer was always silent. |
-| Grace income | Each person gives belief / 100 grace each world hour | A camp of five at belief 60 gives 3 grace an hour, or 72 a day. |
+| Grace income | Each person gives belief / 200 grace each world hour | A camp of five at belief 60 gives 1.5 grace an hour, or 36 a day. At twice this rate, grace sat at the cap for most of an eight-day run, and no prayer forced a choice. |
 | Grace cap | 100 | The player cannot hoard. Unspent grace is wasted, which pushes the player to act. |
 
 The strip shows grace as a gauge, and the number of believers. A person's card shows their belief and the prayers they made.

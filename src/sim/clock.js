@@ -293,7 +293,9 @@ const CLOCK = {
   /* The sky and its people (faith.js). None of it runs in a world made with faith off. */
   faith: {
     every: mins(10),           // how often belief, grace, and prayers are looked at. A whole number of beats.
-    grace: perHour(1),         // grace a tick from one person whose belief is 100. Belief 40 gives 0.4 of it.
+    /* Grace a tick from one person whose belief is 100: half a grace an hour. Belief 40 gives 0.4 of it.
+       At 1 an hour, grace sat at the cap of 100 for most of an 8-day run, so no prayer forced a choice. */
+    grace: perHour(0.5),
     fade: 1 / days(1),         // belief a tick that each person loses, down to the floor: 1 a day
     /* How long a prayer waits for its answer, by kind. A fire prayer waits until the next dawn if
        that is later. A storm prayer waits until the storm's end if that is sooner. */
