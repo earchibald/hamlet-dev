@@ -56,7 +56,7 @@ Tiles hold ground, a feature (tree, sapling, bush, boulder, reeds, hollow pine),
 - Four seasons of 8 days. Spring, summer, autumn, winter.
 - Storms every few days, lasting 150 to 450 ticks. Rain slows wildfire to almost nothing, burns the pit 1.5 times faster, soaks anyone not under a roof, and carries the only lightning.
 - Lightning strikes in the 3 by 3 block of sectors around a camp. With the hearth out, about once in 2.5 days. With it lit, rarely. A struck pine smoulders for 240 ticks so people have time to fetch an ember.
-- A strike near a camp takes a pine with open ground beside it: a lone tree or the edge of a wood. A tree is solid, so nobody can stand beside a pine deep in a wood to take an ember from it. On seed moss-crag-87, every strike near the camp in twenty days fell inside the wood, and the lone founder died beside a cold pit. `tests/lightning.js` runs that seed with no god and checks that the sky lights the first hearth.
+- A strike near a camp takes a pine that people can fetch an ember from. The pine must stand within 60 tiles of the camp's site, and have open ground beside it that people can walk to from the site. A tree is solid, so nobody can stand beside a pine deep in a wood. On seed moss-crag-87, every strike near the camp in twenty days fell inside the wood, and the lone founder died beside a cold pit. The goal offers an ember only from a fire that passes the same test. A person far from the camp still sets out for the ember, and plans the way in stretches. `tests/lightning.js` runs that seed with no god and checks that the sky lights the first hearth.
 
 ## 5. Minds
 

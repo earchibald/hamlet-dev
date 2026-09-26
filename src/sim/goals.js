@@ -32,13 +32,13 @@ TASKS.feedFire = workKind({ label: 'Feeding the fire', amount: CLOCK.work.feedFi
 TASKS.strikeSparks = workKind({ label: 'Striking sparks into the tinder', amount: CLOCK.work.strikeSparks, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || p.fuel <= 0) return;
-  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
+  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
   else { addThought(a, 'sparks', 'Sparks, but no flame', -3, CLOCK.thought.sparks); a.cooldown['strike sparks'] = tick + CLOCK.cooldown.sparks; }
 } });
 TASKS.lightWithMoss = workKind({ label: 'Blowing on the glowing moss', amount: CLOCK.work.mossLight, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || camp.stash.moss <= 0 || p.fuel <= 0) return;
-  camp.stash.moss--; p.lit = true; camp.everLit = true;
+  camp.stash.moss--; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
   log(`${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
   for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
 } });

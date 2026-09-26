@@ -2748,13 +2748,35 @@ function setSite(x, y){
      never overridden here. */
   if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
-/* A wildfire within reach of the camp, for fetching an ember. */
+/* How far from a camp's site, in a straight line, a fire counts as near enough to fetch an ember from. */
+const BLAZE_RANGE = 60;
+/* The ground people can walk to from the camp's site, out to about BLAZE_RANGE steps: the search stops after
+   as many tiles as a disc of that radius holds. It draws no random number. It is kept for one tick and one
+   camp. A load always falls between two ticks, so a loaded world and an unbroken one read the same ground. */
+let blazeReach = null;
+function campReach(){
+  if (blazeReach && blazeReach.at === tick && blazeReach.camp === camp.id) return blazeReach.set;
+  const set = reachable(camp.site[0], camp.site[1], 0, Math.ceil(Math.PI * BLAZE_RANGE * BLAZE_RANGE));
+  blazeReach = { at: tick, camp: camp.id, set };
+  return set;
+}
+/* A burning tile an ember can be taken from: near the site, with ground beside it that people reach from
+   the site. A pine deep in a wood, or one across water, does not count. Before this check the goal said
+   someone could fetch an ember from such a fire, and nobody could. */
+function canFetchFrom(t, reach){
+  return dist(t.x, t.y, camp.site[0], camp.site[1]) <= BLAZE_RANGE && !!nearFind(t.x, t.y, q => reach.has(idx3(q.x, q.y, q.z)), DIRS, t.z);
+}
+/* The nearest fire near the camp that an ember can be fetched from. */
 function nearbyBlaze(){
   if (fireCount <= 0 || !camp.site) return null;
-  const [cx, cy] = camp.site; let best = null;
-  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
-  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
-  return best ? best.t : null;
+  const [cx, cy] = camp.site; const near = [];
+  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= BLAZE_RANGE) near.push({ t, d }); }
+  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= BLAZE_RANGE) near.push({ t, d }); }
+  if (!near.length) return null;
+  near.sort((p, q) => p.d - q.d);
+  const reach = campReach();
+  for (const n of near) if (canFetchFrom(n.t, reach)) return n.t;
+  return null;
 }
 
 function openSpotNear(at, dmin, dmax){
@@ -3089,14 +3111,23 @@ function runTask(a){
 }
 
 /* ---------- human work tasks ---------- */
+/* The way to a fire near the camp. The near country first; then, as drink and pathToStop do, the whole world
+   once, and the first stretch of the way. A founder a long way off still sets out, and plans the next stretch
+   on arrival. Before this, a search of 3,500 tiles failed for a founder 130 tiles away, and the fire burned out. */
+function emberPath(a){
+  const [cx, cy] = camp.site;
+  const goal = (x, y, z) => !!nearFind(x, y, t => t.fire > 0 && dist(t.x, t.y, cx, cy) <= BLAZE_RANGE, DIRS, z);
+  const p = bfs(a.x, a.y, a.z, goal, 3500, a); if (p) return p;
+  const q = bfs(a.x, a.y, a.z, goal, NZ * W * H, a); return q ? q.slice(0, 48) : null;
+}
 TASKS.fetchEmber = { type: 'ember',
   begin(a, args){
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
+    const p = emberPath(a); if (!p) return false;
     return { label: 'Running to the blaze for an ember', path: p, fast: true };
   },
   stops: [(a, t) => {
     if (!a.carrying){
-      if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
+      if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)){ const p = emberPath(a); if (!p || !p.length) return 'fail'; t.path = p; return 'continue'; }
       a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, CLOCK.thought.ember);
       log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
       const [px, py] = camp.pit; const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';
@@ -4731,13 +4762,13 @@ TASKS.feedFire = workKind({ label: 'Feeding the fire', amount: CLOCK.work.feedFi
 TASKS.strikeSparks = workKind({ label: 'Striking sparks into the tinder', amount: CLOCK.work.strikeSparks, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || p.fuel <= 0) return;
-  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
+  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
   else { addThought(a, 'sparks', 'Sparks, but no flame', -3, CLOCK.thought.sparks); a.cooldown['strike sparks'] = tick + CLOCK.cooldown.sparks; }
 } });
 TASKS.lightWithMoss = workKind({ label: 'Blowing on the glowing moss', amount: CLOCK.work.mossLight, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || camp.stash.moss <= 0 || p.fuel <= 0) return;
-  camp.stash.moss--; p.lit = true; camp.everLit = true;
+  camp.stash.moss--; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
   log(`${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
   for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
 } });
@@ -5313,12 +5344,14 @@ function tryLightning(){
     if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
-      /* A strike near a camp takes a pine with open ground beside it: a lone tree or the edge of a wood.
-         A pine deep in a wood has only trees around it, and a tree is solid, so nobody can stand beside
-         the fire to take an ember from it. On seed moss-crag-87 every strike near the camp in twenty
-         days fell inside the pine wood, and the lone founder waited by a cold pit until they died. */
-      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0 && nearFind(t.x, t.y, q => passable(q.x, q.y, q.z), DIRS)) hit = t; }
-      for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
+      /* A strike near a camp takes a pine an ember can be fetched from: near the site, with open ground beside
+         it that people reach from the site. So a lone tree or the edge of a wood, and not a pine deep in a wood,
+         on an island, or in a clearing closed in by trees. On seed moss-crag-87 every strike near the camp in
+         twenty days fell inside the pine wood, and the lone founder waited by a cold pit until they died. The
+         check draws no random number, but a pine it turns down costs the draws of another try. */
+      const reach = campReach(), fetchable = t => t.fire <= 0 && canFetchFrom(t, reach);
+      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && fetchable(t)) hit = t; }
+      for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && fetchable(t)) hit = t; }
       if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
     }
   }
@@ -6886,6 +6919,7 @@ const NOT_SAVED = {
   threatSourcesAt: 'the tick that list was built on',
   threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
   threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
+  blazeReach: "the ground walkable from a camp's site, for nearbyBlaze; kept for one tick",
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */

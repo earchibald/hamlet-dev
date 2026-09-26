@@ -74,14 +74,23 @@ function runTask(a){
 }
 
 /* ---------- human work tasks ---------- */
+/* The way to a fire near the camp. The near country first; then, as drink and pathToStop do, the whole world
+   once, and the first stretch of the way. A founder a long way off still sets out, and plans the next stretch
+   on arrival. Before this, a search of 3,500 tiles failed for a founder 130 tiles away, and the fire burned out. */
+function emberPath(a){
+  const [cx, cy] = camp.site;
+  const goal = (x, y, z) => !!nearFind(x, y, t => t.fire > 0 && dist(t.x, t.y, cx, cy) <= BLAZE_RANGE, DIRS, z);
+  const p = bfs(a.x, a.y, a.z, goal, 3500, a); if (p) return p;
+  const q = bfs(a.x, a.y, a.z, goal, NZ * W * H, a); return q ? q.slice(0, 48) : null;
+}
 TASKS.fetchEmber = { type: 'ember',
   begin(a, args){
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, t => t.fire > 0, DIRS, z), 3500, a); if (!p) return false;
+    const p = emberPath(a); if (!p) return false;
     return { label: 'Running to the blaze for an ember', path: p, fast: true };
   },
   stops: [(a, t) => {
     if (!a.carrying){
-      if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)) return 'fail';
+      if (!nearFind(a.x, a.y, q => q.fire > 0, DIRS, a.z)){ const p = emberPath(a); if (!p || !p.length) return 'fail'; t.path = p; return 'continue'; }
       a.carrying = { kind: 'ember', count: 1, dies: tick + CLOCK.limit.ember }; addThought(a, 'ember', 'Snatched fire from a wildfire', 4, CLOCK.thought.ember);
       log(`${a.name} grabs a burning branch from the blaze and runs for the camp.`, [a], 'good');
       const [px, py] = camp.pit; const q = pathToStop(a, px, py, 1); if (!q) return 'fail'; t.path = q; t.label = 'Carrying the ember to the pit'; return 'continue';

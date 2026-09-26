@@ -322,6 +322,7 @@ const NOT_SAVED = {
   threatSourcesAt: 'the tick that list was built on',
   threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
   threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
+  blazeReach: "the ground walkable from a camp's site, for nearbyBlaze; kept for one tick",
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
