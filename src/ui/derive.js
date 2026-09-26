@@ -20,8 +20,21 @@ const inAges = () => era === 'gods';
 /* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
    of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
 function ladder(){ return inAges() ? PACES : SPEEDS; }
-/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
-const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse.
+   `ageNumber` is the one place that count is made. The strip, the timeline, the act card, the foot and
+   the Hurry dialog all read it, because the timeline once printed the absolute age and said "Age 1 to 11"
+   while the strip above it said "Age 10". An age before the Pulse has no number. */
+const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
+const ageName = n => ageNumber(n) === null ? 'Before time' : `Age ${ageNumber(n)}`;
+/* A run of ages, from and to both absolute, named the way ageName names one. */
+function ageSpanName(from, to){
+  const a = ageNumber(from), b = ageNumber(to);
+  if (b === null) return 'Before time';
+  if (a === null) return `Before time to age ${b}`;
+  return a === b ? `Age ${a}` : `Age ${a} to ${b}`;
+}
+/* The strip's clock. In the ages it is the age now playing, named by ageName; in the days it is the stamp. */
+const clockText = () => inAges() ? ageName(age) : stamp();
 const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 /* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
@@ -74,7 +87,7 @@ function actCard(rec){
   const g = beingById(rec.god);
   const said = captionFor(rec);
   const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
-  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const rows = [{ label: 'when', value: ageName(rec.age) }];
   const r = regionById(rec.region !== undefined ? rec.region : rec.near);
   if (r) rows.push({ label: 'where', value: countryLine(r) });
   if (rec.weighed && !rec.byPlayer){
@@ -443,10 +456,11 @@ function tlCellText(rec, withWho){
 const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
-  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, head: '', rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const head = now === 0 ? 'Before the first age' : ageSpanName(from, to);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
   /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
      more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
@@ -466,7 +480,7 @@ function timelineModel(){
   const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
   const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
-    return { shown: true, folded: true, from, to, now, marks: [],
+    return { shown: true, folded: true, from, to, now, head, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
   /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
@@ -490,7 +504,7 @@ function timelineModel(){
     gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
-  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+  return { shown: true, folded: false, from, to, now, head, rows, marks: [] };
 }
 
 /* One chip, opened. The matrix is the record's own, in the record's own order. */
@@ -523,7 +537,7 @@ function footChip(){
   const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
   const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
   const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+  return { head: `${ageName(m.age)}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
