@@ -1,0 +1,88 @@
+// Text faults found in playtest run 2, day 15. Fast.
+// "Logs at last." once per camp; the plurals in the Camp drawer; the valley row; a being's age.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const sim = require('../src/sim');
+const ui = require('../src/ui');
+
+function loadUI(files, names){
+  const api = sim.API.replace('return {', 'return { ' + names.join(', ') + ',');
+  return Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
+}
+const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'dialogs', 'actions'];
+const NAMES = ['ageText', 'campValleyRow', 'valleyName', 'nOf'];
+
+/* Fell one pine by hand: the chop's last stroke, as the task's own stop runs it. */
+function fell(api, a){
+  const tree = api.world.find(t => t.feature === 'tree' && t.fire <= 0);
+  assert.ok(tree, 'the valley has a pine to fell');
+  const t = { kind: 'cutTree', type: 'work', label: '', args: { tree: [tree.x, tree.y, tree.z || 0] }, progress: api.CLOCK.work.cutTree };
+  api.TASKS.cutTree.stops[0](a, t);
+  assert.equal(tree.feature, null, 'the pine is down');
+}
+const atLast = api => api.chronicle.filter(e => / fells a pine\. Logs at last\.$/.test(e.text));
+
+test('"Logs at last." is said for the first pine a camp fells, and not again', () => {
+  const api = loadUI(FILES, NAMES);
+  api.startWorld('r');
+  const a = api.beings.find(b => b.species === 'human');
+  const c1 = api.camp;
+  assert.equal(c1.hadLogs, false, 'a new camp has felled nothing');
+  fell(api, a);
+  assert.equal(atLast(api).length, 1, 'the first pine is news');
+  assert.equal(c1.hadLogs, true);
+  fell(api, a); fell(api, a); fell(api, a);
+  assert.equal(atLast(api).length, 1, 'three more pines in a row are not news again');
+  /* A second camp has its own first logs. */
+  const c2 = api.makeCamp('The second camp');
+  api.camp = c2; a.camp = c2;
+  fell(api, a);
+  assert.equal(atLast(api).length, 2, 'a second camp says it for its own first pine');
+  fell(api, a);
+  assert.equal(atLast(api).length, 2);
+});
+
+test('a being\'s age reads in days, then seasons, then years', () => {
+  const api = loadUI(FILES, NAMES);
+  const season = api.YEAR_DAYS / api.SEASONS.length;
+  const cases = [
+    [0, '0 days'], [0.9, '0 days'], [1, '1 day'], [1.5, '1 day'], [2, '2 days'], [32, '32 days'],
+    [Math.ceil(season) - 1, `${Math.ceil(season) - 1} days`], [Math.ceil(season), '1 season'], [2 * season + 3, '2 seasons'],
+    [api.YEAR_DAYS - 1, '3 seasons'], [api.YEAR_DAYS, '1 year'], [2 * api.YEAR_DAYS - 1, '1 year'],
+    [2 * api.YEAR_DAYS, '2 years'], [70 * api.YEAR_DAYS + 200, '70 years'],
+  ];
+  for (const [d, want] of cases) assert.equal(api.ageText(d), want, `${d} days`);
+});
+
+test('nOf says one thing once and more than one in the plural', () => {
+  const api = loadUI(FILES, NAMES);
+  assert.equal(api.nOf(1, 'day', 'days'), '1 day');
+  assert.equal(api.nOf(0, 'day', 'days'), '0 days');
+  assert.equal(api.nOf(15, 'day', 'days'), '15 days');
+});
+
+test('the Camp drawer has no valley row until the valley has a name', () => {
+  const api = loadUI(FILES, NAMES);
+  api.startWorld('r');
+  assert.equal(api.valleyName(), null, 'a new valley has no name');
+  assert.equal(api.campValleyRow(), null, 'so the drawer shows no valley row');
+  /* An old name nobody has read is not shown either. */
+  api.giveName(api.valley, api.nameRecord('Sadrumo', { tongue: 'old', meaning: 'the eye that does not close', by: 'lost' }));
+  assert.equal(api.campValleyRow(), null, 'an unread name gives no row');
+  api.valley.nameKnown = true;
+  assert.deepEqual(api.campValleyRow(), ['Valley', 'Sadrumo'], 'the row shows the name once it is read');
+});
+
+/* The drawer and the inspect window call these helpers. A check on the source text, so a later edit
+   that puts the bare "days" back is caught without a page to render. */
+test('the Camp drawer and the inspect window use the helpers', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const panels = fs.readFileSync(path.join(__dirname, '../src/ui/panels.js'), 'utf8');
+  const inspect = fs.readFileSync(path.join(__dirname, '../src/ui/inspect.js'), 'utf8');
+  assert.ok(!/\$\{c\.age\} days/.test(panels), 'the camp age no longer prints a bare "days"');
+  assert.ok(/\['Age', nOf\(c\.age, 'day', 'days'\)\]/.test(panels), 'the camp age uses nOf');
+  assert.ok(!/describe\(valley, 'valley'\)/.test(panels), 'the valley row no longer falls back to "the valley"');
+  assert.ok(/campValleyRow\(\)/.test(panels), 'the valley row reads campValleyRow');
+  assert.ok(/ageText\(ageDays\(a\)\)/.test(inspect), 'a being\'s age in the inspect window reads ageText');
+  assert.ok(!/Math\.floor\(ageDays\(a\)\)\} days/.test(inspect), 'and not a bare count of days');
+});

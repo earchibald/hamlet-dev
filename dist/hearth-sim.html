@@ -2670,7 +2670,7 @@ function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, hadLogs: false, founded: tick };
   /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
      gets its first name record once someone is there to give it one: at the site (`setSite`),
      or, failing that, at the hearth (`nameCampAtHearth`). A placeholder such as "The first camp"
@@ -3595,7 +3595,9 @@ TASKS.cutTree = { type: 'work',
     t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
     if (t.progress < CLOCK.work.cutTree) return 'continue';
     tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    /* "Logs at last" is news once per camp: the first pine felled. Every later tree was said again,
+       four times in one hour on day 15 of a playtest, while the woodpile goal already counts the logs. */
+    gainXp(a, 'woodcut'); if (!camp.hadLogs){ camp.hadLogs = true; log(`${a.name} fells a pine. Logs at last.`, [a]); }
     const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
@@ -7985,6 +7987,20 @@ function sectorLabel(s){
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days)), season = YEAR_DAYS / SEASONS.length;
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  if (d >= season) return nOf(Math.floor(d / season), 'season', 'seasons');
+  return nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
@@ -9464,7 +9480,7 @@ function inspectBeing(a, full = false){
   const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
-    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
+    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${ageText(ageDays(a))}. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
@@ -9496,7 +9512,7 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'storehouse') rows.push(['Storehouse', 'the stash on stilts. Food keeps twice as long, and wolves cannot reach it.']);
   if (t.struct && t.struct.type === 'workshop') rows.push(['Workshop', 'a roofed bench. Cord, baskets, rods, and clothes are made here, faster than by the fire.']);
   if (t.struct && t.struct.type === 'kiln') rows.push(['Kiln', `a dome of rock and clay. ${t.struct.fired || 0} pots fired here.`]);
-  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
+  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', ageText((tick - (t.planted || 0)) / DAY)]);
   if (t.garden) rows.push(['Garden', `planted by ${t.garden.name}. Rabbits like it too.`]);
   if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);
@@ -9773,8 +9789,8 @@ function renderCamp(el){
   const kv = [
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
-    ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    campValleyRow() ? ['Valley', esc(campValleyRow()[1])] : null,
+    ['Age', nOf(c.age, 'day', 'days')], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => nOf(n, SPECIES[sp].label, SPECIES[sp].plural)).join(', ')], c.burning ? ['Burning', nOf(c.burning, 'tile', 'tiles')] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;

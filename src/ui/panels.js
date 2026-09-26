@@ -119,8 +119,8 @@ function renderCamp(el){
   const kv = [
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
-    ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    campValleyRow() ? ['Valley', esc(campValleyRow()[1])] : null,
+    ['Age', nOf(c.age, 'day', 'days')], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => nOf(n, SPECIES[sp].label, SPECIES[sp].plural)).join(', ')], c.burning ? ['Burning', nOf(c.burning, 'tile', 'tiles')] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;

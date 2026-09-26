@@ -374,6 +374,20 @@ function sectorLabel(s){
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days)), season = YEAR_DAYS / SEASONS.length;
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  if (d >= season) return nOf(Math.floor(d / season), 'season', 'seasons');
+  return nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
