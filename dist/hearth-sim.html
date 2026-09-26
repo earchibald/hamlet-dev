@@ -2654,6 +2654,11 @@ function reachable(sx, sy, sz, cap = 4000){
   }
   return new Set(q);
 }
+/* Water close enough to drink from or to fill a waterskin at. */
+function besideWater(x, y, z){ return !!nearFind(x, y, t => t.ground === 'water', NEAR, z); }
+/* A camp can stand far from any water. When the near search fails, search the whole world once and walk
+   the first stretch of 48 steps, as pathToStop does. Drinking and filling the waterskin both use it. */
+function pathToFarWater(a){ const q = bfs(a.x, a.y, a.z, besideWater, NZ * W * H, a); return q ? q.slice(0, 48) : null; }
 /* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
 function pathToStop(a, tx, ty, within, tz = 0){
   if (nearAt(a, tx, ty, tz) <= within) return [];
@@ -3603,10 +3608,15 @@ TASKS.cutTree = { type: 'work',
 TASKS.fillWater = { type: 'gather',
   begin(a, args){
     if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, tl => tl.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    return { label: 'Going to fill the waterskin', path: p, progress: 0 };
+    /* The near search first. A camp 90 tiles from the river once failed this search on 268 of 280 tries,
+       and its stash stood empty for most of 16 days, so a failed near search walks the whole world once. */
+    let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+    if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
+    return { label: far ? 'Walking a long way to fill the waterskin' : 'Going to fill the waterskin', path: p, progress: 0 };
   },
-  stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
+  stops: [(a, t) => {
+    if (!besideWater(a.x, a.y, a.z)){ const q = pathToFarWater(a); if (!q) return 'fail'; t.path = q; t.label = 'Walking a long way to fill the waterskin'; return 'continue'; }
+    t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
 
 function takeName(){ if (!namePool.length) namePool = shuffle(NAMES); return namePool.pop(); }
 
@@ -3727,24 +3737,20 @@ Object.assign(TASKS, {
       }
       /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
          world once and covers the first stretch, the same way pathToStop does. Thirst must never have no answer. */
-      const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
-      const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-      let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
-      if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+      let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+      if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
       if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, CLOCK.thought.farwater);
       return { label: far ? 'Walking a long way for water' : 'Going to drink', path: p };
     },
     stops: [(a, t) => {
-      const wet = (x, y, z) => !!nearFind(x, y, w => w.ground === 'water', NEAR, z);
       if (t.args.at){
         const [sx, sy] = t.args.at;
         const g = goTo(a, t, sx, sy, 1); if (g) return g;
         if (camp.stash.water <= 0) return 'fail';
         camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done';
       }
-      if (!wet(a.x, a.y, a.z)){
-        const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-        const q = walkFar(a); if (!q) return 'fail';
+      if (!besideWater(a.x, a.y, a.z)){
+        const q = pathToFarWater(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
       a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
