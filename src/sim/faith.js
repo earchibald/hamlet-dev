@@ -78,7 +78,7 @@ const FAITH_TEXT = {
   own: {
     fire: "{name}'s people lit the fire by their own hands.",
     hunger: "{name}'s people found food by their own hands.",
-    wolf: '{name} was safe from the wolf without the sky.',
+    wolf: '{name} kept clear of the wolf by their own hands.',
     wildfire: 'The fire near {name} went out without the sky.',
   },
   /* A trouble that went away by itself, by kind (a row with `ownHands: false`). */
@@ -87,26 +87,26 @@ const FAITH_TEXT = {
   died: '{name} died before the sky answered.',
   someone: 'Someone',
   thought: { sky: 'The sky heard my prayer', own: 'We managed without the sky', silent: 'The sky did not answer' },
-  forgotten: 'Nobody believes in the sky now. It cannot act.',
+  forgotten: 'Nobody believes in the sky now. It cannot answer anyone.',
   remembered: 'Someone believes in the sky again.',
   rain: 'Rain falls from a clear sky.',
   ward: 'The sky guards the ground.',
   wardFled: 'The sky guards the ground. {count}.',
-  beckon: 'The sky calls. {count} come to the call.',
+  beckon: 'The sky calls, and {count}.',
   beckonLabel: 'Drawn by a call from the sky',
   calm: 'The rain stops. The clouds break.',
   reply: {
     paid: '{said} It cost {cost} grace.',
-    rain: 'Rain. It will fall for a few hours.',
+    rain: 'Rain falls. It will last a few hours.',
     ward: 'The ground is guarded for a day.',
-    beckon: '{count} come to the call.',
+    beckon: 'The sky calls, and {count}.',
     calm: 'The rain stops.',
   },
   refuse: {
-    off: 'The sky plays only in a world made to be played.',
+    off: 'The sky can act only in a world you play, not one you watch.',
     early: 'The valley is not made yet.',
-    forgotten: 'Nobody believes in the sky. It cannot act.',
-    grace: 'Your grace is too thin. {have} of {cost}.',
+    forgotten: 'Nobody believes in the sky now. It cannot answer anyone.',
+    grace: 'Not enough grace. You have {have}, and this costs {cost}.',
     raining: 'It is already raining.',
     clear: 'The sky is already clear.',
     nowhere: 'The sky cannot reach that place.',
@@ -476,7 +476,7 @@ function beckonAct(e){
     b.next = tick; n++;
   }
   if (!n) return FAITH_TEXT.refuse.noBeasts;
-  const cost = payMiracle('beckon', x, y, z), count = nOf(n, 'animal', 'animals');
+  const cost = payMiracle('beckon', x, y, z), count = nOf(n, 'animal comes', 'animals come');
   log(faithSay(FAITH_TEXT.beckon, { count }), humans().filter(a => nearAt(a, x, y, z) <= FAITH.witnessRadius), 'good');
   return faithSay(FAITH_TEXT.reply.paid, { said: faithSay(FAITH_TEXT.reply.beckon, { count }), cost });
 }

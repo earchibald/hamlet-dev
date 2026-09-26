@@ -95,7 +95,7 @@ test('grace comes from belief each hour, and stops at the cap', () => {
   at(api, 2, 9); period(api);
   const hour = api.hours(1) / api.CLOCK.faith.every;
   api.faith.grace = 0; a.belief = 60; period(api, hour);
-  assert.ok(Math.abs(api.faith.grace - 0.6) < 0.01, `one person at belief 60 gave ${api.faith.grace} grace in an hour, not 0.6`);
+  assert.ok(Math.abs(api.faith.grace - 0.3) < 0.01, `one person at belief 60 gave ${api.faith.grace} grace in an hour, not 0.3`);
   api.faith.grace = 99.99; period(api);
   assert.equal(api.faith.grace, 100);
 });
@@ -213,7 +213,7 @@ test('a Spark with too little grace is refused and costs nothing; with enough it
   const { api, pit } = playCamp();
   at(api, 2, 9); period(api);
   api.faith.grace = 10;
-  assert.equal(door(api, 'light', { x: pit.x, y: pit.y }), 'Your grace is too thin. 10 of 15.');
+  assert.equal(door(api, 'light', { x: pit.x, y: pit.y }), 'Not enough grace. You have 10, and this costs 15.');
   assert.equal(pit.struct.lit, false); assert.equal(api.faith.grace, 10);
   api.faith.grace = 20;
   door(api, 'light', { x: pit.x, y: pit.y });
@@ -444,7 +444,7 @@ test('the Calm with no storm is refused and free, and with faith off it is refus
   assert.equal(door(api, 'calm', { x: a.x, y: a.y }), 'The sky is already clear.');
   assert.equal(api.faith.grace, 50); assert.equal(api.faith.signs.length, n);
   api.weather.storm = true; api.faith.grace = 20;
-  assert.equal(door(api, 'calm', { x: a.x, y: a.y }), 'Your grace is too thin. 20 of 25.');
+  assert.equal(door(api, 'calm', { x: a.x, y: a.y }), 'Not enough grace. You have 20, and this costs 25.');
   assert.equal(api.weather.storm, true);
 });
 

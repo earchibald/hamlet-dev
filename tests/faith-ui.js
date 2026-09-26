@@ -448,7 +448,10 @@ test('the help section names every cost, the cap, and the state and key of Slow 
   const { api } = world();
   let html = api.skyHelpHTML();
   for (const k of ['light', 'rain', 'calm', 'ward', 'beckon']) assert.ok(html.includes(String(api.FAITH.cost[k])), `the ${k} cost`);
-  assert.ok(html.includes(`Spark ${api.FAITH.cost.light}, Rain ${api.FAITH.cost.rain}, Calm ${api.FAITH.cost.calm}, Ward ${api.FAITH.cost.ward}, Beckon ${api.FAITH.cost.beckon}.`));
+  /* Each miracle is named with the prayer it answers and its cost, so a new player can match the two. */
+  const C = api.FAITH.cost;
+  for (const said of [`Spark lights a cold fire (${C.light})`, `Beckon calls deer and rabbits to the hungry (${C.beckon})`, `Ward drives off a wolf (${C.ward})`, `Rain puts out a wildfire (${C.rain})`, `Calm stops a storm (${C.calm})`])
+    assert.ok(html.includes(said), `the help pairs a miracle with its prayer: ${said}`);
   assert.ok(html.includes('Calm stops a storm at once.'), 'the help says what Calm does');
   assert.ok(html.includes('or a storm with no roof.'), 'the help names the storm prayer');
   assert.ok(html.includes(`stops at ${api.FAITH.graceCap}.`));
