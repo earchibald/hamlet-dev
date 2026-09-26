@@ -489,10 +489,9 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
   }
 });
 
-/* Four init sites hand a hard-coded value to the guarded doors, 1 to the pace and DAYS_SPEED to the speed:
+/* Three init sites hand a hard-coded value to the guarded doors, 1 to the pace and DAYS_SPEED to the speed:
      src/ui/actions.js       setPace(1)                                   in newWorld
-     src/ui/actions.js       setSpeed(ui.savedSpeed || speed || DAYS_SPEED) in onLoad
-     src/ui/actions.js       setSpeed(ui.savedSpeed || speed || DAYS_SPEED) in onSettle
+     src/ui/state.js         let speed = DAYS_SPEED                       read by onLoad and onSettle
      src/ui/main.js          setSpeed(DAYS_SPEED)                         in initUI
    The guard throws on a value off its ladder, so a ladder edited to drop that value does not give the player
    a wrong speed. It gives them a blank page, because the throw lands on the startup path.
@@ -505,7 +504,7 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
 test('the value the init path hands each door is a rung of that door’s ladder', () => {
   const api = loadUI(['state'], ['PACES', 'SPEEDS', 'DAYS_SPEED']);
   assert.ok(api.PACES.includes(1), 'the ages open with setPace(1), so 1 must be a rung of PACES or the first frame throws');
-  assert.ok(api.SPEEDS.includes(api.DAYS_SPEED), 'the days open with setSpeed(DAYS_SPEED) and the `|| DAYS_SPEED` fallback, so DAYS_SPEED must be a rung of SPEEDS or the first frame throws');
+  assert.ok(api.SPEEDS.includes(api.DAYS_SPEED), 'the days open with setSpeed(DAYS_SPEED), and speed starts at DAYS_SPEED, so DAYS_SPEED must be a rung of SPEEDS or the first frame throws');
 });
 
 /* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site

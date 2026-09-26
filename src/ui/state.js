@@ -108,8 +108,9 @@ const ui = {
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
   /* True once the player picks a days speed with a key, a button, or the palette. Only ACTIONS.speed sets
-     it, and restore() reads it back. restore() honours a saved speed only when it is set: before this
-     marker, every page load saved speed 1 on its own, and that 1 was never the player's choice. */
+     it, and restore() reads it back. Before this marker, every page load saved speed 1 on its own, and
+     that 1 was never the player's choice. A record from then has no marker. restore() keeps its speed
+     unless it is 1, since only a click could have saved 8, 64, or 256. */
   speedChosen: false,
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
   nextWin: 1,
@@ -191,7 +192,8 @@ function restore(){
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
-    if (s.speedChosen === true && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
+    const chosen = s.speedChosen === true || (s.speedChosen === undefined && s.speed !== 1);
+    if (chosen && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
