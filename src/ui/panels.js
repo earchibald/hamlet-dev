@@ -10,6 +10,8 @@ function renderUI(force){
      because the key holds neither the view nor whether a fire exists. The camp fire view joins the cycle
      when the camp picks its site, with the view unchanged. setHTML skips the write when nothing changed. */
   setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
+  /* The tools, with the miracles only in a world played as the sky. setHTML skips an unchanged write. */
+  setHTML($('tools'), toolsHTML());
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   drawTimeline();

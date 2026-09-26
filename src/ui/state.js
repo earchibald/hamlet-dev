@@ -9,10 +9,57 @@ const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
 /* The two views drawn tile by tile at full size: the sector, and the camp fire. */
 const closeUp = v => v === 'loc' || v === 'fire';
-/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
+/* Every word the page adds for a world played as the sky, in one table so the text review finds them all.
+   The sim's own sentences (prayers, answers, refusals, the season's line) are in FAITH_TEXT in
+   src/sim/faith.js and are reused, not copied. `{name}` and the other slots are filled by faithSay. */
+const SKY_TEXT = {
+  grace: 'Grace',
+  forgotten: 'Forgotten',
+  believers: '{n} of {of} believe',
+  left: '{time} left',
+  slowed: '{name} prays. Time slows so you can listen.',
+  slowOn: 'Time slows when someone prays.',
+  slowOff: 'Time keeps its speed when someone prays.',
+  slowKey: 'Slow for prayers, on or off',
+  belief: 'Belief',
+  hintCost: 'It costs {cost} grace.',
+  tally: {
+    believers: 'Believers', mean: 'Mean belief', answered: 'Answered by the sky', ownHands: 'Met by their own hands',
+    silent: 'The sky was silent', births: 'Born', deaths: 'Died', spent: 'Grace spent',
+  },
+  /* The card's last line, picked by the first rule that fits, in this order. */
+  closing: {
+    forgotten: 'Nobody believes in the sky now.',
+    quiet: 'Nobody needed the sky this season.',
+    learning: 'They are learning to manage without the sky.',
+    heard: 'The sky answered more often than it was silent.',
+    unheard: 'They called more often than the sky answered.',
+    even: 'The sky answered as often as it was silent.',
+  },
+  help: {
+    watched: 'This world is watched, not played. Choose Play as the sky when you make a world to play it.',
+    lines: [
+      'You are the sky. Each person believes in you, from 0 to 100. Their card shows how much.',
+      'Belief gives you grace. Each believer gives a little every hour, and more when they believe more. Grace stops at {cap}.',
+      'People pray when they are in trouble: a cold fire in the evening, no food, a wolf in the dark, or a wildfire near the camp. A prayer shows as a chip with the time left, and a \u2726 over the one who prays.',
+      'Each miracle costs grace. Spark {light}, Rain {rain}, Ward {ward}, Beckon {beckon}. Nudge is free.',
+      'If the sky answers, the one who prayed believes more, and so do the others. If they manage by their own hands, they believe a little less. If nobody answers, they believe much less.',
+      'Belief fades a little every day. If nobody believes, the sky is forgotten, and it cannot act.',
+      'When a season ends, a card shows how it went.',
+    ],
+    slow: 'Slow for prayers is {state}. {key} switches it. When it is on, a new prayer slows the game to {speed}.',
+    on: 'on', off: 'off',
+  },
+};
+/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick.
+   `act` is the door act a miracle sends, and its cost is FAITH.cost[act]. A tool with `faith` shows only in
+   a world made to be played. The Spark is the old Light fire: with faith off it is free, as it was. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
-  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Enter or click lights it. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'light',   key: 'f', label: 'Spark',      oneShot: true,  act: 'light',  hint: 'Light the fire pit under the cursor. Enter or click lights it. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'rain',    key: 'r', label: 'Rain',       oneShot: true,  act: 'rain',   faith: true, hint: 'Make it rain now, over the whole valley. Rain puts out a wildfire, and it soaks everyone without a roof. Enter or click calls the rain. Shift makes the tool stick.' },
+  { id: 'ward',    key: 'd', label: 'Ward',       oneShot: true,  act: 'ward',   faith: true, hint: 'Guard the ground under the cursor for a day. Wolves and foxes near it run, and keep away. Enter or click guards it. Shift makes the tool stick.' },
+  { id: 'beckon',  key: 'b', label: 'Beckon',     oneShot: true,  act: 'beckon', faith: true, hint: 'Call the deer and rabbits near the cursor to come to it. Wolves may follow them. Enter or click calls them. Shift makes the tool stick.' },
   { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
@@ -129,6 +176,13 @@ const ui = {
      the being stands on. t is the wall time in ms when the being left that square. For the last
      entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
   trails: {},
+  /* A world played as the sky. slowForPrayers is a preference and is saved: a new prayer drops the
+     speed to DAYS_SPEED while it is on. seenPrayers holds the ids of the prayers the page has already
+     seen, and seenTallies how many season cards it has shown. Both name one world, so they are not saved,
+     and newWorld, onSettle, and onLoad set them again. Only actions.js writes the three, and restore() reads the preference back. */
+  slowForPrayers: true,
+  seenPrayers: {},
+  seenTallies: 0,
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
@@ -180,7 +234,7 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom, slowForPrayers: ui.slowForPrayers })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -191,6 +245,7 @@ function restore(){
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
+    if (typeof s.slowForPrayers === 'boolean') ui.slowForPrayers = s.slowForPrayers;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     const chosen = s.speedChosen === true || (s.speedChosen === undefined && s.speed !== 1);
     if (chosen && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }

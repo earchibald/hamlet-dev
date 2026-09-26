@@ -384,6 +384,15 @@ function sectorSummary(s){
 
 /* ---- nearby view: the sector and its eight neighbours, from the world cache at 9 px per tile ---- */
 const midOrigin = () => ({ ox: (cur.sx - 1) * LW, oy: (cur.sy - 1) * LH });
+/* The mark over a person who prays, in a world played as the sky: a small star above their glyph. */
+const PRAY_MARK = '\u2726';
+function drawPrayMark(g, px, py, size){
+  const f = g.font;
+  g.font = `700 ${size}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
+  g.lineWidth = 3; g.strokeStyle = P.halo; g.strokeText(PRAY_MARK, px, py);
+  g.fillStyle = P.god; g.fillText(PRAY_MARK, px, py);
+  g.font = f;
+}
 function drawMid(){
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   const { ox, oy } = midOrigin(), MW = 3 * LW * MS, MH = 3 * LH * MS;
@@ -405,12 +414,14 @@ function drawMid(){
     for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
   }
   mctx.globalAlpha = 1;
+  const praying = prayingNow();
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
     if (a.species === 'god' && drawGodIcon(mctx, a.pole, px, py, 1)) continue;
     if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
     mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
+    if (praying[a.id]) drawPrayMark(mctx, px, Math.max(MS / 2, py - MS), MS + 2);
   }
   for (const c of camps) if (c.site){ const [x, y] = c.site; if (x < ox || x >= ox + 3 * LW || y < oy || y >= oy + 3 * LH) continue; mctx.strokeStyle = c === viewCamp ? P.select : P.grid; mctx.lineWidth = 1.5; mctx.strokeRect((x - ox) * MS - 4.5, (y - oy) * MS - 4.5, MS + 9, MS + 9); }
   if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
@@ -496,6 +507,7 @@ function drawLoc(){
     }
   }
   ctx.globalAlpha = 1;
+  const praying = prayingNow();
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
@@ -506,6 +518,7 @@ function drawLoc(){
       ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
     }
     if (a.carrying){ ctx.fillStyle = a.carrying.kind === 'rock' ? P.rock : a.carrying.kind === 'stick' || a.carrying.kind === 'spear' || a.carrying.kind === 'log' ? P.stick : a.carrying.kind === 'berries' ? P.berry : a.carrying.kind === 'ember' ? P.fire : a.carrying.kind === 'water' ? P['water-fg'] : P.carcass; ctx.fillRect((a.x - ox) * T + T - 7, (a.y - oy) * T + 2, 5, 5); }
+    if (praying[a.id]) drawPrayMark(ctx, px, Math.max(T / 4, py - T * 0.62), Math.round(T / 2));
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;

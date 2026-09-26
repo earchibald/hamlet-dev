@@ -38,6 +38,13 @@ function inspectBeing(a, full = false){
   const hist = a.history.slice(0, full ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   const s = secOf(a.x, a.y);
   let extra = '';
+  /* A world played as the sky: how much this person believes, and the prayer they have open. */
+  let sky = '';
+  if (a.species === 'human' && skyPlayed() && a.belief !== undefined){
+    const pr = a.alive ? prayerOf(a) : null, left = pr ? timeLeft(pr.until - tick) : '';
+    sky = `<div class="need"><span>${SKY_TEXT.belief}</span>${bar(a.belief, needColor(a.belief))}<span class="num">${Math.round(a.belief)}</span></div>`
+      + (pr ? `<div class="muted">${esc(prayerText(pr))}. ${esc(left[0].toUpperCase() + left.slice(1))}.</div>` : '');
+  }
   if (a.species === 'human'){
     const rels = beings.filter(o => o !== a && a.rel[o.id]).map(o => `${o.name} (${a.rel[o.id]}, ${a.opinions[o.id] > 0 ? '+' : ''}${a.opinions[o.id]})`).join(', ') || 'No friends or rivals yet.';
     extra = `${stateLines(a).map(line => `<div class="muted">${esc(line)}</div>`).join('')}<h3>Personality</h3><div class="chips">${Object.entries(a.traits).map(([k, v]) => `<span class="chip" title="${k} ${v}">${traitWord(k, v)}</span>`).join('')}${a.clothes ? '<span class="chip">wearing hide clothes</span>' : ''}${a.camp && a.camp.tools.basket && a.species === 'human' ? '<span class="chip">with a basket</span>' : ''}</div><h3>Skills</h3><div class="chips">${Object.entries(a.skills).filter(([k, v]) => v > 0).map(([k, v]) => `<span class="chip">${k} ${v}</span>`).join('') || '<span class="muted">Nothing yet. Skills come from work, and from elders by the fire.</span>'}</div><h3>Relationships</h3><div>${rels}</div>`;
@@ -50,7 +57,7 @@ function inspectBeing(a, full = false){
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
     <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${ageText(ageDays(a))}. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
-    ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
+    ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${sky}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
     ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;

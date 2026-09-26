@@ -549,7 +549,7 @@ test('keyName prints the modifiers: \u2318K, Ctrl+K, Shift+F, Shift+Alt+1, and n
   const named = l => api.KEYMAP.filter(k => k.label === l);
   assert.equal(api.keyName(named('Command palette').find(k => k.meta)), '\u2318K');
   assert.equal(api.keyName(named('Command palette').find(k => k.ctrl)), 'Ctrl+K');
-  assert.equal(api.keyName(named('Light fire, and keep it')[0]), 'Shift+F');
+  assert.equal(api.keyName(named('Spark, and keep it')[0]), 'Shift+F');
   assert.equal(api.keyName(named('Nudge, and keep it')[0]), 'Shift+N');
   assert.equal(api.keyName(named('Mute alert 1')[0]), 'Shift+Alt+1');
   assert.equal(api.keyName(named('Jump to alert 1')[0]), 'Alt+1');
@@ -790,11 +790,12 @@ test('window keys: O pops out or docks, Esc closes a focused window, Tab walks t
   assert.deepEqual(keyHit(api, ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
 });
 
-test('tools: three, inspect first, light fire and nudge one-shot, no camp site', () => {
+test('tools: inspect first, then the Spark and the three miracles, then nudge; all but inspect one-shot; no camp site', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['TOOLS', ...KEYS]);
-  assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'nudge']);
-  assert.equal(api.TOOLS[0].oneShot, false); assert.equal(api.TOOLS[1].oneShot, true); assert.equal(api.TOOLS[2].oneShot, true);
-  assert.equal(api.TOOLS[1].label, 'Light fire'); assert.equal(api.TOOLS[2].label, 'Nudge');
+  assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'rain', 'ward', 'beckon', 'nudge']);
+  assert.deepEqual(api.TOOLS.map(t => t.oneShot), [false, true, true, true, true, true]);
+  const by = Object.fromEntries(api.TOOLS.map(t => [t.id, t]));
+  assert.equal(by.light.label, 'Spark'); assert.equal(by.nudge.label, 'Nudge');
   assert.deepEqual(keyHit(api, ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });
   assert.deepEqual(keyHit(api, ev('f'), 'window:2'), { action: 'follow', arg: undefined });
   assert.deepEqual(keyHit(api, ev('f'), 'map'), { action: 'tool', arg: 'light' });
@@ -846,7 +847,7 @@ test('a focused row wins over an any row, whatever the order in the table', () =
   assert.equal(api.keyAction(ev('Escape'), 'dialog:help').focus, 'dialog:help', 'the dialog row answers, not the any row above it');
   assert.equal(api.keyAction(ev('Escape'), 'map').focus, 'any');
   assert.deepEqual(keyHit(api, ev('f'), 'window:2'), { action: 'follow', arg: undefined });
-  assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'window:2'), { action: 'follow', arg: undefined }, 'Shift+F in a window does not stick Light fire');
+  assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'window:2'), { action: 'follow', arg: undefined }, 'Shift+F in a window does not stick the Spark');
   assert.deepEqual(keyHit(api, ev('F', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'light' });
 });
 

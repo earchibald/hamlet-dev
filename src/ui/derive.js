@@ -182,8 +182,77 @@ function daysOfWood(){
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
   return fuel / (CLOCK.rate.pitBurn * DAY);
 }
+/* ---- the sky ---- A world made with `options.faith` is played. Everything here reads the sim's `faith`
+   record and never writes it. With faith off, or in the ages, each reading is empty. */
+const skyPlayed = () => !inAges() && options.faith === true;
+/* The living people who believe above the floor, out of all the living people, as the strip says it. */
+function believersText(){
+  const hs = humans();
+  return faithSay(SKY_TEXT.believers, { n: hs.filter(a => a.belief > FAITH.belief.floor).length, of: hs.length });
+}
+/* The Grace gauge. Its level says what the grace can buy: good when it covers the dearest miracle, warn
+   when it covers the cheapest, bad when it covers none. A forgotten sky can buy nothing, whatever it holds. */
+function graceGauge(){
+  if (!skyPlayed()) return null;
+  const g = faith ? faith.grace : 0, forgotten = !!(faith && faith.forgotten), costs = Object.values(FAITH.cost);
+  const level = forgotten || g < Math.min(...costs) ? 'bad' : g < Math.max(...costs) ? 'warn' : 'good';
+  return { v: Math.min(1, g / FAITH.graceCap), text: forgotten ? SKY_TEXT.forgotten : String(Math.floor(g)), level, believers: believersText() };
+}
+/* The open prayers of one camp, oldest first. */
+const campPrayers = (c = camp) => skyPlayed() && faith && c ? faith.prayers.filter(p => !p.end && p.camp === c.id) : [];
+/* A person's open prayer, or null. A person never has two. */
+const prayerOf = a => skyPlayed() && faith ? faith.prayers.find(p => !p.end && p.who === a.id) || null : null;
+/* The ids of everyone praying now, in any camp, for the mark over their heads. */
+function prayingNow(){
+  const out = {};
+  if (skyPlayed() && faith) for (const p of faith.prayers) if (!p.end) out[p.who] = true;
+  return out;
+}
+/* The sim's own prayer line, without its full stop, as a chip says it: "Aki prays for fire". */
+function prayerText(p){
+  const a = beingById(p.who);
+  return faithSay(FAITH_TEXT.pray[p.kind], { name: a ? a.name : FAITH_TEXT.someone }).replace(/\.$/, '');
+}
+/* The time a prayer has left: whole hours, or minutes in the last hour. */
+function timeLeft(ticks){
+  const t = Math.max(0, ticks);
+  const time = t >= hours(1) ? nOf(Math.round(t / hours(1)), 'hour', 'hours') : nOf(Math.max(1, Math.ceil(t / mins(1))), 'minute', 'minutes');
+  return faithSay(SKY_TEXT.left, { time });
+}
+/* The tools the player can use in this world, with their costs when the world is played. A miracle
+   tool is left out when faith is off. */
+const toolShown = t => !!t && (!t.faith || options.faith === true);
+function toolRows(){
+  return TOOLS.filter(toolShown).map(t => {
+    const cost = options.faith === true && t.act ? FAITH.cost[t.act] : null;
+    return { id: t.id, key: t.key, label: t.label, cost, hint: cost === null ? t.hint : `${t.hint} ${faithSay(SKY_TEXT.hintCost, { cost })}`, on: t.id === tool, pinned: t.id === tool && ui.sticky };
+  });
+}
+/* The speed after the page looks at the prayers. A prayer that is open and not yet seen brings a speed
+   above the days default down to it. Anything else leaves the speed alone. Pure: the caller keeps
+   `seen`, a plain object of prayer ids, and writes the speed. */
+function prayerSpeed(seen, prayers, s){
+  return s > DAYS_SPEED && prayers.some(p => !p.end && !seen[p.id]) ? DAYS_SPEED : s;
+}
+/* The season card: its title, its rows as label and value, and its one closing line. */
+const tallyTitle = t => faithSay(FAITH_TEXT.tally.ends, { season: t.season[0].toUpperCase() + t.season.slice(1) }).replace(/\.$/, '');
+function tallyRows(t){
+  const L = SKY_TEXT.tally;
+  return [[L.believers, `${t.believers} of ${t.people}`], [L.mean, String(t.meanBelief)], [L.answered, String(t.answered)], [L.ownHands, String(t.ownHands)],
+    [L.silent, String(t.silent)], [L.births, String(t.births)], [L.deaths, String(t.deaths)], [L.spent, String(t.spent)]];
+}
+function tallyClosing(t){
+  const C = SKY_TEXT.closing;
+  if (!t.believers) return C.forgotten;
+  if (!t.answered && !t.ownHands && !t.silent) return C.quiet;
+  if (t.ownHands > t.answered + t.silent) return C.learning;
+  if (t.answered > t.silent) return C.heard;
+  if (t.silent > t.answered) return C.unheard;
+  return C.even;
+}
+
 function gauges(){
-  if (inAges()) return { hearth: null, food: null, water: null, beds: null };
+  if (inAges()) return { grace: null, hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
   const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
@@ -192,7 +261,7 @@ function gauges(){
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
   const n = campHumans().length, beds = bedsFor();
   const bedsG = !camp.shelter ? null : { v: Math.min(1, beds / Math.max(1, n)), text: `${beds} for ${n}`, level: beds >= n ? 'good' : 'warn' };
-  return { hearth, food, water, beds: bedsG };
+  return { grace: graceGauge(), hearth, food, water, beds: bedsG };
 }
 
 /* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. 'cold:3:Ada is cold' mutes that one chip. */
@@ -200,7 +269,7 @@ const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${ty
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 /* A mute key as the player reads it. The chip's text may hold a colon, so only the first two are split on. */
-const ALERT_LABEL = { fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
+const ALERT_LABEL = { prayer: 'Prayer', fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
 function muteLabel(m){
   const i = m.indexOf(':'), j = i < 0 ? -1 : m.indexOf(':', i + 1);
   const type = i < 0 ? m : m.slice(0, i), kind = `${ALERT_LABEL[type] || type} alerts`;
@@ -257,6 +326,8 @@ function burningNearCamp(){
 function alerts(){
   if (inAges()) return [];
   const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
+  /* A prayer first: it is the one alert the player is asked to answer, so it takes Alt+1. */
+  for (const pr of campPrayers()) add('prayer', prayerText(pr), 'pray', { being: pr.who, after: timeLeft(pr.until - tick) });
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
   else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });
@@ -558,7 +629,7 @@ function footChip(){
 function viewKey(){
   if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
-  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
+  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text + (a.after || '')).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
@@ -673,6 +744,8 @@ function paletteRows(){
   for (const k of KEYMAP){
     if (k.focus === 'speedrow' || k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
     if (seen.has(k.label)) continue; seen.add(k.label);
+    /* A miracle is no command in a world that is only watched. */
+    if ((k.action === 'tool' || k.action === 'toolSticky') && !toolShown(TOOLS.find(t => t.id === k.arg))) continue;
     out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
   }
   for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
