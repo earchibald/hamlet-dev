@@ -58,7 +58,7 @@ function skyHelpHTML(){
   const H = SKY_TEXT.help, row = KEYMAP.find(k => k.action === 'slowForPrayers');
   const lines = H.lines.map(l => faithSay(l, { cap: FAITH.graceCap, ...FAITH.cost }));
   lines.push(faithSay(H.slow, { state: ui.slowForPrayers ? H.on : H.off, key: row ? keyName(row) : '', speed: SPEED_LABEL[DAYS_SPEED] }));
-  return `${options.faith === true ? '' : `<p class="muted">${esc(H.watched)}</p>`}<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+  return `${faithWorld() ? '' : `<p class="muted">${esc(H.watched)}</p>`}<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
 }
 /* The season's card: its rows as a small table and one closing line. Enter or Esc closes it. */
 function openTally(t){

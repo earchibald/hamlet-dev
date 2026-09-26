@@ -184,7 +184,10 @@ function daysOfWood(){
 }
 /* ---- the sky ---- A world made with `options.faith` is played. Everything here reads the sim's `faith`
    record and never writes it. With faith off, or in the ages, each reading is empty. */
-const skyPlayed = () => !inAges() && options.faith === true;
+/* True for a world made to be played. The page builds its tools before the first world exists, when
+   `options` is still unset, so this never reads a field of it blind. */
+const faithWorld = () => !!options && options.faith === true;
+const skyPlayed = () => !inAges() && faithWorld();
 /* The living people who believe above the floor, out of all the living people, as the strip says it. */
 function believersText(){
   const hs = humans();
@@ -221,10 +224,10 @@ function timeLeft(ticks){
 }
 /* The tools the player can use in this world, with their costs when the world is played. A miracle
    tool is left out when faith is off. */
-const toolShown = t => !!t && (!t.faith || options.faith === true);
+const toolShown = t => !!t && (!t.faith || faithWorld());
 function toolRows(){
   return TOOLS.filter(toolShown).map(t => {
-    const cost = options.faith === true && t.act ? FAITH.cost[t.act] : null;
+    const cost = faithWorld() && t.act ? FAITH.cost[t.act] : null;
     return { id: t.id, key: t.key, label: t.label, cost, hint: cost === null ? t.hint : `${t.hint} ${faithSay(SKY_TEXT.hintCost, { cost })}`, on: t.id === tool, pinned: t.id === tool && ui.sticky };
   });
 }

@@ -89,6 +89,15 @@ test('the believers count is the living people above the floor, out of the livin
   assert.match(api.toolsHTML(), /Rain/, 'sanity: the strip helpers are loaded');
 });
 
+/* initUI builds the tool buttons before the first world is made, while `options` is still unset. The
+   first build threw there in Safari, and the page never started. */
+test('the tools can be read before any world exists', () => {
+  const api = loadUI(FILES, NAMES, EXTRA);
+  assert.equal(api.options, undefined, 'no world yet');
+  assert.deepEqual(api.toolRows().map(t => t.id), ['inspect', 'light', 'nudge']);
+  assert.doesNotThrow(() => api.toolsHTML());
+});
+
 test('with faith off there is no gauge, no prayer chip, and no miracle tool', () => {
   const { api, a } = world(false);
   assert.equal(api.graceGauge(), null);
