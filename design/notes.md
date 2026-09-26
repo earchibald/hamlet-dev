@@ -77,7 +77,7 @@ Skills: gather, build, cook, trap, craft, woodcut, hunt, wary. Animals use hunt 
 
 Urgent needs interrupt work. A need task in progress is never interrupted by another need. A person with two urgent needs once flipped between drink and eat every tick and died next to water. Sitting by the fire is the one exception: a person low on food or water is sent to eat or drink even mid-sit, because sitting restores neither, and a person once starved that way. The search for water stopped after 3000 tiles, and a camp founded 59 steps from the nearest river let two people die of thirst beside a full stash; a failed near search now walks the whole world once and covers the first stretch, as pathToStop does.
 
-Filling the waterskin had the same fault and now has the same fix: a camp 90 tiles from the river (seed moss-crag-87) failed the fill search on 268 of 280 tries, and its stash was empty for most of 16 days.
+Filling the waterskin had the same fault, and now has the same fix. A camp 90 tiles from the river (seed moss-crag-87) failed the fill search on 268 of 280 tries. Its stash was empty for most of 16 days.
 
 ## 6. Daily rhythms
 
