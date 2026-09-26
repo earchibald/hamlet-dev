@@ -10,7 +10,7 @@ function loadUI(files, names){
   return Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'dialogs', 'actions'];
-const NAMES = ['ageText', 'campValleyRow', 'valleyName', 'nOf'];
+const NAMES = ['ageText', 'campValleyRow', 'valleyName', 'gauges'];
 
 /* Fell one pine by hand: the chop's last stroke, as the task's own stop runs it. */
 function fell(api, a){
@@ -85,4 +85,41 @@ test('the Camp drawer and the inspect window use the helpers', () => {
   assert.ok(/campValleyRow\(\)/.test(panels), 'the valley row reads campValleyRow');
   assert.ok(/ageText\(ageDays\(a\)\)/.test(inspect), 'a being\'s age in the inspect window reads ageText');
   assert.ok(!/Math\.floor\(ageDays\(a\)\)\} days/.test(inspect), 'and not a bare count of days');
+});
+
+/* A camp with a lit pit beside its first person, and one sprite, one wolf, and one deer, each one
+   tile from the pit. Every other creature of those kinds is dead, so the nearest one is ours. */
+function campAtOne(){
+  const api = loadUI(FILES, NAMES);
+  api.startWorld('r');
+  const a = api.beings.find(b => b.species === 'human');
+  const pit = [a.x, a.y];
+  api.camp.pit = pit; api.camp.site = pit; api.camp.stashTile = pit;
+  api.tileAt(pit[0], pit[1], 0).struct = { type: 'firepit', fuel: 200, lit: true };
+  api.camp.fae.known = true; api.camp.tools.spear = 1;
+  for (const b of api.beings) if (['sprite', 'wolf', 'deer'].includes(b.species)) b.alive = false;
+  for (const sp of ['sprite', 'wolf', 'deer']){ const b = api.makeBeing(sp, pit[0] + 1, pit[1], sp, 0); b.z = 0; api.beings.push(b); }
+  return api;
+}
+const goalText = (api, id) => api.goalState(api.GOALS.find(g => g.id === id)).text;
+
+test('goal texts say one stick, one log, and one tile', () => {
+  const api = campAtOne();
+  api.camp.stash.stick = 1; api.camp.stash.log = 1;
+  assert.match(goalText(api, 'fire'), /Woodpile: 1 stick, 1 log\./);
+  api.camp.stash.stick = 3; api.camp.stash.log = 2;
+  assert.match(goalText(api, 'fire'), /Woodpile: 3 sticks, 2 logs\./);
+  assert.match(goalText(api, 'faefight'), /^A sprite is 1 tile from the fire\./);
+  assert.match(goalText(api, 'guard'), /^A wolf is 1 tile from the fire\./);
+  assert.match(goalText(api, 'deer'), /^Deer within 1 tile\./);
+});
+
+test('the hearth gauge says one day of wood', () => {
+  const api = campAtOne();
+  const p = api.tileAt(api.camp.pit[0], api.camp.pit[1], 0).struct;
+  api.camp.stash.stick = 0; api.camp.stash.log = 0;
+  p.fuel = 1.5 * api.CLOCK.rate.pitBurn * api.DAY;
+  assert.equal(api.gauges().hearth.text, '1 day of wood');
+  p.fuel = 2.5 * api.CLOCK.rate.pitBurn * api.DAY;
+  assert.equal(api.gauges().hearth.text, '2 days of wood');
 });
