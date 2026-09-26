@@ -72,7 +72,7 @@ The best part of this loop is that the simulation's own growth is the difficulty
 | A child's belief | The mean of the parents | Belief is taught. |
 | Belief fades | 1 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. No loss takes belief under the floor. That holds for the daily fade, for a prayer the sky left unanswered, and for a trouble the people met by their own hands. Seeing a miracle, or an answered prayer, can lift belief again. |
 | Seeing a miracle | +2 belief, at most once a day for each person | A person who stands within 10 tiles sees it. Two Sparks in one evening do not buy belief twice. |
-| Grace at the start | 30 | Enough for one Spark, so the first fire prayer can be answered. At 0, the founder had only 4 grace by the first evening, and the first prayer was always silent. |
+| Grace at the start | 30 | Enough for one Spark, so the first fire prayer can be answered. At 0, and at the first income rate, the founder had only 4 grace by the first evening, and the first prayer was always silent. |
 | Grace income | Each person gives belief / 200 grace each world hour | A camp of five at belief 60 gives 1.5 grace an hour, or 36 a day. At twice this rate, grace sat at the cap for most of an eight-day run, and no prayer forced a choice. |
 | Grace cap | 100 | The player cannot hoard. Unspent grace is wasted, which pushes the player to act. |
 
@@ -104,7 +104,7 @@ A camp has at most one prayer of each kind open at a time. A trouble that goes o
 | Rain | R | 40 | A storm starts now. | Rain soaks everyone who is not under a roof, and the pit burns faster in the rain. |
 | Ward | D | 15 | Every wolf and fox near the spot flees, and keeps away from it for a day. With no wolf or fox near the spot, it is refused and costs nothing. | It does not kill them. They come back hungry. |
 | Beckon | B | 20 | Up to 4 deer and rabbits within 60 tiles walk toward the spot. With no deer or rabbit near enough, it is refused and costs nothing. At 30 tiles, the nearest animal was 45 to 66 tiles from a hungry camp, and every Beckon was refused. | Wolves hunt what they follow. |
-| Calm | L | 25 | The storm ends now, as if it had ended on its own. The next storm still comes when it would have. With no storm, the Calm is refused and costs nothing: "The sky is already clear." | The rain that was quenching a wildfire stops too. |
+| Calm | L | 25 | The storm ends now, as if it had ended on its own. The next storm is counted from now, so it comes sooner. With no storm, the Calm is refused and costs nothing: "The sky is already clear." | The rain that was quenching a wildfire stops too. |
 | Nudge | N | 0 | The old nudge. It stays free. | Nothing. |
 
 Every miracle passes the door, so it is logged and replays.
@@ -125,7 +125,7 @@ The second row is the important one. A camp that learns to cope alone slowly sto
 
 ### 3.5 The story camera (built, with a switch)
 
-When a new prayer arrives and the game runs faster than 8x, the speed drops to 8x. The switch is "Slow for prayers" in the help page, and it is on by default. Review P1 rejected an automatic pause for the first fire. This is not a pause. It is a drop to the default speed, only for a prayer, and the player can turn it off.
+When a new prayer arrives and the game runs faster than 8x, the speed drops to 8x. The P key switches it, the help page says whether it is on, and it is on by default. Review P1 rejected an automatic pause for the first fire. This is not a pause. It is a drop to the default speed, only for a prayer, and the player can turn it off.
 
 ### 3.6 Seasons as chapters (built)
 
@@ -163,3 +163,22 @@ Each spring, the camp asks for a vow: "Keep us all through winter", "Give us a s
 - A prayer draws no random number. The miracles draw none of their own either, except through the rules they start (a storm's end, a fleeing wolf's path), and those are replayed from the door log.
 - Every new behaviour has a chronicle line, a thought, a chip, or a card row.
 - Every miracle is a door act, and every door act is logged.
+
+## 5. How it plays, measured, and what is not solved
+
+The broad review played seeds r and moss-crag-87 for 10 world days each, twice. An attentive script answered every open prayer with the right miracle when grace allowed. An absent script did nothing.
+
+| Seed | Sky | Prayers and how they ended | Grace low / high, share at the cap | Belief range | People | Forgotten |
+|---|---|---|---|---|---|---|
+| r | attentive | fire, wolf, hunger: all answered | 17 / 100, 3% | 16 to 98 | 6 | never |
+| r | absent | fire silent 3 times, hunger by their own hands | 30 / 74, 0% | 5 to 40 | 4 | days 3.3 to 4.1 |
+| moss-crag-87 | attentive | fire, wolf twice, hunger twice, storm: answered; one hunger ran out of time | 13 / 85, 0% | 15 to 85 | 5 | never |
+| moss-crag-87 | absent | fire silent twice, storm silent | 30 / 89, 0% | 5 to 40 | 7 | days 2.5 to 3.1 |
+
+The hunger prayer that ran out of time had a Beckon that landed, and it ended as silent. That was a fault. A miracle that landed near the trouble after the prayer opened now counts as an answer at the deadline, with its own line.
+
+**Not solved.** The loop works, and an attentive sky and an absent one give plainly different valleys. The loop does not yet force hard choices. Grace was never short when a prayer opened. After the first fire, a camp can go five or six days without a prayer. On seed r over 20 days, the camp grew to 20 people, and grace sat at the cap 36% of the time. Income grows with the population faster than trouble does. Try these levers in order:
+
+1. Trouble grows with the camp: prayers per person, not per camp and kind.
+2. Vows (3.12): a standing demand each season, so that grace has a use when nobody prays.
+3. Rival gods (3.10): a second sky answers the prayers you leave and takes the belief with it.

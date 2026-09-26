@@ -1,5 +1,7 @@
 # Plan: the sky plays (faith, prayers, miracles, chapters)
 
+> This is the plan as it was dispatched. Reviews changed several numbers and rules after it: the fade is 1 a day, a witness gains once a day, there are five miracles (Calm was added), and prayers renew daily. The proposal and `design/notes.md` section 21 hold the rules as built.
+
 The proposal is `design/proposals/2026-09-26-the-sky-plays.md`. Read it first: its tables are the spec. This plan says where each piece goes. Branch `game-loop`, worktree `/Users/earchibald/Worktrees/hamlet-game-loop`.
 
 ## Invariants (every task)
