@@ -436,7 +436,9 @@ const ACTIONS = {
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
-  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  /* A speed key, a speed button, and the palette all end here, so this is the one place a days speed
+     counts as the player's choice. The pace of the ages is not a days speed and sets no marker. */
+  speed(s){ if (inAges()) setPace(s); else { ui.speedChosen = true; setSpeed(s); } setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },

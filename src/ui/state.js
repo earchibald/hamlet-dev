@@ -27,9 +27,8 @@ let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = nu
 /* The speed the days open at when the player has none saved. At 1x a world day takes 24 real minutes
    and the first fire pit about 4, so a new player waited through a still valley. 8x brings the pit in
    about half a minute and a day in 3 minutes. It is not 64x, because at 64x a chronicle line is gone in
-   about a second, and the first fire is the line a new player must not miss. A speed read back from
-   storage wins over this one, so a returning player keeps the speed they left at. It must be a rung of
-   SPEEDS, or setSpeed throws. */
+   about a second, and the first fire is the line a new player must not miss. A speed the player chose
+   wins over this one: see ui.speedChosen. It must be a rung of SPEEDS, or setSpeed throws. */
 const DAYS_SPEED = 8;
 let speed = DAYS_SPEED, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
@@ -108,6 +107,10 @@ const ui = {
   chronSearch: '',
   note: null,          /* { text, at }: a said message that holds the foot for four seconds */
   savedSpeed: 0,       /* from storage, applied by newWorld */
+  /* True once the player picks a days speed with a key, a button, or the palette. Only ACTIONS.speed sets
+     it, and restore() reads it back. restore() honours a saved speed only when it is set: before this
+     marker, every page load saved speed 1 on its own, and that 1 was never the player's choice. */
+  speedChosen: false,
   windows: [],         /* floating windows: { id, kind, target, x, y, w, h } */
   nextWin: 1,
   rects: {},           /* remembered rect per window kind or drawer id, from storage */
@@ -176,7 +179,7 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -188,7 +191,7 @@ function restore(){
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
-    if (SPEEDS.includes(s.speed)) ui.savedSpeed = s.speed;
+    if (s.speedChosen === true && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
     if (s.rects && typeof s.rects === 'object') ui.rects = s.rects;
     if (Array.isArray(s.recent)) ui.recent = s.recent.filter(l => typeof l === 'string').slice(0, 5);
   } catch (e) { /* no storage, or bad data */ }
