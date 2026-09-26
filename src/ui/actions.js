@@ -246,7 +246,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -366,7 +366,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
@@ -444,7 +444,10 @@ const ACTIONS = {
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
-  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  /* A speed key, a speed button, and the palette all end here, so this is the one place a days speed
+     counts as the player's choice. savedSpeed follows it, or a load would go back to the speed read at
+     page load. The pace of the ages is not a days speed and sets no marker. */
+  speed(s){ if (inAges()) setPace(s); else { ui.speedChosen = true; ui.savedSpeed = s; setSpeed(s); } setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },

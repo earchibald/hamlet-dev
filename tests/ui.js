@@ -489,12 +489,11 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
   }
 });
 
-/* Four init sites hand a hard-coded 1 to the guarded doors:
-     src/ui/actions.js:90    setPace(1)
-     src/ui/actions.js:159   setSpeed(ui.savedSpeed || speed || 1)
-     src/ui/actions.js:222   setSpeed(ui.savedSpeed || speed || 1)
-     src/ui/main.js:142      setSpeed(1)
-   The guard throws on a value off its ladder, so a ladder edited to drop 1 does not give the player
+/* Three init sites hand a hard-coded value to the guarded doors, 1 to the pace and DAYS_SPEED to the speed:
+     src/ui/actions.js       setPace(1)                                   in newWorld
+     src/ui/state.js         let speed = DAYS_SPEED                       read by onLoad and onSettle
+     src/ui/main.js          setSpeed(DAYS_SPEED)                         in initUI
+   The guard throws on a value off its ladder, so a ladder edited to drop that value does not give the player
    a wrong speed. It gives them a blank page, because the throw lands on the startup path.
    These two assertions are the only thing that catches that. Every other reference to either ladder
    indexes it — PACES[1], SPEEDS[1], SPEEDS.forEach — and an index survives 1 leaving.
@@ -503,9 +502,9 @@ test('every speed button sits in #speeds and carries both attributes, each is a 
    ladder edit is read. Delete either, edit its ladder, and the suite stays green while the page
    stops opening. */
 test('the value the init path hands each door is a rung of that door’s ladder', () => {
-  const api = loadUI(['state'], ['PACES', 'SPEEDS']);
+  const api = loadUI(['state'], ['PACES', 'SPEEDS', 'DAYS_SPEED']);
   assert.ok(api.PACES.includes(1), 'the ages open with setPace(1), so 1 must be a rung of PACES or the first frame throws');
-  assert.ok(api.SPEEDS.includes(1), 'the days open with setSpeed(1) and the `|| 1` fallback, so 1 must be a rung of SPEEDS or the first frame throws');
+  assert.ok(api.SPEEDS.includes(api.DAYS_SPEED), 'the days open with setSpeed(DAYS_SPEED), and speed starts at DAYS_SPEED, so DAYS_SPEED must be a rung of SPEEDS or the first frame throws');
 });
 
 /* The guard at the door, for the routes a template scan cannot see: a direct call, and any call site
