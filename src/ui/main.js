@@ -25,7 +25,8 @@ function frame(now){
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
          leaves no backlog for a later one to run in one burst.
          The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
-      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
+      /* The days hold while the season's card is open, so the chapter does not run on behind it. */
+      else if (!holdDays()){ acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
@@ -44,6 +45,9 @@ function frame(now){
     /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
     if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    /* A world played as the sky: a new prayer can slow the game, and a season's end opens its card.
+       Every frame, so a prayer at 256x is heard within one frame of world time. */
+    notePrayers(); noteTallies();
     pruneTrails(now);
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
@@ -62,7 +66,8 @@ function initUI(){
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
+  /* The tools depend on the world: its miracles show only when it is played. renderUI writes them again. */
+  setHTML($('tools'), toolsHTML());
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
   $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(inAges() ? b.dataset.pace : b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
@@ -75,19 +80,21 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
-     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
-     typed seed survives Take a god the same way it already does Make world. */
+  /* The Play as the sky, Watch the valley, and Take a god buttons carry value="make", value="watch", and
+     value="take". Esc closes the dialog with an empty returnValue and keeps the world. Every path reads
+     the seed box once, here, so a typed seed survives each of them. Play makes a world with faith on,
+     Watch one with faith off. Take a god is the Become slice, and its world is watched. */
   $('start').addEventListener('close', () => {
     setFocus('map'); const rv = $('start').returnValue; $('start').returnValue = '';
-    if (rv === 'make' || rv === 'take'){
+    if (rv === 'make' || rv === 'watch' || rv === 'take'){
       const seed = $('seed').value.trim() || randomSeed();
-      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+      if (rv === 'take') ACTIONS.takeGod(seed); else newWorld(seed, { faith: rv === 'make' });
     }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('tallyClose').addEventListener('click', ACTIONS.closeTally);
   $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
   $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
@@ -198,7 +205,8 @@ function initUI(){
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });
   setTool('inspect');
-  newWorld(randomSeed());
+  /* The world behind the start dialog is played, as Enter would make it, so Esc keeps the default. */
+  newWorld(randomSeed(), { faith: true });
   if (!ui.savedSpeed) setSpeed(DAYS_SPEED); /* newWorld's restore() must read storage before any persist() can overwrite it */
   /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
   offerContinue();

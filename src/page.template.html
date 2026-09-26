@@ -92,6 +92,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip kbd{margin:0;opacity:.7}
 .chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.chip.pray{color:var(--map-god);border-color:color-mix(in srgb,var(--map-god) 60%,transparent)}
+.chip .left{opacity:.75}
+.gauge .believers{color:var(--muted)}
+#tools .cost{margin-left:5px;opacity:.7;font-size:11px}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel);--drawer-w:330px;--drawer-right:52px;--drawer-gap:10px}
@@ -287,7 +291,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Play as the sky<kbd>Enter</kbd></button><button class="btn" id="watchWorld" value="watch">Watch the valley<kbd>Alt+W</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
+  <p class="muted">Play as the sky: the people pray to you, and every miracle costs grace. Watch the valley: nobody prays, and the fire costs nothing.</p>
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
 </dialog>
@@ -300,6 +305,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
 <input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">
+  <h2>Playing as the sky</h2>
+  <div id="helpSky"></div>
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
   <p class="muted">[ and ] show more or fewer ages while the timeline is focused. Elsewhere they change level.</p>
@@ -314,7 +321,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   </div>
   <h2>Things to try</h2>
   <ul id="tips">
-    <li>Wait for the fire pit, then use Light fire on it. Then strike the grass instead and compare.</li>
+    <li>Wait for the fire pit, then use Spark on it. Then strike the grass instead and compare.</li>
     <li>Let the fire go out. Watch the goals, the moods, and who comes to fix it.</li>
     <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
     <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
@@ -329,6 +336,13 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the tabs in the strip.</li>
   </ul>
   <p><button class="btn" id="helpClose">Close<kbd>Esc</kbd></button></p>
+</dialog>
+<!-- The season's card, for a world played as the sky. Filled by openTally in src/ui/dialogs.js. -->
+<dialog id="tally" aria-labelledby="tallyTitle">
+  <h2 id="tallyTitle"></h2>
+  <table class="kv" id="tallyRows"></table>
+  <p id="tallyLine"></p>
+  <p><button class="btn" type="button" id="tallyClose">Go on<kbd>Enter</kbd></button></p>
 </dialog>
 <dialog id="mute">
   <h2 id="muteTitle">Mute</h2>
