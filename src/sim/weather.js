@@ -46,7 +46,11 @@ function tryLightning(){
     if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
-      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
+      /* A strike near a camp takes a pine with open ground beside it: a lone tree or the edge of a wood.
+         A pine deep in a wood has only trees around it, and a tree is solid, so nobody can stand beside
+         the fire to take an ember from it. On seed moss-crag-87 every strike near the camp in twenty
+         days fell inside the pine wood, and the lone founder waited by a cold pit until they died. */
+      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0 && nearFind(t.x, t.y, q => passable(q.x, q.y, q.z), DIRS)) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
       if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
     }

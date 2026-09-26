@@ -91,8 +91,10 @@ TASKS.fetchEmber = { type: 'ember',
     const pit = pitTile().struct; a.carrying = null;
     if (pit.fuel <= 0) return 'fail';
     if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
+    /* The first fire is not "back": the pit was never lit. Both lines keep "sets the ember", which the soak counts. */
+    const first = !camp.everLit;
     pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
-    log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major', 'fire');
+    log(first ? `${a.name} sets the ember in the pit. The wood catches, and the camp has a hearth.` : `${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major', 'fire');
     addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
     return 'done';
   }] };

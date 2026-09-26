@@ -3106,8 +3106,10 @@ TASKS.fetchEmber = { type: 'ember',
     const pit = pitTile().struct; a.carrying = null;
     if (pit.fuel <= 0) return 'fail';
     if (pit.lit){ log(`${a.name} adds the ember to a fire someone else already lit.`, [a]); return 'done'; }
+    /* The first fire is not "back": the pit was never lit. Both lines keep "sets the ember", which the soak counts. */
+    const first = !camp.everLit;
     pit.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
-    log(`${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major', 'fire');
+    log(first ? `${a.name} sets the ember in the pit. The wood catches, and the camp has a hearth.` : `${a.name} sets the ember in the pit. The fire is back, and nobody waited for the sky.`, campHumans(), 'major', 'fire');
     addThought(a, 'rekindled', 'Brought fire home', 10, CLOCK.thought.rekindled); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
     return 'done';
   }] };
@@ -4864,8 +4866,8 @@ const GOALS = [
       const p = t.struct;
       if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${camp.stash.stick} sticks${camp.stash.log ? `, ${camp.stash.log} logs` : ''}.` };
       const blaze = nearbyBlaze();
-      if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
-      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
+      if (blaze && p.fuel > 0) return { s: 'active', text: 'Cold, but something is burning nearby. Someone can fetch an ember.' };
+      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: light it yourself, or wait for lightning to strike near the camp in a storm.' : 'Cold and empty. Sticks first, then fire.' };
     },
     offers(a){
       const t = pitTile(); if (!t) return []; const p = t.struct; const out = [];
@@ -5311,7 +5313,11 @@ function tryLightning(){
     if (rng() < rollFor(out ? CLOCK.rate.lightningOut : CLOCK.rate.lightningLit, CLOCK.every.cellular)){
       const sc = secOf(...camp.site), sx = clamp(sc.sx + rint(3) - 1, 0, SW - 1), sy = clamp(sc.sy + rint(3) - 1, 0, SH - 1);
       let hit = null;
-      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0) hit = t; }
+      /* A strike near a camp takes a pine with open ground beside it: a lone tree or the edge of a wood.
+         A pine deep in a wood has only trees around it, and a tree is solid, so nobody can stand beside
+         the fire to take an ember from it. On seed moss-crag-87 every strike near the camp in twenty
+         days fell inside the pine wood, and the lone founder waited by a cold pit until they died. */
+      for (let k = 0; k < 60 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (t.feature === 'tree' && t.fire <= 0 && nearFind(t.x, t.y, q => passable(q.x, q.y, q.z), DIRS)) hit = t; }
       for (let k = 0; k < 40 && !hit; k++){ const t = tileAt(sx * LW + rint(LW), sy * LH + rint(LH)); if (tileFuel(t) > 0 && t.fire <= 0) hit = t; }
       if (hit && ignite(hit)){ hit.fire = Math.max(hit.fire, CLOCK.fire.strikeFuel); log(`Lightning strikes ${hit.feature === 'tree' ? 'a pine' : 'the ground'} in the ${sectors[secIdx(sx, sy)].name.toLowerCase()} near the camp. Something is burning.`, campHumans(), out ? 'good' : 'bad', 'fire'); }
     }

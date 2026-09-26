@@ -167,8 +167,8 @@ const GOALS = [
       const p = t.struct;
       if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${camp.stash.stick} sticks${camp.stash.log ? `, ${camp.stash.log} logs` : ''}.` };
       const blaze = nearbyBlaze();
-      if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
-      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
+      if (blaze && p.fuel > 0) return { s: 'active', text: 'Cold, but something is burning nearby. Someone can fetch an ember.' };
+      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: light it yourself, or wait for lightning to strike near the camp in a storm.' : 'Cold and empty. Sticks first, then fire.' };
     },
     offers(a){
       const t = pitTile(); if (!t) return []; const p = t.struct; const out = [];
