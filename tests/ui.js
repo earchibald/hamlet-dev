@@ -1546,16 +1546,18 @@ test('the timeline lights nothing on an age-end beat: unmake and backstop run af
 });
 
 test('the header names the span from the model, not the raw age, and says so before any age has run', () => {
-  const api = loadUI(['state', 'derive'], TL_API);
+  const api = loadUI(['state', 'derive'], [...TL_API, 'ageSpanName']);
   api.startCreation('gamma', {});
   const before = api.timelineModel();
   assert.equal(before.now, 0, 'no age has run yet');
   assert.equal(before.from, 1); assert.equal(before.to, 1);
+  assert.equal(before.head, 'Before the first age', 'the head says so plainly before the first age');
   for (let n = 0; n < 8; n++) api.step();
   const after = api.timelineModel();
   assert.equal(after.to, after.now, 'to is the live age once the creation has run');
+  assert.equal(after.head, api.ageSpanName(after.from, after.to), 'the head names the span, counted from the Pulse');
   const src = fs.readFileSync('src/ui/timeline.js', 'utf8');
-  assert.match(src, /m\.now === 0 \? 'Before the first age' : `Age \$\{m\.from\} to \$\{m\.to\}`/, 'the head prints the span, and says so plainly before the first age');
+  assert.match(src, /span\.textContent = m\.head;/, 'timeline.js draws the model head');
 });
 
 test('a chip opens the matrix that produced it, unsorted and unscored by the view', () => {
@@ -1572,14 +1574,14 @@ test('a chip opens the matrix that produced it, unsorted and unscored by the vie
 });
 
 test('an opened chip says who weighed what, and what it took', () => {
-  const api = loadUI(['state', 'derive'], ['footChip', 'ui', 'creation', 'startCreation', 'step']);
+  const api = loadUI(['state', 'derive'], ['footChip', 'ageName', 'ui', 'creation', 'startCreation', 'step']);
   api.startCreation('gamma', {});
   for (let n = 0; n < 8; n++) api.step();
   assert.equal(api.footChip(), null, 'nothing is open');
   const rec = api.creation.choices.find(c => !c.continued && c.picked && c.opts.length > 1);
   api.ui.timelineChip = `${rec.age}:${rec.god}`;
   const f = api.footChip();
-  assert.match(f.head, new RegExp(`Age ${rec.age}`));
+  assert.ok(f.head.startsWith(`${api.ageName(rec.age)}. `), f.head);
   assert.match(f.head, new RegExp(rec.picked));
   assert.equal(f.rows.length, Math.min(4, rec.opts.length), 'at most four rows');
   assert.equal(f.rows[0].type, rec.opts[0].type, "in the record's own order");
