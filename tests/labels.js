@@ -44,10 +44,11 @@ test('"Logs at last." is said for the first pine a camp fells, and not again', (
 
 test('a being\'s age reads in days, then seasons, then years', () => {
   const api = loadUI(FILES, NAMES);
-  const season = api.YEAR_DAYS / api.SEASONS.length;
+  assert.deepEqual(api.SEASON_LENGTHS, [91, 91, 91, 92], 'the cases below are written for these season lengths');
   const cases = [
     [0, '0 days'], [0.9, '0 days'], [1, '1 day'], [1.5, '1 day'], [2, '2 days'], [32, '32 days'],
-    [Math.ceil(season) - 1, `${Math.ceil(season) - 1} days`], [Math.ceil(season), '1 season'], [2 * season + 3, '2 seasons'],
+    [90, '90 days'], [91, '1 season'], [92, '1 season'], [181, '1 season'], [182, '2 seasons'], [183, '2 seasons'],
+    [272, '2 seasons'], [273, '3 seasons'], [364, '3 seasons'],
     [api.YEAR_DAYS - 1, '3 seasons'], [api.YEAR_DAYS, '1 year'], [2 * api.YEAR_DAYS - 1, '1 year'],
     [2 * api.YEAR_DAYS, '2 years'], [70 * api.YEAR_DAYS + 200, '70 years'],
   ];
@@ -80,7 +81,11 @@ test('the Camp drawer and the inspect window use the helpers', () => {
   const panels = fs.readFileSync(path.join(__dirname, '../src/ui/panels.js'), 'utf8');
   const inspect = fs.readFileSync(path.join(__dirname, '../src/ui/inspect.js'), 'utf8');
   assert.ok(!/\$\{c\.age\} days/.test(panels), 'the camp age no longer prints a bare "days"');
-  assert.ok(/\['Age', nOf\(c\.age, 'day', 'days'\)\]/.test(panels), 'the camp age uses nOf');
+  assert.ok(/\['Age', ageText\(c\.age\)\]/.test(panels), 'the camp age uses ageText, so a year-old camp reads "1 year"');
+  assert.equal((panels.match(/campValleyRow\(\)/g) || []).length, 1, 'the drawer asks campValleyRow once');
+  const dialogs = fs.readFileSync(path.join(__dirname, '../src/ui/dialogs.js'), 'utf8');
+  assert.ok(!/describe\(valley, 'valley'\)/.test(dialogs), 'the help page no longer falls back to "the valley"');
+  assert.ok(/\$\{valleyName\(\) \? `<li>This valley: \$\{esc\(valleyName\(\)\)\}\.<\/li>` : ''\}/.test(dialogs), 'the help page has a valley line only once the name is known');
   assert.ok(!/describe\(valley, 'valley'\)/.test(panels), 'the valley row no longer falls back to "the valley"');
   assert.ok(/campValleyRow\(\)/.test(panels), 'the valley row reads campValleyRow');
   assert.ok(/ageText\(ageDays\(a\)\)/.test(inspect), 'a being\'s age in the inspect window reads ageText');

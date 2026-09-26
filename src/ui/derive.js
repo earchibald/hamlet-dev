@@ -376,15 +376,19 @@ function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 /* An age, said as people say one: years once a being has lived one, seasons for the months before
    that, and days for the first season. Every place that gives a being's age uses this, so the words
    agree. LIFE is still written in days on this branch, so today a person reads in days; the words
-   turn to years with no change here once LIFE is written in years. */
+   turn to years with no change here once LIFE is written in years. The seasons are counted off the
+   calendar's own lengths, SEASON_LENGTHS, not an average: with an average of 91.25 days, day 182
+   read "1 season" though the calendar had turned twice. */
 function ageText(days){
-  const d = Math.max(0, Math.floor(days)), season = YEAR_DAYS / SEASONS.length;
+  const d = Math.max(0, Math.floor(days));
   if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
-  if (d >= season) return nOf(Math.floor(d / season), 'season', 'seasons');
-  return nOf(d, 'day', 'days');
+  let seasons = 0, end = 0;
+  for (const len of SEASON_LENGTHS){ end += len; if (d >= end) seasons++; else break; }
+  return seasons ? nOf(seasons, 'season', 'seasons') : nOf(d, 'day', 'days');
 }
 /* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
-   row that said "the valley" told the player nothing, so until then there is no row. */
+   row that said "the valley" told the player nothing, so until then there is no row. The help page's
+   valley line follows the same rule. */
 const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
 
 function campSummary(){
