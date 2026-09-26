@@ -36,6 +36,11 @@ function reachable(sx, sy, sz, cap = 4000){
   }
   return new Set(q);
 }
+/* Water close enough to drink from or to fill a waterskin at. */
+function besideWater(x, y, z){ return !!nearFind(x, y, t => t.ground === 'water', NEAR, z); }
+/* A camp can stand far from any water. When the near search fails, search the whole world once and walk
+   the first stretch of 48 steps, as pathToStop does. Drinking and filling the waterskin both use it. */
+function pathToFarWater(a){ const q = bfs(a.x, a.y, a.z, besideWater, NZ * W * H, a); return q ? q.slice(0, 48) : null; }
 /* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
 function pathToStop(a, tx, ty, within, tz = 0){
   if (nearAt(a, tx, ty, tz) <= within) return [];
