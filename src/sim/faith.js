@@ -225,9 +225,12 @@ const PRAYERS = {
 };
 
 /* ---------- the tick ---------- */
+/* The people get their beliefs at once, and not at the first period: the strip read "0 of 1 believe" for
+   the first ten world minutes. faithTick still gives one to each person who arrives later. No random number. */
 function startFaith(){
   faith = { grace: FAITH.graceStart, spent: 0, prayers: [], signs: [], tallies: [], troubles: {}, forgotten: false, nextPrayer: 1,
     season: seasonOf(), since: freshTally() };
+  giveBeliefs();
 }
 function freshTally(){ return { answered: 0, ownHands: 0, silent: 0, births: 0, deaths: 0, spent: 0, tick }; }
 /* True when the rules should run: a world made to be played, in the days. It starts the record the

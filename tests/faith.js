@@ -73,6 +73,23 @@ test('belief starts at 40 for the founder, 20 for a newcomer, and the mean of th
   assert.equal(a.belief, 40); assert.equal(n.belief, 20); assert.equal(k.belief, 30);
 });
 
+/* Beliefs were given only at a faith period, so for the first ten world minutes the strip read
+   "0 of 1 believe". They are given when faith starts, and that draws no random number. */
+test('beliefs are given as soon as faith starts, before the first period, with no random number drawn', () => {
+  const api = load(); api.startWorld('r', { faith: true });
+  const a = api.firstPerson();
+  assert.equal(api.faith, null, 'sanity: faith has not started');
+  api.step();
+  assert.ok(api.tick % api.CLOCK.faith.every !== 0, `sanity: tick ${api.tick} is not a faith period`);
+  assert.ok(api.faith, 'the first tick of the days starts faith');
+  assert.equal(a.belief, api.FAITH.belief.founder, 'the founder believes from the first tick');
+  const b = load(); b.startWorld('r', { faith: true });
+  const c = load(); c.startWorld('r', { faith: true });
+  b.startFaith();
+  assert.equal(b.firstPerson().belief, api.FAITH.belief.founder);
+  assert.equal(b.rng(), c.rng(), 'startFaith drew a random number');
+});
+
 test('grace comes from belief each hour, and stops at the cap', () => {
   const { api, a, pit } = playCamp(); pit.struct.fuel = 0;
   at(api, 2, 9); period(api);
