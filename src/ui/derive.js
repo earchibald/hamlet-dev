@@ -22,7 +22,6 @@ const inAges = () => era === 'gods';
 function ladder(){ return inAges() ? PACES : SPEEDS; }
 /* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
 const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
-const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 /* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
@@ -177,7 +176,7 @@ function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
-  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${Math.floor(wood)} days of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
+  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
   const meals = stashFood() + camp.stash.fish * 2, aim = foodTarget();
   const food = !camp.site ? null : { v: Math.min(1, meals / aim), text: `${meals} of ${aim}`, level: level3(meals, aim) };
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
@@ -373,6 +372,24 @@ function sectorLabel(s){
    sector is a proper noun and needs no article of its own; an unnamed one is still just its biome
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
+
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. The seasons are counted off the
+   calendar's own lengths, SEASON_LENGTHS, not an average: with an average of 91.25 days, day 182
+   read "1 season" though the calendar had turned twice. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days));
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  let seasons = 0, end = 0;
+  for (const len of SEASON_LENGTHS){ end += len; if (d >= end) seasons++; else break; }
+  return seasons ? nOf(seasons, 'season', 'seasons') : nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. The help page's
+   valley line follows the same rule. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
 
 function campSummary(){
   return {

@@ -165,7 +165,7 @@ const GOALS = [
     state(){
       const t = pitTile(); if (!t) return { s: 'blocked', text: 'There is no fire pit yet.' };
       const p = t.struct;
-      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${camp.stash.stick} sticks${camp.stash.log ? `, ${camp.stash.log} logs` : ''}.` };
+      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${nOf(camp.stash.stick, 'stick', 'sticks')}${camp.stash.log ? `, ${nOf(camp.stash.log, 'log', 'logs')}` : ''}.` };
       const blaze = nearbyBlaze();
       if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
       return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
@@ -296,7 +296,7 @@ const GOALS = [
     offers(a){ if (!camp.fae.known || camp.ward || !camp.pit || !pitLit() || camp.fae.favor > -10) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the ward posts', score: 28, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 3, 5); if (!site) return [];
       return [{ label: 'set the ward posts', score: camp.fae.favor < -20 ? 55 : 30, task: { kind: 'setWardPosts', args: { at: site } } }]; } },
   { id: 'faefight', title: 'Drive off the sprites', stage: 'sprites', after: 'fae', standing: true,
-    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nearAt(sp, ...camp.pit)} tiles from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
+    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nOf(nearAt(sp, ...camp.pit), 'tile', 'tiles')} from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
     offers(a){ const sp = spriteNear(); if (!sp || camp.fae.favor >= -30 || !camp.tools.spear || a.traits.bravery < 0.5) return []; return [{ label: 'drive off the sprite with the spear', score: 60 + a.traits.bravery * 15, task: { kind: 'fightSprite', args: { sprite: sp.id } } }]; } },
   { id: 'waterskin', title: 'Sew a waterskin', stage: 'tools', after: 'cook', need: { hide: 2 },
     state(){
@@ -313,7 +313,7 @@ const GOALS = [
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, task: { kind: 'makeSpear', args: { at: camp.stashTile } } }]; return [{ label: 'gather a rock for the spear', score: 40, task: { kind: 'gather', args: { item: camp.stash.rock < 1 ? 'rock' : 'stick' } } }]; } },
   { id: 'deer', title: 'Hunt deer', stage: 'food', after: 'spear', standing: true,
-    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nearAt(d, ...camp.site)} tiles. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
+    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nOf(nearAt(d, ...camp.site), 'tile', 'tiles')}. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
     offers(a){ const d = deerNear(); if (!d || !camp.tools.spear || a.traits.bravery < 0.4 || camp.stash.venison > 0) return []; return [{ label: 'hunt a deer', score: 48 + a.skills.hunt * 5 + (stashFood() < 4 ? 15 : 0), task: { kind: 'huntDeer', args: { deer: d.id } } }]; } },
   { id: 'rack', title: 'Build a drying rack', stage: 'food', after: 'firepit', need: { stick: 6 },
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
@@ -333,7 +333,7 @@ const GOALS = [
       return out;
     } },
   { id: 'guard', title: 'Keep wolves off', stage: 'settlement', after: 'fire', standing: true,
-    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nearAt(w, ...camp.pit)} tiles from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
+    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nOf(nearAt(w, ...camp.pit), 'tile', 'tiles')} from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
     offers(a){ const w = wolfNear(); if (!w || !pitLit() || a.traits.bravery < 0.35) return []; return [{ label: 'drive off the wolf with a firebrand', score: 72 + a.traits.bravery * 20, task: { kind: 'driveOff', args: { wolf: w.id, at: camp.pit } } }]; } },
   { id: 'scout', title: 'Found a second camp', stage: 'settlement', after: 'shelter',
     state(){
