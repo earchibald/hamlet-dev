@@ -627,12 +627,29 @@ function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && s
 /* Inspectors share one saved rect, so each new one steps 24 px down and across, into the first slot no open inspector holds.
    A drawer window keeps one rect per drawer id and opens where it was left. */
 const WIN_STEP = 24;
-function winOpen(kind, target){
+/* A window's title bar is its only handle. A bar pushed off the page cannot be dragged back, so every
+   window is kept where its whole bar shows: on open, on drag, and when the page is resized. `area` is
+   the window layer's size in px, from winArea() in actions.js. The window may hang off the bottom, but
+   never by its bar. From the grip the corner stays on the page, so the window can always be shrunk.
+   With no area (the tests that drive winOpen in Node) the rect is left as it is. */
+const WIN_MIN_W = 220, WIN_MIN_H = 120, WIN_BAR = 32;
+function winClamp(r, area, grip){
+  if (!area) return { ...r };
+  let { x, y, w, h } = r;
+  if (grip){ w = Math.max(WIN_MIN_W, Math.min(w, area.w - x)); h = Math.max(WIN_MIN_H, Math.min(h, area.h - y)); }
+  w = Math.max(WIN_MIN_W, Math.min(w, area.w)); h = Math.max(WIN_MIN_H, Math.min(h, area.h));
+  x = Math.max(0, Math.min(x, area.w - w)); y = Math.max(0, Math.min(y, area.h - WIN_BAR));
+  return { x, y, w, h };
+}
+function winOpen(kind, target, area){
   const have = winFind(kind, target); if (have) return have;
   const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
-  const held = (n) => ui.windows.some(w => w.kind === 'inspect' && w.x === saved.x + WIN_STEP * n && w.y === saved.y + WIN_STEP * n);
-  let n = 0; if (kind === 'inspect') while (held(n)) n++;
-  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
+  /* The step is taken before the clamp, and a slot is held when a window sits at its clamped place.
+     Near an edge several steps clamp to one place, so the search stops after WIN_MAX steps. */
+  const at = (n) => winClamp({ x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h }, area);
+  const held = (n) => { const p = at(n); return ui.windows.some(w => w.kind === 'inspect' && w.x === p.x && w.y === p.y); };
+  let n = 0; if (kind === 'inspect') while (n < WIN_MAX && held(n)) n++;
+  const r = at(n);
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);

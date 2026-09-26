@@ -135,7 +135,7 @@ function hideTip(){ tipTarget = null; tipAnchor = null; renderTip(); }
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
-  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
+  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile }, winArea());
   setFocus(`window:${w.id}`); hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
