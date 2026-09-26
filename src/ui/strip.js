@@ -1,10 +1,12 @@
 /* The strip: clock, season, weather, the camp's name and tabs, four gauges, and alert chips. */
-const GAUGE_LABEL = { grace: SKY_TEXT.grace, hearth: 'Hearth', food: 'Food', water: 'Water', beds: 'Beds' };
-/* The Grace gauge carries the believers count after its number. */
+const GAUGE_LABEL = { hearth: 'Hearth', food: 'Food', water: 'Water', beds: 'Beds' };
+/* The Grace gauge carries the believers count after its number. Its label is read at call time: some
+   tests load this file without state.js, where SKY_TEXT lives. */
 function gaugeHTML(id, g){
   if (!g) return '';
+  const label = id === 'grace' ? SKY_TEXT.grace : GAUGE_LABEL[id];
   const more = g.believers ? `<span class="believers">${esc(g.believers)}</span>` : '';
-  return `<span class="gauge ${g.level}" data-gauge="${id}" title="${GAUGE_LABEL[id]}: ${esc(g.text)}${g.believers ? '. ' + esc(g.believers) + '.' : ''}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${esc(g.text)}</span>${more}</span>`;
+  return `<span class="gauge ${g.level}" data-gauge="${id}" title="${label}: ${esc(g.text)}${g.believers ? '. ' + esc(g.believers) + '.' : ''}"><span>${label}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${esc(g.text)}</span>${more}</span>`;
 }
 /* The tool buttons, from toolRows. The miracles print their cost when the world is played. The current
    tool is lit, and its pin shows when Shift made it stick, so a rebuild keeps what setTool showed. */

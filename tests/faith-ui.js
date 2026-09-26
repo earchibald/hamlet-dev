@@ -32,7 +32,7 @@ function withPage(fn){
 
 const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'inspect', 'strip', 'dialogs', 'actions'];
 const NAMES = ['ui', 'SKY_TEXT', 'TOOLS', 'KEYMAP', 'keyAction', 'keyName', 'ACTIONS', 'gauges', 'graceGauge', 'believersText', 'alerts',
-  'ALERT_LABEL', 'campPrayers', 'prayerOf', 'prayingNow', 'prayerText', 'timeLeft', 'toolRows', 'toolShown', 'toolsHTML', 'chipHTML',
+  'ALERT_LABEL', 'campPrayers', 'prayerOf', 'prayingNow', 'prayerText', 'timeLeft', 'toolRows', 'toolShown', 'toolsHTML', 'chipHTML', 'gaugeHTML',
   'prayerSpeed', 'notePrayers', 'noteTallies', 'resetSky', 'tallyTitle', 'tallyRows', 'tallyClosing', 'skyHelpHTML', 'inspectBeing',
   'setTool', 'paletteRows', 'persist', 'restore', 'STORE_KEY', 'DAYS_SPEED', 'newWorld', 'mute'];
 const EXTRA = {
@@ -76,6 +76,8 @@ test('the Grace gauge reads the grace, its level says what it can buy, and it sa
   api.faith.forgotten = true;
   assert.deepEqual([g(80).text, g(80).level], ['Forgotten', 'bad'], 'a forgotten sky buys nothing, whatever it holds');
   assert.equal(api.gauges().grace.text, 'Forgotten', 'the strip reads the gauge through gauges()');
+  api.faith.forgotten = false;
+  assert.match(api.gaugeHTML('grace', g(33)), /<span>Grace<\/span>.*<span class="t">33<\/span><span class="believers">1 of 1 believe<\/span>/, 'the strip prints the label, the number, and the believers');
   assert.equal(a.belief, 40);
 });
 
