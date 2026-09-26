@@ -98,6 +98,9 @@ const ELAPSED_READS = [
   'camp.guardLogged  tasks.js', 'camp.rotLogged  camps.js', 'e.tick  names.js',
   'g.lastBirth  fae.js', 'h.lastChild  camps.js', 'i.born  world.js', 'k.outSince  species.js',
   'rint  world.js', 't.planted  world.js', 't.worked  tasks.js', 'w.oldDen.clearedAt  species.js',
+  /* A threshold: a miracle's sign is dropped once it is older than CLOCK.faith.signKeep. A jump that
+     passes the keep drops it, as the days would have. */
+  's.tick  faith.js',
 ];
 
 test('the rules read no elapsed gap that this file has not been shown', () => {

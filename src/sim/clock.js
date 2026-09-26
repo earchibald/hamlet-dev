@@ -17,7 +17,7 @@ const days = n => n * DAY;
 const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
-   does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
+   does not compound linearly over many ticks. Built for the retune. `CLOCK.faith.grace` reads it. */
 const perHour = p => p / hours(1);
 /* The chance that a roll made once a tick at `rate` comes up at least once in `n` ticks. Over one
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
@@ -286,7 +286,22 @@ const CLOCK = {
     pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
     clothes: ticks(1500), garden: ticks(1500),
     woken: mins(30),   // roused from sleep by something near. Written in world units: a new value never takes a marker.
+    /* The sky and its people (faith.js). What a prayer's end leaves in the one who prayed. */
+    heard: hours(12), ownHands: hours(8), unheard: hours(12),
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
+  },
+  /* The sky and its people (faith.js). None of it runs in a world made with faith off. */
+  faith: {
+    every: mins(10),           // how often belief, grace, and prayers are looked at. A whole number of beats.
+    grace: perHour(1),         // grace a tick from one person whose belief is 100. Belief 40 gives 0.4 of it.
+    fade: 2 / days(1),         // belief a tick that each person loses, down to the floor: 2 a day
+    /* How long a prayer waits for its answer, by kind. A fire prayer made in the evening waits until
+       dawn instead. */
+    deadline: { fire: hours(12), hunger: days(1), wolf: hours(1), wildfire: hours(6) },
+    evening: hours(17),        // from this hour to dawn is evening, when a cold pit makes someone pray
+    rainLength: hours(4),      // the storm that Rain starts
+    wardHold: days(1),         // how long a Ward keeps wolves and foxes off its ground
+    signKeep: days(2),         // how long the sign of a miracle is kept for credit
   },
 };
 

@@ -8,7 +8,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats();
+  goalPriority = {}; wanderAt = 0; doomAt = 0; faith = null; resetBeats();
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
@@ -63,6 +63,8 @@ function updateWorld(){
   gnomeTick();
   spawnWildlife();
   godsTick();
+  /* Last, so that no step above moves. It draws no random number, and with faith off it returns at once. */
+  faithTick();
 }
 /* In the gods era a step is an age, or with `oneAct` one god of it. In the days era it is a tick, and
    `oneAct` means nothing there. A species with perTick false is not stepped by the tick: the gods

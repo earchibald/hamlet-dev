@@ -5,6 +5,7 @@
 // later files are written in its units. tasks.js declares TASKS before beings.js,
 // species.js, and fae.js add their kinds to it. Function calls between files are
 // free, because function declarations hoist across the joined script.
+// faith.js comes after fae.js: it reads the helpers of the files before it, at call time only.
 // snapshot.js comes after main.js and before door.js, because the door's load act
 // calls it and it reads no other file's tables at load time.
 //
@@ -13,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FILES = ['core', 'clock', 'names', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
+const FILES = ['core', 'clock', 'names', 'field', 'marks', 'world', 'path', 'camps', 'tasks', 'beings', 'species', 'fae', 'faith', 'goals', 'recipes', 'weather', 'gods', 'settle', 'main', 'snapshot', 'door'];
 
 function source(){
   return FILES.map(f => fs.readFileSync(path.join(__dirname, f + '.js'), 'utf8')).join('\n');
@@ -62,6 +63,7 @@ const API = `return {
   get field(){ return field; }, get boundaries(){ return boundaries; },
   get ZMIN(){ return ZMIN; }, get ZMAX(){ return ZMAX; }, get ZOFF(){ return ZOFF; }, get NZ(){ return NZ; }, get W(){ return W; }, get H(){ return H; },
   get options(){ return options; },
+  get faith(){ return faith; }, set faith(v){ faith = v; }, FAITH, FAITH_TEXT, PRAYERS, faithTick, startFaith, giveBeliefs, wardPoints, tallyLine, isEvening, nextDawn,
   campName, campNameOf, campHumans, humans, loneHumans, firstPerson, stashFood, hideReserved, bedsFor, beingById, nearFind, addThought,
   get camp(){ return camp; }, set camp(c){ camp = c; },
   get camps(){ return camps; }, get beings(){ return beings; }, get chronicle(){ return chronicle; },

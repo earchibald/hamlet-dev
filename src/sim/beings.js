@@ -297,6 +297,8 @@ function threatsFor(a){
   if (a.species === 'gnome'){
     for (const b of sourcesNow()){ if (!b.alive) continue; if (b.species === 'human' && ember(b) && near(b, a) <= 5) out.push([b.x, b.y]); if (b.species === 'wolf' && near(b, a) <= 6) out.push([b.x, b.y]); }
   }
+  /* A Ward from the sky (faith.js). With faith off there is no ward, and the list is what it was. */
+  if (SPECIES[a.species].warded) for (const w of wardPoints(a)) out.push(w);
   return out;
 }
 

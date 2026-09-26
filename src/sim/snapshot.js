@@ -290,7 +290,7 @@ const SAVED_STATE = {
   resCache: 'resCache', startRegion: 'startRegion', doorLog: 'doorLog',
   inhabited: 'inhabited', inhabitedTold: 'inhabitedTold',
   nrng: 'nrng', lore: 'lore', tongue: 'tongue', valley: 'valley', river: 'river', stillWater: 'stillWater',
-  ponds: 'ponds', fords: 'fords',
+  ponds: 'ponds', fords: 'fords', faith: 'faith',
 };
 /* The value of every saved global, by its snapshot name. The guard walks these, and a test holds this
    table to SAVED_STATE, so a new saved global is walked without anyone remembering to add it here. */
@@ -299,7 +299,7 @@ function savedValues(){
     rng, godRng, levels, raised, hills, caves, sectors, groves, camps, campNow: camp, beings, items, corpses,
     chronicle, legends, weather, goalPriority, namePool, godNamePool, gestureFallbacks,
     creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold,
-    nrng, lore, tongue, valley, river, stillWater, ponds, fords };
+    nrng, lore, tongue, valley, river, stillWater, ponds, fords, faith };
 }
 /* Which global the snapshot leaves out, and why. Each of these comes back from something else. */
 const NOT_SAVED = {
@@ -368,6 +368,8 @@ function takeSnapshot(){
       ponds: ponds.map(p => encode(p, 'pond')),
       fords: fords.map(f => encode(f, 'ford')),
       lostNames: lostNames(),
+      /* The sky and its people. Plain data: prayers and signs name beings and camps by id. */
+      faith: faith ? clean(faith) : null,
     };
     /* Last, because encoding the rest is what finds them. */
     snap.strayGroves = SNAP_IX.strayGroves ? SNAP_IX.strayGroves.list : [];
@@ -538,6 +540,10 @@ function decodeSnapshot(snap){
   stage.namePool = snapCopy(snapArray(snap.namePool, 'namePool'));
   stage.godNamePool = snapCopy(snapArray(snap.godNamePool, 'godNamePool'));
   stage.gestureFallbacks = snapCopy(snapObj(snap.gestureFallbacks, 'gestureFallbacks'));
+  /* A save from before faith.js holds no record. A world made to be played starts one on its next tick. */
+  const f = snapOpt(snap.faith, null);
+  stage.faith = f === null ? null : snapCopy(snapObj(f, 'faith'));
+  if (stage.faith) for (const k of ['prayers', 'signs', 'tallies']) snapArray(stage.faith[k], 'faith ' + k);
   return stage;
 }
 
@@ -579,6 +585,7 @@ function commitSnapshot(s){
      while a god's turn is open, and step() answers 'The turn is yours.' for as long as pending is set. */
   agePos = null; pending = null; runUntil = null; stops = [];
   resetDoor(); doorLog = s.doorLog;
+  faith = s.faith;
 }
 
 /* Why the last load was refused, in the words the fault threw. The player sees the plain sentence;
