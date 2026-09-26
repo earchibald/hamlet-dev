@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
-const { runDays, setClock, DAY } = require('./lib/run');
+const { runDays, replayGod, fingerprint, setClock, DAY } = require('./lib/run');
 
 /* A camp on seed r made to be played: the founder at the stash, a cold pit laid with wood, and open
    ground round the site. No wolf, fox, deer, or rabbit is left alive, so a test adds the one it needs
@@ -336,4 +336,20 @@ test('a snapshot taken mid-prayer loads the same faith record and the same belie
   const p = open(api)[0];
   for (const w of [api, b]){ setClock(w, p.until); w.faithTick(); }
   assert.deepEqual(b.faith, api.faith);
+});
+
+/* The Spark as soon as the grace allows, on the first camp's cold pit. It lands on day 2. */
+function sparkWhenAble(api){
+  const c = api.camps[0], f = api.faith;
+  if (!f || !c.pit || f.grace < api.FAITH.cost.light) return;
+  const p = api.tileAt(c.pit[0], c.pit[1]).struct;
+  if (!p.lit && p.fuel > 0) door(api, 'light', { x: c.pit[0], y: c.pit[1], z: 0 });
+}
+test('a world played as the sky replays from its seed, its options, and its log', () => {
+  const a = runDays('r', 2, null, sparkWhenAble, { faith: true });
+  assert.ok(a.api.faith.spent > 0, 'no miracle landed, so the replay proves nothing');
+  const r = a.api.replay;
+  const b = runDays(r.seed, 2, null, replayGod(r), r.options);
+  assert.deepEqual(fingerprint(b.api, b.events), fingerprint(a.api, a.events));
+  assert.deepEqual(b.api.faith, a.api.faith);
 });
