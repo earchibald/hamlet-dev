@@ -32,14 +32,15 @@ TASKS.feedFire = workKind({ label: 'Feeding the fire', amount: CLOCK.work.feedFi
 TASKS.strikeSparks = workKind({ label: 'Striking sparks into the tinder', amount: CLOCK.work.strikeSparks, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || p.fuel <= 0) return;
-  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ p.lit = true; camp.everLit = true; log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
+  if (rng() < 0.2 + a.skills.craft * 0.1 + a.traits.patience * 0.25){ const first = !camp.everLit; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand; if (first) log(`${a.name} coaxes a spark into flame. The wood takes light, and the camp has a hearth.`, campHumans(), 'major'); else log(`${a.name} coaxes a spark into flame. The fire is back.`, campHumans(), 'good'); for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth); gainXp(a, 'craft'); }
   else { addThought(a, 'sparks', 'Sparks, but no flame', -3, CLOCK.thought.sparks); a.cooldown['strike sparks'] = tick + CLOCK.cooldown.sparks; }
 } });
 TASKS.lightWithMoss = workKind({ label: 'Blowing on the glowing moss', amount: CLOCK.work.mossLight, effect(a, args){
   const p = pitTile().struct;
   if (p.lit || camp.stash.moss <= 0 || p.fuel <= 0) return;
-  camp.stash.moss--; p.lit = true; camp.everLit = true;
-  log(`${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
+  const first = !camp.everLit;
+  camp.stash.moss--; p.lit = true; camp.everLit = true; camp.nextArrival = camp.nextArrival || tick + CLOCK.arrival.firstByHand;
+  log(first ? `${a.name} tucks the glowing moss into the pit and blows. The fire takes, and the camp has a hearth.` : `${a.name} tucks the glowing moss into the pit and blows. The fire takes. No lightning, no sky.`, campHumans(), 'major');
   for (const h of campHumans()) addThought(h, 'hearth', 'The fire is lit', 8, CLOCK.thought.hearth);
 } });
 TASKS.layFire = workKind({ label: 'Laying the fire', amount: CLOCK.work.layFire, effect(a, args){
@@ -167,8 +168,8 @@ const GOALS = [
       const p = t.struct;
       if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${nOf(camp.stash.stick, 'stick', 'sticks')}${camp.stash.log ? `, ${nOf(camp.stash.log, 'log', 'logs')}` : ''}.` };
       const blaze = nearbyBlaze();
-      if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
-      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
+      if (blaze && p.fuel > 0) return { s: 'active', text: 'Cold, but something is burning nearby. Someone can fetch an ember.' };
+      return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: light it yourself, or wait for lightning to strike near the camp in a storm.' : 'Cold and empty. Sticks first, then fire.' };
     },
     offers(a){
       const t = pitTile(); if (!t) return []; const p = t.struct; const out = [];

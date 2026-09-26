@@ -81,13 +81,41 @@ function setSite(x, y){
      never overridden here. */
   if (!camp.founder){ const founder = namerFor([x, y]); if (founder) nameFoundersCamp(camp, founder); }
 }
-/* A wildfire within reach of the camp, for fetching an ember. */
+/* How far from a camp's site a fire counts as near enough to fetch an ember from. `dist` counts tiles across
+   plus tiles down, not the straight line. */
+const BLAZE_RANGE = 60;
+/* The ground people can walk to from the camp's site. The search stops after as many tiles as a disc of
+   radius BLAZE_RANGE holds. A walk moves in four directions, so on open ground that reaches about 75 steps
+   from the site; a narrow way reaches further. It draws no random number.
+   The result is kept for one tick and one camp, because a goal asks for it many times in a tick. A door act
+   can change the ground inside a tick: a player's strike sets a tile burning, and a burning tile cannot be
+   walked. A load puts back a tick and camp ids that the cache may already hold, from another world. So
+   `inject` clears it before every act, and `loadSnapshot` and `startWorld` clear it too. Before that, a load
+   at the same tick kept the old ground, and the goal did not offer an ember that a fresh load offered. */
+let blazeReach = null;
+function campReach(){
+  if (blazeReach && blazeReach.at === tick && blazeReach.camp === camp.id) return blazeReach.set;
+  const set = reachable(camp.site[0], camp.site[1], 0, Math.ceil(Math.PI * BLAZE_RANGE * BLAZE_RANGE));
+  blazeReach = { at: tick, camp: camp.id, set };
+  return set;
+}
+/* A burning tile an ember can be taken from: near the site, with ground beside it that people reach from
+   the site. A pine deep in a wood, or one across water, does not count. Before this check the goal said
+   someone could fetch an ember from such a fire, and nobody could. */
+function canFetchFrom(t, reach){
+  return dist(t.x, t.y, camp.site[0], camp.site[1]) <= BLAZE_RANGE && !!nearFind(t.x, t.y, q => reach.has(idx3(q.x, q.y, q.z)), DIRS, t.z);
+}
+/* The nearest fire near the camp that an ember can be fetched from. */
 function nearbyBlaze(){
   if (fireCount <= 0 || !camp.site) return null;
-  const [cx, cy] = camp.site; let best = null;
-  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
-  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= 60 && (!best || d < best.d)) best = { t, d }; }
-  return best ? best.t : null;
+  const [cx, cy] = camp.site; const near = [];
+  for (const t of world){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= BLAZE_RANGE) near.push({ t, d }); }
+  for (const t of raised){ if (t.fire <= 0) continue; const d = dist(t.x, t.y, cx, cy); if (d <= BLAZE_RANGE) near.push({ t, d }); }
+  if (!near.length) return null;
+  near.sort((p, q) => p.d - q.d);
+  const reach = campReach();
+  for (const n of near) if (canFetchFrom(n.t, reach)) return n.t;
+  return null;
 }
 
 function openSpotNear(at, dmin, dmax){

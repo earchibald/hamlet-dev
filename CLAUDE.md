@@ -30,6 +30,11 @@ A small Dwarf-Fortress-style simulation. Read `design/notes.md` first. It holds 
 - `tests/icons.js`: the icons of the ten kinds of god. Their table and outline, and the helpers that draw them on a canvas and as SVG. The icon on the map, the god's card, the people list, the timeline and the caption. Fast.
 - `tests/gnomes.js`: the gnomes, their burrows, and their mushrooms. Fast.
 - `tests/wanderer.js`: the valley after the last person. The line that says the people are gone, the wanderer who comes, and winter. Fast.
+- `tests/lightning.js`: the first fire from the sky. Seed moss-crag-87 runs with no god, and nobody lights the pit. A strike near the camp, an ember fetched from it, and the first hearth must come within three storm gaps of the pit being laid. The gap is the mean time between storms that bring a strike, from `CLOCK`. That run stops at the first hearth and takes about 4 s.
+
+  A second test computes how long a cold camp waits for a strike, from `CLOCK` and the weather model. The mean over the year must be close to 2.5 days, the design's figure.
+
+  Hand-built checks follow. Lightning strikes the one pine that people can reach. The goal offers no ember from a fire that nobody can reach. A founder far from the camp still fetches the ember. A first fire lit by moss or by firestones brings newcomers, and its line says the camp has a hearth. A door act or a load inside a tick clears the cached reach, so no stale result is left. Fast.
 - `tests/closing.js`: the cave goals, den contention, site scoring, and lightning. Fast.
 - `tests/door.js`: every act through `inject()`, logged whether it lands or not. Fast.
 - `tests/options.js`: world size and the level range at start. Fast.

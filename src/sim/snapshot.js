@@ -322,6 +322,7 @@ const NOT_SAVED = {
   threatSourcesAt: 'the tick that list was built on',
   threatSourcesOf: 'the beings array that list was built from, so a prune or a load rebuilds it',
   threatSourcesLen: 'how long that array was, so a being pushed mid-tick rebuilds it',
+  blazeReach: "a cache of the ground walkable from a camp's site, for nearbyBlaze; cleared by every door act, every load, and every new world, and rebuilt on the next call",
 };
 
 /* The whole state as plain JSON. Nothing here changes the state or draws from a stream. */
@@ -586,7 +587,7 @@ let lastLoadFault = null;
 
 /* Load a whole world from a snapshot. Returns null when it loaded, or the sentence that says why not. */
 function loadSnapshot(snap){
-  lastLoadFault = null;
+  lastLoadFault = null; blazeReach = null;
   if (snap === null || typeof snap !== 'object' || Array.isArray(snap)) return 'This save cannot be read.';
   if (snap.version !== SNAPSHOT_VERSION){
     if (typeof snap.version !== 'number' || !Number.isFinite(snap.version)) return 'This file is not a save this world can read.';
