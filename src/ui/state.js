@@ -233,8 +233,12 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
+/* The speed a reload opens at. Once the player has chosen one, it is ui.savedSpeed, not the speed now:
+   a new prayer drops the speed to DAYS_SPEED, and setSpeed persists. When the speed now was written,
+   a player at 64x who reloaded after a prayer opened at 8x. */
+const persistedSpeed = () => ui.speedChosen === true && SPEEDS.includes(ui.savedSpeed) ? ui.savedSpeed : typeof speed === 'number' ? speed : 1;
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom, slowForPrayers: ui.slowForPrayers })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: persistedSpeed(), speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom, slowForPrayers: ui.slowForPrayers })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {

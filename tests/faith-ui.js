@@ -231,6 +231,28 @@ test('a new prayer slows the game once and says why; the switch turns it off; th
   });
 });
 
+/* setSpeed persists, and the drop for a prayer calls setSpeed. When persist wrote the speed now, a
+   player at 64x who reloaded after a prayer opened at 8x. This reads what persist wrote, not memory. */
+test('a prayer\'s slow-down is not saved as the player\'s speed', () => {
+  const { api, a } = world();
+  const store = {};
+  global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  try {
+    withPage(() => {
+      api.resetSky(); api.putSpeed(8);
+      api.ACTIONS.speed(64);
+      assert.equal(JSON.parse(store[api.STORE_KEY]).speed, 64, 'sanity: the chosen speed is saved');
+      pray(api, a); api.notePrayers();
+      assert.equal(api.getSpeed(), 8, 'sanity: the prayer slowed the game');
+      const saved = JSON.parse(store[api.STORE_KEY]);
+      assert.equal(saved.speed, 64, 'the saved speed is still the player\'s 64x');
+      assert.equal(saved.speedChosen, true);
+      api.ui.savedSpeed = 0; api.ui.speedChosen = false; api.restore();
+      assert.equal(api.ui.savedSpeed, 64, 'a reload reads 64x back');
+    });
+  } finally { delete global.localStorage; }
+});
+
 test('Slow for prayers is saved, on by default, and a stored value that is not a boolean is refused', () => {
   const { api } = world();
   assert.equal(api.ui.slowForPrayers, true, 'on by default');
