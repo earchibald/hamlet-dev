@@ -22,6 +22,7 @@ const DOOR_ACTS = {
   rain(e){ return rainAct(e); },
   ward(e){ return wardAct(e); },
   beckon(e){ return beckonAct(e); },
+  calm(e){ return calmAct(e); },
   poke(e){
     const a = beingById(e.id);
     return a ? poke(a) : 'Nobody is there to nudge.';

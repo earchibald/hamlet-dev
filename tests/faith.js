@@ -42,13 +42,13 @@ function praying(){
 }
 const addBeing = (api, species, x, y) => { const b = api.makeBeing(species, x, y); api.beings.push(b); return b; };
 
-test('faith off: no record, no belief, and rain, ward, and beckon refuse and change nothing', () => {
+test('faith off: no record, no belief, and rain, ward, beckon, and calm refuse and change nothing', () => {
   const { api } = runDays('r', 0.25, null, () => {});
   assert.equal(api.options.faith, false);
   assert.equal(api.faith, null, 'a world with faith off made a faith record');
   assert.ok(api.beings.every(b => !('belief' in b)), 'a person in a world with faith off has a belief');
   const off = api.FAITH_TEXT.refuse.off, storm = api.weather.storm;
-  for (const act of ['rain', 'ward', 'beckon']) assert.equal(door(api, act, { x: 5, y: 5, z: 0 }), off, act);
+  for (const act of ['rain', 'ward', 'beckon', 'calm']) assert.equal(door(api, act, { x: 5, y: 5, z: 0 }), off, act);
   assert.equal(api.weather.storm, storm, 'rain changed the weather with faith off');
   assert.equal(api.faith, null);
 });
@@ -287,27 +287,232 @@ test("a wolf prayer is the person's: it ends when the wolf leaves them, though a
   assert.equal(p.end, 'passed', 'the prayer stayed open while the wolf stalked someone else');
 });
 
-test('hunger opens a prayer by the hungriest, and a fire near the camp opens a wildfire prayer', () => {
-  const { api, a, c, pit } = playCamp();
+test('hunger opens a prayer when the stash is under half its aim, and it ends when the stash is back', () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
   at(api, 2, 9); period(api);
   for (const k of ['berries', 'cooked', 'smoked']) c.stash[k] = 0;
-  a.needs.food = 10; pit.struct.fuel = 0;
+  const target = api.foodTarget(), half = Math.ceil(target / 2);
+  assert.ok(half > 1, 'the aim is too small to leave food in a stash under half of it, so the test proves nothing');
+  /* At half the aim, and hungry, nobody prays. */
+  c.stash.berries = half; a.needs.food = 40;
+  period(api);
+  assert.equal(open(api).length, 0, 'a camp with half its aim in the stash prayed for food');
+  /* One meal under half, with food left in the stash: the old rule waited for an empty stash. */
+  c.stash.berries = half - 1;
   period(api);
   const h = open(api).find(p => p.kind === 'hunger');
-  assert.ok(h && h.who === a.id, 'no hunger prayer');
-  /* A second person, since the founder already has a prayer open, and a pine burning near the site. */
+  assert.ok(c.stash.berries > 0, 'the stash is empty, so the test does not tell the new trouble from the old');
+  assert.ok(h && h.who === a.id, 'no hunger prayer with the stash under half its aim');
+  assert.equal(lines(api, /prays for food/)[0].text, `${a.name} prays for food.`);
+  /* The one who prayed eats: the camp's stash is still low, so the prayer stays open. */
+  a.needs.food = 90;
+  period(api);
+  assert.equal(h.end, null, 'a meal from a low stash ended the prayer');
+  /* A Beckon near the camp, then the stash back at half its aim: the sky is credited. */
+  const d = addBeing(api, 'deer', pit.x + 7, pit.y + 7); api.faith.grace = 50;
+  assert.match(door(api, 'beckon', { x: pit.x, y: pit.y }), /cost 20 grace/);
+  assert.ok(d.task && d.task.kind === 'walkTo');
+  c.stash.berries = half;
+  period(api);
+  assert.equal(h.end, 'sky');
+});
+
+test('a hungry person does not pray while the food is 50 or more', () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 9); period(api);
+  for (const k of ['berries', 'cooked', 'smoked']) c.stash[k] = 0;
+  /* The literal, not FAITH.hungryBelow: a test that reads the threshold passes whatever it is set to. */
+  a.needs.food = 50;
+  period(api);
+  assert.equal(open(api).length, 0, `a person at food ${a.needs.food} prayed`);
+  a.needs.food = 49;
+  period(api);
+  assert.ok(open(api).some(p => p.kind === 'hunger'), `a person at food ${a.needs.food}, with an empty stash, did not pray`);
+});
+
+test('a sleeper near a wolf at night prays in a dream', () => {
+  const { api, a, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 22); period(api);
+  a.x = pit.x + 12; a.y = pit.y; a.asleep = true; api.faith.grace = 50;
+  const w = addBeing(api, 'wolf', a.x + 3, a.y);
+  period(api);
+  const p = open(api).find(p => p.kind === 'wolf');
+  assert.ok(p && p.who === a.id, 'a sleeper near a wolf did not pray');
+  assert.equal(a.asleep, true, 'the sleeper woke, so the test does not tell a dream from a waking prayer');
+  const said = lines(api, /dreams of wolves/);
+  assert.equal(said.length, 1); assert.equal(said[0].text, `${a.name} dreams of wolves and prays in their sleep.`);
+  assert.equal(lines(api, /prays to be kept from the wolf/).length, 0, 'a dream was told as a waking prayer');
+  /* The rest is a wolf prayer: a Ward answers it. */
+  door(api, 'ward', { x: a.x, y: a.y });
+  w.x = a.x + 30; w.task = null;
+  period(api);
+  assert.equal(p.end, 'sky');
+});
+
+test('a sleeper does not dream of a fire, a famine, or a storm', () => {
+  const { api, a, c } = playCamp();
+  /* The fire prayer is the one to watch: the founder prays for the cold pit the moment they wake. */
+  a.asleep = true;
+  at(api, 2, 22); period(api);
+  a.needs.warmth = 10; a.needs.food = 10;
+  for (const k of ['berries', 'cooked', 'smoked']) c.stash[k] = 0;
+  api.weather.storm = true; api.weather.until = api.tick + api.hours(8);
+  period(api);
+  assert.equal(api.faith.prayers.length, 0, 'a sleeper prayed for ' + api.faith.prayers.map(p => p.kind).join(', '));
+  a.asleep = false; period(api);
+  assert.ok(open(api).length > 0, 'the founder, awake, did not pray, so the test proves nothing');
+});
+
+/* A camp at 10:00 on day 2 in a storm of eight hours, with the founder out in it and cold. */
+function inStorm(){
+  const w = playCamp(); w.pit.struct.fuel = 0;
+  at(w.api, 2, 10); period(w.api);
+  w.api.weather.storm = true; w.api.weather.until = w.api.tick + w.api.hours(8);
+  w.a.needs.warmth = 50;
+  assert.equal(w.api.underRoof(w.a), false, 'the founder is under a roof');
+  period(w.api);
+  const p = open(w.api).find(p => p.kind === 'storm');
+  assert.ok(p && p.who === w.a.id, 'no storm prayer from one out in the rain and cold');
+  return { ...w, p };
+}
+
+test('a storm with a cold person out in it opens a storm prayer, with a deadline of six hours', () => {
+  const { api, a, p } = inStorm();
+  assert.equal(lines(api, /prays for the rain to stop/)[0].text, `${a.name} prays for the rain to stop.`);
+  assert.equal(p.until, p.at + api.CLOCK.faith.deadline.storm);
+  /* A storm about to end sets the deadline at its end. */
+  const w = playCamp(); w.pit.struct.fuel = 0;
+  at(w.api, 2, 10); period(w.api);
+  w.api.weather.storm = true; w.api.weather.until = w.api.tick + w.api.hours(2); w.a.needs.warmth = 50;
+  period(w.api);
+  assert.equal(open(w.api).find(q => q.kind === 'storm').until, w.api.weather.until);
+});
+
+test('nobody prays about a storm when they are warm, or under a roof', () => {
+  for (const how of ['warm', 'roofed']){
+    const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+    at(api, 2, 10); period(api);
+    api.weather.storm = true; api.weather.until = api.tick + api.hours(8);
+    a.needs.warmth = how === 'warm' ? 95 : 50;
+    if (how === 'roofed'){ const t = api.tileAt(a.x + 1, a.y); t.struct = { type: 'leanto', camp: c }; c.shelter = [t.x, t.y]; }
+    assert.equal(api.underRoof(a), how === 'roofed');
+    period(api);
+    assert.equal(open(api).length, 0, `a person ${how} prayed about the storm`);
+  }
+});
+
+test('the Calm ends the storm the ordinary way and answers the storm prayer', () => {
+  const { api, a, p } = inStorm();
+  api.faith.grace = 50; a.belief = 40;
+  const s0 = api.streamState(api.rng);
+  assert.match(door(api, 'calm', { x: a.x, y: a.y }), /The rain stops\. It cost 25 grace\./);
+  assert.equal(api.weather.storm, false);
+  assert.equal(api.faith.grace, 25);
+  /* The next storm is set as when a storm ends by itself: one gap on, and one draw for its spread. */
+  const gap = api.CLOCK.storm.gap, spread = api.CLOCK.storm.gapSpread;
+  assert.ok(api.weather.next >= api.tick + gap && api.weather.next <= api.tick + gap + spread, `the next storm is at ${api.weather.next - api.tick} ticks`);
+  assert.notEqual(api.streamState(api.rng), s0, 'the Calm drew no number for the next storm');
+  assert.equal(lines(api, /clouds break/).length, 1);
+  period(api);
+  assert.equal(p.end, 'sky');
+  assert.equal(lines(api, /The sky heard/)[0].text, `The sky heard ${a.name}. The rain stopped.`);
+  assert.ok(a.belief > 40 + 20 - 0.1, `belief ${a.belief}`);
+});
+
+test('the Calm with no storm is refused and free, and with faith off it is refused', () => {
+  const { api, a, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 10); period(api);
+  api.faith.grace = 50; api.weather.storm = false;
+  const n = api.faith.signs.length;
+  assert.equal(door(api, 'calm', { x: a.x, y: a.y }), 'The sky is already clear.');
+  assert.equal(api.faith.grace, 50); assert.equal(api.faith.signs.length, n);
+  api.weather.storm = true; api.faith.grace = 20;
+  assert.equal(door(api, 'calm', { x: a.x, y: a.y }), 'Your grace is too thin. 20 of 25.');
+  assert.equal(api.weather.storm, true);
+});
+
+test('a storm that ends by itself ends the storm prayer with no credit and no blame', () => {
+  const { api, a, c, p } = inStorm();
   const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 30;
-  const t = api.tileAt(pit.x + 5, pit.y); t.ground = 'grass'; t.feature = 'tree';
-  api.lightTile(t.x, t.y, 0);
-  assert.ok(t.fire > 0 && api.fireCount > 0, 'the pine did not catch');
+  a.belief = 40;
+  const before = [a.belief, b.belief];
+  api.endStorm();
+  period(api);
+  assert.equal(p.end, 'passed');
+  const fade = api.CLOCK.faith.fade * api.CLOCK.faith.every;
+  assert.ok(Math.abs(a.belief - (before[0] - fade)) < 1e-9 && Math.abs(b.belief - (before[1] - fade)) < 1e-9, `belief moved from ${before} to ${[a.belief, b.belief]}`);
+  const said = lines(api, /rain stopped on its own/);
+  assert.equal(said.length, 1); assert.equal(said[0].text, `The rain stopped on its own. ${a.name} can get dry.`); assert.equal(said[0].kind, 'info');
+  assert.equal(api.faith.since.ownHands + api.faith.since.silent + api.faith.since.answered, 0, 'a storm that ended by itself was counted');
+  assert.ok(!a.thoughts.some(t => t.key === 'prayer'), 'a storm that ended by itself left a thought');
+});
+
+test('one struck pine near the camp is no wildfire; three burning tiles are', () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 9); period(api);
+  const pine = dx => { const t = api.tileAt(pit.x + dx, pit.y + 4); t.ground = 'grass'; t.feature = 'tree'; api.lightTile(t.x, t.y, 0); assert.ok(t.fire > 0, 'the pine did not catch'); return t; };
+  const t1 = pine(0);
+  /* The pit burning too does not make a second fire. */
+  pit.struct.fuel = 300; pit.struct.lit = true; pit.fire = 50;
+  assert.equal(api.burningNear(c).length, 1, 'the pit was counted as a fire in the open');
+  period(api);
+  assert.equal(open(api).filter(p => p.kind === 'wildfire').length, 0, 'one struck pine opened a wildfire prayer');
+  pine(1);
+  period(api);
+  assert.equal(open(api).filter(p => p.kind === 'wildfire').length, 0, 'two burning tiles opened a wildfire prayer');
+  pine(2);
   period(api);
   const f = open(api).find(p => p.kind === 'wildfire');
-  assert.ok(f && f.who === b.id, 'no wildfire prayer');
+  assert.ok(f && f.who === a.id, 'three burning tiles opened no wildfire prayer');
   /* Rain anywhere answers it. */
   api.faith.grace = 50; api.weather.storm = false;
   door(api, 'rain', { x: 1, y: 1 });
-  t.fire = 0; period(api);
+  for (const t of api.burningNear(c)) t.fire = 0;
+  period(api);
   assert.equal(f.end, 'sky');
+  assert.ok(t1);
+});
+
+test('nobody prays about a wildfire in their sleep', () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+  a.asleep = true;
+  at(api, 2, 23); period(api);
+  /* Two sleepers: a filter that passes the list's index on as the dream flag lets the second one pray. */
+  const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 30; b.asleep = true;
+  for (let dx = 0; dx < 3; dx++){ const t = api.tileAt(pit.x + dx, pit.y + 4); t.ground = 'grass'; t.feature = 'tree'; api.lightTile(t.x, t.y, 0); }
+  assert.ok(api.burningNear(c).length >= 3, 'the pines did not catch');
+  period(api);
+  assert.deepEqual(api.faith.prayers.map(p => p.kind), [], 'a sleeper prayed');
+  b.asleep = false; period(api);
+  assert.ok(open(api).some(p => p.kind === 'wildfire' && p.who === b.id), 'nobody awake prayed about the fire, so the test proves nothing');
+});
+
+test('no loss takes belief under the floor: silence, their own hands, and the fade', () => {
+  const floor = () => load().FAITH.belief.floor;
+  /* Silence: the one who prayed loses 12 and the others 3, from just above the floor. */
+  {
+    const { api, a, c, p } = praying();
+    const b = addBeing(api, 'human', a.x, a.y); b.camp = c;
+    a.belief = floor() + 4; b.belief = floor() + 1;
+    setClock(api, p.until); api.faithTick();
+    assert.equal(p.end, 'silent');
+    assert.equal(a.belief, floor(), `silence took the one who prayed to ${a.belief}`);
+    assert.equal(b.belief, floor(), `silence took another to ${b.belief}`);
+  }
+  /* Their own hands: the one who prayed loses 4. */
+  {
+    const { api, a, p, pit } = praying();
+    a.belief = floor() + 2; pit.struct.lit = true; period(api);
+    assert.equal(p.end, 'own');
+    assert.equal(a.belief, floor(), `their own hands took belief to ${a.belief}`);
+  }
+  /* A belief already under the floor, as a test or an old save may leave it, is not lowered. */
+  {
+    const { api, a, c, p } = praying();
+    const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 2;
+    setClock(api, p.until); api.faithTick();
+    assert.equal(b.belief, 2, 'a loss lowered a belief already under the floor');
+  }
 });
 
 test('a season turn pushes a tally with its counts, and one line for the chronicle', () => {

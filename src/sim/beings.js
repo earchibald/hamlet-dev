@@ -422,6 +422,12 @@ function bodyBreak(a, s){
   return b;
 }
 
+/* A person under a roof: below the surface, in a cave, under a raised tile, or beside a shelter or a hut
+   of `camp`. Rain does not soak them, and the cold reaches them less. The faith rules read it too. */
+function underRoof(a){
+  const here = tileAt(a.x, a.y, a.z);
+  return a.z < 0 || !!(here && here.cave) || hasTile(a.x, a.y, a.z + 1) || !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
+}
 /* One stretch of a being's body, from `a.seen` to at most `lim`. It moves `a.seen` to where it got. */
 function bodyStretch(a, lim){
   const s = a.seen, sp = SPECIES[a.species], n = a.needs;
@@ -436,7 +442,7 @@ function bodyStretch(a, lim){
     const season = seasonOf(dayOf(s + 1)), under = a.z < 0 || !!(here && here.cave);
     const cold = under ? CLOCK.cold.under : season === 'winter' ? (night ? CLOCK.cold.winterNight : CLOCK.cold.winterDay) : season === 'summer' ? CLOCK.cold.summer : (night ? CLOCK.cold.night : CLOCK.cold.day);
     byFire = !!(camp && pitLit() && nearAt(a, ...camp.pit) <= 3);
-    roofed = under || hasTile(a.x, a.y, a.z + 1) || !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
+    roofed = underRoof(a);
     dW = -cold * (1.3 - a.traits.hardiness * 0.6) * (storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (a.clothes ? 0.6 : 1) * (stage(a, s + 1) === 'adult' ? 1 : 1.3) + (byFire ? CLOCK.rate.fireWarms : 0);
   }
   /* How much of the stretch shares one answer to "is this person freezing" and "is this person out of

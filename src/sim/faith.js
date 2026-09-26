@@ -24,7 +24,7 @@ const FAITH = {
   graceStart: 30,
   graceCap: 100,
   /* The grace each miracle costs, by the name of its door act. `light` is the Spark. */
-  cost: { light: 15, rain: 40, ward: 15, beckon: 20 },
+  cost: { light: 15, rain: 40, ward: 15, beckon: 20, calm: 25 },
   /* How a prayer's end moves belief: the one who prayed, everyone else in their camp, and the mood of
      the thought the one who prayed is left with. A death before the answer is the silent row. */
   outcome: {
@@ -36,13 +36,20 @@ const FAITH = {
     passed: { prayer: 0, others: 0, mood: 0 },
   },
   coldBelow: 40,        // warmth under this is cold enough to pray for fire in the day
-  hungryBelow: 30,      // food under this is hungry enough to pray
+  /* Food under this is hungry enough to pray, while the stash is under `stashLow` of the camp's aim.
+     The old trouble was an empty stash and food under 30. Over eight days on seeds r and moss-crag-87
+     with a lit fire, it made nobody pray for food. While the stash was under half its aim, the
+     hungriest person's food ran from 20 to 70. At 50, the trouble holds for about half of that time. */
+  hungryBelow: 50,
+  stashLow: 0.5,
+  wetBelow: 95,         // warmth under this, out in a storm with no roof, is reason to pray for the rain to stop
+  wildfireTiles: 3,     // burning tiles near the camp, not the pit, that make a wildfire. One struck pine is not one.
   wolfNear: 8,          // a wolf or a fox this close at night is a reason to pray
   fireSafe: 8,          // this close to a lit pit, nobody prays about a wolf
   wildfireRadius: 12,   // a fire this close to the camp site, on the valley floor, is a wildfire
   witnessRadius: 10,    // a person this close to a miracle saw it
   wardRadius: 10,       // how far a Ward reaches
-  beckonRadius: 30,     // how far a Beckon is heard
+  beckonRadius: 60,     // how far a Beckon is heard
   beckonMost: 4,        // how many animals one Beckon draws
   beckonWithin: 3,      // how close to the spot they come
   /* How near the trouble a sign must be to be the answer. */
@@ -57,12 +64,16 @@ const FAITH_TEXT = {
     hunger: '{name} prays for food.',
     wolf: '{name} prays to be kept from the wolf.',
     wildfire: '{name} prays for rain on the fire.',
+    storm: '{name} prays for the rain to stop.',
   },
+  /* The prayer of one asleep, by kind (a row with `dreams: true`). */
+  dream: { wolf: '{name} dreams of wolves and prays in their sleep.' },
   heard: {
     fire: 'The sky heard {name}. The fire caught.',
     hunger: 'The sky heard {name}. There is food again.',
     wolf: 'The sky heard {name}. The wolf turned away.',
     wildfire: 'The sky heard {name}. The fire is out.',
+    storm: 'The sky heard {name}. The rain stopped.',
   },
   own: {
     fire: "{name}'s people lit the fire by their own hands.",
@@ -71,7 +82,7 @@ const FAITH_TEXT = {
     wildfire: 'The fire near {name} went out without the sky.',
   },
   /* A trouble that went away by itself, by kind (a row with `ownHands: false`). */
-  passed: { wolf: 'The wolf went away. {name} breathes again.' },
+  passed: { wolf: 'The wolf went away. {name} breathes again.', storm: 'The rain stopped on its own. {name} can get dry.' },
   silent: 'The sky was silent when {name} called.',
   died: '{name} died before the sky answered.',
   someone: 'Someone',
@@ -83,11 +94,13 @@ const FAITH_TEXT = {
   wardFled: 'The sky guards the ground. {count}.',
   beckon: 'The sky calls. {count} come to the call.',
   beckonLabel: 'Drawn by a call from the sky',
+  calm: 'The rain stops. The clouds break.',
   reply: {
     paid: '{said} It cost {cost} grace.',
     rain: 'Rain. It will fall for a few hours.',
     ward: 'The ground is guarded for a day.',
     beckon: '{count} come to the call.',
+    calm: 'The rain stops.',
   },
   refuse: {
     off: 'The sky plays only in a world made to be played.',
@@ -95,6 +108,7 @@ const FAITH_TEXT = {
     forgotten: 'Nobody believes in the sky. It cannot act.',
     grace: 'Your grace is too thin. {have} of {cost}.',
     raining: 'It is already raining.',
+    clear: 'The sky is already clear.',
     nowhere: 'The sky cannot reach that place.',
     noBeasts: 'No deer or rabbit is near enough to hear.',
     noWolves: 'No wolf or fox is near enough to guard against.',
@@ -123,12 +137,29 @@ const faithSay = (text, slots) => text.replace(/\{(\w+)\}/g, (m, k) => slots[k] 
    prayer's own trouble is over; without it the prayer is over when the camp's trouble is.
    `places(p, c)` are where the answer must fall, and `near` how close, or null for anywhere.
    `answers` are the miracles that count. `ownHands: false` means that a trouble which ends with no
-   sign went away by itself, and nobody learns anything from it. Each reads `camp`, which the caller
-   sets. */
+   sign went away by itself, and nobody learns anything from it. `dreams: true` lets a sleeper pray
+   about that kind. `deadline()`, when a row has it, is the tick the prayer waits until; without it the
+   prayer waits `CLOCK.faith.deadline[kind]`. Each reads `camp`, which the caller sets. */
 const isEvening = () => { const s = tick % DAY; return s >= CLOCK.faith.evening || s < CLOCK.night.lifts; };
 const nextDawn = () => Math.floor(tick / DAY) * DAY + CLOCK.night.lifts + (tick % DAY >= CLOCK.night.lifts ? DAY : 0);
-/* A person who can pray: awake, believing above the floor, with no prayer open. */
-const canPray = a => a.alive && !a.asleep && a.belief > FAITH.belief.floor && !faith.prayers.some(p => !p.end && p.who === a.id);
+/* A person who can pray: awake, or asleep for a kind that `dreams`, believing above the floor, with no
+   prayer open. */
+const canPray = (a, dreams = false) => a.alive && (!a.asleep || dreams) && a.belief > FAITH.belief.floor && !faith.prayers.some(p => !p.end && p.who === a.id);
+/* Out in a storm with no roof, and cold with it. `underRoof` is the test the body's warmth uses. */
+const wetAndCold = a => !underRoof(a) && a.needs.warmth < FAITH.wetBelow;
+/* The camp's stash is under `stashLow` of its aim. */
+const stashLow = () => stashFood() < foodTarget() * FAITH.stashLow;
+/* The tiles burning on the valley floor within `wildfireRadius` of the camp site, not the pit. */
+function burningNear(c){
+  const out = [];
+  if (!c.site || fireCount <= 0) return out;
+  const r = FAITH.wildfireRadius, [sx, sy] = c.site;
+  for (let y = sy - r; y <= sy + r; y++) for (let x = sx - r; x <= sx + r; x++){
+    if (!inb(x, y) || (c.pit && c.pit[0] === x && c.pit[1] === y)) continue;
+    const t = tileAt(x, y); if (t.fire > 0) out.push(t);
+  }
+  return out;
+}
 /* The lowest score, and on a tie the first in the list. No random number. */
 function lowest(list, score){ let best = null, bs = Infinity; for (const a of list){ const s = score(a); if (s < bs){ best = a; bs = s; } } return best; }
 /* The nearest wolf or fox that makes a person afraid, or null. A person by a lit pit is safe. */
@@ -145,40 +176,51 @@ const PRAYERS = {
     who(){ const ev = isEvening(); return lowest(campHumans().filter(a => canPray(a) && (ev || a.needs.warmth < FAITH.coldBelow)), a => a.needs.warmth); },
     where: (c, a, t) => [t.x, t.y, 0],
     places: (p, c) => c.pit ? [[c.pit[0], c.pit[1], 0]] : [p.where],
-    near: FAITH.near.fire, answers: ['light'], byDawn: true,
+    near: FAITH.near.fire, answers: ['light'],
+    /* The next dawn, and never less than the deadline, so a prayer made just before dawn is not over at once. */
+    deadline: () => Math.max(nextDawn(), tick + CLOCK.faith.deadline.fire),
   },
   hunger: {
-    trouble(){ return stashFood() <= 0 && campHumans().some(a => a.needs.food < FAITH.hungryBelow); },
+    trouble(){ return stashLow() && campHumans().some(a => a.needs.food < FAITH.hungryBelow); },
     who(){ return lowest(campHumans().filter(a => canPray(a) && a.needs.food < FAITH.hungryBelow), a => a.needs.food); },
+    /* The prayer is for the camp's food: it ends when the stash is back to `stashLow` of its aim, not
+       when the one who prayed has eaten. With the old end, a meal from the low stash closed it by
+       their own hands within the hour, before a player could answer. */
+    over: () => !stashLow(),
     where: (c, a) => c.site ? [c.site[0], c.site[1], 0] : [a.x, a.y, a.z],
     places: (p, c) => [p.where, ...(c.site ? [[c.site[0], c.site[1], 0]] : []), ...c.snares.map(s => [s.x, s.y, 0])],
     near: FAITH.near.hunger, answers: ['beckon'],
   },
   wolf: {
     trouble(){ return isNight() && campHumans().some(a => beastNear(a)); },
-    who(){ return lowest(campHumans().filter(a => canPray(a) && beastNear(a)), a => near(a, beastNear(a))); },
+    /* A sleeper prays too, in a dream. The wolf comes at night, when most people are asleep. */
+    who(){ return lowest(campHumans().filter(a => canPray(a, true) && beastNear(a)), a => near(a, beastNear(a))); },
     /* The prayer is the person's: it ends when no wolf or fox is near the one who prayed, whoever
        else in the camp is still afraid. */
     over: (p, c, a) => !beastNear(a),
     where: (c, a) => [a.x, a.y, a.z],
     places: (p) => { const a = beingById(p.who); return a ? [p.where, [a.x, a.y, a.z]] : [p.where]; },
     /* A wolf that wanders off was not driven off by anyone. */
-    near: FAITH.wardRadius, answers: ['ward'], ownHands: false,
+    near: FAITH.wardRadius, answers: ['ward'], ownHands: false, dreams: true,
   },
   wildfire: {
-    trouble(c){
-      if (!c.site || fireCount <= 0) return null;
-      const r = FAITH.wildfireRadius, [sx, sy] = c.site;
-      for (let y = sy - r; y <= sy + r; y++) for (let x = sx - r; x <= sx + r; x++){
-        if (!inb(x, y) || (c.pit && c.pit[0] === x && c.pit[1] === y)) continue;
-        const t = tileAt(x, y); if (t.fire > 0) return t;
-      }
-      return null;
-    },
-    who(c, t){ return lowest(campHumans().filter(canPray), a => nearAt(a, t.x, t.y)); },
+    /* A fire that spreads, not the one pine that lightning struck to give the camp its ember. */
+    trouble(c){ const ts = burningNear(c); return ts.length >= FAITH.wildfireTiles ? ts[0] : null; },
+    who(c, t){ return lowest(campHumans().filter(a => canPray(a)), a => nearAt(a, t.x, t.y)); },
     where: (c, a, t) => [t.x, t.y, 0],
     places: () => [],
     near: null, answers: ['rain'],
+  },
+  storm: {
+    trouble(){ return weather.storm && campHumans().some(wetAndCold); },
+    who(){ return lowest(campHumans().filter(a => canPray(a) && wetAndCold(a)), a => a.needs.warmth); },
+    /* The prayer is for the rain to stop. Going in under a roof does not end it. */
+    over: () => !weather.storm,
+    where: (c, a) => [a.x, a.y, a.z],
+    places: () => [],
+    /* The rain that stops by itself was stopped by nobody. */
+    near: null, answers: ['calm'], ownHands: false,
+    deadline: () => Math.min(tick + CLOCK.faith.deadline.storm, weather.until),
   },
 };
 
@@ -203,7 +245,7 @@ function faithTick(){
   let gain = 0;
   for (const a of humans()) gain += a.belief / FAITH.belief.top * CLOCK.faith.grace * n;
   faith.grace = Math.min(FAITH.graceCap, faith.grace + gain);
-  for (const a of humans()) if (a.belief > FAITH.belief.floor) a.belief = Math.max(FAITH.belief.floor, a.belief - CLOCK.faith.fade * n);
+  for (const a of humans()) setBelief(a, -CLOCK.faith.fade * n);
   openPrayers();
   resolvePrayers();
   checkForgotten();
@@ -220,7 +262,8 @@ function giveBeliefs(){
     a.belief = a === first ? FAITH.belief.founder : ps.length ? ps.reduce((s, p) => s + p.belief, 0) / ps.length : FAITH.belief.newcomer;
   }
 }
-const setBelief = (a, d) => { a.belief = clamp(a.belief + d, 0, FAITH.belief.top); };
+/* A loss never takes belief under the floor, or lower if it is already under it. A gain may lift it anywhere. */
+const setBelief = (a, d) => { a.belief = d < 0 ? Math.max(a.belief + d, Math.min(a.belief, FAITH.belief.floor)) : Math.min(FAITH.belief.top, a.belief + d); };
 
 /* `faith.troubles` holds, by 'campId:kind', the tick the last prayer of that kind opened. */
 function openPrayers(){
@@ -237,11 +280,9 @@ function openPrayers(){
         const a = row.who(c, found);
         if (!a) continue;
         faith.troubles[key] = tick;
-        /* A fire prayer waits for dawn, and never less than its deadline, so one made just before
-           dawn is not over at once. */
-        const until = row.byDawn ? Math.max(nextDawn(), tick + CLOCK.faith.deadline[kind]) : tick + CLOCK.faith.deadline[kind];
+        const until = row.deadline ? row.deadline() : tick + CLOCK.faith.deadline[kind];
         faith.prayers.push({ id: faith.nextPrayer++, kind, who: a.id, camp: c.id, at: tick, until, where: row.where(c, a, found), end: null, endedAt: 0 });
-        log(faithSay(FAITH_TEXT.pray[kind], { name: a.name }), [a]);
+        log(faithSay(a.asleep && FAITH_TEXT.dream[kind] ? FAITH_TEXT.dream[kind] : FAITH_TEXT.pray[kind], { name: a.name }), [a]);
       }
     }
   } finally { camp = prev; }
@@ -373,6 +414,17 @@ function rainAct(e){
   const cost = payMiracle('rain', at[0], at[1], 0);
   log(FAITH_TEXT.rain, humans(), 'good');
   return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.rain, cost });
+}
+/* The Calm: the storm ends now, the way a storm ends by itself, so the next one comes when it would have. */
+function calmAct(e){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  if (faithOn() && !weather.storm) return FAITH_TEXT.refuse.clear;
+  const why = refused('calm'); if (why) return why;
+  const { x, y } = actSpot(e), at = inb(x, y) ? [x, y] : (camp && camp.site) || [0, 0];
+  endStorm();
+  const cost = payMiracle('calm', at[0], at[1], 0);
+  log(FAITH_TEXT.calm, humans(), 'good');
+  return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.calm, cost });
 }
 /* The Ward: every wolf and fox near the spot runs, and the spot is a threat to them for a day. */
 function wardAct(e){

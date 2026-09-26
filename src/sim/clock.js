@@ -296,8 +296,8 @@ const CLOCK = {
     grace: perHour(1),         // grace a tick from one person whose belief is 100. Belief 40 gives 0.4 of it.
     fade: 1 / days(1),         // belief a tick that each person loses, down to the floor: 1 a day
     /* How long a prayer waits for its answer, by kind. A fire prayer waits until the next dawn if
-       that is later. */
-    deadline: { fire: hours(12), hunger: days(1), wolf: hours(1), wildfire: hours(6) },
+       that is later. A storm prayer waits until the storm's end if that is sooner. */
+    deadline: { fire: hours(12), hunger: days(1), wolf: hours(1), wildfire: hours(6), storm: hours(6) },
     /* A camp prays about one kind of trouble at most once in this long, counted from when the last
        such prayer opened. A cold pit brings a prayer each evening, and an empty stash one each day. */
     prayAgain: days(1),
