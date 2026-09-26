@@ -70,7 +70,9 @@ The best part of this loop is that the simulation's own growth is the difficulty
 | The founder's belief at the start | 40 | They are alone, and they looked up. |
 | A newcomer's belief | 20 | They heard stories of the sky on the road. |
 | A child's belief | The mean of the parents | Belief is taught. |
-| Belief fades | 2 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. |
+| Belief fades | 1 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. |
+| Seeing a miracle | +2 belief, at most once a day for each person | A person who stands within 10 tiles sees it. Two Sparks in one evening do not buy belief twice. |
+| Grace at the start | 30 | Enough for one Spark, so the first fire prayer can be answered. At 0, the founder had only 4 grace by the first evening, and the first prayer was always silent. |
 | Grace income | Each person gives belief / 100 grace each world hour | A camp of five at belief 60 gives 3 grace an hour, or 72 a day. |
 | Grace cap | 100 | The player cannot hoard. Unspent grace is wasted, which pushes the player to act. |
 
@@ -82,12 +84,12 @@ A prayer is a plain record: who prays, what for, when, the deadline, and how it 
 
 | Kind | When a person prays | The deadline | The miracle that answers it |
 |---|---|---|---|
-| Fire | The pit is laid with wood and is cold, and it is evening or the person is cold. | Dawn, or 12 hours | Spark on the pit |
-| Hunger | The camp's food is gone and the person is hungry. | 1 day | Beckon near the camp or its snares |
-| Wolf | A wolf or a fox is near the person at night, and they are away from a lit fire. | 1 hour | Ward near the person |
+| Fire | The pit is laid with wood and is cold, and it is evening or the person is cold. The coldest person prays. | The next dawn or 12 hours, whichever is later | Spark on the pit |
+| Hunger | The camp's food is gone and the person is hungry. The hungriest person prays. | 1 day | Beckon near the camp or its snares |
+| Wolf | A wolf or a fox is near the person at night, and they are away from a lit fire. The prayer is that person's: it ends when no wolf or fox is near them. | 1 hour | Ward near the person |
 | Wildfire | A fire burns in the open near the camp. | 6 hours | Rain |
 
-Nobody prays twice for the same trouble, and a camp has at most one prayer of each kind open at a time. A prayer draws no random number, so a world with faith switched off replays the old story exactly.
+A camp has at most one prayer of each kind open at a time. A trouble that goes on brings a new prayer a day after the last one opened: a cold pit brings a prayer each evening, and an empty stash one each day. If the one who prayed dies, someone else may pray at once. A prayer whose camp is gone ends with no line and moves nobody. A prayer draws no random number, so a world with faith switched off replays the old story exactly.
 
 ### 3.3 Four miracles (built)
 
@@ -95,21 +97,23 @@ Nobody prays twice for the same trouble, and a camp has at most one prayer of ea
 |---|---|---|---|---|
 | Spark | L | 15 | Lights the pit, or sets a pine smouldering. This is the old Light fire. | A strike on a pine in dry summer can start a wildfire. |
 | Rain | R | 40 | A storm starts now. | Rain soaks everyone who is not under a roof, and the pit burns faster in the rain. |
-| Ward | D | 15 | Every wolf and fox near the spot flees, and keeps away from it for a day. | It does not kill them. They come back hungry. |
-| Beckon | B | 20 | Deer and rabbits nearby walk toward the spot. | Wolves hunt what they follow. |
+| Ward | D | 15 | Every wolf and fox near the spot flees, and keeps away from it for a day. With no wolf or fox near the spot, it is refused and costs nothing. | It does not kill them. They come back hungry. |
+| Beckon | B | 20 | Deer and rabbits nearby walk toward the spot. With no deer or rabbit near enough, it is refused and costs nothing. | Wolves hunt what they follow. |
 | Nudge | N | 0 | The old nudge. It stays free. | Nothing. |
 
 Every miracle passes the door, so it is logged and replays.
 
 ### 3.4 Credit (built)
 
-A miracle leaves a sign: the act, the place, and the tick. When a prayer's trouble ends before its deadline, the rules look for a sign of a miracle that answers that kind, near the trouble, made after the prayer. That is the whole test.
+A miracle leaves a sign: the act, the place, and the tick. When a prayer's trouble ends before its deadline, the rules look for a sign of a miracle that answers that kind, near the trouble, made after the prayer opened. A sign made before it does not count. That is the whole test.
 
 | The trouble ends... | The one who prayed | The others in the camp | The line |
 |---|---|---|---|
 | ...and a sign of the sky is there | +20 belief | +6 belief | "The sky heard Aki." |
 | ...and no sign is there | −4 belief | nothing | "Aki's people lit the fire by their own hands." |
+| ...by itself, for a kind marked so (the wolf that wanders off) | nothing | nothing | "The wolf went away. Aki breathes again." |
 | ...after the deadline, or never | −12 belief | −3 belief | "The sky was silent when Aki called." |
+| ...because the one who prayed died | (dead) | −3 belief | "Aki died before the sky answered." |
 
 The second row is the important one. A camp that learns to cope alone slowly stops believing. That is the right result for the story, and it is the thing that makes the late game hard.
 
