@@ -40,6 +40,7 @@ function element(id){
    the test checks what the query means at each width, not only its text. */
 function run(width, { stored = null, storage = true } = {}){
   const els = { narrow: element('narrow'), narrowGo: element('narrowGo'), start: element('start') };
+  const doc = element('document');
   const store = {}; if (stored) store['hearth.narrowSeen'] = stored;
   const sessionStorage = {
     getItem(k){ if (!storage) throw new Error('blocked'); return k in store ? store[k] : null; },
@@ -54,10 +55,9 @@ function run(width, { stored = null, storage = true } = {}){
       return { matches: width <= Number(m[1]) };
     }
   };
-  const document = { getElementById: id => els[id] || null };
-  const timers = [];
-  vm.runInNewContext(noticeScript(), { window, document, sessionStorage, setTimeout: fn => timers.push(fn) });
-  return { ...els, store, queries, timers };
+  const document = { getElementById: id => els[id] || null, addEventListener: doc.addEventListener.bind(doc), removeEventListener: doc.removeEventListener.bind(doc) };
+  vm.runInNewContext(noticeScript(), { window, document, sessionStorage });
+  return { ...els, doc, store, queries };
 }
 
 test('the page carries the notice dialog, its text, and a button that prints its key', () => {
@@ -94,21 +94,32 @@ test('Go on anyway closes the notice and remembers it for the session', () => {
   assert.equal(run(390, { stored: '1' }).narrow.shown, 0, 'the notice came back in the same session');
 });
 
-test('Esc closes the notice, remembers it, and leaves the start dialog open', () => {
+test('Esc closes the notice and remembers it', () => {
   const r = run(390);
   const ev = r.narrow.fire('cancel');
+  /* The cancel is prevented and the notice closes itself. The prevented cancel is also what keeps
+     WebKit from closing the start dialog on the same Esc; that half is checked in the browser. */
+  assert.equal(ev.defaultPrevented, true);
   assert.equal(r.narrow.open, false);
   assert.equal(r.store['hearth.narrowSeen'], '1');
-  /* WebKit sends the same Esc on to the start dialog. Its cancel must be held, or the start closes too. */
-  assert.equal(ev.defaultPrevented, true);
-  assert.equal(r.start.fire('cancel').defaultPrevented, true, 'the start dialog would close on the same Esc');
-  r.timers.forEach(fn => fn());
-  assert.equal(r.start.fire('cancel').defaultPrevented, false, 'the start dialog stays unclosable by Esc after the notice');
 });
 
-test('a key pressed on the notice stops there, so Enter does not also make a world', () => {
+/* The key is fired at the document with a target outside the notice: after Tab, focus leaves the notice
+   for the body, and a listener on the notice itself never hears the key. */
+test('while the notice is open, a key aimed anywhere stops at the document, and keeps its default', () => {
   const r = run(390);
-  assert.equal(r.narrow.fire('keydown', { key: 'Enter' }).stopped, true);
+  const body = { id: 'body' };
+  for (const k of [{ key: 'Enter' }, { key: 'Escape' }, { key: 'g', altKey: true }]){
+    const ev = r.doc.fire('keydown', { ...k, target: body });
+    assert.equal(ev.stopped, true, `${k.key} reached the page's key handler while the notice was open`);
+    assert.equal(ev.defaultPrevented, false, `${k.key} lost its default, so the notice's button or Esc would not work`);
+  }
+});
+
+test('once the notice is closed, keys reach the page again', () => {
+  const r = run(390);
+  r.narrowGo.fire('click');
+  assert.equal(r.doc.fire('keydown', { key: 'Enter', target: { id: 'seed' } }).stopped, false);
 });
 
 test('blocked storage still shows the notice, and the button still closes it', () => {

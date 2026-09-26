@@ -10709,26 +10709,25 @@ if (typeof document !== 'undefined') initUI();
 <script>
 /* The narrow-screen notice (review P3). Phones are not supported for now. A screen narrower than 540 CSS
    pixels gets a notice over the start dialog. 540 catches every phone held upright (360 to 440 wide) and
-   leaves alone a small tablet (600) and an iPad (768 and up), held upright or not. The notice is page
-   shell, not view state, so it lives here and not in src/ui/. It runs after initUI has opened the start
-   dialog, so it opens on top of it, and closeDialogs never sees it open. Its keys stop here, so Enter on
-   its button does not also make a world behind it. Go on anyway hides it for the rest of the session.
-   Storage may be blocked, so every touch is wrapped, as in persist() in src/ui/state.js. */
+   leaves alone a small tablet (600) and an iPad (768 and up), held upright or not. The width is read once,
+   at load. The notice is page shell, not view state, so it lives here and not in src/ui/. This script runs
+   after initUI has opened the start dialog, so the notice opens on top of it. While it is open, the frame
+   loop holds the ages, as it does for any open dialog.
+   While the notice is open, a capture listener on the document stops every key before the handler in
+   src/ui/main.js sees it. That handler still reads the focus as the start dialog, so Enter would make a
+   world behind the notice, and Alt+G would take a god. The listener does not prevent the default, so
+   Enter still clicks the focused button and Esc still cancels the notice. The cancel is prevented and the
+   notice closes itself: the prevented cancel is also what keeps WebKit from closing the start dialog on
+   the same Esc. Go on anyway hides the notice for the rest of the session. Storage may be blocked, so
+   every touch is wrapped, as in persist() in src/ui/state.js. */
 (function(){
   const NARROW_QUERY = '(max-width: 539px)', NARROW_KEY = 'hearth.narrowSeen';
   const d = document.getElementById('narrow');
   if (!d || !window.matchMedia || !window.matchMedia(NARROW_QUERY).matches) return;
   try { if (sessionStorage.getItem(NARROW_KEY)) return; } catch (e) { /* no storage: show it */ }
   const go = () => { try { sessionStorage.setItem(NARROW_KEY, '1'); } catch (e) { /* no storage */ } d.close(); };
-  d.addEventListener('keydown', e => e.stopPropagation());
-  /* WebKit sends one Esc as a cancel to every open modal, top first, so the start dialog would close
-     behind the notice and skip the choice of a world. Hold the start dialog's cancel for this one key. */
-  d.addEventListener('cancel', e => {
-    e.preventDefault();
-    const start = document.getElementById('start'), hold = ev => ev.preventDefault();
-    if (start){ start.addEventListener('cancel', hold, { once: true }); setTimeout(() => start.removeEventListener('cancel', hold), 0); }
-    go();
-  });
+  document.addEventListener('keydown', e => { if (d.open) e.stopPropagation(); }, true);
+  d.addEventListener('cancel', e => { e.preventDefault(); go(); });
   document.getElementById('narrowGo').addEventListener('click', go);
   d.showModal();
 })();
