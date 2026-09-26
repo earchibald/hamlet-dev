@@ -792,10 +792,10 @@ test('window keys: O pops out or docks, Esc closes a focused window, Tab walks t
   assert.deepEqual(keyHit(api, ev('Tab'), 'window:3'), { action: 'focusNext', arg: undefined });
 });
 
-test('tools: inspect first, then the Spark and the three miracles, then nudge; all but inspect one-shot; no camp site', () => {
+test('tools: inspect first, then the Spark and the four miracles, then nudge; all but inspect one-shot; no camp site', () => {
   const api = loadUI(['state', 'derive', 'keys', 'actions'], ['TOOLS', ...KEYS]);
-  assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'rain', 'ward', 'beckon', 'nudge']);
-  assert.deepEqual(api.TOOLS.map(t => t.oneShot), [false, true, true, true, true, true]);
+  assert.deepEqual(api.TOOLS.map(t => t.id), ['inspect', 'light', 'rain', 'calm', 'ward', 'beckon', 'nudge']);
+  assert.deepEqual(api.TOOLS.map(t => t.oneShot), [false, true, true, true, true, true, true]);
   const by = Object.fromEntries(api.TOOLS.map(t => [t.id, t]));
   assert.equal(by.light.label, 'Spark'); assert.equal(by.nudge.label, 'Nudge');
   assert.deepEqual(keyHit(api, ev('N', { shiftKey: true }), 'map'), { action: 'toolSticky', arg: 'nudge' });

@@ -430,8 +430,8 @@ function onSettle(){
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    /* The Spark and the three miracles. The door pays for them, or says why it will not. */
-    case 'light': case 'rain': case 'ward': case 'beckon': say(inject({ source: 'player', act: TOOLS.find(t => t.id === tool).act, x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
+    /* The Spark and the four miracles. The door pays for them, or says why it will not. */
+    case 'light': case 'rain': case 'calm': case 'ward': case 'beckon': say(inject({ source: 'player', act: TOOLS.find(t => t.id === tool).act, x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');

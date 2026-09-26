@@ -100,11 +100,11 @@ A camp has at most one prayer of each kind open at a time. A trouble that goes o
 
 | Miracle | Key | Grace | What it does | What it can cost |
 |---|---|---|---|---|
-| Spark | L | 15 | Lights the pit, or sets a pine smouldering. This is the old Light fire. | A strike on a pine in dry summer can start a wildfire. |
+| Spark | F | 15 | Lights the pit, or sets a pine smouldering. This is the old Light fire. | A strike on a pine in dry summer can start a wildfire. |
 | Rain | R | 40 | A storm starts now. | Rain soaks everyone who is not under a roof, and the pit burns faster in the rain. |
 | Ward | D | 15 | Every wolf and fox near the spot flees, and keeps away from it for a day. With no wolf or fox near the spot, it is refused and costs nothing. | It does not kill them. They come back hungry. |
 | Beckon | B | 20 | Up to 4 deer and rabbits within 60 tiles walk toward the spot. With no deer or rabbit near enough, it is refused and costs nothing. At 30 tiles, the nearest animal was 45 to 66 tiles from a hungry camp, and every Beckon was refused. | Wolves hunt what they follow. |
-| Calm | none yet | 25 | The storm ends now, as if it had ended on its own. The next storm still comes when it would have. With no storm, the Calm is refused and costs nothing: "The sky is already clear." | The rain that was quenching a wildfire stops too. |
+| Calm | L | 25 | The storm ends now, as if it had ended on its own. The next storm still comes when it would have. With no storm, the Calm is refused and costs nothing: "The sky is already clear." | The rain that was quenching a wildfire stops too. |
 | Nudge | N | 0 | The old nudge. It stays free. | Nothing. |
 
 Every miracle passes the door, so it is logged and replays.

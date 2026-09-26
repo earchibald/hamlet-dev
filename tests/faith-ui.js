@@ -34,7 +34,7 @@ const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'inspect', 's
 const NAMES = ['ui', 'SKY_TEXT', 'TOOLS', 'KEYMAP', 'keyAction', 'keyName', 'ACTIONS', 'gauges', 'graceGauge', 'believersText', 'alerts',
   'ALERT_LABEL', 'campPrayers', 'prayerOf', 'prayingNow', 'prayerText', 'timeLeft', 'toolRows', 'toolShown', 'toolsHTML', 'chipHTML', 'gaugeHTML',
   'prayerSpeed', 'notePrayers', 'noteTallies', 'resetSky', 'tallyTitle', 'tallyRows', 'tallyClosing', 'skyHelpHTML', 'inspectBeing',
-  'setTool', 'paletteRows', 'persist', 'restore', 'STORE_KEY', 'DAYS_SPEED', 'newWorld', 'mute'];
+  'setTool', 'applyTool', 'paletteRows', 'persist', 'restore', 'STORE_KEY', 'DAYS_SPEED', 'newWorld', 'mute'];
 const EXTRA = {
   getTool: '() => tool', getSpeed: '() => speed', putSpeed: '(v) => { speed = v; }',
   setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }',
@@ -112,22 +112,47 @@ test('with faith off there is no gauge, no prayer chip, and no miracle tool', ()
   assert.equal(api.prayerOf(a), null);
 });
 
-test('with faith on the tools are Spark, Rain, Ward, and Beckon, each with its cost in the button and the hint', () => {
+test('with faith on the tools are Spark, Rain, Calm, Ward, and Beckon, each with its cost in the button and the hint', () => {
   const { api } = world();
   const rows = api.toolRows();
-  assert.deepEqual(rows.map(t => t.id), ['inspect', 'light', 'rain', 'ward', 'beckon', 'nudge']);
+  assert.deepEqual(rows.map(t => t.id), ['inspect', 'light', 'rain', 'calm', 'ward', 'beckon', 'nudge']);
   const by = Object.fromEntries(rows.map(t => [t.id, t]));
   assert.equal(by.light.label, 'Spark');
-  for (const id of ['light', 'rain', 'ward', 'beckon']){
+  for (const id of ['light', 'rain', 'calm', 'ward', 'beckon']){
     assert.equal(by[id].cost, api.FAITH.cost[id], `${id} costs FAITH.cost`);
     assert.ok(by[id].hint.includes(`It costs ${api.FAITH.cost[id]} grace.`), `${id} hint names its cost`);
     assert.ok(/Enter/.test(by[id].hint), `${id} hint says Enter`);
   }
   assert.equal(by.nudge.cost, null, 'Nudge stays free'); assert.equal(by.inspect.cost, null);
-  for (const l of ['Spark', 'Rain', 'Ward', 'Beckon', 'Rain, and keep it']) assert.ok(api.paletteRows().some(r => r.label === l), `the palette offers ${l} in a played world`);
+  for (const l of ['Spark', 'Rain', 'Calm', 'Ward', 'Beckon', 'Rain, and keep it', 'Calm, and keep it']) assert.ok(api.paletteRows().some(r => r.label === l), `the palette offers ${l} in a played world`);
   const html = api.toolsHTML();
   assert.match(html, /data-tool="rain"[^>]*>Rain<span class="cost">40<\/span><kbd>R<\/kbd>/);
   assert.match(html, /data-tool="light"[^>]*>Spark<span class="cost">15<\/span><kbd>F<\/kbd>/);
+  assert.match(html, /data-tool="calm"[^>]*>Calm<span class="cost">25<\/span><kbd>L<\/kbd>/);
+  assert.ok(html.indexOf('data-tool="rain"') < html.indexOf('data-tool="calm"') && html.indexOf('data-tool="calm"') < html.indexOf('data-tool="ward"'), 'Calm sits next to Rain');
+});
+
+/* The Calm is a door act (calmAct in faith.js). The tool sends it at the cursor, and the foot says the door's answer. */
+test('the Calm tool stops a storm through the door and pays, and with no storm it is refused and costs nothing', () => {
+  const { api, a } = world();
+  api.setUp();
+  withPage(() => {
+    const c = { x: a.x, y: a.y, z: 0 };
+    api.faith.grace = 50; api.weather.storm = false;
+    api.setTool('calm'); api.applyTool(c, {});
+    assert.equal(api.ui.note && api.ui.note.text, api.FAITH_TEXT.refuse.clear, 'no storm: the tool sends the Calm, and the door says the sky is already clear');
+    assert.equal(api.faith.grace, 50, 'a refused Calm costs nothing');
+    assert.equal(api.getTool(), 'inspect', 'a one-shot tool goes back to Inspect');
+    api.weather.storm = true; api.weather.until = api.tick + api.hours(3);
+    api.setTool('calm'); api.applyTool(c, {});
+    assert.equal(api.weather.storm, false, 'the storm ends');
+    assert.equal(api.faith.grace, 50 - api.FAITH.cost.calm);
+    assert.match(api.ui.note.text, new RegExp(`cost ${api.FAITH.cost.calm} grace`));
+    assert.equal(api.doorLog[api.doorLog.length - 1].act, 'calm', 'it went through the door');
+  });
+  const off = world(false).api;
+  assert.ok(!off.toolRows().some(t => t.id === 'calm'), 'no Calm in a watched world');
+  assert.ok(!off.paletteRows().some(r => r.label === 'Calm'), 'and none in its palette');
 });
 
 test('a miracle tool is refused in a watched world, and the choice of tool stays where it was', () => {
@@ -138,10 +163,12 @@ test('a miracle tool is refused in a watched world, and the choice of tool stays
   assert.ok(!api.paletteRows().some(r => r.action === 'tool' && r.arg === 'rain'), 'the palette offers no Rain in a watched world');
 });
 
-test('the keys: F stays the Spark, R, D, and B are the miracles, P switches the slow-down, and none clashes', () => {
+test('the keys: F stays the Spark, R, L, D, and B are the miracles, P switches the slow-down, and none clashes', () => {
   const { api } = world();
   for (const focus of ['map', 'drawer:people', 'drawer:goals', 'window:2']){
     assert.deepEqual(hit(api, ev('r'), focus), { action: 'tool', arg: 'rain' }, `R in ${focus}`);
+    assert.deepEqual(hit(api, ev('l'), focus), { action: 'tool', arg: 'calm' }, `L in ${focus}`);
+    assert.deepEqual(hit(api, ev('L', { shiftKey: true }), focus), { action: 'toolSticky', arg: 'calm' }, `Shift+L in ${focus}`);
     assert.deepEqual(hit(api, ev('d'), focus), { action: 'tool', arg: 'ward' }, `D in ${focus}`);
     assert.deepEqual(hit(api, ev('b'), focus), { action: 'tool', arg: 'beckon' }, `B in ${focus}`);
     assert.deepEqual(hit(api, ev('p'), focus), { action: 'slowForPrayers', arg: undefined }, `P in ${focus}`);
@@ -149,7 +176,7 @@ test('the keys: F stays the Spark, R, D, and B are the miracles, P switches the 
   }
   assert.deepEqual(hit(api, ev('f'), 'map'), { action: 'tool', arg: 'light' }, 'F is still the fire');
   /* No other row in a focus the map can hold takes these keys. */
-  const mine = new Set(['r', 'd', 'b', 'p']);
+  const mine = new Set(['r', 'l', 'd', 'b', 'p']);
   for (const k of api.KEYMAP){
     if (!mine.has(k.key.toLowerCase()) || k.ctrl || k.alt || k.meta || k.focus.startsWith('dialog')) continue;
     assert.ok(['tool', 'toolSticky', 'slowForPrayers'].includes(k.action), `${api.keyName(k)} is also ${k.label} in ${k.focus}`);
@@ -420,8 +447,10 @@ test('the person card shows belief and the open prayer with faith on, and neithe
 test('the help section names every cost, the cap, and the state and key of Slow for prayers', () => {
   const { api } = world();
   let html = api.skyHelpHTML();
-  for (const k of ['light', 'rain', 'ward', 'beckon']) assert.ok(html.includes(String(api.FAITH.cost[k])), `the ${k} cost`);
-  assert.ok(html.includes(`Spark ${api.FAITH.cost.light}, Rain ${api.FAITH.cost.rain}, Ward ${api.FAITH.cost.ward}, Beckon ${api.FAITH.cost.beckon}.`));
+  for (const k of ['light', 'rain', 'calm', 'ward', 'beckon']) assert.ok(html.includes(String(api.FAITH.cost[k])), `the ${k} cost`);
+  assert.ok(html.includes(`Spark ${api.FAITH.cost.light}, Rain ${api.FAITH.cost.rain}, Calm ${api.FAITH.cost.calm}, Ward ${api.FAITH.cost.ward}, Beckon ${api.FAITH.cost.beckon}.`));
+  assert.ok(html.includes('Calm stops a storm at once.'), 'the help says what Calm does');
+  assert.ok(html.includes('or a storm with no roof.'), 'the help names the storm prayer');
   assert.ok(html.includes(`stops at ${api.FAITH.graceCap}.`));
   assert.ok(html.includes('Slow for prayers is on. P switches it.'));
   assert.ok(html.includes('8×'));

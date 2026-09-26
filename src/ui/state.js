@@ -41,8 +41,9 @@ const SKY_TEXT = {
     lines: [
       'You are the sky. Each person believes in you, from 0 to 100. Their card shows how much.',
       'Belief gives you grace. Each believer gives a little every hour, and more when they believe more. Grace stops at {cap}.',
-      'People pray when they are in trouble: a cold fire in the evening, no food, a wolf in the dark, or a wildfire near the camp. A prayer shows as a chip with the time left, and a \u2726 over the one who prays.',
-      'Each miracle costs grace. Spark {light}, Rain {rain}, Ward {ward}, Beckon {beckon}. Nudge is free.',
+      'People pray when they are in trouble: a cold fire in the evening, no food, a wolf in the dark, a wildfire near the camp, or a storm with no roof. A prayer shows as a chip with the time left, and a \u2726 over the one who prays.',
+      'Each miracle costs grace. Spark {light}, Rain {rain}, Calm {calm}, Ward {ward}, Beckon {beckon}. Nudge is free.',
+      'Calm stops a storm at once. With no storm, it does nothing and costs nothing.',
       'If the sky answers, the one who prayed believes more, and so do the others. If they manage by their own hands, they believe a little less. If nobody answers, they believe much less.',
       'Belief fades a little every day. If nobody believes, the sky is forgotten, and it cannot act.',
       'When a season ends, a card shows how it went.',
@@ -58,6 +59,8 @@ const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
   { id: 'light',   key: 'f', label: 'Spark',      oneShot: true,  act: 'light',  hint: 'Light the fire pit under the cursor. Enter or click lights it. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
   { id: 'rain',    key: 'r', label: 'Rain',       oneShot: true,  act: 'rain',   faith: true, hint: 'Make it rain now, over the whole valley. Rain puts out a wildfire, and it soaks everyone without a roof. Enter or click calls the rain. Shift makes the tool stick.' },
+  /* L is free in every focus. C is the borders, and S is in the stage chord. */
+  { id: 'calm',    key: 'l', label: 'Calm',       oneShot: true,  act: 'calm',   faith: true, hint: 'Stop the rain now, over the whole valley. People out in it can get dry, but a wildfire it was putting out burns on. Enter or click stops the rain. Shift makes the tool stick.' },
   { id: 'ward',    key: 'd', label: 'Ward',       oneShot: true,  act: 'ward',   faith: true, hint: 'Guard the ground under the cursor for a day. Wolves and foxes near it run, and keep away. Enter or click guards it. Shift makes the tool stick.' },
   { id: 'beckon',  key: 'b', label: 'Beckon',     oneShot: true,  act: 'beckon', faith: true, hint: 'Call the deer and rabbits near the cursor to come to it. Wolves may follow them. Enter or click calls them. Shift makes the tool stick.' },
   { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
