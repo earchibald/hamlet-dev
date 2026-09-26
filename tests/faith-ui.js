@@ -123,6 +123,7 @@ test('with faith on the tools are Spark, Rain, Ward, and Beckon, each with its c
     assert.ok(/Enter/.test(by[id].hint), `${id} hint says Enter`);
   }
   assert.equal(by.nudge.cost, null, 'Nudge stays free'); assert.equal(by.inspect.cost, null);
+  for (const l of ['Spark', 'Rain', 'Ward', 'Beckon', 'Rain, and keep it']) assert.ok(api.paletteRows().some(r => r.label === l), `the palette offers ${l} in a played world`);
   const html = api.toolsHTML();
   assert.match(html, /data-tool="rain"[^>]*>Rain<span class="cost">40<\/span><kbd>R<\/kbd>/);
   assert.match(html, /data-tool="light"[^>]*>Spark<span class="cost">15<\/span><kbd>F<\/kbd>/);

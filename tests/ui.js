@@ -570,12 +570,14 @@ test('Esc answers from every focus: the map, a drawer, a window, and each dialog
 });
 
 test('the palette lists every static action', () => {
-  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS, 'paletteRows']);
+  const api = loadUI(['state', 'derive', 'keys', 'actions'], [...DERIVE, ...KEYS, 'paletteRows', 'TOOLS']);
   api.startWorld('r'); api.camp = api.camps[0]; api.notePulses();
   const labels = new Set(api.paletteRows().map(r => r.label));
   const seen = new Set();
   for (const k of api.KEYMAP){
     if (k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
+    /* This world is watched, so the miracles are not commands in it. tests/faith-ui.js checks both sides. */
+    if ((k.action === 'tool' || k.action === 'toolSticky') && api.TOOLS.find(t => t.id === k.arg).faith) continue;
     if (seen.has(k.label)) continue; seen.add(k.label);
     assert.ok(labels.has(k.label), `the palette has no row for ${k.label}`);
   }
@@ -1162,7 +1164,7 @@ function inTheAges(seed = 'alpha', n = 6){
 test('in the ages the view model holds: no gauges, no chips, no goals, and the gods are the people', () => {
   const api = inTheAges();
   assert.equal(api.inAges(), true);
-  assert.deepEqual(api.gauges(), { hearth: null, food: null, water: null, beds: null });
+  assert.deepEqual(api.gauges(), { grace: null, hearth: null, food: null, water: null, beds: null });
   assert.deepEqual(api.alerts(), []);
   assert.deepEqual(api.drawerRows('goals'), []);
   const people = api.drawerRows('people');

@@ -35,6 +35,10 @@ function openHurry(){
 }
 function openHelp(){
   closeDialogs();
+  /* The section on playing as the sky comes first, as it does in the dialog. The lore is written last:
+     tests/ui.js reads the help through a stub that gives every id one element, so the last write is
+     the one it sees, and the lore is what it checks. */
+  $('helpSky').innerHTML = skyHelpHTML();
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
@@ -49,7 +53,6 @@ function openHelp(){
     <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
     ${valleyName() ? `<li>This valley: ${esc(valleyName())}.</li>` : ''}
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
-  $('helpSky').innerHTML = skyHelpHTML();
   setFocus('dialog:help'); $('help').showModal();
 }
 /* The help page's section on playing as the sky. The costs come from FAITH.cost, and the key and the
