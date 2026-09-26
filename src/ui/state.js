@@ -24,7 +24,14 @@ let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'in
    advanceZoom and endZoom. The world does not step while it is set. */
 let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
-let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The speed the days open at when the player has none saved. At 1x a world day takes 24 real minutes
+   and the first fire pit about 4, so a new player waited through a still valley. 8x brings the pit in
+   about half a minute and a day in 3 minutes. It is not 64x, because at 64x a chronicle line is gone in
+   about a second, and the first fire is the line a new player must not miss. A speed read back from
+   storage wins over this one, so a returning player keeps the speed they left at. It must be a rung of
+   SPEEDS, or setSpeed throws. */
+const DAYS_SPEED = 8;
+let speed = DAYS_SPEED, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
    so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the

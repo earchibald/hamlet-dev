@@ -7384,7 +7384,14 @@ let cv, ctx, wcv, wctx, mcv, mctx, ocv, octx, zcv, zctx, dpr, P = {}, tool = 'in
    advanceZoom and endZoom. The world does not step while it is set. */
 let zoom = null;
 let hover = null, whover = null, mhover = null, tipTarget = null, tipAnchor = null;
-let speed = 1, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
+/* The speed the days open at when the player has none saved. At 1x a world day takes 24 real minutes
+   and the first fire pit about 4, so a new player waited through a still valley. 8x brings the pit in
+   about half a minute and a day in 3 minutes. It is not 64x, because at 64x a chronicle line is gone in
+   about a second, and the first fire is the line a new player must not miss. A speed read back from
+   storage wins over this one, so a returning player keeps the speed they left at. It must be a rung of
+   SPEEDS, or setSpeed throws. */
+const DAYS_SPEED = 8;
+let speed = DAYS_SPEED, paused = false, acc = 0, last = 0, lastUi = 0, chronKey = '', worldDirty = 0;
 /* How many world ticks the page draws in one real second at pace 1. A tick is one world second,
    so this is how much faster than life the valley runs when it is watched at the slowest pace.
    It lives here and not in the clock table because it is wall time, and wall time is the
@@ -10150,7 +10157,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed || DAYS_SPEED); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -10270,7 +10277,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed || DAYS_SPEED);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
@@ -10686,7 +10693,7 @@ function initUI(){
   });
   setTool('inspect');
   newWorld(randomSeed());
-  if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  if (!ui.savedSpeed) setSpeed(DAYS_SPEED); /* newWorld's restore() must read storage before any persist() can overwrite it */
   /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
   offerContinue();
   openStart();

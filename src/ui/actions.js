@@ -238,7 +238,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed || DAYS_SPEED); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -358,7 +358,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed || DAYS_SPEED);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing

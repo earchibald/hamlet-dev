@@ -14,7 +14,7 @@
     "perf": "node tests/perf/measure.js --seed r --days 10 --runs 3 --profile",
     "perf:ladder": "node tests/perf/measure.js --ladder --seed r --days 10 --runs 3 --profile",
     "ages": "node --test tests/ages.js",
-    "fast": "node --test tests/names.js tests/field.js tests/gods.js tests/become.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js tests/wanderer.js tests/snapshot.js tests/ui.js tests/clock.js tests/soak-guards.js tests/build.js tests/tasks.js tests/chronicle.js tests/itemgrid.js tests/garden.js tests/stalk.js tests/types.js tests/reachable.js tests/beats.js tests/beings-lazy.js tests/setclock.js tests/icons.js tests/people.js tests/trails.js tests/preview.js tests/zoom.js",
+    "fast": "node --test tests/names.js tests/field.js tests/gods.js tests/become.js tests/ages.js tests/settle.js tests/options.js tests/door.js tests/terrain.js tests/crafts.js tests/gnomes.js tests/dwellers.js tests/closing.js tests/wanderer.js tests/snapshot.js tests/ui.js tests/clock.js tests/soak-guards.js tests/build.js tests/tasks.js tests/chronicle.js tests/itemgrid.js tests/garden.js tests/stalk.js tests/types.js tests/reachable.js tests/beats.js tests/beings-lazy.js tests/setclock.js tests/icons.js tests/people.js tests/trails.js tests/preview.js tests/zoom.js tests/days-speed.js",
     "types": "node_modules/.bin/tsc -p tsconfig.sim.json --pretty false"
   },
   "devDependencies": {
