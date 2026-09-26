@@ -203,6 +203,15 @@ function graceGauge(){
 }
 /* The open prayers of one camp, oldest first. */
 const campPrayers = (c = camp) => skyPlayed() && faith && c ? faith.prayers.filter(p => !p.end && p.camp === c.id) : [];
+/* The open prayers of every camp, the chosen camp's first, and each camp's oldest first. A prayer in any
+   camp slows the game, so each one must be a chip the player can click. */
+function skyPrayers(c = camp){
+  if (!skyPlayed() || !faith) return [];
+  const open = faith.prayers.filter(p => !p.end);
+  return c ? open.filter(p => p.camp === c.id).concat(open.filter(p => p.camp !== c.id)) : open;
+}
+/* A prayer whose chip the player muted, here or everywhere. It keeps its chip hidden and does not slow the game. */
+const prayerMuted = p => isMuted('prayer', p.camp, prayerText(p));
 /* A person's open prayer, or null. A person never has two. */
 const prayerOf = a => skyPlayed() && faith ? faith.prayers.find(p => !p.end && p.who === a.id) || null : null;
 /* The ids of everyone praying now, in any camp, for the mark over their heads. */
@@ -329,8 +338,9 @@ function burningNearCamp(){
 function alerts(){
   if (inAges()) return [];
   const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
-  /* A prayer first: it is the one alert the player is asked to answer, so it takes Alt+1. */
-  for (const pr of campPrayers()) add('prayer', prayerText(pr), 'pray', { being: pr.who, after: timeLeft(pr.until - tick) });
+  /* A prayer first: it is the one alert the player is asked to answer, so it takes Alt+1. Every camp's
+     prayers are chips, and each is muted by its own camp, so the chip carries that camp's id. */
+  for (const pr of skyPrayers()) if (!prayerMuted(pr)) out.push({ n: out.length + 1, type: 'prayer', text: prayerText(pr), level: 'pray', being: pr.who, after: timeLeft(pr.until - tick), camp: pr.camp });
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
   else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });

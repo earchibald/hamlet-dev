@@ -21,7 +21,9 @@ let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; setFocus('dialog:mute'); $('mute').showModal(); }
 function muteChoice(k){
   if (!muteFor) return;
-  if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
+  /* A prayer chip can come from another camp, and it names that camp. Every other chip is the chosen camp's. */
+  const cid = muteFor.camp !== undefined ? muteFor.camp : camp.id;
+  if (k === 1) mute(muteFor.type, cid, muteFor.text); else if (k === 2) mute(muteFor.type, cid); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
 /* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it

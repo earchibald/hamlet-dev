@@ -38,6 +38,7 @@ const NAMES = ['ui', 'SKY_TEXT', 'TOOLS', 'KEYMAP', 'keyAction', 'keyName', 'ACT
 const EXTRA = {
   getTool: '() => tool', getSpeed: '() => speed', putSpeed: '(v) => { speed = v; }',
   setUp: '() => { wcv = {}; ocv = {}; dpr = 1; }',
+  setEra: '(v) => { era = v; }', stubDraw: '() => { draw = () => {}; }', getPaused: '() => paused', frame: '(now) => frame(now)',
 };
 
 /* A world on seed r in the days. With `faith`, its record is started and every living person believes. */
@@ -182,14 +183,24 @@ test('an open prayer is the first chip: who prays, for what, the time left, and 
   assert.deepEqual(api.prayingNow(), {}, 'and no mark');
 });
 
-test('a prayer in another camp is not a chip in this one', () => {
-  const { api, a } = world();
+/* A prayer in any camp slows the game, so each one must be a chip the player can click. The chosen
+   camp's come first, so its own prayer keeps Alt+1. */
+test('a prayer in another camp is a chip too, after the chosen camp\'s, and it mutes by its own camp', () => {
+  const { api, a, c } = world();
   const c2 = api.makeCamp('The second camp');
   const b = api.makeBeing('human', a.x, a.y); b.camp = c2; api.beings.push(b); api.giveBeliefs();
   pray(api, b, 'hunger');
-  assert.ok(!api.alerts().some(x => x.type === 'prayer'), 'the chosen camp shows its own prayers');
+  pray(api, a, 'fire');
+  const chips = api.alerts().filter(x => x.type === 'prayer');
+  assert.deepEqual(chips.map(x => x.text), [`${a.name} prays for fire`, `${b.name} prays for food`], 'the chosen camp\'s prayer first, then the other camp\'s');
+  assert.deepEqual(chips.map(x => x.camp), [c.id, c2.id]);
+  assert.equal(chips[1].being, b.id, 'the chip jumps to the one who prays');
   api.camp = c2;
-  assert.equal(api.alerts()[0].text, `${b.name} prays for food`);
+  assert.deepEqual(api.alerts().filter(x => x.type === 'prayer').map(x => x.text), [`${b.name} prays for food`, `${a.name} prays for fire`], 'the other camp chosen, its prayer comes first');
+  api.camp = c;
+  withPage(() => { api.ACTIONS.muteMenu(2); api.ACTIONS.muteChoice(1); });
+  assert.ok(api.ui.mutes.has(`prayer:${c2.id}:${b.name} prays for food`), 'the mute names the prayer\'s own camp, not the chosen one');
+  assert.deepEqual(api.alerts().filter(x => x.type === 'prayer').map(x => x.text), [`${a.name} prays for fire`]);
 });
 
 test('prayerSpeed: a prayer not yet seen brings a speed above the default down to it, and nothing else does', () => {
@@ -228,6 +239,62 @@ test('a new prayer slows the game once and says why; the switch turns it off; th
       assert.equal(api.getSpeed(), 64, 'with the switch off, a new prayer keeps the speed');
       assert.ok(api.ui.seenPrayers[api.faith.prayers[1].id], 'but the prayer is seen, so turning it on later does not slow for it');
     }
+  });
+});
+
+/* A chip the player muted is a prayer the player chose not to hear, so it must not stop the game. */
+test('a prayer whose chip is muted does not slow the game, and is seen', () => {
+  const { api, a, c } = world();
+  withPage(() => {
+    api.resetSky(); api.putSpeed(64); api.ui.note = null;
+    api.mute('prayer', c.id, `${a.name} prays for fire`);
+    const p = pray(api, a, 'fire');
+    api.notePrayers();
+    assert.equal(api.getSpeed(), 64, 'a muted prayer keeps the speed');
+    assert.equal(api.ui.note, null, 'and says nothing');
+    assert.ok(api.ui.seenPrayers[p.id], 'it is seen, so unmuting it later does not slow for it');
+    api.ui.mutes.clear(); api.mute('prayer', 0);
+    const b = api.makeBeing('human', a.x, a.y); b.camp = a.camp; api.beings.push(b); api.giveBeliefs();
+    pray(api, b, 'hunger'); api.notePrayers();
+    assert.equal(api.getSpeed(), 64, 'a prayer muted everywhere keeps the speed');
+    api.ui.mutes.clear();
+    p.end = 'sky'; pray(api, a, 'wolf'); api.notePrayers();
+    assert.equal(api.getSpeed(), 8, 'sanity: an unmuted prayer still slows it');
+  });
+});
+
+/* resetSky(true) marks a loaded world's prayers seen. Without it, every load at 64x with a prayer open
+   dropped to 8x and said someone prays. */
+test('a load at 64x with an open prayer does not slow the game or say that anyone prays', () => {
+  const { api, a } = world();
+  withPage(() => {
+    pray(api, a);
+    api.putSpeed(64); api.ui.note = null;
+    api.resetSky(true); api.notePrayers();
+    assert.equal(api.getSpeed(), 64);
+    assert.equal(api.ui.note, null);
+    api.resetSky(); api.notePrayers();
+    assert.equal(api.getSpeed(), 8, 'sanity: a new world with the same prayer open would slow');
+  });
+});
+
+test('notePrayers does nothing in a watched world or in the ages', () => {
+  withPage(() => {
+    const off = world(false).api;
+    off.faith = { prayers: [{ id: 1, kind: 'fire', who: off.firstPerson().id, camp: off.camps[0].id, at: 0, until: 1e9, end: null }], tallies: [] };
+    off.resetSky(); off.putSpeed(64); off.ui.note = null;
+    off.notePrayers();
+    assert.equal(off.getSpeed(), 64, 'a watched world keeps its speed');
+    assert.equal(off.ui.note, null);
+    assert.deepEqual(off.ui.seenPrayers, {}, 'and reads no prayer');
+    const { api, a } = world();
+    pray(api, a); api.resetSky(); api.putSpeed(64); api.ui.note = null;
+    api.setEra('gods');
+    api.notePrayers();
+    assert.equal(api.getSpeed(), 64, 'the ages keep their speed');
+    assert.deepEqual(api.ui.seenPrayers, {}, 'and read no prayer');
+    api.setEra('days'); api.notePrayers();
+    assert.equal(api.getSpeed(), 8, 'sanity: the same world in the days slows');
   });
 });
 
@@ -311,6 +378,31 @@ test('a new tally opens its card once; a watched world never opens one; a load d
       off.resetSky(); off.noteTallies();
       assert.equal(opened.length, 2, 'a watched world never opens the card');
     } finally { delete global.openTally; delete global.anyDialogOpen; }
+  });
+});
+
+/* The frame loop steps the days only when holdDays() is false, and holdDays() reads the card's dialog. */
+test('the season card holds the days: the frame loop does not step, and neither do Step and Hour', () => {
+  const { api } = world(true, FILES.concat('main'));
+  withPage(() => {
+    const card = document.getElementById('tally');
+    global.requestAnimationFrame = () => {};
+    try {
+      api.stubDraw(); api.ui.autosaveDay = 1e9; api.putSpeed(8);
+      const t0 = api.tick;
+      card.open = true;
+      api.frame(1000); api.frame(1250);
+      assert.equal(api.tick, t0, 'a frame of 250 ms at 8x steps nothing behind the card');
+      api.ACTIONS.step(); api.ACTIONS.hour();
+      assert.equal(api.tick, t0, 'Step and Hour do nothing behind the card');
+      assert.equal(api.getPaused(), false, 'and do not pause the world');
+      card.open = false;
+      api.frame(1500);
+      assert.ok(api.tick > t0, `sanity: with the card closed, the frame steps (${api.tick - t0} ticks)`);
+      const t1 = api.tick;
+      api.ACTIONS.step();
+      assert.equal(api.tick, t1 + 1, 'sanity: Step steps one tick');
+    } finally { delete global.requestAnimationFrame; }
   });
 });
 

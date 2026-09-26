@@ -202,17 +202,18 @@ function resetSky(loaded){
   if (!toolShown(TOOLS.find(t => t.id === tool))){ tool = 'inspect'; ui.sticky = false; }
 }
 /* Every frame. A prayer the view has not seen drops the speed to the days default, if the player keeps
-   Slow for prayers on and the speed is higher. The drop is not the player's choice, so it leaves
-   ui.speedChosen and ui.savedSpeed alone. */
+   Slow for prayers on and the speed is higher. A prayer whose chip is muted is seen but slows nothing.
+   The drop is not the player's choice, so it leaves ui.speedChosen and ui.savedSpeed alone. */
 function notePrayers(){
   if (!skyPlayed() || !faith) return;
   const fresh = faith.prayers.filter(p => !p.end && !ui.seenPrayers[p.id]);
   if (!fresh.length) return;
-  const s = ui.slowForPrayers ? prayerSpeed(ui.seenPrayers, faith.prayers, speed) : speed;
+  const heard = fresh.filter(p => !prayerMuted(p));
+  const s = ui.slowForPrayers ? prayerSpeed(ui.seenPrayers, heard, speed) : speed;
   for (const p of fresh) ui.seenPrayers[p.id] = true;
   if (s === speed) return;
   setSpeed(s);
-  const a = beingById(fresh[0].who);
+  const a = beingById(heard[0].who);
   say(faithSay(SKY_TEXT.slowed, { name: a ? a.name : FAITH_TEXT.someone }));
 }
 /* Every frame. A season that has ended opens its card, once no other dialog is open. */
@@ -485,9 +486,10 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
-     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up.
+     Step and Hour do nothing while the season's card is open, since the days hold behind it. */
+  step(){ if (holdDays()) return; setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
+  hour(){ if (holdDays()) return; if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
