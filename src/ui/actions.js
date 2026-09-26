@@ -71,7 +71,7 @@ function pruneTrails(now){
     if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
   }
 }
-/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+/* The template's speed labels are only right for the days; showLadder relabels them, not the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
   document.querySelectorAll('#speeds .btn').forEach(b => {
@@ -93,8 +93,16 @@ function relabelSpeeds(labels, key){
 function onLadder(rungs, v, fn, name){
   if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
 }
-function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* The buttons show the ladder of the era that runs, whichever setter was called. setSpeed is called in
+   the ages too: initUI sets the days' speed after newWorld has begun the ages, and it used to relabel the
+   buttons 1× to 256× and light the first one while the ages ran at single pace behind the start dialog. */
+function showLadder(){
+  const ages = inAges(), key = ages ? 'pace' : 'speed', now = ages ? pace : speed;
+  relabelSpeeds(ages ? PACE_LABEL : SPEED_LABEL, key);
+  document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset[key]) === now));
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; showLadder(); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; showLadder(); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
