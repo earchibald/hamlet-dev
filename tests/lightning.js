@@ -9,14 +9,15 @@ const assert = require('node:assert/strict');
 const { load } = require('../src/sim');
 const { collect } = require('./lib/run');
 
-/* The bound comes from the rates in CLOCK, not from the design note. design/notes.md says a strike near a
-   cold camp comes about once in 2.5 days. The code gives less than that, and the user will rule on which is
-   right. In spring the code gives this:
+/* The bound comes from the rates in CLOCK. design/notes.md says a strike near a cold camp comes about once in
+   2.5 days. The code once gave less than that, and the user ruled for the design: the code now matches it.
+   The test below, 'a cold camp waits about 2.5 days', checks the design's figure. This function gives the
+   bound for the run on moss-crag-87. In spring the code gives this:
      - a storm lasts `length + lengthSpread / 2` on average, and the next one starts `gap + gapSpread / 2`
        after it ends, so a storm begins about every 3.8 world days;
      - during a storm, a strike near a cold camp comes at `rate.lightningOut` a tick, so a storm of average
-       length brings one with the chance 1 - (1 - rate)^length, about 0.65;
-     - so a storm that brings a strike comes about once in 5.8 world days.
+       length brings one with the chance 1 - (1 - rate)^length, about 0.93;
+     - so a storm that brings a strike comes about once in 4.1 world days.
    The bound is three of those gaps after the pit is laid.
    On the code before PR 135 this seed never lit in twenty days. At each of the four strikes near the camp,
    on days 8.00, 12.40, 19.14 and 19.16, the founder had no path to any tile beside the fire, measured at
@@ -29,6 +30,31 @@ function strikeGapDays(api){
   const length = storm.length + storm.lengthSpread / 2, cycle = storm.gap + storm.gapSpread / 2 + length;
   const bringsOne = api.rollFor(rate.lightningOut, Math.round(length));
   return cycle / bringsOne / api.DAY;
+}
+/* The mean wait, in world days, from a moment the pit is laid and cold to the first strike near the camp.
+   This is the figure the player lives through, and the one design/notes.md gives. It is exact for the
+   weather model in updateWeather and the roll in tryLightning, not a sample:
+     - storms start and end on a beat, so a storm lasts ceil(len / beat) beats and a gap ceil(gap / beat),
+       for each value `rint` can draw;
+     - during a storm, the camp's beat rolls `rollFor(rate.lightningOut, beat)` once;
+     - the pit is laid at a moment spread evenly over the weather's cycle, in one season. Summer's gap is
+       `summerGap`. Sleet is a storm too, so winter is like spring and autumn.
+   Es is the mean wait from the first beat of a storm. A storm with no strike costs its length and a gap,
+   and the wait starts again at the next storm. */
+function coldWaitDays(api, season){
+  const { storm } = api.CLOCK, beat = api.CLOCK.every.cellular;
+  const q = 1 - api.rollFor(api.CLOCK.rate.lightningOut, beat);
+  const beatsOf = (base, spread) => { const out = []; for (let k = 0; k < spread; k++) out.push(Math.ceil((base + k) / beat)); return out; };
+  const Ls = beatsOf(storm.length, storm.lengthSpread), Gs = beatsOf(season === 'summer' ? storm.summerGap : storm.gap, storm.gapSpread);
+  const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  /* With m beats of storm left: the mean beats until the strike, or m if none comes, and the chance of none. */
+  const upTo = m => q * (1 - Math.pow(q, m)) / (1 - q), none = m => Math.pow(q, m);
+  const EG = mean(Gs), EL = mean(Ls);
+  const Es = (mean(Ls.map(upTo)) + mean(Ls.map(none)) * EG) / (1 - mean(Ls.map(none)));
+  /* Laid in a gap: wait out the rest of it, then Es. Laid in a storm: roll the beats left, then as above. */
+  const inGap = mean(Gs.map(g => g * (g + 1) / 2 + g * Es));
+  const inStorm = mean(Ls.map(L => { let s = 0; for (let m = 1; m <= L; m++) s += upTo(m) + none(m) * (EG + Es); return s; }));
+  return (inGap + inStorm) / (EL + EG) * beat / api.DAY;
 }
 const GAPS = 3;
 const LAID = /It only needs a spark\./, STRIKE = /^Lightning strikes a pine .* near the camp\./, GRAB = /grabs a burning branch from the blaze/, HEARTH = /sets the ember in the pit\. The wood catches, and the camp has a hearth\./;
@@ -50,9 +76,19 @@ function leftAlone(seed){
   return { api, events: c.events, laidAt, limit, gap };
 }
 
-test('the bound reads the code\'s own rate: a storm with a strike about once in 5.8 world days in spring', () => {
+test('the bound reads the code\'s own rate: a storm with a strike about once in 4.1 world days in spring', () => {
   const gap = strikeGapDays(load());
-  assert.ok(gap > 5 && gap < 7, `the gap is ${gap.toFixed(2)} days; if the rates were retuned, rewrite the comment above strikeGapDays`);
+  assert.ok(gap > 3.8 && gap < 4.4, `the gap is ${gap.toFixed(2)} days; if the rates were retuned, rewrite the comment above strikeGapDays`);
+});
+
+/* design/notes.md, section 4: with the hearth out, lightning strikes near a camp about once in 2.5 days.
+   The mean over the year, each season weighted by its length, must be near that. */
+test('a cold camp waits about 2.5 days for a strike, as the design says', () => {
+  const api = load();
+  const per = api.SEASONS.map(s => coldWaitDays(api, s));
+  const year = per.reduce((s, w, i) => s + w * api.SEASON_LENGTHS[i], 0) / api.SEASON_LENGTHS.reduce((a, b) => a + b, 0);
+  const told = api.SEASONS.map((s, i) => `${s} ${per[i].toFixed(2)}`).join(', ');
+  assert.ok(year > 2.2 && year < 2.8, `a cold camp waits ${year.toFixed(2)} days on average for a strike (${told}); the design says about 2.5`);
 });
 
 /* The run that arrives by simulating. It does not tell which part of the fix it needs; the hand-built tests

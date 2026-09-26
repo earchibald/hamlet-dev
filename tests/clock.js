@@ -190,7 +190,7 @@ test('the camp rules and the cellular systems read the table', () => {
   assert.deepEqual(C.storm, { first: T(1500), firstSpread: T(2000), length: T(150), lengthSpread: T(300), gap: T(2000), summerGap: T(4000), gapSpread: T(3000) });
   assert.equal(C.food.cookedKeeps, T(1800)); assert.equal(C.food.berriesKeep, T(3500));
   const R = load().tickRate;
-  assert.equal(C.rate.lightningLit, R(0.0006)); assert.equal(C.rate.lightningOut, R(0.0035)); assert.equal(C.rate.strayLightning, R(0.0008));
+  assert.equal(C.rate.lightningLit, R(0.0006)); assert.equal(C.rate.lightningOut, R(0.009)); assert.equal(C.rate.strayLightning, R(0.0008));
   assert.equal(C.plant.samples, R(60)); assert.equal(C.plant.bushOld, load().days(60));
 });
 

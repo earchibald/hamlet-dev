@@ -91,7 +91,9 @@ const isNight = (t = tick) => { const s = t % DAY; return s >= CLOCK.night.falls
 const CLOCK = {
   rate: {
     pitBurn: tickRate(0.25),   // fuel the lit pit burns (a burning tile's rate is `fire.burn`)
-    lightningLit: tickRate(0.0006), lightningOut: tickRate(0.0035),   // near a camp in a storm, hearth lit or out
+    lightningLit: tickRate(0.0006), lightningOut: tickRate(0.009),   // near a camp in a storm, hearth lit or out
+    /* With the hearth out, nearly every storm brings a strike, so a cold camp waits about 2.5 days for one, as
+       design/notes.md says. At 0.0035 it waited 4.65 days, and 6.24 in summer. tests/lightning.js computes it. */
     strayLightning: tickRate(0.0008),
     fireWarms: tickRate(0.5),          // warmth gained within 3 tiles of a lit pit
     freezeHurts: tickRate(0.03), starveHurts: tickRate(0.04), heals: tickRate(0.01), fireHurts: tickRate(2.5),
