@@ -8,7 +8,7 @@ Written on 26 September 2026 at the user's request: "Evaluate what we have, deve
 |---|---|---|---|
 | 1 | **Belief and grace** | The people believe in the sky, or not. Belief is the sky's power. Every miracle costs grace. | Built |
 | 2 | **Prayers** | The simulation asks the player for help. Each prayer has a person, a need, and a deadline. | Built |
-| 3 | **Four miracles** | Spark, Rain, Ward, and Beckon. Each one helps, and each one has a cost in the world. | Built |
+| 3 | **Five miracles** | Spark, Rain, Ward, Beckon, and Calm. Each one helps, and each one has a cost in the world. | Built |
 | 4 | **Credit** | People thank the sky only when the sky acted. A need met by their own hands teaches them they do not need you. | Built |
 | 5 | **The story camera** | The game slows down when a prayer arrives, so the player is present for the moment that matters. | Built, with a switch |
 | 6 | **Seasons as chapters** | Each season ends with a tally card: who believes, which prayers you answered, who was born and who died. | Built |
@@ -70,7 +70,7 @@ The best part of this loop is that the simulation's own growth is the difficulty
 | The founder's belief at the start | 40 | They are alone, and they looked up. |
 | A newcomer's belief | 20 | They heard stories of the sky on the road. |
 | A child's belief | The mean of the parents | Belief is taught. |
-| Belief fades | 1 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. |
+| Belief fades | 1 a day, down to a floor of 5 | Faith that is never met fades. It does not go to zero by itself. No loss takes belief under the floor. That holds for the daily fade, for a prayer the sky left unanswered, and for a trouble the people met by their own hands. Seeing a miracle, or an answered prayer, can lift belief again. |
 | Seeing a miracle | +2 belief, at most once a day for each person | A person who stands within 10 tiles sees it. Two Sparks in one evening do not buy belief twice. |
 | Grace at the start | 30 | Enough for one Spark, so the first fire prayer can be answered. At 0, the founder had only 4 grace by the first evening, and the first prayer was always silent. |
 | Grace income | Each person gives belief / 100 grace each world hour | A camp of five at belief 60 gives 3 grace an hour, or 72 a day. |
@@ -85,20 +85,26 @@ A prayer is a plain record: who prays, what for, when, the deadline, and how it 
 | Kind | When a person prays | The deadline | The miracle that answers it |
 |---|---|---|---|
 | Fire | The pit is laid with wood and is cold, and it is evening or the person is cold. The coldest person prays. | The next dawn or 12 hours, whichever is later | Spark on the pit |
-| Hunger | The camp's food is gone and the person is hungry. The hungriest person prays. | 1 day | Beckon near the camp or its snares |
-| Wolf | A wolf or a fox is near the person at night, and they are away from a lit fire. The prayer is that person's: it ends when no wolf or fox is near them. | 1 hour | Ward near the person |
-| Wildfire | A fire burns in the open near the camp. | 6 hours | Rain |
+| Hunger | The stash holds less than half the camp's aim, and someone's food is under 50. The hungriest person prays. The prayer ends when the stash is back to half the aim, not when the one who prayed has eaten. | 1 day | Beckon near the camp or its snares |
+| Wolf | A wolf or a fox is within 8 tiles of the person at night, and they are more than 8 tiles from a lit fire. A sleeper prays too, in a dream: "Aki dreams of wolves and prays in their sleep." The prayer is that person's: it ends when no wolf or fox is near them. | 1 hour | Ward near the person |
+| Wildfire | At least 3 tiles burn in the open within 12 tiles of the camp, not counting the pit. One pine struck by lightning, which gives the camp its first ember, is not a wildfire. | 6 hours | Rain |
+| Storm | It storms, and someone in the camp is out in it with no roof and a warmth under 95. The coldest such person prays for the rain to stop. The prayer ends when the storm ends. When a storm stops on its own, nobody stopped it, so belief does not move: "The rain stopped on its own. Aki can get dry." | 6 hours, or the storm's end if that is sooner | Calm |
+
+Only the wolf prayer comes in a dream. A sleeper does not pray about fire, food, a wildfire, or a storm.
+
+The thresholds were set by eight world days on seeds `r` and `moss-crag-87`, with a player and without one. With a lit fire in spring, a person out in a storm mostly stays at 94 to 100 warmth. At a threshold of 60, one storm in ten made anyone pray. At 95, three did. The stash fell under half its aim on both seeds, while the hungriest person's food was between 20 and 70.
 
 A camp has at most one prayer of each kind open at a time. A trouble that goes on brings a new prayer a day after the last one opened: a cold pit brings a prayer each evening, and an empty stash one each day. If the one who prayed dies, someone else may pray at once. A prayer whose camp is gone ends with no line and moves nobody. A prayer draws no random number, so a world with faith switched off replays the old story exactly.
 
-### 3.3 Four miracles (built)
+### 3.3 Five miracles (built)
 
 | Miracle | Key | Grace | What it does | What it can cost |
 |---|---|---|---|---|
 | Spark | L | 15 | Lights the pit, or sets a pine smouldering. This is the old Light fire. | A strike on a pine in dry summer can start a wildfire. |
 | Rain | R | 40 | A storm starts now. | Rain soaks everyone who is not under a roof, and the pit burns faster in the rain. |
 | Ward | D | 15 | Every wolf and fox near the spot flees, and keeps away from it for a day. With no wolf or fox near the spot, it is refused and costs nothing. | It does not kill them. They come back hungry. |
-| Beckon | B | 20 | Deer and rabbits nearby walk toward the spot. With no deer or rabbit near enough, it is refused and costs nothing. | Wolves hunt what they follow. |
+| Beckon | B | 20 | Up to 4 deer and rabbits within 60 tiles walk toward the spot. With no deer or rabbit near enough, it is refused and costs nothing. At 30 tiles, the nearest animal was 45 to 66 tiles from a hungry camp, and every Beckon was refused. | Wolves hunt what they follow. |
+| Calm | none yet | 25 | The storm ends now, as if it had ended on its own. The next storm still comes when it would have. With no storm, the Calm is refused and costs nothing: "The sky is already clear." | The rain that was quenching a wildfire stops too. |
 | Nudge | N | 0 | The old nudge. It stays free. | Nothing. |
 
 Every miracle passes the door, so it is logged and replays.
