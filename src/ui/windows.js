@@ -47,7 +47,7 @@ function wireWindows(){
     setFocus(`window:${w.id}`); ui.windows = [...ui.windows.filter(x => x !== w), w]; renderUI(true);
     if (e.target.closest('[data-close]')){ winClose(w.id); persist(); renderUI(true); return; }
     const f = e.target.closest('[data-follow]'); if (f){ const id = Number(f.dataset.follow); followId = followId === id ? null : id; renderUI(true); return; }
-    const grip = e.target.closest('.grip'), bar = e.target.closest('.bar');
+    const grip = e.target.closest('.grip'), bar = e.target.closest('.win > .bar');
     if (!grip && !bar) return;
     drag = { w, grip: !!grip, x0: e.clientX, y0: e.clientY, x: w.x, y: w.y, wd: w.w, ht: w.h }; el.setPointerCapture(e.pointerId); e.preventDefault();
   });

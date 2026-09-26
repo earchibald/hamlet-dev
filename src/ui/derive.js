@@ -601,7 +601,7 @@ function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && s
 const WIN_STEP = 24;
 /* A window's title bar is its only handle. A bar pushed off the page cannot be dragged back, so every
    window is kept where its whole bar shows: on open, on drag, and when the page is resized. `area` is
-   the window layer's size in px, from winArea() in windows.js. The window may hang off the bottom, but
+   the window layer's size in px, from winArea() in actions.js. The window may hang off the bottom, but
    never by its bar. From the grip the corner stays on the page, so the window can always be shrunk.
    With no area (the tests that drive winOpen in Node) the rect is left as it is. */
 const WIN_MIN_W = 220, WIN_MIN_H = 120, WIN_BAR = 32;

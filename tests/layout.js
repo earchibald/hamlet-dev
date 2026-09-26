@@ -66,19 +66,43 @@ test('the drag handler clamps both a move and a resize', () => {
 });
 test('a page resize pulls every window back', () => {
   assert.match(src('src/ui/main.js'), /window\.addEventListener\('resize', fitWindows\)/);
-  assert.match(src('src/ui/actions.js'), /function fitWindows\(\)\{[^\n]*winClamp\(w, area\)/);
+});
+/* fitWindows reads the window layer through document, and repaints through renderWindows. Both are
+   stubbed for the call. A shrink moves the window, and a regrow finds it at its old size. */
+test('a page resize moves a window but keeps its size', () => {
+  const rig = loadUI(['state', 'icons', 'derive', 'keys', 'marks', 'map', 'dialogs', 'actions'], ['ui', 'fitWindows']);
+  let area = { clientWidth: 1000, clientHeight: 382 };
+  global.document = { getElementById: id => id === 'windows' ? area : null };
+  global.renderWindows = () => {};
+  try {
+    rig.ui.windows = [{ id: 1, kind: 'inspect', target: { being: 1 }, x: 900, y: 500, w: 330, h: 420 }];
+    rig.fitWindows();
+    assert.deepEqual(rig.ui.windows[0], { id: 1, kind: 'inspect', target: { being: 1 }, x: 670, y: 382 - api.WIN_BAR, w: 330, h: 420 });
+    area = { clientWidth: 1440, clientHeight: 836 }; rig.fitWindows();
+    assert.equal(rig.ui.windows[0].h, 420, 'the window is whole again when the page grows back');
+  } finally { delete global.document; delete global.renderWindows; }
+});
+test('a press on a need bar in a card does not start a drag', () => {
+  assert.match(src('src/ui/windows.js'), /bar = e\.target\.closest\('\.win > \.bar'\)/);
 });
 
 /* These read the built page. They pin the text of each rule. A later rule that overrides one would
    still pass here; the WebKit screenshots in the pull request are the evidence for the layout. */
 const page = src('dist/hearth-sim.html');
 test('the window title bar resets the progress bar rule it shares a class with', () => {
-  assert.match(page, /\.win \.bar\{height:auto;overflow:visible;/);
+  assert.match(page, /\.win > \.bar\{height:auto;overflow:visible;/);
+});
+/* The need bars in an inspector's card are .bar elements inside the window. A rule on .win .bar
+   gave them the title bar's padding and flex, and their fill came out 0 px high. */
+test('no window rule reaches the need bars in a card', () => {
+  assert.doesNotMatch(page, /^\.win \.bar[ {]/m);
 });
 test('the map is centred beside the drawer column', () => {
   assert.match(page, /\.mapbox \.views\{[^}]*justify-content:center\}/);
-  assert.match(page, /\.mapbox \.views::after\{content:"";flex:0 1000 392px\}/);
+  assert.match(page, /\.mapbox \.views::after\{content:"";flex:0 1000 calc\(var\(--drawer-w\) \+ var\(--drawer-right\) \+ var\(--drawer-gap\)\)\}/);
+  assert.match(page, /#drawers\{position:absolute;right:var\(--drawer-right\);top:10px;bottom:10px;width:var\(--drawer-w\);/);
 });
-test('the Goals drawer keeps room for one whole goal', () => {
-  assert.match(page, /\.drawer\[data-drawer="goals"\]\{min-height:190px\}/);
+test('the Goals drawer keeps room for one whole goal, and every drawer keeps its header', () => {
+  assert.match(page, /\.drawer\[data-drawer="goals"\]\{min-height:min\(190px,28vh\)\}/);
+  assert.match(page, /\.drawer\{flex:1 1 0;min-height:70px;/);
 });

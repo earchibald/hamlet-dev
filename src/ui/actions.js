@@ -120,8 +120,9 @@ function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
 /* The size of the layer the windows sit in, which winClamp keeps every title bar inside. It is null
    when the layer has no size, or no page at all (a test rig in Node), and then nothing is clamped. */
 function winArea(){ const box = typeof document !== 'undefined' && document.getElementById ? $('windows') : null; return box && box.clientWidth > 0 && box.clientHeight > 0 ? { w: box.clientWidth, h: box.clientHeight } : null; }
-/* On a page resize every open window is pulled back until its title bar shows. */
-function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows) Object.assign(w, winClamp(w, area)); renderWindows(); }
+/* On a page resize every open window is pulled back until its title bar shows. Only the place moves:
+   a window keeps its size, so it is whole again when the page grows back. */
+function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows){ const c = winClamp(w, area); w.x = c.x; w.y = c.y; } renderWindows(); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
    The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){

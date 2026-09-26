@@ -94,13 +94,13 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
-.mapbox{position:relative;overflow:hidden;background:var(--panel)}
+.mapbox{position:relative;overflow:hidden;background:var(--panel);--drawer-w:330px;--drawer-right:52px;--drawer-gap:10px}
 /* The map is centred in the room left of the drawer column, open or shut, so it holds still when a
    drawer opens or shuts and a drawer does not cover it. The room is made by a spacer as wide as the
-   column (drawers 330 px, at 52 px from the edge, and a 10 px gap). The spacer gives up its width
-   first, so on a narrow page the map moves left before it is cut. */
+   column. The spacer reads the same custom properties as #drawers, so the two cannot drift apart. It
+   gives up its width first, so on a narrow page the map moves left before it is cut. */
 .mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-.mapbox .views::after{content:"";flex:0 1000 392px}
+.mapbox .views::after{content:"";flex:0 1000 calc(var(--drawer-w) + var(--drawer-right) + var(--drawer-gap))}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -124,12 +124,14 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
 #drawerTabs .btn kbd{margin-left:0;margin-inline-start:5px}
-#drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+#drawers{position:absolute;right:var(--drawer-right);top:10px;bottom:10px;width:var(--drawer-w);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.drawer{flex:1 1 0;min-height:70px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
-/* With every drawer open, Goals shrank until its first goal's detail line was cut in half. This keeps
-   room for the filter row, a stage heading, and one goal whose detail runs to three lines. */
-.drawer[data-drawer="goals"]{min-height:190px}
+/* Every drawer keeps 70 px, room for its header and its filter row, so on a short page with every
+   drawer open none of them shrinks away. With every drawer open, Goals shrank until its first goal's
+   detail line was cut in half. It keeps room for the filter row, a stage heading, and one goal whose
+   detail runs to three lines, but never more than 28% of the page height, so it cannot starve the rest. */
+.drawer[data-drawer="goals"]{min-height:min(190px,28vh)}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
@@ -175,12 +177,14 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
 /* The title bar shares the class name .bar with the progress bars, whose rule sets a 7 px height and
-   hides the overflow. Without this reset the title bar was squashed and its title cut in half. */
-.win .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
-.win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+   hides the overflow. Without this reset the title bar was squashed and its title cut in half. The
+   rules name the window's own child, .win > .bar: a need bar in an inspector's card is a .bar inside
+   the window too, and the old .win .bar rule took its height and hid its fill. */
+.win > .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win > .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The cut title gives way, so the dock hint and the close button keep their width. */
-.win .bar .title.cut + span{flex:none}
-.win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
+.win > .bar .title.cut + span{flex:none}
+.win > .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
 /* The hover card. */
