@@ -19,7 +19,7 @@ let faith = null;
 const FAITH = {
   belief: { founder: 40, newcomer: 20, floor: 5, top: 100, witness: 2 },
   /* The grace the sky starts with: enough for one Spark, so the first fire prayer can be answered.
-     At 0 the founder's belief of 40 gave 4 grace by the first evening, and the first prayer was
+     At 0, and at the first income rate (twice today's), the founder's belief of 40 gave 4 grace by the first evening, and the first prayer was
      always silent. */
   graceStart: 30,
   graceCap: 100,
@@ -84,6 +84,7 @@ const FAITH_TEXT = {
   /* A trouble that went away by itself, by kind (a row with `ownHands: false`). */
   passed: { wolf: 'The wolf went away. {name} breathes again.', storm: 'The rain stopped on its own. {name} can get dry.' },
   silent: 'The sky was silent when {name} called.',
+  cameLate: 'The sky came when {name} called. The trouble is not over yet.',
   died: '{name} died before the sky answered.',
   someone: 'Someone',
   thought: { sky: 'The sky heard my prayer', own: 'We managed without the sky', silent: 'The sky did not answer' },
@@ -311,14 +312,16 @@ function resolvePrayers(){
         delete faith.troubles[c.id + ':' + p.kind];
       }
       else if (row.over ? row.over(p, c, a) : !row.trouble(c)) closePrayer(p, skySign(p, c) ? 'sky' : row.ownHands === false ? 'passed' : 'own', a);
-      else if (tick >= p.until) closePrayer(p, 'silent', a);
+      /* A miracle that landed but did not end the trouble in time is still an answer: the people saw
+         the sky come. Before this, a paid Beckon whose deer came too slowly ended as "silent". */
+      else if (tick >= p.until) closePrayer(p, skySign(p, c) ? 'sky' : 'silent', a, true);
     }
   } finally { camp = prev; }
   const closed = faith.prayers.filter(p => p.end);
   if (closed.length > FAITH.keepClosed){ const drop = new Set(closed.slice(0, closed.length - FAITH.keepClosed)); faith.prayers = faith.prayers.filter(p => !drop.has(p)); }
 }
 /* The end of one prayer. `camp` is the prayer's camp. */
-function closePrayer(p, end, a){
+function closePrayer(p, end, a, late = false){
   p.end = end; p.endedAt = tick;
   const row = FAITH.outcome[end === 'died' ? 'silent' : end];
   if (end === 'passed'){
@@ -332,7 +335,7 @@ function closePrayer(p, end, a){
   for (const o of campHumans()) if (o !== a) setBelief(o, row.others);
   if (end === 'sky') faith.since.answered++; else if (end === 'own') faith.since.ownHands++; else faith.since.silent++;
   const name = a ? a.name : FAITH_TEXT.someone;
-  const text = end === 'sky' ? FAITH_TEXT.heard[p.kind] : end === 'own' ? FAITH_TEXT.own[p.kind] : end === 'died' ? FAITH_TEXT.died : FAITH_TEXT.silent;
+  const text = end === 'sky' ? (late ? FAITH_TEXT.cameLate : FAITH_TEXT.heard[p.kind]) : end === 'own' ? FAITH_TEXT.own[p.kind] : end === 'died' ? FAITH_TEXT.died : FAITH_TEXT.silent;
   log(faithSay(text, { name }), a ? [a] : [], end === 'sky' ? 'good' : end === 'own' ? 'info' : 'bad');
 }
 /* The sky is forgotten when no living person believes above the floor. */
@@ -418,7 +421,8 @@ function rainAct(e){
   log(FAITH_TEXT.rain, humans(), 'good');
   return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.rain, cost });
 }
-/* The Calm: the storm ends now, the way a storm ends by itself, so the next one comes when it would have. */
+/* The Calm: the storm ends now, through the same endStorm as a storm that ends by itself. The next storm is
+   counted from now, so it comes sooner than it would have. */
 function calmAct(e){
   if (!options.faith) return FAITH_TEXT.refuse.off;
   if (faithOn() && !weather.storm) return FAITH_TEXT.refuse.clear;

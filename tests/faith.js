@@ -199,6 +199,17 @@ test('a prayer past its deadline ends in silence', () => {
   assert.equal(api.faith.prayers.filter(q => q.kind === 'fire').length, 1);
 });
 
+test('a miracle that landed but did not end the trouble by the deadline still counts as an answer', () => {
+  /* A paid Beckon whose deer came too slowly once ended as "The sky was silent", and cost belief. */
+  const { api, a, p, pit } = praying();
+  a.belief = 40;
+  api.faith.signs.push({ act: 'light', x: pit.x, y: pit.y, z: 0, tick: p.at + 1 });
+  setClock(api, p.until); period(api);
+  assert.equal(p.end, 'sky', 'a landed miracle at the deadline was not an answer');
+  assert.ok(a.belief > 40, `belief ${a.belief} did not rise`);
+  assert.equal(lines(api, /came when/)[0].text, `The sky came when ${a.name} called. The trouble is not over yet.`);
+});
+
 test('one who dies before the answer gets the silent row, with its own line', () => {
   const { api, a, c } = praying();
   const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 30;

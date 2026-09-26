@@ -40,10 +40,10 @@ const SKY_TEXT = {
     watched: 'This world is watched, not played. Choose Play as the sky when you start a new world.',
     lines: [
       'You are the sky. Each person believes in you, from 0 to 100. Their card shows how much.',
-      'Belief gives you grace. Each believer gives a little every hour, and more when they believe more. Grace stops at {cap}.',
+      'Belief gives you grace. Each person gives a little every hour, and more when they believe more. Grace stops at {cap}.',
       'People pray when they are in trouble: a cold fire in the evening, no food, a wolf in the dark, a wildfire near the camp, or a storm with no roof. A prayer shows as a chip with the time left, and a \u2726 over the one who prays.',
       'Each miracle answers one kind of prayer, and each costs grace. Spark lights a cold fire ({light}). Beckon calls deer and rabbits to the hungry ({beckon}). Ward drives off a wolf ({ward}). Rain puts out a wildfire ({rain}). Calm stops a storm ({calm}).',
-      'A miracle answers a prayer only if it lands near the trouble, after the prayer is made. Nudge is free. It wakes one person and sends them to work.',
+      'A miracle answers a prayer only if it lands near the trouble, after the prayer is made. Nudge is free. It makes one person stop and think again.',
       'Calm stops a storm at once. With no storm, it does nothing and costs nothing.',
       'If the sky answers, the one who prayed believes more, and so do the others. If they manage by their own hands, they believe a little less. If nobody answers, they believe much less.',
       'Belief fades a little every day. If nobody believes, the sky is forgotten, and it cannot act.',
