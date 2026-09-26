@@ -580,7 +580,9 @@ TASKS.cutTree = { type: 'work',
     t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
     if (t.progress < CLOCK.work.cutTree) return 'continue';
     tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    /* "Logs at last" is news once per camp: the first pine felled. Every later tree was said again,
+       four times in one hour on day 15 of a playtest, while the woodpile goal already counts the logs. */
+    gainXp(a, 'woodcut'); if (!camp.hadLogs){ camp.hadLogs = true; log(`${a.name} fells a pine. Logs at last.`, [a]); }
     const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
@@ -588,7 +590,12 @@ TASKS.cutTree = { type: 'work',
 TASKS.fillWater = { type: 'gather',
   begin(a, args){
     if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, tl => tl.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    return { label: 'Going to fill the waterskin', path: p, progress: 0 };
+    /* The near search first. A camp 90 tiles from the river once failed this search on 268 of 280 tries,
+       and its stash stood empty for most of 16 days, so a failed near search walks the whole world once. */
+    let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+    if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
+    return { label: far ? 'Walking a long way to fill the waterskin' : 'Going to fill the waterskin', path: p, progress: 0 };
   },
-  stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
+  stops: [(a, t) => {
+    if (!besideWater(a.x, a.y, a.z)){ const q = pathToFarWater(a); if (!q) return 'fail'; t.path = q; t.label = 'Walking a long way to fill the waterskin'; return 'continue'; }
+    t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };

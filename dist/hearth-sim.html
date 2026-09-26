@@ -481,9 +481,14 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
+/* An age's number, counted from the Pulse. An age before the Pulse has no number. This is the one place
+   the count is made: the chronicle's stamp below, and the strip, the timeline, the act card, the foot and
+   the Hurry dialog in src/ui/derive.js, all read it. The timeline once printed the absolute age and said
+   "Age 1 to 11" while the strip above it said "Age 10". */
+const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
-  if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
+  if (era === 'gods') return ageNumber(age) === null ? 'Before time' : `Age ${ageNumber(age)}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
 /* A test seam, and the only way to see every line. `chronicle` keeps its last 300 and drops the
@@ -496,6 +501,11 @@ function stamp(){
    number, and it is in `NOT_SAVED`, so a loaded save cannot install one. A harness may observe more
    than the player. It must not make the world it observes a different world. */
 let chronicleSink = null, chronicleWritten = 0;
+
+/* A count and its noun: "1 day", "2 days". The one plural helper for the sim and the page, which
+   share one scope. It lives here so goal texts can use it; it moved from src/ui/derive.js. */
+/** @param {number} n @param {string} one @param {string} many */
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
    for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
@@ -2654,6 +2664,11 @@ function reachable(sx, sy, sz, cap = 4000){
   }
   return new Set(q);
 }
+/* Water close enough to drink from or to fill a waterskin at. */
+function besideWater(x, y, z){ return !!nearFind(x, y, t => t.ground === 'water', NEAR, z); }
+/* A camp can stand far from any water. When the near search fails, search the whole world once and walk
+   the first stretch of 48 steps, as pathToStop does. Drinking and filling the waterskin both use it. */
+function pathToFarWater(a){ const q = bfs(a.x, a.y, a.z, besideWater, NZ * W * H, a); return q ? q.slice(0, 48) : null; }
 /* The path to a task's next stop. A far stop is approached in stretches of 48 steps. */
 function pathToStop(a, tx, ty, within, tz = 0){
   if (nearAt(a, tx, ty, tz) <= within) return [];
@@ -2670,7 +2685,7 @@ function makeCamp(name){
   const c = { id: nextId++, name, site: null, target: null, pit: null, stashTile: null,
     stash: { stick: 0, rock: 0, berries: 0, carcass: 0, venison: 0, cooked: 0, smoked: 0, log: 0, hide: 0, water: 0, moss: 0, fibre: 0, cord: 0, fish: 0, clay: 0, pot: 0, cuttings: 0 }, rot: { cooked: [], berries: [] },
     fae: { known: false, favor: 0, grudges: {}, blightUntil: 0, lastPrank: 0 }, gnomes: { known: false }, stone: null, ward: null,
-    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, founded: tick };
+    tools: { axe: 0, waterskin: 0, spear: 0, firestones: 0, basket: 0, rod: 0 }, shelter: null, rack: null, storehouse: null, workshop: null, kiln: null, garden: null, huts: [], village: false, snares: [], pitfalls: [], litTicks: 0, streak: 0, bestStreak: 0, everLit: false, outSince: 0, nextArrival: 0, siteReason: '', coals: 0, rotLogged: 0, wolfLogged: 0, guardLogged: 0, fished: 0, hadLogs: false, founded: tick };
   /* `c.name` reads plain from the start, so a chronicle line never special-cases it. The camp
      gets its first name record once someone is there to give it one: at the site (`setSite`),
      or, failing that, at the hearth (`nameCampAtHearth`). A placeholder such as "The first camp"
@@ -3595,7 +3610,9 @@ TASKS.cutTree = { type: 'work',
     t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
     if (t.progress < CLOCK.work.cutTree) return 'continue';
     tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    /* "Logs at last" is news once per camp: the first pine felled. Every later tree was said again,
+       four times in one hour on day 15 of a playtest, while the woodpile goal already counts the logs. */
+    gainXp(a, 'woodcut'); if (!camp.hadLogs){ camp.hadLogs = true; log(`${a.name} fells a pine. Logs at last.`, [a]); }
     const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
@@ -3603,10 +3620,15 @@ TASKS.cutTree = { type: 'work',
 TASKS.fillWater = { type: 'gather',
   begin(a, args){
     if (a.carrying && a.carrying.kind !== 'water') return startTask(a, 'deliver');
-    const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, tl => tl.ground === 'water', NEAR, z), 3000, a); if (!p) return false;
-    return { label: 'Going to fill the waterskin', path: p, progress: 0 };
+    /* The near search first. A camp 90 tiles from the river once failed this search on 268 of 280 tries,
+       and its stash stood empty for most of 16 days, so a failed near search walks the whole world once. */
+    let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+    if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
+    return { label: far ? 'Walking a long way to fill the waterskin' : 'Going to fill the waterskin', path: p, progress: 0 };
   },
-  stops: [(a, t) => { t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
+  stops: [(a, t) => {
+    if (!besideWater(a.x, a.y, a.z)){ const q = pathToFarWater(a); if (!q) return 'fail'; t.path = q; t.label = 'Walking a long way to fill the waterskin'; return 'continue'; }
+    t.label = 'Filling the waterskin'; if (++t.progress < CLOCK.work.fillWaterskin) return 'continue'; a.carrying = { kind: 'water', count: 3 }; a.needs.water = 100; return chain(a, t, startTask(a, 'deliver')) || 'done'; }] };
 
 function takeName(){ if (!namePool.length) namePool = shuffle(NAMES); return namePool.pop(); }
 
@@ -3727,24 +3749,20 @@ Object.assign(TASKS, {
       }
       /* The near country first. A camp can stand far from any water, so a failed near search walks the whole
          world once and covers the first stretch, the same way pathToStop does. Thirst must never have no answer. */
-      const wet = (x, y, z) => !!nearFind(x, y, t => t.ground === 'water', NEAR, z);
-      const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-      let p = bfs(a.x, a.y, a.z, wet, 3000, a), far = false;
-      if (!p){ p = walkFar(a); if (!p) return false; far = true; }
+      let p = bfs(a.x, a.y, a.z, besideWater, 3000, a), far = false;
+      if (!p){ p = pathToFarWater(a); if (!p) return false; far = true; }
       if (far && a.species === 'human') addThought(a, 'farwater', 'Walking a long way for water', -3, CLOCK.thought.farwater);
       return { label: far ? 'Walking a long way for water' : 'Going to drink', path: p };
     },
     stops: [(a, t) => {
-      const wet = (x, y, z) => !!nearFind(x, y, w => w.ground === 'water', NEAR, z);
       if (t.args.at){
         const [sx, sy] = t.args.at;
         const g = goTo(a, t, sx, sy, 1); if (g) return g;
         if (camp.stash.water <= 0) return 'fail';
         camp.stash.water--; a.needs.water = 100; addThought(a, 'drank', 'Drank at the fire without a long walk', 3, CLOCK.thought.drank); return 'done';
       }
-      if (!wet(a.x, a.y, a.z)){
-        const walkFar = a => { const q = bfs(a.x, a.y, a.z, wet, NZ * W * H, a); return q ? q.slice(0, 48) : null; };
-        const q = walkFar(a); if (!q) return 'fail';
+      if (!besideWater(a.x, a.y, a.z)){
+        const q = pathToFarWater(a); if (!q) return 'fail';
         t.path = q; t.label = 'Walking a long way for water'; return 'continue';
       }
       a.needs.water = 100; if (a.species === 'human'){ addThought(a, 'drank', 'Drank cold river water', 2, CLOCK.thought.drank); namePondHere(a); } return 'done';
@@ -4862,7 +4880,7 @@ const GOALS = [
     state(){
       const t = pitTile(); if (!t) return { s: 'blocked', text: 'There is no fire pit yet.' };
       const p = t.struct;
-      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${camp.stash.stick} sticks${camp.stash.log ? `, ${camp.stash.log} logs` : ''}.` };
+      if (p.lit) return { s: 'active', text: `Burning. Fuel ${Math.round(p.fuel / PIT_MAX * 100)}%. Woodpile: ${nOf(camp.stash.stick, 'stick', 'sticks')}${camp.stash.log ? `, ${nOf(camp.stash.log, 'log', 'logs')}` : ''}.` };
       const blaze = nearbyBlaze();
       if (blaze && p.fuel > 0) return { s: 'active', text: 'Out, but something is burning nearby. Someone can fetch an ember.' };
       return { s: p.fuel > 0 || camp.stash.stick >= 4 ? 'active' : 'blocked', text: p.fuel > 0 ? 'Laid and ready. It needs fire: from you, or from a lightning strike nearby.' : 'Cold and empty. Sticks first, then fire.' };
@@ -4993,7 +5011,7 @@ const GOALS = [
     offers(a){ if (!camp.fae.known || camp.ward || !camp.pit || !pitLit() || camp.fae.favor > -10) return []; if (camp.stash.stick < 6) return [{ label: 'gather sticks for the ward posts', score: 28, task: { kind: 'gather', args: { item: 'stick' } } }]; const site = openSpotNear(camp.pit, 3, 5); if (!site) return [];
       return [{ label: 'set the ward posts', score: camp.fae.favor < -20 ? 55 : 30, task: { kind: 'setWardPosts', args: { at: site } } }]; } },
   { id: 'faefight', title: 'Drive off the sprites', stage: 'sprites', after: 'fae', standing: true,
-    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nearAt(sp, ...camp.pit)} tiles from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
+    state(){ const sp = spriteNear(); if (!camp.fae.known) return { s: 'blocked', text: 'Nobody has seen the sprites.' }; return { s: sp && camp.fae.favor < -30 ? 'active' : 'idle', text: sp ? `A sprite is ${nOf(nearAt(sp, ...camp.pit), 'tile', 'tiles')} from the fire.${camp.fae.favor < -30 ? ' It means no good.' : ''}` : 'None near. A killed sprite is never forgotten by its grove.' }; },
     offers(a){ const sp = spriteNear(); if (!sp || camp.fae.favor >= -30 || !camp.tools.spear || a.traits.bravery < 0.5) return []; return [{ label: 'drive off the sprite with the spear', score: 60 + a.traits.bravery * 15, task: { kind: 'fightSprite', args: { sprite: sp.id } } }]; } },
   { id: 'waterskin', title: 'Sew a waterskin', stage: 'tools', after: 'cook', need: { hide: 2 },
     state(){
@@ -5010,7 +5028,7 @@ const GOALS = [
     state(){ if (!camp.tools.axe) return { s: 'blocked', text: 'Needs the axe to shape a shaft.' }; if (camp.tools.spear) return { s: 'done', text: 'A fire-hardened shaft with a flaked point. Deer are in reach now.' }; return { s: 'active', text: `Stick ${Math.min(camp.stash.stick, 1)}/1, rock ${Math.min(camp.stash.rock, 1)}/1.` }; },
     offers(a){ if (!camp.tools.axe || camp.tools.spear) return []; if (camp.stash.stick >= 1 && camp.stash.rock >= 1) return [{ label: 'make the spear', score: 50, task: { kind: 'makeSpear', args: { at: camp.stashTile } } }]; return [{ label: 'gather a rock for the spear', score: 40, task: { kind: 'gather', args: { item: camp.stash.rock < 1 ? 'rock' : 'stick' } } }]; } },
   { id: 'deer', title: 'Hunt deer', stage: 'food', after: 'spear', standing: true,
-    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nearAt(d, ...camp.site)} tiles. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
+    state(){ if (!camp.tools.spear) return { s: 'blocked', text: 'Needs the spear.' }; const d = deerNear(); return { s: d ? 'active' : 'idle', text: d ? `Deer within ${nOf(nearAt(d, ...camp.site), 'tile', 'tiles')}. A deer feeds the camp for days and gives two hides.` : 'No deer near the camp. They graze at dawn and dusk, and wolves thin them in winter.' }; },
     offers(a){ const d = deerNear(); if (!d || !camp.tools.spear || a.traits.bravery < 0.4 || camp.stash.venison > 0) return []; return [{ label: 'hunt a deer', score: 48 + a.skills.hunt * 5 + (stashFood() < 4 ? 15 : 0), task: { kind: 'huntDeer', args: { deer: d.id } } }]; } },
   { id: 'rack', title: 'Build a drying rack', stage: 'food', after: 'firepit', need: { stick: 6 },
     state(){ if (!camp.pit) return { s: 'blocked', text: 'Needs the fire pit.' }; if (camp.rack) return { s: 'done', text: 'A rack of sticks over the smoke. Meat dried here keeps for the winter.' }; return { s: 'active', text: `Sticks ${Math.min(camp.stash.stick, 6)}/6. Cooked meat spoils in two days. Smoked meat does not.` }; },
@@ -5030,7 +5048,7 @@ const GOALS = [
       return out;
     } },
   { id: 'guard', title: 'Keep wolves off', stage: 'settlement', after: 'fire', standing: true,
-    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nearAt(w, ...camp.pit)} tiles from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
+    state(){ const w = wolfNear(); if (!camp.pit) return { s: 'blocked', text: 'Wolves come to a camp with meat and no fire.' }; return { s: w ? 'active' : 'idle', text: w ? `A wolf is ${nOf(nearAt(w, ...camp.pit), 'tile', 'tiles')} from the fire.` : 'No wolf near. A lit fire keeps them at the edge of the dark.' }; },
     offers(a){ const w = wolfNear(); if (!w || !pitLit() || a.traits.bravery < 0.35) return []; return [{ label: 'drive off the wolf with a firebrand', score: 72 + a.traits.bravery * 20, task: { kind: 'driveOff', args: { wolf: w.id, at: camp.pit } } }]; } },
   { id: 'scout', title: 'Found a second camp', stage: 'settlement', after: 'shelter',
     state(){
@@ -7643,9 +7661,18 @@ const inAges = () => era === 'gods';
 /* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
    of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
 function ladder(){ return inAges() ? PACES : SPEEDS; }
-/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse. */
-const ageName = n => pulseAge === null || n < pulseAge ? 'Before time' : `Age ${n - pulseAge + 1}`;
-const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse,
+   through `ageNumber` in src/sim/core.js, which the chronicle's stamp reads too. */
+const ageName = n => ageNumber(n) === null ? 'Before time' : `Age ${ageNumber(n)}`;
+/* A run of ages, from and to both absolute, named the way ageName names one. */
+function ageSpanName(from, to){
+  const a = ageNumber(from), b = ageNumber(to);
+  if (b === null) return 'Before time';
+  if (a === null) return `Before time to age ${b}`;
+  return a === b ? `Age ${a}` : `Age ${a} to ${b}`;
+}
+/* The strip's clock. In the ages it is the age now playing, named by ageName; in the days it is the stamp. */
+const clockText = () => inAges() ? ageName(age) : stamp();
 /* The caption is the line the act itself wrote. A gesture that wrote no line has no caption. */
 function captionFor(rec){
   return rec.said !== null && rec.said !== undefined && legends[rec.said] ? legends[rec.said].text : '';
@@ -7697,7 +7724,7 @@ function actCard(rec){
   const g = beingById(rec.god);
   const said = captionFor(rec);
   const head = said || `${g ? g.name : 'A god'} ${m ? m.word : rec.kind}.`;
-  const rows = [{ label: 'when', value: `Age ${rec.age}` }];
+  const rows = [{ label: 'when', value: ageName(rec.age) }];
   const r = regionById(rec.region !== undefined ? rec.region : rec.near);
   if (r) rows.push({ label: 'where', value: countryLine(r) });
   if (rec.weighed && !rec.byPlayer){
@@ -7800,7 +7827,7 @@ function gauges(){
   if (inAges()) return { hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
-  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${Math.floor(wood)} days of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
+  const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
   const meals = stashFood() + camp.stash.fish * 2, aim = foodTarget();
   const food = !camp.site ? null : { v: Math.min(1, meals / aim), text: `${meals} of ${aim}`, level: level3(meals, aim) };
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
@@ -7997,6 +8024,24 @@ function sectorLabel(s){
    word, lower-cased to sit mid-sentence, with 'the' in front as it always read. */
 function sectorProse(s){ return nameOf(s) || `the ${s.name.toLowerCase()}`; }
 
+/* An age, said as people say one: years once a being has lived one, seasons for the months before
+   that, and days for the first season. Every place that gives a being's age uses this, so the words
+   agree. LIFE is still written in days on this branch, so today a person reads in days; the words
+   turn to years with no change here once LIFE is written in years. The seasons are counted off the
+   calendar's own lengths, SEASON_LENGTHS, not an average: with an average of 91.25 days, day 182
+   read "1 season" though the calendar had turned twice. */
+function ageText(days){
+  const d = Math.max(0, Math.floor(days));
+  if (d >= YEAR_DAYS) return nOf(Math.floor(d / YEAR_DAYS), 'year', 'years');
+  let seasons = 0, end = 0;
+  for (const len of SEASON_LENGTHS){ end += len; if (d >= end) seasons++; else break; }
+  return seasons ? nOf(seasons, 'season', 'seasons') : nOf(d, 'day', 'days');
+}
+/* The Camp drawer's valley row. The valley has no name until the first village gives it one, and a
+   row that said "the valley" told the player nothing, so until then there is no row. The help page's
+   valley line follows the same rule. */
+const campValleyRow = () => { const n = valleyName(); return n ? ['Valley', n] : null; };
+
 function campSummary(){
   return {
     stash: Object.entries(camp.stash).filter(([k, v]) => v > 0),
@@ -8066,10 +8111,11 @@ function tlCellText(rec, withWho){
 const tlBlank = ageN => ({ age: ageN, text: '', chip: null, major: false, blank: true, playing: false });
 
 function timelineModel(){
-  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, rows: [], marks: [] };
+  const empty = { shown: false, folded: ui.timelineFold !== false, from: 1, to: 1, now: 0, head: '', rows: [], marks: [] };
   if (!inAges() || !creation || !creation.choices) return empty;
   const now = age;
   const { from, to } = timelineSpan(ui.timelineZoom | 0, now);
+  const head = now === 0 ? 'Before the first age' : ageSpanName(from, to);
   const inSpan = creation.choices.filter(c => c.age >= from && c.age <= to);
   /* The playing cell is the newest turn decided this age: not the newest gesture. A decision can carry
      more than one gesture (a split that also gives birth to a new god writes a `split` and a `born`
@@ -8089,7 +8135,7 @@ function timelineModel(){
   const playing = rec => !atAgeEnd && !!last && last.god === rec.god && rec.age === age;
   const cell = (rec, withWho) => ({ age: rec.age, text: tlCellText(rec, withWho), major: !!rec.picked && !rec.continued, chip: `${rec.age}:${rec.god}`, blank: false, playing: playing(rec) });
   if (ui.timelineFold !== false){
-    return { shown: true, folded: true, from, to, now, marks: [],
+    return { shown: true, folded: true, from, to, now, head, marks: [],
       rows: [{ id: 'all', label: 'The ages', cells: inSpan.map(r => cell(r, true)) }] };
   }
   /* Unfolded, a column must mean one age: every row gets one cell for every age in the span, filled
@@ -8113,7 +8159,7 @@ function timelineModel(){
     gateCells.push(a !== to ? tlBlank(a) : { age: a, text: gate ? (gate.ok ? 'the world will hold' : `wants ${gate.lack}`) : 'not weighed yet', major: false, chip: null, blank: false, playing: false });
   }
   rows.push({ id: 'gate', label: 'The gate', cells: gateCells });
-  return { shown: true, folded: false, from, to, now, rows, marks: [] };
+  return { shown: true, folded: false, from, to, now, head, rows, marks: [] };
 }
 
 /* One chip, opened. The matrix is the record's own, in the record's own order. */
@@ -8146,7 +8192,7 @@ function footChip(){
   const takenIdx = m.picked && !m.byPlayer ? m.opts.findIndex(o => !o.failed) : -1;
   const all = m.opts.map((o, i) => ({ type: o.type, score: o.score, failed: !!o.failed, taken: i === takenIdx }));
   const rows = takenIdx >= 4 ? all.slice(0, 3).concat(all[takenIdx]) : all.slice(0, 4);
-  return { head: `Age ${m.age}. ${m.name} ${did}${hand}.`, rows };
+  return { head: `${ageName(m.age)}. ${m.name} ${did}${hand}.`, rows };
 }
 
 /* A short string that changes when anything the strip or drawers show changes. */
@@ -9384,7 +9430,7 @@ function drawTimeline(){
   el.replaceChildren();
   if (!m.shown) return;
   const head = document.createElement('div'); head.className = 'tlhead';
-  const span = document.createElement('span'); span.textContent = m.now === 0 ? 'Before the first age' : `Age ${m.from} to ${m.to}`;
+  const span = document.createElement('span'); span.textContent = m.head;
   const sp = document.createElement('span'); sp.className = 'sp';
   sp.append(tlButton('foldTl', m.folded ? 'Every god' : 'One row', 'T'),
             tlButton('tlOut', 'More ages', '['), tlButton('tlIn', 'Fewer ages', ']'));
@@ -9476,7 +9522,7 @@ function inspectBeing(a, full = false){
   const follow = full && a.alive ? `<button class="btn small" data-follow="${a.id}">${followId === a.id ? 'Stop following' : 'Follow'}</button>` : '';
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
-    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${Math.floor(ageDays(a))} days. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
+    <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${ageText(ageDays(a))}. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
     ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
@@ -9508,7 +9554,7 @@ function inspectTile(x, y, z = 0){
   if (t.struct && t.struct.type === 'storehouse') rows.push(['Storehouse', 'the stash on stilts. Food keeps twice as long, and wolves cannot reach it.']);
   if (t.struct && t.struct.type === 'workshop') rows.push(['Workshop', 'a roofed bench. Cord, baskets, rods, and clothes are made here, faster than by the fire.']);
   if (t.struct && t.struct.type === 'kiln') rows.push(['Kiln', `a dome of rock and clay. ${t.struct.fired || 0} pots fired here.`]);
-  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', `${Math.floor((tick - (t.planted || 0)) / DAY)} days`]);
+  if (t.feature === 'bush' || t.feature === 'tree' || t.feature === 'sapling') rows.push(['Age', ageText((tick - (t.planted || 0)) / DAY)]);
   if (t.garden) rows.push(['Garden', `planted by ${t.garden.name}. Rabbits like it too.`]);
   if (t.feature === 'sapling' && !saplingMayGrow(t)) rows.push(['Growth', 'held back. A tree here would close the only way through.']);
   if (t.struct && t.struct.type === 'stone') rows.push(['Offering stone', t.struct.offering ? `${t.struct.offering} berries left for the sprites` : 'empty. Berries left here at dusk are gone by morning.']);
@@ -9587,7 +9633,7 @@ function chipHTML(a){
 }
 /* The clock runs on every gate tick, not on the view key, so the time never freezes. */
 function renderClock(){
-  $('clock').textContent = stamp();
+  $('clock').textContent = clockText();
   $('season').textContent = seasonLine();
   const w = weather.storm ? (isWinter() ? 'Sleet' : 'Rain') : isNight() ? 'Night' : '';
   $('weather').textContent = w; $('weather').classList.toggle('on', !!weather.storm);
@@ -9780,13 +9826,13 @@ function renderChronicle(el){
 function renderCamp(el){
   if (inAges()){ const n = $('count-camp'); if (n) n.textContent = ''; el.innerHTML = '<div class="muted">No camp yet. The valley is not made.</div>'; return; }
   const c = campSummary();
-  const nm = campNames();
+  const nm = campNames(), vrow = campValleyRow();
   const past = nm.past.map(r => `<span title="${esc(nameTitle(r))}">${esc(r.text)}, day ${Math.floor(r.since / DAY) + 1}${r.why ? `, ${esc(r.why)}` : ''}</span>`).join('; ');
   const kv = [
     ['Name', `<span title="${esc(nameTitle(nm.now))}">${esc(camp.name)}</span>${camp.village ? ', a village' : ''}`],
     past ? ['Once called', past] : null,
-    ['Valley', esc(describe(valley, 'valley'))],
-    ['Age', `${c.age} days`], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => `${n} ${sp}`).join(', ')], c.burning ? ['Burning', `${c.burning} tiles`] : null,
+    vrow ? [vrow[0], esc(vrow[1])] : null,
+    ['Age', ageText(c.age)], ['Stash', c.stash.map(([k, v]) => `${v} ${ITEMS[k].plural}`).join(', ') || 'empty'], ['Tools', esc(c.tools.join(', ')) || 'none'], c.favor !== null ? ['Sprite favour', String(c.favor)] : null, ['In the world', c.animals.map(([sp, n]) => nOf(n, SPECIES[sp].label, SPECIES[sp].plural)).join(', ')], c.burning ? ['Burning', nOf(c.burning, 'tile', 'tiles')] : null,
   ].filter(Boolean);
   const cnt = $('count-camp'); if (cnt) cnt.textContent = '';
   el.innerHTML = `<table class="kv">${kv.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
@@ -9874,7 +9920,7 @@ function muteChoice(k){
    is open, as they hold behind any dialog. */
 function openHurry(){
   closeDialogs();
-  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  $('hurryLeft').textContent = `${ageName(age)}. ${awakeGods().length} gods are still awake.`;
   setFocus('dialog:hurry');
   $('hurry').showModal();
   $('hurryGo').focus();
@@ -9893,7 +9939,7 @@ function openHelp(){
     <li>What took them: ${esc(lore.took)}.</li>
     <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
     <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
-    <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
+    ${valleyName() ? `<li>This valley: ${esc(valleyName())}.</li>` : ''}
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   setFocus('dialog:help'); $('help').showModal();
 }
@@ -9995,7 +10041,7 @@ function pruneTrails(now){
     if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
   }
 }
-/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+/* The template's speed labels are only right for the days; showLadder relabels them, not the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
   document.querySelectorAll('#speeds .btn').forEach(b => {
@@ -10017,8 +10063,16 @@ function relabelSpeeds(labels, key){
 function onLadder(rungs, v, fn, name){
   if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
 }
-function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* The buttons show the ladder of the era that runs, whichever setter was called. setSpeed is called in
+   the ages too: initUI sets the days' speed after newWorld has begun the ages, and it used to relabel the
+   buttons 1× to 256× and light the first one while the ages ran at single pace behind the start dialog. */
+function showLadder(){
+  const ages = inAges(), key = ages ? 'pace' : 'speed', now = ages ? pace : speed;
+  relabelSpeeds(ages ? PACE_LABEL : SPEED_LABEL, key);
+  document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset[key]) === now));
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; showLadder(); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; showLadder(); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }

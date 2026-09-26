@@ -28,7 +28,7 @@ function muteChoice(k){
    is open, as they hold behind any dialog. */
 function openHurry(){
   closeDialogs();
-  $('hurryLeft').textContent = `Age ${age}. ${awakeGods().length} gods are still awake.`;
+  $('hurryLeft').textContent = `${ageName(age)}. ${awakeGods().length} gods are still awake.`;
   setFocus('dialog:hurry');
   $('hurry').showModal();
   $('hurryGo').focus();
@@ -47,7 +47,7 @@ function openHelp(){
     <li>What took them: ${esc(lore.took)}.</li>
     <li>The sky: ${esc(lore.sky.text)}, ${esc(lore.sky.meaning)}. That is you.</li>
     <li>The sprites: ${esc(lore.sprites.text)}, ${esc(lore.sprites.meaning)}.</li>
-    <li>This valley: ${esc(valleyName() || describe(valley, 'valley'))}.</li>
+    ${valleyName() ? `<li>This valley: ${esc(valleyName())}.</li>` : ''}
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   setFocus('dialog:help'); $('help').showModal();
 }
