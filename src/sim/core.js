@@ -180,6 +180,11 @@ function stamp(){
    than the player. It must not make the world it observes a different world. */
 let chronicleSink = null, chronicleWritten = 0;
 
+/* A count and its noun: "1 day", "2 days". The one plural helper for the sim and the page, which
+   share one scope. It lives here so goal texts can use it; it moved from src/ui/derive.js. */
+/** @param {number} n @param {string} one @param {string} many */
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 /* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
    for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */
 function log(text, who = [], kind = 'info', tag = null){
