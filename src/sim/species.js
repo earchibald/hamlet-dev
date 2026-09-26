@@ -4,12 +4,14 @@ const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, o
    ticks can ask what stage the being was in at the start of the stretch without moving the world. */
 const ageDays = (a, t = tick) => (t - a.born) / DAY;
 const stage = (a, t = tick) => { const L = LIFE[a.species]; const d = ageDays(a, t); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
+/* `warded`: a Ward from the sky drives it off. `beckoned`: a Beckon from the sky draws it. Both are read
+   only in a world made with faith on (faith.js). */
 const SPECIES = {
   human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
-  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
-  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true },
+  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true, beckoned: true },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true, warded: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true, warded: true },
+  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true, beckoned: true },
   sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, fae: true },
   gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, folk: true },
 };

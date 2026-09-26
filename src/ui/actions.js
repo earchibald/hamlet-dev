@@ -34,7 +34,10 @@ function setActCaption(text, pole){
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id, sticky = false){
-  tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
+  /* A miracle is refused, with the sim's own sentence, in a world that is only watched. */
+  const t = TOOLS.find(t => t.id === id);
+  if (!toolShown(t)){ say(FAITH_TEXT.refuse.off); return; }
+  tool = id; ui.sticky = sticky && t.oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 /* The one writer of `ui.focus`. Every file but this one calls this instead of setting the field
@@ -165,9 +168,12 @@ const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x:
 /* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
-function newWorld(seed){
+/* `opts` are the world's options. The start dialog passes `{ faith: true }` to play as the sky and
+   `{ faith: false }` to watch. */
+function newWorld(seed, opts = {}){
   endZoom();
-  startCreation(seed, {});
+  startCreation(seed, opts);
+  resetSky();
   fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
@@ -181,6 +187,40 @@ function newWorld(seed){
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* ---------- the sky ----------
+   A world played as the sky. The view keeps which prayers and which season cards it has seen; these
+   functions are their one writer, with the slow-down that a new prayer brings. */
+
+/* A new world, a settle, or a load. Nothing of the old world is seen, and a miracle tool the new world
+   does not show goes back to Inspect. A loaded world's prayers and tallies are already there, so they
+   count as seen: a load slows nothing and opens no card. */
+function resetSky(loaded){
+  ui.seenPrayers = {}; ui.seenTallies = 0;
+  if (loaded && faith){ for (const p of faith.prayers) ui.seenPrayers[p.id] = true; ui.seenTallies = faith.tallies.length; }
+  if (!toolShown(TOOLS.find(t => t.id === tool))){ tool = 'inspect'; ui.sticky = false; }
+}
+/* Every frame. A prayer the view has not seen drops the speed to the days default, if the player keeps
+   Slow for prayers on and the speed is higher. A prayer whose chip is muted is seen but slows nothing.
+   The drop is not the player's choice, so it leaves ui.speedChosen and ui.savedSpeed alone. */
+function notePrayers(){
+  if (!skyPlayed() || !faith) return;
+  const fresh = faith.prayers.filter(p => !p.end && !ui.seenPrayers[p.id]);
+  if (!fresh.length) return;
+  const heard = fresh.filter(p => !prayerMuted(p));
+  const s = ui.slowForPrayers ? prayerSpeed(ui.seenPrayers, heard, speed) : speed;
+  for (const p of fresh) ui.seenPrayers[p.id] = true;
+  if (s === speed) return;
+  setSpeed(s);
+  const a = beingById(heard[0].who);
+  say(faithSay(SKY_TEXT.slowed, { name: a ? a.name : FAITH_TEXT.someone }));
+}
+/* Every frame. A season that has ended opens its card, once no other dialog is open. */
+function noteTallies(){
+  if (!skyPlayed() || !faith || faith.tallies.length <= ui.seenTallies || anyDialogOpen()) return;
+  ui.seenTallies = faith.tallies.length;
+  openTally(faith.tallies[faith.tallies.length - 1]);
 }
 
 /* ---------- saves ----------
@@ -238,6 +278,7 @@ function onLoad(){
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
   /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
   ui.peopleCamp = null;
+  resetSky(true);
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -372,6 +413,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
+  resetSky();
   setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -388,7 +430,8 @@ function onSettle(){
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
+    /* The Spark and the four miracles. The door pays for them, or says why it will not. */
+    case 'light': case 'rain': case 'calm': case 'ward': case 'beckon': say(inject({ source: 'player', act: TOOLS.find(t => t.id === tool).act, x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');
@@ -443,9 +486,10 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
-     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up.
+     Step and Hour do nothing while the season's card is open, since the days hold behind it. */
+  step(){ if (holdDays()) return; setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
+  hour(){ if (holdDays()) return; if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
@@ -516,6 +560,10 @@ const ACTIONS = {
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
+  /* Watch the valley: the same close, with faith off. */
+  watchWorld(){ $('start').close('watch'); },
+  closeTally(){ closeDialogs(); },
+  slowForPrayers(){ ui.slowForPrayers = !ui.slowForPrayers; persist(); say(ui.slowForPrayers ? SKY_TEXT.slowOn : SKY_TEXT.slowOff); },
   newWorld(){ openStart(); },
   /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
      slice about what the player experiences must be reachable by a player. The turn card waits.

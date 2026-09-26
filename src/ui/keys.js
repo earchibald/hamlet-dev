@@ -73,7 +73,14 @@ const KEYMAP = [
   { key: 'F5',         focus: 'any',    action: 'campN', arg: 5, label: 'Camp 5' },
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
   /* Start and help each have their own focus. When they shared one, Enter in help opened Start. */
-  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Make world', button: 'newWorld' },
+  /* Enter plays: a world played as the sky is the default. Watching takes Alt, as Continue does, because a
+     plain letter goes into the seed box. */
+  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Play as the sky', button: 'newWorld' },
+  { key: 'w',          alt: true, focus: 'dialog:start', action: 'watchWorld', label: 'Watch the valley', button: 'watchWorld' },
+  /* The season's card. Esc closes it too, as it closes every dialog. */
+  { key: 'Enter',      focus: 'dialog:tally', action: 'closeTally', label: 'Close the season card', button: 'tallyClose' },
+  /* A world played as the sky slows down for a new prayer. This switches that off and on. */
+  { key: 'p',          focus: 'any',    action: 'slowForPrayers', label: SKY_TEXT.slowKey },
   { key: 'Escape',     focus: 'dialog:help',  action: 'back',      label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
@@ -93,7 +100,7 @@ const KEYMAP = [
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
-/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick Light fire. */
+/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick the Spark. */
 KEYMAP.push({ key: 'f',          shift: true, focus: 'window', action: 'follow', label: 'Follow this person', quiet: true });
 for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){

@@ -22,8 +22,10 @@ const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
 /* `force` is the Force Actions setting: a barred option may be taken, with no penalty. It is read
-   only where the player chooses. No rule reads it, so it cannot move the creation. */
-const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false };
+   only where the player chooses. No rule reads it, so it cannot move the creation.
+   `faith` makes the world a game: the people believe in the sky, pray, and the sky's miracles cost
+   grace (faith.js). Off, every faith rule returns at once, and the world is the sandbox it was. */
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false, faith: false };
 let options;
 /* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
    setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
@@ -32,6 +34,7 @@ function checkOptions(o){
   if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
   if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
   if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  if (typeof q.faith !== 'boolean') return `Faith is either on or off. Got ${q.faith}.`;
   return null;
 }
 function setOptions(o){

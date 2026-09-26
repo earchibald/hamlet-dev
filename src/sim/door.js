@@ -17,7 +17,12 @@ let replayHead = null;
 /* Acts by name. Each takes the event and returns its message. */
 /** @type {{ [act: string]: DoorAct }} */
 const DOOR_ACTS = {
-  light(e){ return lightTile(e.x, e.y, e.z || 0); },
+  /* The Spark. With faith off, the old Light fire exactly. The miracles are in faith.js. */
+  light(e){ return sparkAct(e); },
+  rain(e){ return rainAct(e); },
+  ward(e){ return wardAct(e); },
+  beckon(e){ return beckonAct(e); },
+  calm(e){ return calmAct(e); },
   poke(e){
     const a = beingById(e.id);
     return a ? poke(a) : 'Nobody is there to nudge.';

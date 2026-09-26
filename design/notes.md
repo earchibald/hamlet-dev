@@ -780,3 +780,25 @@ front looks exactly like a bug and is not one. Call the frame by hand when drivi
 - G: time and tiers. A one-second tick, real years, day and season tiers calibrated from the tick tier, deterministic zoom both ways, breakpoints on a watch list, and tasks as data (done) and snapshots (done). Each later plan of G adds its own state to the snapshot and its own references to `REFS`: the tier, the placement stream, the counts, the annals, the pending events, and the watch list. The completeness test (`REFS names every field that points at a record`) and the oracle hold each addition to the same proof G3 built.
 - Then the lingering gods. A sleeping god wakes, and later gods are born of side effects or of belief. Of the four inhabit modes, Become is built for a god in the ages; see section 19. Possess, Vessel, and Manifestation are refused by name until each has its spec.
 - `pickBerries`, `pickFibre`, `digClay`, and `takeCuttings` are one shape four times; a `harvestKind` builder like `workKind` would make them four rows. Not done in G2 because G2 moves no behaviour.
+
+## 21. The sky plays
+
+The proposal is `design/proposals/2026-09-26-the-sky-plays.md`, and the plan is `design/plans/2026-09-26-the-sky-plays-plan.md`. The proposal holds the argument and the tables. This section records the rules as built and what testing changed.
+
+**Why.** Section 9 says the early dependence on the player is the reason the player pays attention. Later work removed it: lightning, moss, and firestones light the camp's fire without the player. Faith puts the dependence back, and gives it a price. The people believe in the sky, their belief is the sky's grace, and every miracle spends grace.
+
+- **A world option.** `options.faith` is false by default in the sim, so the soak, the golden record, and every older test run with faith off, and nothing in them moves. The page's start dialog passes `true` for "Play as the sky" and `false` for "Watch the valley". Every faith rule returns at once when the option is off.
+- **No random number.** Belief, grace, prayers, credit, and the tally draw nothing. A miracle can start a rule that draws (a storm's end, a flee), and the door log replays it.
+- **The rules live in `src/sim/faith.js`.** `faithTick()` is the last step of `updateWorld()`, so no older step is reordered. It runs every `CLOCK.faith.every`. Durations and rates are in `CLOCK.faith`. Amounts that are not time are in `FAITH`. Every sentence is in `FAITH_TEXT`. The prayer kinds are rows of `PRAYERS`.
+- **Belief** is a plain number on each person. The founder starts at 40, and a newcomer at 20. A child starts at the mean of its parents. Belief fades 1 a day. No loss, from any cause, takes belief below the floor of 5.
+- **Grace** starts at 30, so that the first fire prayer can be answered. At 0, the first prayer was always silent: the founder had earned only 9 grace by dawn at the first income rate, and a Spark costs 15. Grace comes from belief at the rate `CLOCK.faith.grace`, and it caps at 100. The first income rate left grace at the cap for most of an eight-day run, so it was halved.
+- **Prayers.** A camp prays about one kind of trouble at most once a day. The day is counted from when the last such prayer opened. When the prayer was counted from its end, a silent fire prayer ended at dawn, and the next evening brought no new prayer. The first version allowed one prayer for each trouble, and a camp with a lit fire then prayed nothing for five days. So the triggers were widened:
+  - hunger while the stash is under half its aim, not only when it is empty;
+  - a wolf near a sleeper (a dream prayer);
+  - a cold person out in a storm with no roof.
+- **One struck pine is not a wildfire.** A wildfire prayer needs three burning tiles near the camp. Before this rule, the lightning that gave a camp its first ember opened a wildfire prayer, and the camp lost belief for its own gift.
+- **Credit** needs a sign of an answering miracle, made after the prayer opened, near the trouble. A trouble met with no sign is "by their own hands", and it costs the one who prayed a little belief. For a wolf that leaves or a storm that ends by itself, nobody's hands met the trouble, so the end is neutral (`ownHands: false`, the end `passed`).
+- **Witnesses** gain belief from a miracle at most once a day. Without that limit, casting Wards at nothing was the best way to raise belief. A Ward or a Beckon with no animal in range is refused, and it costs nothing.
+- **Forgotten** means that no living person believes above the floor. Every miracle is refused while it lasts, and the refusal reads the beliefs at the moment of the act.
+- **The season tally** is a record pushed at each season's turn, with one major line. The page shows it as a card, and the days hold while the card is open.
+- **The page slows for a prayer.** A new prayer drops a speed above 8x to 8x. It is not a pause, and a muted prayer chip does not slow the game. The switch is `P`. Review P1 rejected an automatic pause for the first fire; this is a different thing and it has a switch, but the user has not ruled on it.

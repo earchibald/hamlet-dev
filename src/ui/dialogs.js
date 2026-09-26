@@ -21,7 +21,9 @@ let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; setFocus('dialog:mute'); $('mute').showModal(); }
 function muteChoice(k){
   if (!muteFor) return;
-  if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
+  /* A prayer chip can come from another camp, and it names that camp. Every other chip is the chosen camp's. */
+  const cid = muteFor.camp !== undefined ? muteFor.camp : camp.id;
+  if (k === 1) mute(muteFor.type, cid, muteFor.text); else if (k === 2) mute(muteFor.type, cid); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
 /* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it
@@ -35,6 +37,10 @@ function openHurry(){
 }
 function openHelp(){
   closeDialogs();
+  /* The section on playing as the sky comes first, as it does in the dialog. The lore is written last:
+     tests/ui.js reads the help through a stub that gives every id one element, so the last write is
+     the one it sees, and the lore is what it checks. */
+  $('helpSky').innerHTML = skyHelpHTML();
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
@@ -51,6 +57,24 @@ function openHelp(){
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   setFocus('dialog:help'); $('help').showModal();
 }
+/* The help page's section on playing as the sky. The costs come from FAITH.cost, and the key and the
+   state of Slow for prayers from the key map and the view, so the page cannot drift from the rules. */
+function skyHelpHTML(){
+  const H = SKY_TEXT.help, row = KEYMAP.find(k => k.action === 'slowForPrayers');
+  const lines = H.lines.map(l => faithSay(l, { cap: FAITH.graceCap, ...FAITH.cost }));
+  lines.push(faithSay(H.slow, { state: ui.slowForPrayers ? H.on : H.off, key: row ? keyName(row) : '', speed: SPEED_LABEL[DAYS_SPEED] }));
+  return `${faithWorld() ? '' : `<p class="muted">${esc(H.watched)}</p>`}<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+}
+/* The season's card: its rows as a small table and one closing line. Enter or Esc closes it. */
+function openTally(t){
+  closeDialogs();
+  $('tallyTitle').textContent = tallyTitle(t);
+  $('tallyRows').innerHTML = tallyRows(t).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  $('tallyLine').textContent = tallyClosing(t);
+  setFocus('dialog:tally'); $('tally').showModal(); $('tallyClose').focus();
+}
+/* The days hold while the season's card is open. */
+const holdDays = () => { const d = $('tally'); return !!(d && d.open); };
 
 /* The command palette: every action and every named thing, one search box. */
 let palRows = [], palHit = [], palSel = 0;

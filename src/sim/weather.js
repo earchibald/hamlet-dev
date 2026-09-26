@@ -37,8 +37,10 @@ function spreadTo(nx, ny, nz, mult){
 function updateWeather(){
   if (!onBeat('updateWeather')) return;
   if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
-  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
+  if (weather.storm && tick >= weather.until) endStorm();
 }
+/* A storm ends, and the next one is set. The Calm (faith.js) ends one the same way. */
+function endStorm(){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 /* Lightning near the camp, only in storms. More often when the hearth is out. */
 function tryLightning(){
   if (camp.site && weather.storm){

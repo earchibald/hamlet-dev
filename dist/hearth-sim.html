@@ -92,6 +92,10 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip kbd{margin:0;opacity:.7}
 .chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.chip.pray{color:var(--map-god);border-color:color-mix(in srgb,var(--map-god) 60%,transparent)}
+.chip .left{opacity:.75}
+.gauge .believers{color:var(--muted)}
+#tools .cost{margin-left:5px;opacity:.7;font-size:11px}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel);--drawer-w:330px;--drawer-right:52px;--drawer-gap:10px}
@@ -287,7 +291,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
-  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Make world<kbd>Enter</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
+  <form method="dialog" class="seed"><label for="seed" class="muted">World seed</label><input id="seed" autocomplete="off"><button class="btn" id="newWorld" value="make">Play as the sky<kbd>Enter</kbd></button><button class="btn" id="watchWorld" value="watch">Watch the valley<kbd>Alt+W</kbd></button><button class="btn" id="takeGod" value="take" formnovalidate>Take a god<kbd>Alt+G</kbd></button></form>
+  <p class="muted">Play as the sky: the people pray to you, and every miracle costs grace. Watch the valley: nobody prays, and the fire costs nothing.</p>
   <p><button class="btn" type="button" id="continueBtn" hidden>Continue the last world<kbd>Alt+C</kbd></button></p>
   <p class="muted" id="startNote" hidden></p>
 </dialog>
@@ -300,6 +305,8 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <!-- The file picker for Load. It is opened from the key or the palette, and it keeps no value. -->
 <input type="file" id="loadFile" accept=".json,application/json" hidden>
 <dialog id="help">
+  <h2>Playing as the sky</h2>
+  <div id="helpSky"></div>
   <h2>Keys</h2>
   <table class="keys" id="helpKeys"></table>
   <p class="muted">[ and ] show more or fewer ages while the timeline is focused. Elsewhere they change level.</p>
@@ -314,7 +321,7 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   </div>
   <h2>Things to try</h2>
   <ul id="tips">
-    <li>Wait for the fire pit, then use Light fire on it. Then strike the grass instead and compare.</li>
+    <li>Wait for the fire pit, then use Spark on it. Then strike the grass instead and compare.</li>
     <li>Let the fire go out. Watch the goals, the moods, and who comes to fix it.</li>
     <li>Pin a rabbit and watch its decisions when a fox or a person comes close.</li>
     <li>Turn Stock food off and see what the newcomers do when they arrive.</li>
@@ -329,6 +336,13 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
     <li>When a camp reaches five people with a roof, two of them will leave in spring to found another. Switch camps with the tabs in the strip.</li>
   </ul>
   <p><button class="btn" id="helpClose">Close<kbd>Esc</kbd></button></p>
+</dialog>
+<!-- The season's card, for a world played as the sky. Filled by openTally in src/ui/dialogs.js. -->
+<dialog id="tally" aria-labelledby="tallyTitle">
+  <h2 id="tallyTitle"></h2>
+  <table class="kv" id="tallyRows"></table>
+  <p id="tallyLine"></p>
+  <p><button class="btn" type="button" id="tallyClose">Go on<kbd>Enter</kbd></button></p>
 </dialog>
 <dialog id="mute">
   <h2 id="muteTitle">Mute</h2>
@@ -368,8 +382,10 @@ const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 /* Levels. Level 0 is the surface. Above it are hilltops. Below it are caves. A level is an array like the surface, mostly null. */
 let ZMIN = -2, ZMAX = 2, ZOFF = 2, NZ = ZMAX - ZMIN + 1;
 /* `force` is the Force Actions setting: a barred option may be taken, with no penalty. It is read
-   only where the player chooses. No rule reads it, so it cannot move the creation. */
-const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false };
+   only where the player chooses. No rule reads it, so it cannot move the creation.
+   `faith` makes the world a game: the people believe in the sky, pray, and the sky's miracles cost
+   grace (faith.js). Off, every faith rule returns at once, and the world is the sandbox it was. */
+const DEFAULT_OPTIONS = { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false, faith: false };
 let options;
 /* The rules an option set must keep. It returns the sentence that says which rule it breaks, or null.
    setOptions reads it, and so does a loader that must judge a save file before it touches the state. */
@@ -378,6 +394,7 @@ function checkOptions(o){
   if (!Number.isInteger(q.sw) || !Number.isInteger(q.sh) || q.sw < 1 || q.sh < 1) return `The world needs at least one sector each way. Got ${q.sw} by ${q.sh}.`;
   if (!Number.isInteger(q.zmin) || !Number.isInteger(q.zmax) || q.zmin > -2 || q.zmax < 2) return `The level range must reach from -2 or lower to 2 or higher, since the valley digs two levels down and raises two up. Got ${q.zmin} to ${q.zmax}.`;
   if (!Number.isInteger(q.ageLimit) || q.ageLimit < 1) return `The age limit must be a whole number of ages, at least 1. Got ${q.ageLimit}.`;
+  if (typeof q.faith !== 'boolean') return `Faith is either on or off. Got ${q.faith}.`;
   return null;
 }
 function setOptions(o){
@@ -566,7 +583,7 @@ const days = n => n * DAY;
 const years = n => n * YEAR_DAYS * DAY;
 /* A rate for each world hour, as a rate for each tick. It serves an amount and a small chance alike:
    the linear form is exact for an amount, and only an approximation for a chance, since a chance
-   does not compound linearly over many ticks. Built for the retune. No rule reads it yet. */
+   does not compound linearly over many ticks. Built for the retune. `CLOCK.faith.grace` reads it. */
 const perHour = p => p / hours(1);
 /* The chance that a roll made once a tick at `rate` comes up at least once in `n` ticks. Over one
    tick it returns the rate itself, because `1 - (1 - rate)` is not exactly `rate` in floating point,
@@ -835,7 +852,28 @@ const CLOCK = {
     pit: ticks(800), sparks: ticks(300), dud: ticks(400), roof: ticks(1200), giftLeft: ticks(400),
     clothes: ticks(1500), garden: ticks(1500),
     woken: mins(30),   // roused from sleep by something near. Written in world units: a new value never takes a marker.
+    /* The sky and its people (faith.js). What a prayer's end leaves in the one who prayed. */
+    heard: hours(12), ownHands: hours(8), unheard: hours(12),
     wouldnothold: 4,   // a god's thought. Nothing counts it down: the tick does not step a god.
+  },
+  /* The sky and its people (faith.js). None of it runs in a world made with faith off. */
+  faith: {
+    every: mins(10),           // how often belief, grace, and prayers are looked at. A whole number of beats.
+    /* Grace a tick from one person whose belief is 100: half a grace an hour. Belief 40 gives 0.4 of it.
+       At 1 an hour, grace sat at the cap of 100 for most of an 8-day run, so no prayer forced a choice. */
+    grace: perHour(0.5),
+    fade: 1 / days(1),         // belief a tick that each person loses, down to the floor: 1 a day
+    /* How long a prayer waits for its answer, by kind. A fire prayer waits until the next dawn if
+       that is later. A storm prayer waits until the storm's end if that is sooner. */
+    deadline: { fire: hours(12), hunger: days(1), wolf: hours(1), wildfire: hours(6), storm: hours(6) },
+    /* A camp prays about one kind of trouble at most once in this long, counted from when the last
+       such prayer opened. A cold pit brings a prayer each evening, and an empty stash one each day. */
+    prayAgain: days(1),
+    witnessGap: days(1),       // a person gains belief from seeing a miracle at most once in this long
+    evening: hours(17),        // from this hour to dawn is evening, when a cold pit makes someone pray
+    rainLength: hours(4),      // the storm that Rain starts
+    wardHold: days(1),         // how long a Ward keeps wolves and foxes off its ground
+    signKeep: days(2),         // how long the sign of a miracle is kept for credit
   },
 };
 
@@ -3995,6 +4033,8 @@ function threatsFor(a){
   if (a.species === 'gnome'){
     for (const b of sourcesNow()){ if (!b.alive) continue; if (b.species === 'human' && ember(b) && near(b, a) <= 5) out.push([b.x, b.y]); if (b.species === 'wolf' && near(b, a) <= 6) out.push([b.x, b.y]); }
   }
+  /* A Ward from the sky (faith.js). With faith off there is no ward, and the list is what it was. */
+  if (SPECIES[a.species].warded) for (const w of wardPoints(a)) out.push(w);
   return out;
 }
 
@@ -4118,6 +4158,12 @@ function bodyBreak(a, s){
   return b;
 }
 
+/* A person under a roof: below the surface, in a cave, under a raised tile, or beside a shelter or a hut
+   of `camp`. Rain does not soak them, and the cold reaches them less. The faith rules read it too. */
+function underRoof(a){
+  const here = tileAt(a.x, a.y, a.z);
+  return a.z < 0 || !!(here && here.cave) || hasTile(a.x, a.y, a.z + 1) || !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
+}
 /* One stretch of a being's body, from `a.seen` to at most `lim`. It moves `a.seen` to where it got. */
 function bodyStretch(a, lim){
   const s = a.seen, sp = SPECIES[a.species], n = a.needs;
@@ -4132,7 +4178,7 @@ function bodyStretch(a, lim){
     const season = seasonOf(dayOf(s + 1)), under = a.z < 0 || !!(here && here.cave);
     const cold = under ? CLOCK.cold.under : season === 'winter' ? (night ? CLOCK.cold.winterNight : CLOCK.cold.winterDay) : season === 'summer' ? CLOCK.cold.summer : (night ? CLOCK.cold.night : CLOCK.cold.day);
     byFire = !!(camp && pitLit() && nearAt(a, ...camp.pit) <= 3);
-    roofed = under || hasTile(a.x, a.y, a.z + 1) || !!(camp && sleepPlaces().some(pl => nearAt(a, ...pl) <= 1));
+    roofed = underRoof(a);
     dW = -cold * (1.3 - a.traits.hardiness * 0.6) * (storm && !roofed ? 1.5 : 1) * (roofed ? 0.4 : 1) * (a.homeless ? 0.3 : 1) * (a.clothes ? 0.6 : 1) * (stage(a, s + 1) === 'adult' ? 1 : 1.3) + (byFire ? CLOCK.rate.fireWarms : 0);
   }
   /* How much of the stretch shares one answer to "is this person freezing" and "is this person out of
@@ -4346,12 +4392,14 @@ const LIFE = { sprite: { adult: 10, old: 150, life: 200 }, human: { adult: 16, o
    ticks can ask what stage the being was in at the start of the stretch without moving the world. */
 const ageDays = (a, t = tick) => (t - a.born) / DAY;
 const stage = (a, t = tick) => { const L = LIFE[a.species]; const d = ageDays(a, t); return d < L.adult ? 'young' : d < L.old ? 'adult' : 'old'; };
+/* `warded`: a Ward from the sky drives it off. `beckoned`: a Beckon from the sky draws it. Both are read
+   only in a world made with faith on (faith.js). */
 const SPECIES = {
   human:  { glyph: '@', label: 'human',  plural: 'people', decay: { food: tickRate(0.035), water: tickRate(0.05), rest: tickRate(0.03), social: tickRate(0.02), warmth: tickRate(0) }, stride: 1, zmin: -2, zmax: 2 },
-  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true },
-  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true },
-  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true },
-  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true },
+  rabbit: { glyph: 'r', label: 'rabbit', plural: 'rabbits', decay: { food: tickRate(0.07), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 0, prey: true, beckoned: true },
+  fox:    { glyph: 'f', label: 'fox',    plural: 'foxes', decay: { food: tickRate(0.025), water: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 6, spread: 5, mood: -8 }, hunter: true, warded: true },
+  wolf:   { glyph: 'w', label: 'wolf',   plural: 'wolves', decay: { food: tickRate(0.02), water: tickRate(0.03), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, bite: { hp: 20, spread: 15, mood: -20 }, hunter: true, warded: true },
+  deer:   { glyph: 'd', label: 'deer',   plural: 'deer', decay: { food: tickRate(0.05), water: tickRate(0.04), rest: tickRate(0.03) }, stride: 1, zmin: 0, zmax: 2, prey: true, beckoned: true },
   sprite: { glyph: '¤', label: 'sprite', plural: 'sprites', decay: { glow: tickRate(0.03), play: tickRate(0.04), rest: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, fae: true },
   gnome:  { glyph: 'g', label: 'gnome',  plural: 'gnomes', decay: { food: tickRate(0.03), rest: tickRate(0.03), social: tickRate(0.02) }, stride: 1, zmin: -2, zmax: 2, folk: true },
 };
@@ -4777,6 +4825,493 @@ function groveTick(){
   if (!onBeat('groveTick')) return;
   if (tick % CLOCK.grove.every === 0) for (const g of groves){ g.anger = Math.max(0, g.anger - 1); const kin = beings.filter(b => b.alive && b.species === 'sprite' && b.grove === g);
     if (seasonOf() === 'spring' && kin.length < 5 && g.anger < 20 && tick - g.lastBirth > CLOCK.grove.birthGap && sectorCount(g.sector, 'oldpines', t => t.feature === 'tree' && tick - (t.planted || 0) > CLOCK.grove.oldPine) > 25 && rng() < CLOCK.grove.birthChance){ g.lastBirth = tick; const q = nearFind(g.x, g.y, q => passable(q.x, q.y), RING); if (q){ const sp = makeBeing('sprite', q.x, q.y, null, 0); sp.born = tick; sp.grove = g; beings.push(sp); } } }
+}
+
+/* ---------- the sky and its people: belief, grace, prayers, miracles, and the seasons ----------
+   A world made with `options.faith` is a game. Each person believes in the sky, from 0 to 100. Every
+   believer gives the sky grace, and every miracle costs grace. People in trouble pray, and the sky
+   answers, or they cope alone, or nobody comes. Belief moves with what they saw.
+
+   With faith off, every rule here returns at once and nothing else in the sim reads `faith`, so the
+   world is the sandbox it was and the golden record does not move. No rule here draws a random
+   number. A miracle may start a rule that draws (a storm's end, a fleeing wolf's path), and that is
+   safe because every miracle is a door act and is in the door log.
+
+   Prayers and signs name beings and camps by id, never by reference, so the whole of `faith` is plain
+   data and a snapshot saves it as it is. The numbers are the proposal's, in
+   design/proposals/2026-09-26-the-sky-plays.md. Durations and rates are in `CLOCK.faith`. */
+
+/** @type {Faith|null} */
+let faith = null;
+
+/* Amounts that are not time. */
+const FAITH = {
+  belief: { founder: 40, newcomer: 20, floor: 5, top: 100, witness: 2 },
+  /* The grace the sky starts with: enough for one Spark, so the first fire prayer can be answered.
+     At 0, and at the first income rate (twice today's), the founder's belief of 40 gave 4 grace by the first evening, and the first prayer was
+     always silent. */
+  graceStart: 30,
+  graceCap: 100,
+  /* The grace each miracle costs, by the name of its door act. `light` is the Spark. */
+  cost: { light: 15, rain: 40, ward: 15, beckon: 20, calm: 25 },
+  /* How a prayer's end moves belief: the one who prayed, everyone else in their camp, and the mood of
+     the thought the one who prayed is left with. A death before the answer is the silent row. */
+  outcome: {
+    sky:    { prayer: 20, others: 6, mood: 6 },
+    own:    { prayer: -4, others: 0, mood: 2 },
+    silent: { prayer: -12, others: -3, mood: -6 },
+    /* A trouble that went away by itself, for a kind whose row says `ownHands: false`: nobody's
+       hands met it, so nothing moves and no thought is left. */
+    passed: { prayer: 0, others: 0, mood: 0 },
+  },
+  coldBelow: 40,        // warmth under this is cold enough to pray for fire in the day
+  /* Food under this is hungry enough to pray, while the stash is under `stashLow` of the camp's aim.
+     The old trouble was an empty stash and food under 30. Over eight days on seeds r and moss-crag-87
+     with a lit fire, it made nobody pray for food. While the stash was under half its aim, the
+     hungriest person's food ran from 20 to 70. At 50, the trouble holds for about half of that time. */
+  hungryBelow: 50,
+  stashLow: 0.5,
+  wetBelow: 95,         // warmth under this, out in a storm with no roof, is reason to pray for the rain to stop
+  wildfireTiles: 3,     // burning tiles near the camp, not the pit, that make a wildfire. One struck pine is not one.
+  wolfNear: 8,          // a wolf or a fox this close at night is a reason to pray
+  fireSafe: 8,          // this close to a lit pit, nobody prays about a wolf
+  wildfireRadius: 12,   // a fire this close to the camp site, on the valley floor, is a wildfire
+  witnessRadius: 10,    // a person this close to a miracle saw it
+  wardRadius: 10,       // how far a Ward reaches
+  beckonRadius: 60,     // how far a Beckon is heard
+  beckonMost: 4,        // how many animals one Beckon draws
+  beckonWithin: 3,      // how close to the spot they come
+  /* How near the trouble a sign must be to be the answer. */
+  near: { fire: 12, hunger: 20 },
+  keepClosed: 40,       // closed prayers kept for the page to show
+};
+
+/* Every sentence a player reads from these rules. `{name}` and the other slots are filled by `faithSay`. */
+const FAITH_TEXT = {
+  pray: {
+    fire: '{name} prays for fire.',
+    hunger: '{name} prays for food.',
+    wolf: '{name} prays to be kept from the wolf.',
+    wildfire: '{name} prays for rain on the fire.',
+    storm: '{name} prays for the rain to stop.',
+  },
+  /* The prayer of one asleep, by kind (a row with `dreams: true`). */
+  dream: { wolf: '{name} dreams of wolves and prays in their sleep.' },
+  heard: {
+    fire: 'The sky heard {name}. The fire caught.',
+    hunger: 'The sky heard {name}. There is food again.',
+    wolf: 'The sky heard {name}. The wolf turned away.',
+    wildfire: 'The sky heard {name}. The fire is out.',
+    storm: 'The sky heard {name}. The rain stopped.',
+  },
+  own: {
+    fire: "{name}'s people lit the fire by their own hands.",
+    hunger: "{name}'s people found food by their own hands.",
+    wolf: '{name} kept clear of the wolf by their own hands.',
+    wildfire: 'The fire near {name} went out without the sky.',
+  },
+  /* A trouble that went away by itself, by kind (a row with `ownHands: false`). */
+  passed: { wolf: 'The wolf went away. {name} breathes again.', storm: 'The rain stopped on its own. {name} can get dry.' },
+  silent: 'The sky was silent when {name} called.',
+  cameLate: 'The sky came when {name} called. The trouble is not over yet.',
+  died: '{name} died before the sky answered.',
+  someone: 'Someone',
+  thought: { sky: 'The sky heard my prayer', own: 'We managed without the sky', silent: 'The sky did not answer' },
+  forgotten: 'Nobody believes in the sky now. It cannot answer anyone.',
+  remembered: 'Someone believes in the sky again.',
+  rain: 'Rain falls from a clear sky.',
+  ward: 'The sky guards the ground.',
+  wardFled: 'The sky guards the ground. {count}.',
+  beckon: 'The sky calls, and {count}.',
+  beckonLabel: 'Drawn by a call from the sky',
+  calm: 'The rain stops. The clouds break.',
+  reply: {
+    paid: '{said} It cost {cost} grace.',
+    rain: 'Rain falls. It will last a few hours.',
+    ward: 'The ground is guarded for a day.',
+    beckon: 'The sky calls, and {count}.',
+    calm: 'The rain stops.',
+  },
+  refuse: {
+    off: 'The sky can act only in a world you play, not one you watch.',
+    early: 'The valley is not made yet.',
+    forgotten: 'Nobody believes in the sky now. It cannot answer anyone.',
+    grace: 'Not enough grace. You have {have}, and this costs {cost}.',
+    raining: 'It is already raining.',
+    clear: 'The sky is already clear.',
+    nowhere: 'The sky cannot reach that place.',
+    noBeasts: 'No deer or rabbit is near enough to hear.',
+    noWolves: 'No wolf or fox is near enough to guard against.',
+  },
+  tally: {
+    ends: '{season} ends.',
+    believe: '{n} of {of} believe.',
+    nobody: 'Nobody prayed.',
+    answered: 'The sky answered {count}.',
+    answeredSilent: 'The sky answered {count} and was silent {times}.',
+    own: 'The people met {count} by their own hands.',
+    born: '{count}.',
+    died: '{count}.',
+    spent: 'The sky spent {n} grace.',
+  },
+  times: ['no times', 'once', 'twice'],
+};
+/* Fill the slots of one sentence. */
+const faithSay = (text, slots) => text.replace(/\{(\w+)\}/g, (m, k) => slots[k] === undefined ? m : String(slots[k]));
+
+/* ---------- the prayers ----------
+   One row per kind of trouble. `trouble(c)` is the camp's trouble, true or a thing it found. A camp
+   prays about one kind of trouble at most once in `CLOCK.faith.prayAgain`, counted from when the last
+   prayer of that kind opened, so a cold pit brings a prayer each evening and not every ten minutes.
+   `who(c, found)` is the one who prays, or null. `over(p, c, a)`, when a row has it, says the
+   prayer's own trouble is over; without it the prayer is over when the camp's trouble is.
+   `places(p, c)` are where the answer must fall, and `near` how close, or null for anywhere.
+   `answers` are the miracles that count. `ownHands: false` means that a trouble which ends with no
+   sign went away by itself, and nobody learns anything from it. `dreams: true` lets a sleeper pray
+   about that kind. `deadline()`, when a row has it, is the tick the prayer waits until; without it the
+   prayer waits `CLOCK.faith.deadline[kind]`. Each reads `camp`, which the caller sets. */
+const isEvening = () => { const s = tick % DAY; return s >= CLOCK.faith.evening || s < CLOCK.night.lifts; };
+const nextDawn = () => Math.floor(tick / DAY) * DAY + CLOCK.night.lifts + (tick % DAY >= CLOCK.night.lifts ? DAY : 0);
+/* A person who can pray: awake, or asleep for a kind that `dreams`, believing above the floor, with no
+   prayer open. */
+const canPray = (a, dreams = false) => a.alive && (!a.asleep || dreams) && a.belief > FAITH.belief.floor && !faith.prayers.some(p => !p.end && p.who === a.id);
+/* Out in a storm with no roof, and cold with it. `underRoof` is the test the body's warmth uses. */
+const wetAndCold = a => !underRoof(a) && a.needs.warmth < FAITH.wetBelow;
+/* The camp's stash is under `stashLow` of its aim. */
+const stashLow = () => stashFood() < foodTarget() * FAITH.stashLow;
+/* The tiles burning on the valley floor within `wildfireRadius` of the camp site, not the pit. */
+function burningNear(c){
+  const out = [];
+  if (!c.site || fireCount <= 0) return out;
+  const r = FAITH.wildfireRadius, [sx, sy] = c.site;
+  for (let y = sy - r; y <= sy + r; y++) for (let x = sx - r; x <= sx + r; x++){
+    if (!inb(x, y) || (c.pit && c.pit[0] === x && c.pit[1] === y)) continue;
+    const t = tileAt(x, y); if (t.fire > 0) out.push(t);
+  }
+  return out;
+}
+/* The lowest score, and on a tie the first in the list. No random number. */
+function lowest(list, score){ let best = null, bs = Infinity; for (const a of list){ const s = score(a); if (s < bs){ best = a; bs = s; } } return best; }
+/* The nearest wolf or fox that makes a person afraid, or null. A person by a lit pit is safe. */
+function beastNear(a){
+  const pit = a.camp && a.camp.pit ? tileAt(a.camp.pit[0], a.camp.pit[1]) : null;
+  if (pit && pit.struct && pit.struct.lit && nearAt(a, pit.x, pit.y) <= FAITH.fireSafe) return null;
+  let best = null;
+  for (const b of beings) if (b.alive && SPECIES[b.species].warded && near(a, b) <= FAITH.wolfNear && (!best || near(a, b) < near(a, best))) best = b;
+  return best;
+}
+const PRAYERS = {
+  fire: {
+    trouble(){ const t = pitTile(); return t && t.struct && !t.struct.lit && t.struct.fuel > 0 ? t : null; },
+    who(){ const ev = isEvening(); return lowest(campHumans().filter(a => canPray(a) && (ev || a.needs.warmth < FAITH.coldBelow)), a => a.needs.warmth); },
+    where: (c, a, t) => [t.x, t.y, 0],
+    places: (p, c) => c.pit ? [[c.pit[0], c.pit[1], 0]] : [p.where],
+    near: FAITH.near.fire, answers: ['light'],
+    /* The next dawn, and never less than the deadline, so a prayer made just before dawn is not over at once. */
+    deadline: () => Math.max(nextDawn(), tick + CLOCK.faith.deadline.fire),
+  },
+  hunger: {
+    trouble(){ return stashLow() && campHumans().some(a => a.needs.food < FAITH.hungryBelow); },
+    who(){ return lowest(campHumans().filter(a => canPray(a) && a.needs.food < FAITH.hungryBelow), a => a.needs.food); },
+    /* The prayer is for the camp's food: it ends when the stash is back to `stashLow` of its aim, not
+       when the one who prayed has eaten. With the old end, a meal from the low stash closed it by
+       their own hands within the hour, before a player could answer. */
+    over: () => !stashLow(),
+    where: (c, a) => c.site ? [c.site[0], c.site[1], 0] : [a.x, a.y, a.z],
+    places: (p, c) => [p.where, ...(c.site ? [[c.site[0], c.site[1], 0]] : []), ...c.snares.map(s => [s.x, s.y, 0])],
+    near: FAITH.near.hunger, answers: ['beckon'],
+  },
+  wolf: {
+    trouble(){ return isNight() && campHumans().some(a => beastNear(a)); },
+    /* A sleeper prays too, in a dream. The wolf comes at night, when most people are asleep. */
+    who(){ return lowest(campHumans().filter(a => canPray(a, true) && beastNear(a)), a => near(a, beastNear(a))); },
+    /* The prayer is the person's: it ends when no wolf or fox is near the one who prayed, whoever
+       else in the camp is still afraid. */
+    over: (p, c, a) => !beastNear(a),
+    where: (c, a) => [a.x, a.y, a.z],
+    places: (p) => { const a = beingById(p.who); return a ? [p.where, [a.x, a.y, a.z]] : [p.where]; },
+    /* A wolf that wanders off was not driven off by anyone. */
+    near: FAITH.wardRadius, answers: ['ward'], ownHands: false, dreams: true,
+  },
+  wildfire: {
+    /* A fire that spreads, not the one pine that lightning struck to give the camp its ember. */
+    trouble(c){ const ts = burningNear(c); return ts.length >= FAITH.wildfireTiles ? ts[0] : null; },
+    who(c, t){ return lowest(campHumans().filter(a => canPray(a)), a => nearAt(a, t.x, t.y)); },
+    where: (c, a, t) => [t.x, t.y, 0],
+    places: () => [],
+    near: null, answers: ['rain'],
+  },
+  storm: {
+    trouble(){ return weather.storm && campHumans().some(wetAndCold); },
+    who(){ return lowest(campHumans().filter(a => canPray(a) && wetAndCold(a)), a => a.needs.warmth); },
+    /* The prayer is for the rain to stop. Going in under a roof does not end it. */
+    over: () => !weather.storm,
+    where: (c, a) => [a.x, a.y, a.z],
+    places: () => [],
+    /* The rain that stops by itself was stopped by nobody. */
+    near: null, answers: ['calm'], ownHands: false,
+    deadline: () => Math.min(tick + CLOCK.faith.deadline.storm, weather.until),
+  },
+};
+
+/* ---------- the tick ---------- */
+/* The people get their beliefs at once, and not at the first period: the strip read "0 of 1 believe" for
+   the first ten world minutes. faithTick still gives one to each person who arrives later. No random number. */
+function startFaith(){
+  faith = { grace: FAITH.graceStart, spent: 0, prayers: [], signs: [], tallies: [], troubles: {}, forgotten: false, nextPrayer: 1,
+    season: seasonOf(), since: freshTally() };
+  giveBeliefs();
+}
+function freshTally(){ return { answered: 0, ownHands: 0, silent: 0, births: 0, deaths: 0, spent: 0, tick }; }
+/* True when the rules should run: a world made to be played, in the days. It starts the record the
+   first time it is asked, so a world, a load of an old save, and a door act all start it the same way. */
+function faithOn(){
+  if (!options.faith || era !== 'days') return false;
+  if (!faith) startFaith();
+  return true;
+}
+/* Called last in updateWorld. The work is done once every `CLOCK.faith.every`. */
+function faithTick(){
+  if (!faithOn() || tick % CLOCK.faith.every) return;
+  giveBeliefs();
+  const n = CLOCK.faith.every;
+  let gain = 0;
+  for (const a of humans()) gain += a.belief / FAITH.belief.top * CLOCK.faith.grace * n;
+  faith.grace = Math.min(FAITH.graceCap, faith.grace + gain);
+  for (const a of humans()) setBelief(a, -CLOCK.faith.fade * n);
+  openPrayers();
+  resolvePrayers();
+  checkForgotten();
+  turnSeason();
+  faith.signs = faith.signs.filter(s => tick - s.tick <= CLOCK.faith.signKeep || s.until > tick);
+}
+/* Every living person without a belief gets one: the first person the founder's, a child the mean of
+   the parents', and anyone else a newcomer's. */
+function giveBeliefs(){
+  const first = firstPerson();
+  for (const a of humans()){
+    if (a.belief !== undefined) continue;
+    const ps = a.parents ? a.parents.map(beingById).filter(p => p && p.belief !== undefined) : [];
+    a.belief = a === first ? FAITH.belief.founder : ps.length ? ps.reduce((s, p) => s + p.belief, 0) / ps.length : FAITH.belief.newcomer;
+  }
+}
+/* A loss never takes belief under the floor, or lower if it is already under it. A gain may lift it anywhere. */
+const setBelief = (a, d) => { a.belief = d < 0 ? Math.max(a.belief + d, Math.min(a.belief, FAITH.belief.floor)) : Math.min(FAITH.belief.top, a.belief + d); };
+
+/* `faith.troubles` holds, by 'campId:kind', the tick the last prayer of that kind opened. */
+function openPrayers(){
+  const prev = camp;
+  try {
+    for (const c of camps){
+      camp = c;
+      for (const kind in PRAYERS){
+        const row = PRAYERS[kind], key = c.id + ':' + kind, last = faith.troubles[key];
+        if (last !== undefined && tick - last < CLOCK.faith.prayAgain) continue;
+        if (faith.prayers.some(p => !p.end && p.camp === c.id && p.kind === kind)) continue;
+        const found = row.trouble(c);
+        if (!found) continue;
+        const a = row.who(c, found);
+        if (!a) continue;
+        faith.troubles[key] = tick;
+        const until = row.deadline ? row.deadline() : tick + CLOCK.faith.deadline[kind];
+        faith.prayers.push({ id: faith.nextPrayer++, kind, who: a.id, camp: c.id, at: tick, until, where: row.where(c, a, found), end: null, endedAt: 0 });
+        log(faithSay(a.asleep && FAITH_TEXT.dream[kind] ? FAITH_TEXT.dream[kind] : FAITH_TEXT.pray[kind], { name: a.name }), [a]);
+      }
+    }
+  } finally { camp = prev; }
+}
+/* A sign of the sky that answers this prayer: the right miracle, made after the prayer, near the trouble. */
+function skySign(p, c){
+  const row = PRAYERS[p.kind], places = row.places(p, c);
+  return faith.signs.some(s => row.answers.includes(s.act) && s.tick >= p.at
+    && (row.near === null || places.some(([x, y, z]) => nearAt(s, x, y, z) <= row.near)));
+}
+function resolvePrayers(){
+  const prev = camp;
+  try {
+    for (const p of faith.prayers){
+      if (p.end) continue;
+      const c = camps.find(k => k.id === p.camp), a = beingById(p.who), row = PRAYERS[p.kind];
+      /* A camp that is gone takes its prayers with it: they end with no line and move nobody. */
+      if (!c){ p.end = 'passed'; p.endedAt = tick; continue; }
+      camp = c;
+      if (!a || !a.alive){
+        closePrayer(p, 'died', a);
+        /* Someone else may pray about the same trouble at once. */
+        delete faith.troubles[c.id + ':' + p.kind];
+      }
+      else if (row.over ? row.over(p, c, a) : !row.trouble(c)) closePrayer(p, skySign(p, c) ? 'sky' : row.ownHands === false ? 'passed' : 'own', a);
+      /* A miracle that landed but did not end the trouble in time is still an answer: the people saw
+         the sky come. Before this, a paid Beckon whose deer came too slowly ended as "silent". */
+      else if (tick >= p.until) closePrayer(p, skySign(p, c) ? 'sky' : 'silent', a, true);
+    }
+  } finally { camp = prev; }
+  const closed = faith.prayers.filter(p => p.end);
+  if (closed.length > FAITH.keepClosed){ const drop = new Set(closed.slice(0, closed.length - FAITH.keepClosed)); faith.prayers = faith.prayers.filter(p => !drop.has(p)); }
+}
+/* The end of one prayer. `camp` is the prayer's camp. */
+function closePrayer(p, end, a, late = false){
+  p.end = end; p.endedAt = tick;
+  const row = FAITH.outcome[end === 'died' ? 'silent' : end];
+  if (end === 'passed'){
+    log(faithSay(FAITH_TEXT.passed[p.kind], { name: a ? a.name : FAITH_TEXT.someone }), a ? [a] : [], 'info');
+    return;
+  }
+  if (a && a.alive){
+    setBelief(a, row.prayer);
+    addThought(a, 'prayer', FAITH_TEXT.thought[end === 'died' ? 'silent' : end], row.mood, end === 'sky' ? CLOCK.thought.heard : end === 'own' ? CLOCK.thought.ownHands : CLOCK.thought.unheard);
+  }
+  for (const o of campHumans()) if (o !== a) setBelief(o, row.others);
+  if (end === 'sky') faith.since.answered++; else if (end === 'own') faith.since.ownHands++; else faith.since.silent++;
+  const name = a ? a.name : FAITH_TEXT.someone;
+  const text = end === 'sky' ? (late ? FAITH_TEXT.cameLate : FAITH_TEXT.heard[p.kind]) : end === 'own' ? FAITH_TEXT.own[p.kind] : end === 'died' ? FAITH_TEXT.died : FAITH_TEXT.silent;
+  log(faithSay(text, { name }), a ? [a] : [], end === 'sky' ? 'good' : end === 'own' ? 'info' : 'bad');
+}
+/* The sky is forgotten when no living person believes above the floor. */
+const nobodyBelieves = () => !humans().some(a => a.belief > FAITH.belief.floor);
+function checkForgotten(){
+  const now = nobodyBelieves();
+  if (now === faith.forgotten) return;
+  faith.forgotten = now;
+  if (now) log(FAITH_TEXT.forgotten, humans(), 'major'); else log(FAITH_TEXT.remembered, humans(), 'good');
+}
+/* When the season turns, the one that ended is tallied: one record for the page, one line for the chronicle. */
+function turnSeason(){
+  const s = seasonOf();
+  if (s === faith.season) return;
+  const since = faith.since, hs = beings.filter(b => b.species === 'human');
+  since.births = hs.filter(b => b.parents && b.born >= since.tick).length;
+  since.deaths = hs.filter(b => !b.alive && b.diedAt >= since.tick).length;
+  const living = humans(), believers = living.filter(a => a.belief > FAITH.belief.floor);
+  const t = { season: faith.season, year: yearOf(dayOf(since.tick)), from: since.tick, to: tick,
+    people: living.length, believers: believers.length,
+    meanBelief: living.length ? Math.round(living.reduce((n, a) => n + a.belief, 0) / living.length) : 0,
+    answered: since.answered, ownHands: since.ownHands, silent: since.silent, births: since.births, deaths: since.deaths, spent: since.spent };
+  faith.tallies.push(t);
+  log(tallyLine(t), living, 'major');
+  faith.season = s; faith.since = freshTally();
+}
+function tallyLine(t){
+  const T = FAITH_TEXT.tally, out = [faithSay(T.ends, { season: t.season[0].toUpperCase() + t.season.slice(1) }), faithSay(T.believe, { n: t.believers, of: t.people })];
+  const times = FAITH_TEXT.times[t.silent] || `${t.silent} times`, prayers = nOf(t.answered, 'prayer', 'prayers');
+  if (!t.answered && !t.silent && !t.ownHands) out.push(T.nobody);
+  else if (t.silent) out.push(faithSay(T.answeredSilent, { count: prayers, times }));
+  else out.push(faithSay(T.answered, { count: prayers }));
+  if (t.ownHands) out.push(faithSay(T.own, { count: nOf(t.ownHands, 'trouble', 'troubles') }));
+  if (t.births) out.push(faithSay(T.born, { count: nOf(t.births, 'child was born', 'children were born') }));
+  if (t.deaths) out.push(faithSay(T.died, { count: nOf(t.deaths, 'person died', 'people died') }));
+  if (t.spent) out.push(faithSay(T.spent, { n: t.spent }));
+  return out.join(' ');
+}
+
+/* ---------- the miracles ----------
+   Each is a door act (door.js). A refused miracle costs nothing and says why. */
+function refused(act){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  if (!faithOn()) return FAITH_TEXT.refuse.early;
+  giveBeliefs();
+  /* Asked now, and not read from the last period's flag: belief can fall or return between periods. */
+  if (nobodyBelieves()) return FAITH_TEXT.refuse.forgotten;
+  if (faith.grace < FAITH.cost[act]) return faithSay(FAITH_TEXT.refuse.grace, { have: Math.floor(faith.grace), cost: FAITH.cost[act] });
+  return null;
+}
+/* A miracle that landed: pay, leave its sign, and let whoever stood near see it. */
+function payMiracle(act, x, y, z, extra = {}){
+  const cost = FAITH.cost[act];
+  faith.grace -= cost; faith.spent += cost; faith.since.spent += cost;
+  faith.signs.push({ act, x, y, z, tick, until: 0, ...extra });
+  /* A person gains from seeing a miracle once in `CLOCK.faith.witnessGap`, so a sky that strikes the
+     same pit twice in an evening does not buy belief with it. */
+  for (const a of humans()){
+    if (nearAt(a, x, y, z) > FAITH.witnessRadius || (a.sawSign !== undefined && tick - a.sawSign < CLOCK.faith.witnessGap)) continue;
+    setBelief(a, FAITH.belief.witness); a.sawSign = tick;
+  }
+  return cost;
+}
+const actSpot = e => ({ x: e.x, y: e.y, z: e.z || 0 });
+/* The Spark. With faith off, the old Light fire, unchanged. With faith on, it is paid for only when
+   the strike does something: a pit already burning, or a tile with nothing to burn, costs nothing. */
+function sparkAct(e){
+  const { x, y, z } = actSpot(e);
+  if (!options.faith) return lightTile(x, y, z);
+  const why = refused('light'); if (why) return why;
+  const t = hasTile(x, y, z) ? tileAt(x, y, z) : null, fire = t ? t.fire : 0, lit = !!(t && t.struct && t.struct.lit);
+  const said = lightTile(x, y, z);
+  if (!t || (t.fire === fire && !!(t.struct && t.struct.lit) === lit)) return said;
+  return faithSay(FAITH_TEXT.reply.paid, { said, cost: payMiracle('light', x, y, z) });
+}
+function rainAct(e){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  if (faithOn() && weather.storm) return FAITH_TEXT.refuse.raining;
+  const why = refused('rain'); if (why) return why;
+  const { x, y } = actSpot(e), at = inb(x, y) ? [x, y] : (camp && camp.site) || [0, 0];
+  weather.storm = true; weather.until = tick + CLOCK.faith.rainLength;
+  const cost = payMiracle('rain', at[0], at[1], 0);
+  log(FAITH_TEXT.rain, humans(), 'good');
+  return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.rain, cost });
+}
+/* The Calm: the storm ends now, through the same endStorm as a storm that ends by itself. The next storm is
+   counted from now, so it comes sooner than it would have. */
+function calmAct(e){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  if (faithOn() && !weather.storm) return FAITH_TEXT.refuse.clear;
+  const why = refused('calm'); if (why) return why;
+  const { x, y } = actSpot(e), at = inb(x, y) ? [x, y] : (camp && camp.site) || [0, 0];
+  endStorm();
+  const cost = payMiracle('calm', at[0], at[1], 0);
+  log(FAITH_TEXT.calm, humans(), 'good');
+  return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.calm, cost });
+}
+/* The Ward: every wolf and fox near the spot runs, and the spot is a threat to them for a day. */
+function wardAct(e){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  const why = refused('ward'); if (why) return why;
+  const { x, y, z } = actSpot(e);
+  if (!hasTile(x, y, z)) return FAITH_TEXT.refuse.nowhere;
+  /* A Ward on ground with no wolf or fox near it guards nothing, and costs nothing. */
+  if (!beings.some(b => b.alive && SPECIES[b.species].warded && nearAt(b, x, y, z) <= FAITH.wardRadius)) return FAITH_TEXT.refuse.noWolves;
+  /* The sign first: the flee reads it through threatsFor. */
+  const cost = payMiracle('ward', x, y, z, { until: tick + CLOCK.faith.wardHold });
+  let n = 0;
+  for (const b of beings){
+    if (!b.alive || !SPECIES[b.species].warded || nearAt(b, x, y, z) > FAITH.wardRadius) continue;
+    catchUp(b); if (!b.alive) continue;
+    b.asleep = false; failTask(b);
+    if (startTask(b, 'flee')) n++;
+    b.next = tick;
+  }
+  const saw = humans().filter(a => nearAt(a, x, y, z) <= FAITH.witnessRadius);
+  log(n ? faithSay(FAITH_TEXT.wardFled, { count: nOf(n, 'beast flees', 'beasts flee') }) : FAITH_TEXT.ward, saw, 'good');
+  return faithSay(FAITH_TEXT.reply.paid, { said: FAITH_TEXT.reply.ward, cost });
+}
+/* The threat points a Ward makes for a wolf or a fox. Empty with faith off. threatsFor reads it. */
+function wardPoints(a){
+  if (!faith) return [];
+  const out = [];
+  for (const s of faith.signs) if (s.act === 'ward' && s.until > tick && nearAt(a, s.x, s.y, s.z) <= FAITH.wardRadius) out.push([s.x, s.y]);
+  return out;
+}
+/* The Beckon: the nearest deer and rabbits walk toward the spot. */
+function beckonAct(e){
+  if (!options.faith) return FAITH_TEXT.refuse.off;
+  const why = refused('beckon'); if (why) return why;
+  const { x, y, z } = actSpot(e);
+  if (!hasTile(x, y, z)) return FAITH_TEXT.refuse.nowhere;
+  const heard = beings.filter(b => b.alive && SPECIES[b.species].beckoned && nearAt(b, x, y, z) <= FAITH.beckonRadius)
+    .sort((p, q) => nearAt(p, x, y, z) - nearAt(q, x, y, z) || p.id - q.id);
+  let n = 0;
+  for (const b of heard){
+    if (n >= FAITH.beckonMost) break;
+    const path = pathToStop(b, x, y, FAITH.beckonWithin, z); if (!path) continue;
+    catchUp(b); if (!b.alive) continue;
+    b.asleep = false; failTask(b);
+    setTask(b, 'walkTo', { at: [x, y, z], within: FAITH.beckonWithin }, { label: FAITH_TEXT.beckonLabel, path });
+    b.next = tick; n++;
+  }
+  if (!n) return FAITH_TEXT.refuse.noBeasts;
+  const cost = payMiracle('beckon', x, y, z), count = nOf(n, 'animal comes', 'animals come');
+  log(faithSay(FAITH_TEXT.beckon, { count }), humans().filter(a => nearAt(a, x, y, z) <= FAITH.witnessRadius), 'good');
+  return faithSay(FAITH_TEXT.reply.paid, { said: faithSay(FAITH_TEXT.reply.beckon, { count }), cost });
 }
 
 /* Goal definitions. Each goal reports a state and offers work. */
@@ -5387,8 +5922,10 @@ function spreadTo(nx, ny, nz, mult){
 function updateWeather(){
   if (!onBeat('updateWeather')) return;
   if (!weather.storm && tick >= weather.next){ weather.storm = true; weather.until = tick + CLOCK.storm.length + rint(CLOCK.storm.lengthSpread); log(isWinter() ? 'Sleet drives across the valley.' : 'A storm rolls in over the hills.', humans()); }
-  if (weather.storm && tick >= weather.until){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
+  if (weather.storm && tick >= weather.until) endStorm();
 }
+/* A storm ends, and the next one is set. The Calm (faith.js) ends one the same way. */
+function endStorm(){ weather.storm = false; weather.next = tick + (seasonOf() === 'summer' ? CLOCK.storm.summerGap : CLOCK.storm.gap) + rint(CLOCK.storm.gapSpread); }
 /* Lightning near the camp, only in storms. More often when the hearth is out. */
 function tryLightning(){
   if (camp.site && weather.storm){
@@ -6568,7 +7105,7 @@ function resetState(seed, opts){
   chronicle = []; beings = []; corpses = []; resCache = new Map(); namePool = shuffle(NAMES);
   seedNames();
   camps = []; camp = makeCamp('The first camp'); weather = { storm: false, until: 0, next: CLOCK.storm.first + rint(CLOCK.storm.firstSpread) };
-  goalPriority = {}; wanderAt = 0; doomAt = 0; resetBeats();
+  goalPriority = {}; wanderAt = 0; doomAt = 0; faith = null; resetBeats();
   resetDoor();
   era = 'days'; age = 0; pulseAge = null; godRng = null; legends = []; creation = null; field = null; boundaries = [];
 }
@@ -6623,6 +7160,8 @@ function updateWorld(){
   gnomeTick();
   spawnWildlife();
   godsTick();
+  /* Last, so that no step above moves. It draws no random number, and with faith off it returns at once. */
+  faithTick();
 }
 /* In the gods era a step is an age, or with `oneAct` one god of it. In the days era it is a tick, and
    `oneAct` means nothing there. A species with perTick false is not stepped by the tick: the gods
@@ -6941,7 +7480,7 @@ const SAVED_STATE = {
   resCache: 'resCache', startRegion: 'startRegion', doorLog: 'doorLog',
   inhabited: 'inhabited', inhabitedTold: 'inhabitedTold',
   nrng: 'nrng', lore: 'lore', tongue: 'tongue', valley: 'valley', river: 'river', stillWater: 'stillWater',
-  ponds: 'ponds', fords: 'fords',
+  ponds: 'ponds', fords: 'fords', faith: 'faith',
 };
 /* The value of every saved global, by its snapshot name. The guard walks these, and a test holds this
    table to SAVED_STATE, so a new saved global is walked without anyone remembering to add it here. */
@@ -6950,7 +7489,7 @@ function savedValues(){
     rng, godRng, levels, raised, hills, caves, sectors, groves, camps, campNow: camp, beings, items, corpses,
     chronicle, legends, weather, goalPriority, namePool, godNamePool, gestureFallbacks,
     creation, field, boundaries, resCache, startRegion, doorLog, inhabited, inhabitedTold,
-    nrng, lore, tongue, valley, river, stillWater, ponds, fords };
+    nrng, lore, tongue, valley, river, stillWater, ponds, fords, faith };
 }
 /* Which global the snapshot leaves out, and why. Each of these comes back from something else. */
 const NOT_SAVED = {
@@ -7019,6 +7558,8 @@ function takeSnapshot(){
       ponds: ponds.map(p => encode(p, 'pond')),
       fords: fords.map(f => encode(f, 'ford')),
       lostNames: lostNames(),
+      /* The sky and its people. Plain data: prayers and signs name beings and camps by id. */
+      faith: faith ? clean(faith) : null,
     };
     /* Last, because encoding the rest is what finds them. */
     snap.strayGroves = SNAP_IX.strayGroves ? SNAP_IX.strayGroves.list : [];
@@ -7189,6 +7730,10 @@ function decodeSnapshot(snap){
   stage.namePool = snapCopy(snapArray(snap.namePool, 'namePool'));
   stage.godNamePool = snapCopy(snapArray(snap.godNamePool, 'godNamePool'));
   stage.gestureFallbacks = snapCopy(snapObj(snap.gestureFallbacks, 'gestureFallbacks'));
+  /* A save from before faith.js holds no record. A world made to be played starts one on its next tick. */
+  const f = snapOpt(snap.faith, null);
+  stage.faith = f === null ? null : snapCopy(snapObj(f, 'faith'));
+  if (stage.faith) for (const k of ['prayers', 'signs', 'tallies']) snapArray(stage.faith[k], 'faith ' + k);
   return stage;
 }
 
@@ -7230,6 +7775,7 @@ function commitSnapshot(s){
      while a god's turn is open, and step() answers 'The turn is yours.' for as long as pending is set. */
   agePos = null; pending = null; runUntil = null; stops = [];
   resetDoor(); doorLog = s.doorLog;
+  faith = s.faith;
 }
 
 /* Why the last load was refused, in the words the fault threw. The player sees the plain sentence;
@@ -7345,7 +7891,12 @@ let replayHead = null;
 /* Acts by name. Each takes the event and returns its message. */
 /** @type {{ [act: string]: DoorAct }} */
 const DOOR_ACTS = {
-  light(e){ return lightTile(e.x, e.y, e.z || 0); },
+  /* The Spark. With faith off, the old Light fire exactly. The miracles are in faith.js. */
+  light(e){ return sparkAct(e); },
+  rain(e){ return rainAct(e); },
+  ward(e){ return wardAct(e); },
+  beckon(e){ return beckonAct(e); },
+  calm(e){ return calmAct(e); },
   poke(e){
     const a = beingById(e.id);
     return a ? poke(a) : 'Nobody is there to nudge.';
@@ -7465,10 +8016,61 @@ const NEXT_VIEW = { loc: 'mid', mid: 'world', world: 'fire', fire: 'loc' };
 const VIEW_LABEL = { loc: 'Sector', mid: 'Nearby', world: 'World map', fire: 'Camp fire' };
 /* The two views drawn tile by tile at full size: the sector, and the camp fire. */
 const closeUp = v => v === 'loc' || v === 'fire';
-/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick. */
+/* Every word the page adds for a world played as the sky, in one table so the text review finds them all.
+   The sim's own sentences (prayers, answers, refusals, the season's line) are in FAITH_TEXT in
+   src/sim/faith.js and are reused, not copied. `{name}` and the other slots are filled by faithSay. */
+const SKY_TEXT = {
+  grace: 'Grace',
+  forgotten: 'Forgotten',
+  believers: '{n} of {of} believe',
+  left: '{time} left',
+  slowed: '{name} prays. Time slows so you can listen.',
+  slowOn: 'Time slows when someone prays.',
+  slowOff: 'Time keeps its speed when someone prays.',
+  slowKey: 'Slow for prayers, on or off',
+  belief: 'Belief',
+  hintCost: 'It costs {cost} grace.',
+  tally: {
+    believers: 'Believers', mean: 'Mean belief', answered: 'Answered by the sky', ownHands: 'Met by their own hands',
+    silent: 'The sky was silent', births: 'Born', deaths: 'Died', spent: 'Grace spent',
+  },
+  /* The card's last line, picked by the first rule that fits, in this order. */
+  closing: {
+    forgotten: 'Nobody believes in the sky now.',
+    quiet: 'Nobody needed the sky this season.',
+    learning: 'They are learning to manage without the sky.',
+    heard: 'The sky answered more often than it was silent.',
+    unheard: 'They called more often than the sky answered.',
+    even: 'The sky answered as often as it was silent.',
+  },
+  help: {
+    watched: 'This world is watched, not played. Choose Play as the sky when you start a new world.',
+    lines: [
+      'You are the sky. Each person believes in you, from 0 to 100. Their card shows how much.',
+      'Belief gives you grace. Each person gives a little every hour, and more when they believe more. Grace stops at {cap}.',
+      'People pray when they are in trouble: a cold fire in the evening, no food, a wolf in the dark, a wildfire near the camp, or a storm with no roof. A prayer shows as a chip with the time left, and a \u2726 over the one who prays.',
+      'Each miracle answers one kind of prayer, and each costs grace. Spark lights a cold fire ({light}). Beckon calls deer and rabbits to the hungry ({beckon}). Ward drives off a wolf ({ward}). Rain puts out a wildfire ({rain}). Calm stops a storm ({calm}).',
+      'A miracle answers a prayer only if it lands near the trouble, after the prayer is made. Nudge is free. It makes one person stop and think again.',
+      'Calm stops a storm at once. With no storm, it does nothing and costs nothing.',
+      'If the sky answers, the one who prayed believes more, and so do the others. If they manage by their own hands, they believe a little less. If nobody answers, they believe much less.',
+      'Belief fades a little every day. If nobody believes, the sky is forgotten, and it cannot act.',
+      'When a season ends, a card shows how it went.',
+    ],
+    slow: 'Slow for prayers is {state}. {key} switches it. When it is on, a new prayer slows the game to {speed}.',
+    on: 'on', off: 'off',
+  },
+};
+/* The tools. Inspect is the default. A one-shot tool returns to Inspect after one use, unless Shift made it stick.
+   `act` is the door act a miracle sends, and its cost is FAITH.cost[act]. A tool with `faith` shows only in
+   a world made to be played. The Spark is the old Light fire: with faith off it is free, as it was. */
 const TOOLS = [
   { id: 'inspect', key: 'i', label: 'Inspect',    oneShot: false, hint: 'Point at a person, an animal, or a tile. Enter or click opens a window with the details.' },
-  { id: 'light',   key: 'f', label: 'Light fire', oneShot: true,  hint: 'Light the fire pit under the cursor. Enter or click lights it. Anything else starts a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'light',   key: 'f', label: 'Spark',      oneShot: true,  act: 'light',  hint: 'Light the fire pit under the cursor. Enter or click lights it. Strike anywhere else, and it may start a wildfire. The hover card says what will burn. Shift makes the tool stick.' },
+  { id: 'rain',    key: 'r', label: 'Rain',       oneShot: true,  act: 'rain',   faith: true, hint: 'Make it rain now, over the whole valley. Rain puts out a wildfire, and it soaks everyone without a roof. Enter or click calls the rain. Shift makes the tool stick.' },
+  /* L is free in every focus. C is the borders, and S is in the stage chord. */
+  { id: 'calm',    key: 'l', label: 'Calm',       oneShot: true,  act: 'calm',   faith: true, hint: 'Stop the rain now, over the whole valley. People out in it can get dry, but a wildfire the rain was putting out burns again. Enter or click stops the rain. Shift makes the tool stick.' },
+  { id: 'ward',    key: 'd', label: 'Ward',       oneShot: true,  act: 'ward',   faith: true, hint: 'Guard the ground under the cursor for a day. Wolves and foxes near it run, and keep away. Enter or click guards it. Shift makes the tool stick.' },
+  { id: 'beckon',  key: 'b', label: 'Beckon',     oneShot: true,  act: 'beckon', faith: true, hint: 'Call the deer and rabbits near the cursor to come to it. Wolves may follow them. Enter or click calls them. Shift makes the tool stick.' },
   { id: 'nudge',   key: 'n', label: 'Nudge',      oneShot: true,  hint: 'Make a person stop and think again. Startle an animal. Enter or click nudges. Shift makes the tool stick.' },
 ];
 const TRAIT_WORDS = { bravery: ['timid','steady','brave'], sociability: ['solitary','easygoing','outgoing'], diligence: ['lazy','average worker','hard-working'], temper: ['calm','even-tempered','hot-tempered'], curiosity: ['set in their ways','curious enough','always asking'], patience: ['restless','patient enough','very patient'], hardiness: ['frail','sturdy','tough as roots'] };
@@ -7585,6 +8187,13 @@ const ui = {
      the being stands on. t is the wall time in ms when the being left that square. For the last
      entry, t is when the being reached it. Not saved: persist() names its fields, and this is not one. */
   trails: {},
+  /* A world played as the sky. slowForPrayers is a preference and is saved: a new prayer drops the
+     speed to DAYS_SPEED while it is on. seenPrayers holds the ids of the prayers the page has already
+     seen, and seenTallies how many season cards it has shown. Both name one world, so they are not saved,
+     and newWorld, onSettle, and onLoad set them again. Only actions.js writes the three, and restore() reads the preference back. */
+  slowForPrayers: true,
+  seenPrayers: {},
+  seenTallies: 0,
 };
 const WIN_MAX = 6;
 /* The speed ladder. Keys and steps name a place on it, not a value, so the ladder can change and they hold.
@@ -7635,8 +8244,12 @@ const PEOPLE_AGES = ['any', 'young', 'adult', 'old'];
 
 /* What survives a reload: open drawers, mutes, speed, the goals fold, the chronicle filter. Storage may be blocked, so every touch is wrapped. */
 const STORE_KEY = 'hearth.ui';
+/* The speed a reload opens at. Once the player has chosen one, it is ui.savedSpeed, not the speed now:
+   a new prayer drops the speed to DAYS_SPEED, and setSpeed persists. When the speed now was written,
+   a player at 64x who reloaded after a prayer opened at 8x. */
+const persistedSpeed = () => ui.speedChosen === true && SPEEDS.includes(ui.savedSpeed) ? ui.savedSpeed : typeof speed === 'number' ? speed : 1;
 function persist(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: typeof speed === 'number' ? speed : 1, speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom })); } catch (e) { /* no storage */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ open: ui.open, mutes: [...ui.mutes], speed: persistedSpeed(), speedChosen: ui.speedChosen === true, showAll: ui.showAll, chronFilter: ui.chronFilter, peopleAge: ui.peopleAge, rects: ui.rects, recent: ui.recent, timelineFold: ui.timelineFold, timelineZoom: ui.timelineZoom, slowForPrayers: ui.slowForPrayers })); } catch (e) { /* no storage */ }
 }
 function restore(){
   try {
@@ -7647,6 +8260,7 @@ function restore(){
     if (s.chronFilter === 'all' || s.chronFilter === 'major') ui.chronFilter = s.chronFilter;
     if (PEOPLE_AGES.includes(s.peopleAge)) ui.peopleAge = s.peopleAge;
     if (typeof s.timelineFold === 'boolean') ui.timelineFold = s.timelineFold;
+    if (typeof s.slowForPrayers === 'boolean') ui.slowForPrayers = s.slowForPrayers;
     if (Number.isInteger(s.timelineZoom) && s.timelineZoom >= 0 && s.timelineZoom <= TL_ZOOM_MAX) ui.timelineZoom = s.timelineZoom;
     const chosen = s.speedChosen === true || (s.speedChosen === undefined && s.speed !== 1);
     if (chosen && SPEEDS.includes(s.speed)){ ui.savedSpeed = s.speed; ui.speedChosen = true; }
@@ -7901,8 +8515,89 @@ function daysOfWood(){
   const fuel = (p ? p.fuel : 0) + camp.stash.stick * STICK_FUEL + camp.stash.log * LOG_FUEL;
   return fuel / (CLOCK.rate.pitBurn * DAY);
 }
+/* ---- the sky ---- A world made with `options.faith` is played. Everything here reads the sim's `faith`
+   record and never writes it. With faith off, or in the ages, each reading is empty. */
+/* True for a world made to be played. The page builds its tools before the first world exists, when
+   `options` is still unset, so this never reads a field of it blind. */
+const faithWorld = () => !!options && options.faith === true;
+const skyPlayed = () => !inAges() && faithWorld();
+/* The living people who believe above the floor, out of all the living people, as the strip says it. */
+function believersText(){
+  const hs = humans();
+  return faithSay(SKY_TEXT.believers, { n: hs.filter(a => a.belief > FAITH.belief.floor).length, of: hs.length });
+}
+/* The Grace gauge. Its level says what the grace can buy: good when it covers the dearest miracle, warn
+   when it covers the cheapest, bad when it covers none. A forgotten sky can buy nothing, whatever it holds. */
+function graceGauge(){
+  if (!skyPlayed()) return null;
+  const g = faith ? faith.grace : 0, forgotten = !!(faith && faith.forgotten), costs = Object.values(FAITH.cost);
+  const level = forgotten || g < Math.min(...costs) ? 'bad' : g < Math.max(...costs) ? 'warn' : 'good';
+  return { v: Math.min(1, g / FAITH.graceCap), text: forgotten ? SKY_TEXT.forgotten : String(Math.floor(g)), level, believers: believersText() };
+}
+/* The open prayers of one camp, oldest first. */
+const campPrayers = (c = camp) => skyPlayed() && faith && c ? faith.prayers.filter(p => !p.end && p.camp === c.id) : [];
+/* The open prayers of every camp, the chosen camp's first, and each camp's oldest first. A prayer in any
+   camp slows the game, so each one must be a chip the player can click. */
+function skyPrayers(c = camp){
+  if (!skyPlayed() || !faith) return [];
+  const open = faith.prayers.filter(p => !p.end);
+  return c ? open.filter(p => p.camp === c.id).concat(open.filter(p => p.camp !== c.id)) : open;
+}
+/* A prayer whose chip the player muted, here or everywhere. It keeps its chip hidden and does not slow the game. */
+const prayerMuted = p => isMuted('prayer', p.camp, prayerText(p));
+/* A person's open prayer, or null. A person never has two. */
+const prayerOf = a => skyPlayed() && faith ? faith.prayers.find(p => !p.end && p.who === a.id) || null : null;
+/* The ids of everyone praying now, in any camp, for the mark over their heads. */
+function prayingNow(){
+  const out = {};
+  if (skyPlayed() && faith) for (const p of faith.prayers) if (!p.end) out[p.who] = true;
+  return out;
+}
+/* The sim's own prayer line, without its full stop, as a chip says it: "Aki prays for fire". */
+function prayerText(p){
+  const a = beingById(p.who);
+  return faithSay(FAITH_TEXT.pray[p.kind], { name: a ? a.name : FAITH_TEXT.someone }).replace(/\.$/, '');
+}
+/* The time a prayer has left: whole hours, or minutes in the last hour. */
+function timeLeft(ticks){
+  const t = Math.max(0, ticks);
+  const time = t >= hours(1) ? nOf(Math.round(t / hours(1)), 'hour', 'hours') : nOf(Math.max(1, Math.ceil(t / mins(1))), 'minute', 'minutes');
+  return faithSay(SKY_TEXT.left, { time });
+}
+/* The tools the player can use in this world, with their costs when the world is played. A miracle
+   tool is left out when faith is off. */
+const toolShown = t => !!t && (!t.faith || faithWorld());
+function toolRows(){
+  return TOOLS.filter(toolShown).map(t => {
+    const cost = faithWorld() && t.act ? FAITH.cost[t.act] : null;
+    return { id: t.id, key: t.key, label: t.label, cost, hint: cost === null ? t.hint : `${t.hint} ${faithSay(SKY_TEXT.hintCost, { cost })}`, on: t.id === tool, pinned: t.id === tool && ui.sticky };
+  });
+}
+/* The speed after the page looks at the prayers. A prayer that is open and not yet seen brings a speed
+   above the days default down to it. Anything else leaves the speed alone. Pure: the caller keeps
+   `seen`, a plain object of prayer ids, and writes the speed. */
+function prayerSpeed(seen, prayers, s){
+  return s > DAYS_SPEED && prayers.some(p => !p.end && !seen[p.id]) ? DAYS_SPEED : s;
+}
+/* The season card: its title, its rows as label and value, and its one closing line. */
+const tallyTitle = t => faithSay(FAITH_TEXT.tally.ends, { season: t.season[0].toUpperCase() + t.season.slice(1) }).replace(/\.$/, '');
+function tallyRows(t){
+  const L = SKY_TEXT.tally;
+  return [[L.believers, `${t.believers} of ${t.people}`], [L.mean, String(t.meanBelief)], [L.answered, String(t.answered)], [L.ownHands, String(t.ownHands)],
+    [L.silent, String(t.silent)], [L.births, String(t.births)], [L.deaths, String(t.deaths)], [L.spent, String(t.spent)]];
+}
+function tallyClosing(t){
+  const C = SKY_TEXT.closing;
+  if (!t.believers) return C.forgotten;
+  if (!t.answered && !t.ownHands && !t.silent) return C.quiet;
+  if (t.ownHands > t.answered + t.silent) return C.learning;
+  if (t.answered > t.silent) return C.heard;
+  if (t.silent > t.answered) return C.unheard;
+  return C.even;
+}
+
 function gauges(){
-  if (inAges()) return { hearth: null, food: null, water: null, beds: null };
+  if (inAges()) return { grace: null, hearth: null, food: null, water: null, beds: null };
   const p = camp.pit && tileAt(...camp.pit).struct;
   const wood = daysOfWood();
   const hearth = !p ? null : { v: Math.min(1, p.fuel / PIT_MAX), text: !p.lit ? (p.fuel > 0 ? 'laid, cold' : 'out') : wood < 1 ? 'under a day of wood' : `${nOf(Math.floor(wood), 'day', 'days')} of wood`, level: !p.lit ? 'bad' : wood < 1 ? 'bad' : wood < 2 ? 'warn' : 'good' };
@@ -7911,7 +8606,7 @@ function gauges(){
   const water = !camp.tools.waterskin ? null : { v: Math.min(1, camp.stash.water / waterAim()), text: `${camp.stash.water} of ${waterAim()}`, level: level3(camp.stash.water, waterAim()) };
   const n = campHumans().length, beds = bedsFor();
   const bedsG = !camp.shelter ? null : { v: Math.min(1, beds / Math.max(1, n)), text: `${beds} for ${n}`, level: beds >= n ? 'good' : 'warn' };
-  return { hearth, food, water, beds: bedsG };
+  return { grace: graceGauge(), hearth, food, water, beds: bedsG };
 }
 
 /* Mutes. 'cold' mutes the type everywhere. 'cold:3' mutes it for camp 3. 'cold:3:Ada is cold' mutes that one chip. */
@@ -7919,7 +8614,7 @@ const isMuted = (type, campId, text) => ui.mutes.has(type) || ui.mutes.has(`${ty
 function mute(type, campId, text){ ui.mutes.add(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 function unmute(type, campId, text){ ui.mutes.delete(text != null ? `${type}:${campId}:${text}` : campId ? `${type}:${campId}` : type); }
 /* A mute key as the player reads it. The chip's text may hold a colon, so only the first two are split on. */
-const ALERT_LABEL = { fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
+const ALERT_LABEL = { prayer: 'Prayer', fire: 'Fire', cold: 'Cold', food: 'Food', water: 'Water', threat: 'Threat', sprites: 'Sprite', event: 'Event' };
 function muteLabel(m){
   const i = m.indexOf(':'), j = i < 0 ? -1 : m.indexOf(':', i + 1);
   const type = i < 0 ? m : m.slice(0, i), kind = `${ALERT_LABEL[type] || type} alerts`;
@@ -7976,6 +8671,9 @@ function burningNearCamp(){
 function alerts(){
   if (inAges()) return [];
   const out = [], add = (type, text, level, extra) => { if (!isMuted(type, camp.id, text)) out.push({ n: out.length + 1, type, text, level, ...extra }); };
+  /* A prayer first: it is the one alert the player is asked to answer, so it takes Alt+1. Every camp's
+     prayers are chips, and each is muted by its own camp, so the chip carries that camp's id. */
+  for (const pr of skyPrayers()) if (!prayerMuted(pr)) out.push({ n: out.length + 1, type: 'prayer', text: prayerText(pr), level: 'pray', being: pr.who, after: timeLeft(pr.until - tick), camp: pr.camp });
   const p = camp.pit && tileAt(...camp.pit).struct, fuelDays = daysOfWood();
   if (p && camp.everLit && !p.lit) add('fire', 'The hearth is out', 'bad', { tile: camp.pit });
   else if (p && p.lit && fuelDays < 1) add('fire', 'Under a day of wood', 'bad', { tile: camp.pit });
@@ -8277,7 +8975,7 @@ function footChip(){
 function viewKey(){
   if (inAges()) return ['ages', age, legends.length, creation.discards, gods().map(g => g.id + g.status).join('|'), ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, cursor.x, cursor.y, ui.overlay, ui.timelineFold, ui.timelineZoom, ui.timelineChip, creation.choices.length].join('#');
   const g = gauges();
-  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
+  return [camp.id, camp.name, JSON.stringify(g), alerts().map(a => a.text + (a.after || '')).join('|'), stages(ui.showAll).map(s => s.goals.map(x => x.st.s + x.pr + x.hidden).join('')).join(','),
     peopleRows().map(r => `${r.a.id}${r.m >> 2}${r.status}`).join('|'), chronicle.length, chronicle[0] ? chronicle[0].tick : 0, ui.open.join(''), ui.focus, JSON.stringify(ui.row), ui.chronFilter, ui.chronSearch, ui.peopleCamp, ui.peopleAge, JSON.stringify(ui.unfold),
     cursor.x, cursor.y, cursor.z, ui.overlay].join('#');
 }
@@ -8392,6 +9090,8 @@ function paletteRows(){
   for (const k of KEYMAP){
     if (k.focus === 'speedrow' || k.action === 'rowPick' || k.focus.startsWith('dialog')) continue;
     if (seen.has(k.label)) continue; seen.add(k.label);
+    /* A miracle is no command in a world that is only watched. */
+    if ((k.action === 'tool' || k.action === 'toolSticky') && !toolShown(TOOLS.find(t => t.id === k.arg))) continue;
     out.push({ label: k.label, key: keyName(k), action: k.action, arg: k.arg, group: k.action === 'help' ? 0 : k.action === 'tool' || k.action === 'drawer' ? 2 : 9 });
   }
   for (const a of alerts()) out.push({ label: `Jump to: ${a.text}`, key: a.n <= 9 ? `Alt+${a.n}` : '', action: 'jumpChip', arg: a.n, group: 1 });
@@ -8674,7 +9374,14 @@ const KEYMAP = [
   { key: 'F5',         focus: 'any',    action: 'campN', arg: 5, label: 'Camp 5' },
   { key: 'F6',         focus: 'any',    action: 'campN', arg: 6, label: 'Camp 6' },
   /* Start and help each have their own focus. When they shared one, Enter in help opened Start. */
-  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Make world', button: 'newWorld' },
+  /* Enter plays: a world played as the sky is the default. Watching takes Alt, as Continue does, because a
+     plain letter goes into the seed box. */
+  { key: 'Enter',      focus: 'dialog:start', action: 'makeWorld', label: 'Play as the sky', button: 'newWorld' },
+  { key: 'w',          alt: true, focus: 'dialog:start', action: 'watchWorld', label: 'Watch the valley', button: 'watchWorld' },
+  /* The season's card. Esc closes it too, as it closes every dialog. */
+  { key: 'Enter',      focus: 'dialog:tally', action: 'closeTally', label: 'Close the season card', button: 'tallyClose' },
+  /* A world played as the sky slows down for a new prayer. This switches that off and on. */
+  { key: 'p',          focus: 'any',    action: 'slowForPrayers', label: SKY_TEXT.slowKey },
   { key: 'Escape',     focus: 'dialog:help',  action: 'back',      label: 'Close', button: 'helpClose' },
   { key: 'k',          meta: true, focus: 'any', action: 'palette',   label: 'Command palette', button: 'paletteBtn' },
   { key: 'k',          ctrl: true, focus: 'any', action: 'palette',   label: 'Command palette' },
@@ -8694,7 +9401,7 @@ const KEYMAP = [
   { key: 'Enter',      focus: 'dialog:palette', action: 'paletteRun', label: 'Run command' },
 ];
 KEYMAP.push({ key: 'f',          focus: 'window', action: 'follow',    label: 'Follow this person' });
-/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick Light fire. */
+/* In a window F means follow, so Shift+F must not fall through to the 'any' row and stick the Spark. */
 KEYMAP.push({ key: 'f',          shift: true, focus: 'window', action: 'follow', label: 'Follow this person', quiet: true });
 for (const s of STAGES) KEYMAP.push({ key: STAGE_LETTER[s.id], focus: 'dialog:chord', action: 'stage', arg: s.id, label: `Goals: ${s.label}`, button: `chord-${s.id}` });
 for (const t of TOOLS){
@@ -9244,6 +9951,19 @@ function sectorSummary(s){
 
 /* ---- nearby view: the sector and its eight neighbours, from the world cache at 9 px per tile ---- */
 const midOrigin = () => ({ ox: (cur.sx - 1) * LW, oy: (cur.sy - 1) * LH });
+/* The mark on a person who prays, in a world played as the sky: a gold ring round them, and a star at
+   the top right of their square. `r` is half a square. The star's font is a system one, since the map's
+   monospace face may not carry the glyph. */
+const PRAY_MARK = '\u2726';
+function drawPrayMark(g, px, py, r){
+  g.save();
+  g.lineWidth = Math.max(1.5, r / 6); g.strokeStyle = P.god; g.beginPath(); g.arc(px, py - 1, r * 0.95, 0, 2 * Math.PI); g.stroke();
+  g.font = `700 ${Math.round(r * 1.3)}px system-ui, -apple-system, "Segoe UI Symbol", sans-serif`;
+  const sx = px + r * 0.8, sy = Math.max(r * 0.65, py - r * 0.85);
+  g.lineWidth = 3; g.strokeStyle = P.halo; g.strokeText(PRAY_MARK, sx, sy);
+  g.fillStyle = P.god; g.fillText(PRAY_MARK, sx, sy);
+  g.restore();
+}
 function drawMid(){
   if (tick - worldDirty > 40 || worldDirty === 0){ drawWorldCache(); worldDirty = tick; }
   const { ox, oy } = midOrigin(), MW = 3 * LW * MS, MH = 3 * LH * MS;
@@ -9265,12 +9985,14 @@ function drawMid(){
     for (const d of trailDots(a.id, now)) if (inMid(d.x, d.y)){ mctx.globalAlpha = d.alpha; mctx.beginPath(); mctx.arc((d.x - ox) * MS + MS / 2, (d.y - oy) * MS + MS / 2, MS * 0.24, 0, 2 * Math.PI); mctx.fill(); }
   }
   mctx.globalAlpha = 1;
+  const praying = prayingNow();
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + 3 * LW || a.y < oy || a.y >= oy + 3 * LH) continue;
     const px = (a.x - ox) * MS + MS / 2, py = (a.y - oy) * MS + MS / 2 + 1, glyph = beingGlyph(a);
     if (a.species === 'god' && drawGodIcon(mctx, a.pole, px, py, 1)) continue;
     if (a.species === 'human'){ mctx.lineWidth = 2; mctx.strokeStyle = P.halo; mctx.strokeText(glyph, px, py); }
     mctx.fillStyle = beingColor(a); mctx.fillText(glyph, px, py);
+    if (praying[a.id]) drawPrayMark(mctx, px, py, MS * 0.75);
   }
   for (const c of camps) if (c.site){ const [x, y] = c.site; if (x < ox || x >= ox + 3 * LW || y < oy || y >= oy + 3 * LH) continue; mctx.strokeStyle = c === viewCamp ? P.select : P.grid; mctx.lineWidth = 1.5; mctx.strokeRect((x - ox) * MS - 4.5, (y - oy) * MS - 4.5, MS + 9, MS + 9); }
   if (isWinter()){ mctx.fillStyle = P.snow; mctx.globalAlpha = 0.28; mctx.fillRect((x0 - ox) * MS, (y0 - oy) * MS, (x1 - x0) * MS, (y1 - y0) * MS); mctx.globalAlpha = 1; }
@@ -9356,6 +10078,7 @@ function drawLoc(){
     }
   }
   ctx.globalAlpha = 1;
+  const praying = prayingNow();
   for (const a of beings){
     if (!a.alive || a.x < ox || a.x >= ox + LW || a.y < oy || a.y >= oy + LH) continue;
     if (a.z !== lvl && !(a.z < lvl && !tileAt(a.x, a.y, lvl))) continue;
@@ -9366,6 +10089,7 @@ function drawLoc(){
       ctx.fillStyle = beingColor(a); ctx.fillText(glyph, px, py);
     }
     if (a.carrying){ ctx.fillStyle = a.carrying.kind === 'rock' ? P.rock : a.carrying.kind === 'stick' || a.carrying.kind === 'spear' || a.carrying.kind === 'log' ? P.stick : a.carrying.kind === 'berries' ? P.berry : a.carrying.kind === 'ember' ? P.fire : a.carrying.kind === 'water' ? P['water-fg'] : P.carcass; ctx.fillRect((a.x - ox) * T + T - 7, (a.y - oy) * T + 2, 5, 5); }
+    if (praying[a.id]) drawPrayMark(ctx, px, py, T / 2);
     if (tipTarget && tipTarget.being === a.id){ ctx.strokeStyle = P.select; ctx.lineWidth = 1.5; ctx.strokeRect((a.x - ox) * T + 0.75, (a.y - oy) * T + 0.75, T - 1.5, T - 1.5); }
   }
   ctx.globalAlpha = 1;
@@ -9606,6 +10330,13 @@ function inspectBeing(a, full = false){
   const hist = a.history.slice(0, full ? 30 : 2).map(e => `<li><span class="muted">${e.when}</span> ${e.text}</li>`).join('');
   const s = secOf(a.x, a.y);
   let extra = '';
+  /* A world played as the sky: how much this person believes, and the prayer they have open. */
+  let sky = '';
+  if (a.species === 'human' && skyPlayed() && a.belief !== undefined){
+    const pr = a.alive ? prayerOf(a) : null, left = pr ? timeLeft(pr.until - tick) : '';
+    sky = `<div class="need"><span>${SKY_TEXT.belief}</span>${bar(a.belief, needColor(a.belief))}<span class="num">${Math.round(a.belief)}</span></div>`
+      + (pr ? `<div class="muted">${esc(prayerText(pr))}. ${esc(left[0].toUpperCase() + left.slice(1))}.</div>` : '');
+  }
   if (a.species === 'human'){
     const rels = beings.filter(o => o !== a && a.rel[o.id]).map(o => `${o.name} (${a.rel[o.id]}, ${a.opinions[o.id] > 0 ? '+' : ''}${a.opinions[o.id]})`).join(', ') || 'No friends or rivals yet.';
     extra = `${stateLines(a).map(line => `<div class="muted">${esc(line)}</div>`).join('')}<h3>Personality</h3><div class="chips">${Object.entries(a.traits).map(([k, v]) => `<span class="chip" title="${k} ${v}">${traitWord(k, v)}</span>`).join('')}${a.clothes ? '<span class="chip">wearing hide clothes</span>' : ''}${a.camp && a.camp.tools.basket && a.species === 'human' ? '<span class="chip">with a basket</span>' : ''}</div><h3>Skills</h3><div class="chips">${Object.entries(a.skills).filter(([k, v]) => v > 0).map(([k, v]) => `<span class="chip">${k} ${v}</span>`).join('') || '<span class="muted">Nothing yet. Skills come from work, and from elders by the fire.</span>'}</div><h3>Relationships</h3><div>${rels}</div>`;
@@ -9618,7 +10349,7 @@ function inspectBeing(a, full = false){
   const epi = a.epithets && a.epithets.length ? ` title="${esc(nameTitle(a.epithets[0]))}"` : '';
   return `<div class="head"><strong style="color:${beingColor(a)}"${epi}>${esc(fullName(a))}</strong><span>${moodWord(a, m)} (${m})</span></div>
     <div class="muted" style="margin:1px 0 5px">${stage(a) === 'young' ? 'Young, ' : stage(a) === 'old' ? 'Old, ' : ''}${ageText(ageDays(a))}. ${a.alive ? a.status : 'Dead'}${a.carrying ? `, carrying ${a.carrying.count} ${a.carrying.count > 1 ? ITEMS[a.carrying.kind].plural : ITEMS[a.carrying.kind].name}` : ''}. Health ${Math.round(Math.max(0, a.hp))}. In ${esc(sectorProse(sectors[secIdx(s.sx, s.sy)]))} at ${a.x - s.sx * LW},${a.y - s.sy * LH}.${a.camp && camps.length > 1 ? ` Belongs to ${a.camp.name}.` : ''} ${follow}</div>
-    ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${extra}
+    ${Object.entries(a.needs).map(([k, v]) => need(k, v)).join('')}${sky}${extra}
     <h3>Thoughts</h3><ul>${thoughts}</ul>
     <h3>Last decision (highest score wins)</h3>${why}
     ${hist ? `<h3>${full ? 'Personal history' : 'Recent history'}</h3><ul class="hist">${hist}</ul>` : ''}`;
@@ -9714,9 +10445,18 @@ function tipForCell(c, e){
 
 /* The strip: clock, season, weather, the camp's name and tabs, four gauges, and alert chips. */
 const GAUGE_LABEL = { hearth: 'Hearth', food: 'Food', water: 'Water', beds: 'Beds' };
+/* The Grace gauge carries the believers count after its number. Its label is read at call time: some
+   tests load this file without state.js, where SKY_TEXT lives. */
 function gaugeHTML(id, g){
   if (!g) return '';
-  return `<span class="gauge ${g.level}" title="${GAUGE_LABEL[id]}: ${esc(g.text)}"><span>${GAUGE_LABEL[id]}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${esc(g.text)}</span></span>`;
+  const label = id === 'grace' ? SKY_TEXT.grace : GAUGE_LABEL[id];
+  const more = g.believers ? `<span class="believers">${esc(g.believers)}</span>` : '';
+  return `<span class="gauge ${g.level}" data-gauge="${id}" title="${label}: ${esc(g.text)}${g.believers ? '. ' + esc(g.believers) + '.' : ''}"><span>${label}</span><span class="bar g-${g.level}"><i style="width:${Math.round(g.v * 100)}%"></i></span><span class="t">${esc(g.text)}</span>${more}</span>`;
+}
+/* The tool buttons, from toolRows. The miracles print their cost when the world is played. The current
+   tool is lit, and its pin shows when Shift made it stick, so a rebuild keeps what setTool showed. */
+function toolsHTML(){
+  return toolRows().map(t => `<button class="btn${t.on ? ' on' : ''}" data-tool="${t.id}" aria-pressed="${t.on}" title="${esc(t.hint)}">${esc(t.label)}${t.cost === null ? '' : `<span class="cost">${t.cost}</span>`}<kbd>${t.key.toUpperCase()}</kbd><span class="pin"${t.pinned ? '' : ' hidden'}> \u2316</span></button>`).join('');
 }
 /* Text into markup. It covers the attribute case only because every attribute in src/ui/ is built
    with double quotes, and no single-quoted attribute exists in the tree. The single quote is not
@@ -9724,7 +10464,10 @@ function gaugeHTML(id, g){
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function chipHTML(a){
   const short = a.text.length > 44 ? a.text.slice(0, 42).replace(/\s+\S*$/, '') + '…' : a.text;
-  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${esc(short)}</span>`;
+  /* `after` is said after the text and is not part of it, so a chip's mute key, which is its text, holds
+     while a prayer's time left counts down. */
+  const after = a.after ? ` <span class="left">${esc(a.after)}</span>` : '';
+  return `<span class="chip ${a.level}" data-chip="${a.n}" title="${esc(a.text)}${a.after ? ', ' + esc(a.after) : ''}">${a.n <= 9 ? `<kbd>${a.n}</kbd>` : ''}${esc(short)}${after}</span>`;
 }
 /* The clock runs on every gate tick, not on the view key, so the time never freezes. */
 function renderClock(){
@@ -9739,7 +10482,7 @@ function renderStrip(){
   $('campName').title = inAges() ? '' : nameTitle(campNames().now);
   setHTML($('camps'), camps.length > 1 ? camps.map((c, i) => `<button class="btn small ${c === viewCamp ? 'on' : ''}" data-camp="${c.id}">${esc(c.name)}<kbd>F${i + 1}</kbd></button>`).join('') : '');
   const g = gauges();
-  setHTML($('gauges'), ['hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join(''));
+  setHTML($('gauges'), ['grace', 'hearth', 'food', 'water', 'beds'].map(k => gaugeHTML(k, g[k])).join(''));
   setHTML($('chips'), alerts().slice(0, 9).map(chipHTML).join(''));
 }
 
@@ -9817,6 +10560,8 @@ function renderUI(force){
      because the key holds neither the view nor whether a fire exists. The camp fire view joins the cycle
      when the camp picks its site, with the view unchanged. setHTML skips the write when nothing changed. */
   setHTML($('viewBtn'), `${VIEW_LABEL[nextView(view)]}<kbd>M</kbd>`);
+  /* The tools, with the miracles only in a world played as the sky. setHTML skips an unchanged write. */
+  setHTML($('tools'), toolsHTML());
   const key = viewKey(); if (!force && key === chronKey) return; chronKey = key;
   renderStrip();
   drawTimeline();
@@ -10008,7 +10753,9 @@ let muteFor = null;
 function openMute(a){ closeDialogs(); muteFor = a; $('muteTitle').textContent = `Mute: ${a.text}`; setFocus('dialog:mute'); $('mute').showModal(); }
 function muteChoice(k){
   if (!muteFor) return;
-  if (k === 1) mute(muteFor.type, camp.id, muteFor.text); else if (k === 2) mute(muteFor.type, camp.id); else mute(muteFor.type, 0);
+  /* A prayer chip can come from another camp, and it names that camp. Every other chip is the chosen camp's. */
+  const cid = muteFor.camp !== undefined ? muteFor.camp : camp.id;
+  if (k === 1) mute(muteFor.type, cid, muteFor.text); else if (k === 2) mute(muteFor.type, cid); else mute(muteFor.type, 0);
   muteFor = null; closeDialogs(); persist(); renderUI(true);
 }
 /* H cannot be undone and it throws away the thing the creation is for, so it asks. The ages hold while it
@@ -10022,6 +10769,10 @@ function openHurry(){
 }
 function openHelp(){
   closeDialogs();
+  /* The section on playing as the sky comes first, as it does in the dialog. The lore is written last:
+     tests/ui.js reads the help through a stub that gives every id one element, so the last write is
+     the one it sees, and the lore is what it checks. */
+  $('helpSky').innerHTML = skyHelpHTML();
   const seen = new Set();
   $('helpKeys').innerHTML = KEYMAP.filter(k => !k.quiet).map(k => { const line = `${keyName(k)}|${k.label}`; if (seen.has(line)) return ''; seen.add(line); return `<tr><td>${keyName(k)}</td><td>${k.label}${k.focus === 'map' ? ' <span class="muted">(map)</span>' : k.focus === 'drawer' ? ' <span class="muted">(drawer)</span>' : ''}</td></tr>`; }).join('');
   $('helpMuted').innerHTML = ui.mutes.size ? [...ui.mutes].map(m => `<button class="btn small" data-unmute="${esc(m)}">${esc(muteLabel(m))}<kbd>click</kbd></button>`).join(' ') : '<p class="muted">Nothing is muted.</p>';
@@ -10038,6 +10789,24 @@ function openHelp(){
   </ul><h3>Old names learned</h3>${learned.length ? `<ul>${learned.map(r => `<li>${esc(r.text)}, the ${esc(r.what)}. It means ${esc(r.meaning)}.</li>`).join('')}</ul>` : '<p class="muted">Nobody has found the old marks yet. Walk a hill, or go into a cave.</p>'}`;
   setFocus('dialog:help'); $('help').showModal();
 }
+/* The help page's section on playing as the sky. The costs come from FAITH.cost, and the key and the
+   state of Slow for prayers from the key map and the view, so the page cannot drift from the rules. */
+function skyHelpHTML(){
+  const H = SKY_TEXT.help, row = KEYMAP.find(k => k.action === 'slowForPrayers');
+  const lines = H.lines.map(l => faithSay(l, { cap: FAITH.graceCap, ...FAITH.cost }));
+  lines.push(faithSay(H.slow, { state: ui.slowForPrayers ? H.on : H.off, key: row ? keyName(row) : '', speed: SPEED_LABEL[DAYS_SPEED] }));
+  return `${faithWorld() ? '' : `<p class="muted">${esc(H.watched)}</p>`}<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+}
+/* The season's card: its rows as a small table and one closing line. Enter or Esc closes it. */
+function openTally(t){
+  closeDialogs();
+  $('tallyTitle').textContent = tallyTitle(t);
+  $('tallyRows').innerHTML = tallyRows(t).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  $('tallyLine').textContent = tallyClosing(t);
+  setFocus('dialog:tally'); $('tally').showModal(); $('tallyClose').focus();
+}
+/* The days hold while the season's card is open. */
+const holdDays = () => { const d = $('tally'); return !!(d && d.open); };
 
 /* The command palette: every action and every named thing, one search box. */
 let palRows = [], palHit = [], palSel = 0;
@@ -10099,7 +10868,10 @@ function setActCaption(text, pole){
 const uiNow = () => typeof performance !== 'undefined' ? performance.now() : 0;
 function say(msg){ ui.note = { text: msg, at: uiNow() }; renderFoot(); }
 function setTool(id, sticky = false){
-  tool = id; ui.sticky = sticky && TOOLS.find(t => t.id === id).oneShot;
+  /* A miracle is refused, with the sim's own sentence, in a world that is only watched. */
+  const t = TOOLS.find(t => t.id === id);
+  if (!toolShown(t)){ say(FAITH_TEXT.refuse.off); return; }
+  tool = id; ui.sticky = sticky && t.oneShot;
   document.querySelectorAll('#tools .btn').forEach(b => { const on = b.dataset.tool === id; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.pin').hidden = !(on && ui.sticky); });
 }
 /* The one writer of `ui.focus`. Every file but this one calls this instead of setting the field
@@ -10230,9 +11002,12 @@ const worldPixelFrom = e => { const r = wcv.getBoundingClientRect(); return { x:
 /* In the ages, Enter or a click opens the first god that stands on the land under the cursor. */
 function openGodAt(x, y){ const r = regionAt(x, y), g = r && gods().find(g => g.status !== 'dead' && standsIn(g) === r); if (g) ACTIONS.inspect(g.id); else say('No god stands here.'); }
 /* The world canvases are sized here, not in initUI: startWorld sets W and H, and a world of another size needs another canvas. */
-function newWorld(seed){
+/* `opts` are the world's options. The start dialog passes `{ faith: true }` to play as the sky and
+   `{ faith: false }` to watch. */
+function newWorld(seed, opts = {}){
   endZoom();
-  startCreation(seed, {});
+  startCreation(seed, opts);
+  resetSky();
   fieldKey = ''; setActCaption('');
   cursor = { x: W >> 1, y: H >> 1, z: 0 };
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
@@ -10246,6 +11021,40 @@ function newWorld(seed){
   /* A new world has no autosave of its own, so its first day writes one. */
   ui.autosaveDay = 0;
   lastEra = 'gods'; setPace(1); setPaused(false); setView('world');
+}
+
+/* ---------- the sky ----------
+   A world played as the sky. The view keeps which prayers and which season cards it has seen; these
+   functions are their one writer, with the slow-down that a new prayer brings. */
+
+/* A new world, a settle, or a load. Nothing of the old world is seen, and a miracle tool the new world
+   does not show goes back to Inspect. A loaded world's prayers and tallies are already there, so they
+   count as seen: a load slows nothing and opens no card. */
+function resetSky(loaded){
+  ui.seenPrayers = {}; ui.seenTallies = 0;
+  if (loaded && faith){ for (const p of faith.prayers) ui.seenPrayers[p.id] = true; ui.seenTallies = faith.tallies.length; }
+  if (!toolShown(TOOLS.find(t => t.id === tool))){ tool = 'inspect'; ui.sticky = false; }
+}
+/* Every frame. A prayer the view has not seen drops the speed to the days default, if the player keeps
+   Slow for prayers on and the speed is higher. A prayer whose chip is muted is seen but slows nothing.
+   The drop is not the player's choice, so it leaves ui.speedChosen and ui.savedSpeed alone. */
+function notePrayers(){
+  if (!skyPlayed() || !faith) return;
+  const fresh = faith.prayers.filter(p => !p.end && !ui.seenPrayers[p.id]);
+  if (!fresh.length) return;
+  const heard = fresh.filter(p => !prayerMuted(p));
+  const s = ui.slowForPrayers ? prayerSpeed(ui.seenPrayers, heard, speed) : speed;
+  for (const p of fresh) ui.seenPrayers[p.id] = true;
+  if (s === speed) return;
+  setSpeed(s);
+  const a = beingById(heard[0].who);
+  say(faithSay(SKY_TEXT.slowed, { name: a ? a.name : FAITH_TEXT.someone }));
+}
+/* Every frame. A season that has ended opens its card, once no other dialog is open. */
+function noteTallies(){
+  if (!skyPlayed() || !faith || faith.tallies.length <= ui.seenTallies || anyDialogOpen()) return;
+  ui.seenTallies = faith.tallies.length;
+  openTally(faith.tallies[faith.tallies.length - 1]);
 }
 
 /* ---------- saves ----------
@@ -10303,6 +11112,7 @@ function onLoad(){
   followId = null; ui.row.people = 0; ui.row.goals = 0; ui.row.chronicle = 0; ui.row.camp = 0; ui.row.legends = 0;
   /* A camp id names a camp of the old world, so the People drawer follows the chosen camp again. */
   ui.peopleCamp = null;
+  resetSky(true);
   /* The opened chip named one act of one creation that no longer exists. */
   ui.timelineChip = null;
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -10437,6 +11247,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
+  resetSky();
   setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
@@ -10453,7 +11264,8 @@ function onSettle(){
 function applyTool(c, e){
   switch (tool){
     case 'inspect': pinCell(c, e); break;
-    case 'light': say(inject({ source: 'player', act: 'light', x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
+    /* The Spark and the four miracles. The door pays for them, or says why it will not. */
+    case 'light': case 'rain': case 'calm': case 'ward': case 'beckon': say(inject({ source: 'player', act: TOOLS.find(t => t.id === tool).act, x: c.x, y: c.y, z: c.z })); camp = viewCamp; break;
     case 'nudge': { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z); say(a ? inject({ source: 'player', act: 'poke', id: a.id }) : 'Nobody is there to nudge.'); break; }
   }
   if (TOOLS.find(t => t.id === tool).oneShot && !ui.sticky) setTool('inspect');
@@ -10508,9 +11320,10 @@ function focusStep(d){ if (ui.focus.startsWith('dialog')) return; const ring = f
 const ACTIONS = {
   pause(){ setPaused(!paused); },
   /* One act in the ages, one tick in the days. In the ages the beat then plays while the world is paused;
-     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up. */
-  step(){ setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
-  hour(){ if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
+     stepping again cuts the beat that is running short and starts the next, so holding the key keeps up.
+     Step and Hour do nothing while the season's card is open, since the days hold behind it. */
+  step(){ if (holdDays()) return; setPaused(true); if (inAges()){ ui.playing = false; acc = 0; beatsLastFrame = 1; step(true); ui.playing = true; } else { step(); if (view !== 'world') noteTrails(uiNow()); } renderUI(true); },
+  hour(){ if (holdDays()) return; if (inAges()){ say('There are no hours yet. Step moves one act.'); return; } setPaused(true); for (let k = 0; k < Math.round(hours(1)); k++) step(); ui.trails = {}; renderUI(true); },
   slower(){ ACTIONS.speedStep(Math.max(0, ladder().indexOf(inAges() ? pace : speed) - 1)); },
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
@@ -10581,6 +11394,10 @@ const ACTIONS = {
   help(){ openHelp(); },
   /* Closing Start with 'make' is what its button does. The dialog's close handler makes the world. */
   makeWorld(){ $('start').close('make'); },
+  /* Watch the valley: the same close, with faith off. */
+  watchWorld(){ $('start').close('watch'); },
+  closeTally(){ closeDialogs(); },
+  slowForPrayers(){ ui.slowForPrayers = !ui.slowForPrayers; persist(); say(ui.slowForPrayers ? SKY_TEXT.slowOn : SKY_TEXT.slowOff); },
   newWorld(){ openStart(); },
   /* Make the world, take the first god, and stop. E3 cannot be tested by hand without a way in, and a
      slice about what the player experiences must be reachable by a player. The turn card waits.
@@ -10683,7 +11500,8 @@ function frame(now){
          buy overrun. What the budget could not afford is dropped, as it was before, so a slow frame
          leaves no backlog for a later one to run in one burst.
          The motion trail notes each step's squares. The world map draws no trail, so it skips the cost. */
-      else { acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
+      /* The days hold while the season's card is open, so the chapter does not run on behind it. */
+      else if (!holdDays()){ acc += dt * TICKS_A_SECOND * speed / 1000; const until = performance.now() + STEP_BUDGET_MS, trails = view !== 'world'; while (acc >= 1){ step(); if (trails) noteTrails(now); acc--; if (performance.now() >= until) break; } if (acc >= 1) acc = 0; }
     } catch (e){ onFault(e); }
   }
   /* A stepped beat has no world running to carry its clock, so the frame loop carries it. It runs at the
@@ -10702,6 +11520,9 @@ function frame(now){
     /* The camp fire view keeps a followed person while they are on screen, and gives way to their sector's view when they leave it. */
     if (followId && !inAges()){ const a = beingById(followId); if (a && a.alive){ const s = secOf(a.x, a.y), away = view === 'fire' ? !inLocView(a.x, a.y) : s.sx !== cur.sx || s.sy !== cur.sy; if (view === 'world' || away) setView(view === 'mid' ? 'mid' : 'loc', s); if (closeUp(view) && a.z !== lvl) setLevel(a.z); } else followId = null; }
     camp = viewCamp && camps.includes(viewCamp) ? viewCamp : camps[0];
+    /* A world played as the sky: a new prayer can slow the game, and a season's end opens its card.
+       Every frame, so a prayer at 256x is heard within one frame of world time. */
+    notePrayers(); noteTallies();
     pruneTrails(now);
     draw();
     /* Pulses read every goal's state. Once a render, not once a frame. */
@@ -10720,7 +11541,8 @@ function initUI(){
   readPalette();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPalette);
   new MutationObserver(readPalette).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  $('tools').innerHTML = TOOLS.map(t => `<button class="btn" data-tool="${t.id}" aria-pressed="false" title="${t.hint}">${t.label}<kbd>${t.key.toUpperCase()}</kbd><span class="pin" hidden> ⌖</span></button>`).join('');
+  /* The tools depend on the world: its miracles show only when it is played. renderUI writes them again. */
+  setHTML($('tools'), toolsHTML());
   $('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) (e.shiftKey ? ACTIONS.toolSticky : ACTIONS.tool)(b.dataset.tool); });
   $('speeds').addEventListener('click', e => { const b = e.target.closest('[data-speed]'); if (b) ACTIONS.speed(Number(inAges() ? b.dataset.pace : b.dataset.speed)); });
   $('pause').addEventListener('click', ACTIONS.pause);
@@ -10733,19 +11555,21 @@ function initUI(){
   $('chips').addEventListener('click', e => { const c = e.target.closest('[data-chip]'); if (c) ACTIONS.jumpChip(Number(c.dataset.chip)); });
   $('chips').addEventListener('contextmenu', e => { const c = e.target.closest('[data-chip]'); if (c){ e.preventDefault(); ACTIONS.muteMenu(Number(c.dataset.chip)); } });
   for (const k of [1, 2, 3]) $(`mute${k}`).addEventListener('click', () => ACTIONS.muteChoice(k));
-  /* The Make world and Take a god buttons carry value="make" and value="take". Esc closes the dialog
-     with an empty returnValue and keeps the world. Either path reads the seed box once, here, so a
-     typed seed survives Take a god the same way it already does Make world. */
+  /* The Play as the sky, Watch the valley, and Take a god buttons carry value="make", value="watch", and
+     value="take". Esc closes the dialog with an empty returnValue and keeps the world. Every path reads
+     the seed box once, here, so a typed seed survives each of them. Play makes a world with faith on,
+     Watch one with faith off. Take a god is the Become slice, and its world is watched. */
   $('start').addEventListener('close', () => {
     setFocus('map'); const rv = $('start').returnValue; $('start').returnValue = '';
-    if (rv === 'make' || rv === 'take'){
+    if (rv === 'make' || rv === 'watch' || rv === 'take'){
       const seed = $('seed').value.trim() || randomSeed();
-      if (rv === 'make') newWorld(seed); else ACTIONS.takeGod(seed);
+      if (rv === 'take') ACTIONS.takeGod(seed); else newWorld(seed, { faith: rv === 'make' });
     }
   });
   /* The file picker. The input keeps no value, so the same file can be chosen twice running. */
   $('loadFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) openSaveFile(f); });
   $('continueBtn').addEventListener('click', ACTIONS.continueWorld);
+  $('tallyClose').addEventListener('click', ACTIONS.closeTally);
   $('hurryGo').addEventListener('click', ACTIONS.hurryGo);
   $('hurryStay').addEventListener('click', closeDialogs);
   $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
@@ -10856,7 +11680,8 @@ function initUI(){
     e.preventDefault(); ACTIONS[hit.action](hit.arg);
   });
   setTool('inspect');
-  newWorld(randomSeed());
+  /* The world behind the start dialog is played, as Enter would make it, so Esc keeps the default. */
+  newWorld(randomSeed(), { faith: true });
   if (!ui.savedSpeed) setSpeed(DAYS_SPEED); /* newWorld's restore() must read storage before any persist() can overwrite it */
   /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
   offerContinue();

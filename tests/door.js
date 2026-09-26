@@ -60,7 +60,7 @@ test('the replay record names the seed and the options', () => {
   const api = load(); api.startWorld('r', { sw: 12, sh: 8 });
   const a = api.firstPerson();
   api.inject({ source: 'player', act: 'poke', id: a.id });
-  assert.deepEqual(api.replay, { seed: 'r', options: { sw: 12, sh: 8, zmin: -2, zmax: 2, ageLimit: 200, force: false }, log: [{ tick: api.tick, source: 'player', act: 'poke', id: a.id }] });
+  assert.deepEqual(api.replay, { seed: 'r', options: { sw: 12, sh: 8, zmin: -2, zmax: 2, ageLimit: 200, force: false, faith: false }, log: [{ tick: api.tick, source: 'player', act: 'poke', id: a.id }] });
 });
 
 test('a goal priority is an act: refused for a bad goal or value, logged, and in the chronicle', () => {

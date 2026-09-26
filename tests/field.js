@@ -147,5 +147,5 @@ test('the era, the age, and the stamp', () => {
   /* Every world begins with its creation, so startWorld lands in the days era with the ages behind it. */
   assert.equal(api.era, 'days'); assert.ok(api.age > 0); assert.ok(api.legends.length > 0);
   assert.equal(api.SPECIES.rabbit.prey, true); assert.equal(api.SPECIES.deer.prey, true); assert.equal(api.SPECIES.wolf.prey, undefined);
-  assert.deepEqual(api.options, { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false });
+  assert.deepEqual(api.options, { sw: 10, sh: 6, zmin: -2, zmax: 2, ageLimit: 200, force: false, faith: false });
 });

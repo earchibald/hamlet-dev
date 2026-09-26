@@ -71,6 +71,13 @@ interface Being {
 
   /* human only (beings.js) */
   clothes?: boolean;
+  /* How much this person believes in the sky, 0 to 100. Only in a world made with faith on
+     (faith.js's giveBeliefs sets it the first time it looks). */
+  belief?: number;
+  /* The tick it last gained belief from seeing a miracle (faith.js's payMiracle). */
+  sawSign?: number;
+  /* The tick it died on (beings.js's die). Unset while it lives. */
+  diedAt?: number;
   /* When it last joined a camp (camps.js, names.js): a fresh founder or one born into it. */
   campSince?: number;
   /* How many times it has taught a skill by the fire (beings.js), read by an epithet (names.js). */
@@ -408,4 +415,66 @@ interface WorkKindSpec {
 interface DoorAct {
   (e: any): string | null;
   replacesWorld?: boolean;
+}
+
+/** One prayer (faith.js). It names its person and its camp by id. `end` is null while it is open. */
+interface Prayer {
+  id: number;
+  kind: string;
+  who: number;
+  camp: number;
+  at: number;
+  until: number;
+  where: number[];
+  /* 'passed': the trouble went away by itself (a row with ownHands: false), or the camp is gone. */
+  end: 'sky' | 'own' | 'silent' | 'died' | 'passed' | null;
+  endedAt: number;
+}
+/** The sign a miracle leaves (faith.js): the act, the place, the tick, and, for a Ward, the tick it lapses. */
+interface Sign {
+  act: string;
+  x: number;
+  y: number;
+  z: number;
+  tick: number;
+  until: number;
+}
+/** The counts of one season, as they run and as they are tallied (faith.js). */
+interface FaithCounts {
+  answered: number;
+  ownHands: number;
+  silent: number;
+  births: number;
+  deaths: number;
+  spent: number;
+  tick: number;
+}
+interface Tally {
+  season: string;
+  year: number;
+  from: number;
+  to: number;
+  people: number;
+  believers: number;
+  meanBelief: number;
+  answered: number;
+  ownHands: number;
+  silent: number;
+  births: number;
+  deaths: number;
+  spent: number;
+}
+/** The sky's whole record in a world made with faith on (faith.js). Null in every other world. */
+interface Faith {
+  grace: number;
+  spent: number;
+  prayers: Prayer[];
+  signs: Sign[];
+  tallies: Tally[];
+  /* By 'campId:kind': the tick the camp's last prayer of that kind opened. */
+  troubles: { [campKind: string]: number };
+  forgotten: boolean;
+  nextPrayer: number;
+  season: string;
+  since: FaithCounts;
 }
