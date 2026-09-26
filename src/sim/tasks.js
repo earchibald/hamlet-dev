@@ -580,7 +580,9 @@ TASKS.cutTree = { type: 'work',
     t.progress += 1 + a.skills.woodcut * 0.3; t.label = `Chopping a pine (${Math.min(99, Math.floor(t.progress / CLOCK.work.cutTree * 100))}%)`;
     if (t.progress < CLOCK.work.cutTree) return 'continue';
     tree.feature = null; tree.claimed = null; addItem('log', tree.x, tree.y); addItem('log', tree.x, tree.y); addItem('stick', tree.x, tree.y);
-    gainXp(a, 'woodcut'); log(`${a.name} fells a pine. Logs at last.`, [a]);
+    /* "Logs at last" is news once per camp: the first pine felled. Every later tree was said again,
+       four times in one hour on day 15 of a playtest, while the woodpile goal already counts the logs. */
+    gainXp(a, 'woodcut'); if (!camp.hadLogs){ camp.hadLogs = true; log(`${a.name} fells a pine. Logs at last.`, [a]); }
     const g = groves.find(g => g.sector === sectorOfTile(tree)); if (g){ g.anger = Math.min(100, g.anger + 15); camp.fae.favor = Math.max(-100, camp.fae.favor - 15); camp.fae.grudges[a.id] = (camp.fae.grudges[a.id] || 0) + 25; if (camp.fae.known) addThought(a, 'grovecut', 'Cut a pine where the sprites live. It felt watched', -3, CLOCK.thought.grovecut); for (const o of beings) if (o.alive && o.species === 'sprite' && o.grove === g) addThought(o, 'axe', `${a.name} cut a tree in our grove`, -12, CLOCK.thought.axeCut); }
     return chain(a, t, startTask(a, 'gather', { item: 'log' })) || 'done';
   }],
