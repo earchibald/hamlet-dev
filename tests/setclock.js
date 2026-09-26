@@ -101,6 +101,11 @@ const ELAPSED_READS = [
   /* A threshold: a miracle's sign is dropped once it is older than CLOCK.faith.signKeep. A jump that
      passes the keep drops it, as the days would have. */
   's.tick  faith.js',
+  /* Thresholds. `last` is the tick a camp's last prayer of one kind opened: a new one waits
+     CLOCK.faith.prayAgain. `a.sawSign` is the tick a person last gained belief from a miracle: the
+     next gain waits CLOCK.faith.witnessGap. A jump past either lets the next one come, as the days
+     would have. */
+  'last  faith.js', 'a.sawSign  faith.js',
 ];
 
 test('the rules read no elapsed gap that this file has not been shown', () => {

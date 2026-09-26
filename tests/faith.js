@@ -83,13 +83,13 @@ test('grace comes from belief each hour, and stops at the cap', () => {
   assert.equal(api.faith.grace, 100);
 });
 
-test('belief fades 2 a day to the floor, and never past it', () => {
+test('belief fades 1 a day to the floor, and never past it', () => {
   const { api, a, pit } = playCamp(); pit.struct.fuel = 0;
   at(api, 2, 9); period(api);
   const day = DAY / api.CLOCK.faith.every;
   a.belief = 50; period(api, day);
-  assert.ok(Math.abs(a.belief - 48) < 0.01, `belief went from 50 to ${a.belief} in a day, not 48`);
-  a.belief = 6; period(api, day);
+  assert.ok(Math.abs(a.belief - 49) < 0.01, `belief went from 50 to ${a.belief} in a day, not 49`);
+  a.belief = 5.5; period(api, day);
   assert.equal(a.belief, api.FAITH.belief.floor);
   a.belief = 3; period(api, day);
   assert.equal(a.belief, 3, 'the fade raised a belief below the floor');
@@ -113,7 +113,16 @@ test('in the morning a warm person does not pray for fire, and a cold one does',
   a.needs.warmth = 20; period(api);
   const p = open(api)[0];
   assert.ok(p && p.kind === 'fire', 'a cold person did not pray');
-  assert.equal(p.until, api.tick + api.CLOCK.faith.deadline.fire, 'a morning fire prayer waits 12 hours');
+  assert.equal(p.until, api.nextDawn(), 'a morning fire prayer waits until the next dawn, the later end');
+});
+
+test('a fire prayer made just before dawn waits 12 hours, not until dawn', () => {
+  const { api, a } = playCamp();
+  at(api, 2, 5); period(api);
+  const p = open(api).find(p => p.kind === 'fire');
+  assert.ok(p && p.who === a.id, 'no fire prayer in the hour before dawn');
+  assert.ok(api.nextDawn() - api.tick < api.CLOCK.faith.deadline.fire, 'dawn is not the nearer end, so the test proves nothing');
+  assert.equal(p.until, api.tick + api.CLOCK.faith.deadline.fire);
 });
 
 test('the Spark on the pit answers the prayer: belief rises, and the line says the sky heard', () => {
@@ -248,10 +257,34 @@ test('a wolf at night opens a wolf prayer; a Ward answers it, and a wolf that le
     const p = open(api).find(p => p.kind === 'wolf');
     assert.ok(p && p.who === a.id, 'no wolf prayer');
     if (warded) door(api, 'ward', { x: a.x, y: a.y });
+    const before = a.belief;
     w.x = a.x + 30; w.task = null;
     period(api);
-    assert.equal(p.end, warded ? 'sky' : 'own');
+    assert.equal(p.end, warded ? 'sky' : 'passed');
+    if (warded) continue;
+    /* A wolf that wanders off was not driven off by the camp's own hands: belief stays, but for one
+       period's fade, and the line says so plainly. */
+    assert.ok(Math.abs(a.belief - before) < 0.05, `a wolf that left alone moved belief from ${before} to ${a.belief}`);
+    const said = lines(api, /The wolf went away/);
+    assert.equal(said.length, 1); assert.equal(said[0].text, `The wolf went away. ${a.name} breathes again.`); assert.equal(said[0].kind, 'info');
+    assert.equal(api.faith.since.ownHands, 0, 'a wolf that left alone counted as met by their own hands');
   }
+});
+
+test("a wolf prayer is the person's: it ends when the wolf leaves them, though another is still afraid", () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 22); period(api);
+  a.x = pit.x + 12; a.y = pit.y;
+  const b = addBeing(api, 'human', pit.x - 12, pit.y); b.camp = c; b.belief = 30; b.asleep = false; b.task = null;
+  const w = addBeing(api, 'wolf', a.x + 3, a.y);
+  period(api);
+  const p = open(api).find(p => p.kind === 'wolf');
+  assert.ok(p && p.who === a.id, 'no wolf prayer by the one the wolf is near');
+  /* The wolf leaves the one who prayed for the other. The camp is still afraid; the prayer is over. */
+  w.x = b.x + 3; w.y = b.y; w.task = null;
+  assert.ok(api.beastNear(b) && !api.beastNear(a), 'the wolf did not move from one to the other');
+  period(api);
+  assert.equal(p.end, 'passed', 'the prayer stayed open while the wolf stalked someone else');
 });
 
 test('hunger opens a prayer by the hungriest, and a fire near the camp opens a wildfire prayer', () => {
@@ -313,6 +346,11 @@ test('forgotten when nobody believes above the floor: a miracle is refused, and 
   a.belief = 20; period(api);
   assert.equal(api.faith.forgotten, false);
   assert.equal(lines(api, /believes in the sky again/).length, 1);
+  /* A miracle asks who believes now, not what the last period found. */
+  a.belief = api.FAITH.belief.floor;
+  assert.equal(api.faith.forgotten, false, 'the flag moved without a period, so the test proves nothing');
+  assert.equal(door(api, 'light', { x: pit.x, y: pit.y }), api.FAITH_TEXT.refuse.forgotten, 'a miracle was allowed when nobody believed');
+  assert.equal(pit.struct.lit, false);
 });
 
 test('the faith rules draw no random number', () => {
@@ -338,7 +376,124 @@ test('a snapshot taken mid-prayer loads the same faith record and the same belie
   assert.deepEqual(b.faith, api.faith);
 });
 
-/* The Spark as soon as the grace allows, on the first camp's cold pit. It lands on day 2. */
+test('a sign made before the prayer opened does not answer it', () => {
+  const { api, pit } = playCamp();
+  at(api, 2, 16); period(api);
+  api.faith.grace = 50;
+  assert.match(door(api, 'light', { x: pit.x, y: pit.y }), /cost 15 grace/);
+  pit.struct.lit = false;   // put out, say by the rain
+  at(api, 2, 17); period(api);
+  const p = open(api).find(p => p.kind === 'fire');
+  assert.ok(p, 'no fire prayer');
+  assert.ok(api.faith.signs.some(s => s.act === 'light' && s.tick < p.at && s.x === pit.x && s.y === pit.y), 'no sign on the pit before the prayer, so the test proves nothing');
+  pit.struct.lit = true;
+  period(api);
+  assert.equal(p.end, 'own', 'a Spark made before the prayer was credited with answering it');
+});
+
+test('a season tally counts a person who died in it', () => {
+  const { api, a, c, pit } = playCamp(); pit.struct.fuel = 0;
+  at(api, 2, 9); period(api);
+  const b = addBeing(api, 'human', a.x, a.y); b.camp = c; period(api);
+  api.die(b, 'cold');
+  assert.equal(b.alive, false);
+  at(api, api.SEASON_LENGTHS[0] + 1, 0); api.faithTick();
+  const t = api.faith.tallies[0];
+  assert.equal(t.deaths, 1, 'the death was not counted');
+  assert.equal(t.people, 1);
+  assert.match(lines(api, /^Spring ends\./)[0].text, / 1 person died\./);
+});
+
+test('with two who could pray, the coldest prays for fire and the hungriest for food', () => {
+  for (const kind of ['fire', 'hunger']){
+    const { api, a, c, pit } = playCamp();
+    const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 30; b.asleep = false; b.task = null;
+    for (const k in b.needs) b.needs[k] = 90;
+    at(api, 2, 9); period(api);
+    assert.equal(api.faith.prayers.length, 0, 'someone prayed before the test set a trouble');
+    /* The second person is the worse off, so neither "the first" nor "the best off" passes. */
+    if (kind === 'fire'){ a.needs.warmth = 30; b.needs.warmth = 10; }
+    else { pit.struct.fuel = 0; for (const k of ['berries', 'cooked', 'smoked']) c.stash[k] = 0; a.needs.food = 25; b.needs.food = 10; }
+    period(api);
+    const p = open(api).find(p => p.kind === kind);
+    assert.ok(p, `no ${kind} prayer`);
+    assert.equal(p.who, b.id, `the ${kind} prayer was not made by the one worst off`);
+  }
+});
+
+test('the first fire prayer of a world made to be played can be answered', () => {
+  const api = load(); api.startWorld('r', { faith: true });
+  let p = null;
+  for (let i = 0; i < 2 * DAY && !p; i++){ api.step(); p = api.faith && api.faith.prayers.find(q => q.kind === 'fire'); }
+  assert.ok(p, 'no fire prayer in two days');
+  const need = api.FAITH.cost.light;
+  assert.ok(api.faith.grace >= need, `grace at the first fire prayer is ${api.faith.grace.toFixed(1)}, under the Spark's ${need}`);
+  const c = api.camps.find(k => k.id === p.camp);
+  assert.match(door(api, 'light', { x: c.pit[0], y: c.pit[1], z: 0 }), new RegExp(`cost ${need} grace`));
+});
+
+test('a cold pit brings a new prayer the next evening, and not before a day has passed', () => {
+  const { api, a, p } = praying();
+  setClock(api, p.until); api.faithTick();
+  assert.equal(p.end, 'silent');
+  /* Cold from dawn on, so only the wait holds the next prayer back. */
+  a.needs.warmth = 10;
+  const E = api.CLOCK.faith.every, next = p.at + api.CLOCK.faith.prayAgain;
+  period(api, (next - api.tick) / E - 1);
+  assert.equal(api.faith.prayers.filter(q => q.kind === 'fire').length, 1, 'a second fire prayer came before a day had passed');
+  period(api);
+  assert.equal(api.tick, next);
+  const q = open(api).find(q => q.kind === 'fire');
+  assert.ok(q && q.who === a.id, 'the cold pit brought no prayer the next evening');
+  assert.ok(api.isEvening(), 'the new prayer is not in the evening');
+});
+
+test('one who dies with a prayer open frees the trouble for another to pray at once', () => {
+  const { api, a, c } = praying();
+  const b = addBeing(api, 'human', a.x, a.y); b.camp = c; b.belief = 30; b.asleep = false; b.task = null;
+  for (const k in b.needs) b.needs[k] = 90;
+  a.alive = false;
+  period(api);
+  period(api);
+  const q = open(api).find(q => q.kind === 'fire');
+  assert.ok(q && q.who === b.id, 'nobody else prayed for the cold pit after the one who prayed died');
+});
+
+test('a person gains from seeing a miracle once a day; a Ward with nothing near is refused and free', () => {
+  const { api, a, pit } = playCamp();
+  at(api, 2, 9); period(api);
+  api.faith.grace = 100; a.belief = 40;
+  const w = api.FAITH.belief.witness;
+  door(api, 'light', { x: pit.x, y: pit.y });
+  assert.equal(a.belief, 40 + w, 'the founder did not see the first Spark');
+  pit.struct.lit = false;
+  assert.match(door(api, 'light', { x: pit.x, y: pit.y }), /cost 15 grace/);
+  assert.equal(a.belief, 40 + w, 'a second Spark the same hour gave the witness bonus again');
+  setClock(api, api.tick + api.CLOCK.faith.witnessGap);
+  pit.struct.lit = false;
+  door(api, 'light', { x: pit.x, y: pit.y });
+  assert.equal(a.belief, 40 + 2 * w, 'a Spark a day later gave no witness bonus');
+  /* No wolf or fox is alive in this camp. */
+  const g = api.faith.grace, n = api.faith.signs.length;
+  assert.equal(door(api, 'ward', { x: pit.x, y: pit.y }), api.FAITH_TEXT.refuse.noWolves);
+  assert.equal(api.faith.grace, g, 'a Ward that guarded nothing cost grace');
+  assert.equal(api.faith.signs.length, n, 'a Ward that guarded nothing left a sign');
+});
+
+test('a prayer whose camp is gone ends with no line and moves nobody', () => {
+  const { api, a, c, p } = praying();
+  a.belief = 40;
+  const n = api.chronicle.length;
+  api.camps.splice(api.camps.indexOf(c), 1);
+  api.camp = c;
+  period(api);
+  assert.equal(p.end, 'passed');
+  assert.equal(api.chronicle.length, n, 'the end of a prayer whose camp is gone was logged');
+  assert.ok(Math.abs(a.belief - 40) < 0.05, `belief moved from 40 to ${a.belief}`);
+  assert.equal(api.camp, c, 'the camp cursor was not put back');
+});
+
+/* The Spark as soon as the grace allows, on the first camp's cold pit. It lands on day 1. */
 function sparkWhenAble(api){
   const c = api.camps[0], f = api.faith;
   if (!f || !c.pit || f.grace < api.FAITH.cost.light) return;

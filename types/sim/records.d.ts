@@ -74,6 +74,8 @@ interface Being {
   /* How much this person believes in the sky, 0 to 100. Only in a world made with faith on
      (faith.js's giveBeliefs sets it the first time it looks). */
   belief?: number;
+  /* The tick it last gained belief from seeing a miracle (faith.js's payMiracle). */
+  sawSign?: number;
   /* The tick it died on (beings.js's die). Unset while it lives. */
   diedAt?: number;
   /* When it last joined a camp (camps.js, names.js): a fresh founder or one born into it. */
@@ -424,7 +426,8 @@ interface Prayer {
   at: number;
   until: number;
   where: number[];
-  end: 'sky' | 'own' | 'silent' | 'died' | null;
+  /* 'passed': the trouble went away by itself (a row with ownHands: false), or the camp is gone. */
+  end: 'sky' | 'own' | 'silent' | 'died' | 'passed' | null;
   endedAt: number;
 }
 /** The sign a miracle leaves (faith.js): the act, the place, the tick, and, for a Ward, the tick it lapses. */
@@ -468,8 +471,8 @@ interface Faith {
   prayers: Prayer[];
   signs: Sign[];
   tallies: Tally[];
-  /* A camp's trouble, by 'campId:kind': the tick it began, and whether anyone prayed about it yet. */
-  troubles: { [campKind: string]: { since: number; prayed: boolean } };
+  /* By 'campId:kind': the tick the camp's last prayer of that kind opened. */
+  troubles: { [campKind: string]: number };
   forgotten: boolean;
   nextPrayer: number;
   season: string;

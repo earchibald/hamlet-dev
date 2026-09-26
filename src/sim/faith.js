@@ -18,6 +18,10 @@ let faith = null;
 /* Amounts that are not time. */
 const FAITH = {
   belief: { founder: 40, newcomer: 20, floor: 5, top: 100, witness: 2 },
+  /* The grace the sky starts with: enough for one Spark, so the first fire prayer can be answered.
+     At 0 the founder's belief of 40 gave 4 grace by the first evening, and the first prayer was
+     always silent. */
+  graceStart: 30,
   graceCap: 100,
   /* The grace each miracle costs, by the name of its door act. `light` is the Spark. */
   cost: { light: 15, rain: 40, ward: 15, beckon: 20 },
@@ -27,6 +31,9 @@ const FAITH = {
     sky:    { prayer: 20, others: 6, mood: 6 },
     own:    { prayer: -4, others: 0, mood: 2 },
     silent: { prayer: -12, others: -3, mood: -6 },
+    /* A trouble that went away by itself, for a kind whose row says `ownHands: false`: nobody's
+       hands met it, so nothing moves and no thought is left. */
+    passed: { prayer: 0, others: 0, mood: 0 },
   },
   coldBelow: 40,        // warmth under this is cold enough to pray for fire in the day
   hungryBelow: 30,      // food under this is hungry enough to pray
@@ -63,6 +70,8 @@ const FAITH_TEXT = {
     wolf: '{name} was safe from the wolf without the sky.',
     wildfire: 'The fire near {name} went out without the sky.',
   },
+  /* A trouble that went away by itself, by kind (a row with `ownHands: false`). */
+  passed: { wolf: 'The wolf went away. {name} breathes again.' },
   silent: 'The sky was silent when {name} called.',
   died: '{name} died before the sky answered.',
   someone: 'Someone',
@@ -88,6 +97,7 @@ const FAITH_TEXT = {
     raining: 'It is already raining.',
     nowhere: 'The sky cannot reach that place.',
     noBeasts: 'No deer or rabbit is near enough to hear.',
+    noWolves: 'No wolf or fox is near enough to guard against.',
   },
   tally: {
     ends: '{season} ends.',
@@ -106,10 +116,15 @@ const FAITH_TEXT = {
 const faithSay = (text, slots) => text.replace(/\{(\w+)\}/g, (m, k) => slots[k] === undefined ? m : String(slots[k]));
 
 /* ---------- the prayers ----------
-   One row per kind of trouble. `trouble(c)` is the camp's trouble, true or a thing it found; it is
-   the camp's and not one person's, so nobody prays twice for the same trouble. `who(c, found)` is the
-   one who prays, or null. `places(p, c)` are where the answer must fall, and `near` how close, or
-   null for anywhere. `answers` are the miracles that count. Each reads `camp`, which the caller sets. */
+   One row per kind of trouble. `trouble(c)` is the camp's trouble, true or a thing it found. A camp
+   prays about one kind of trouble at most once in `CLOCK.faith.prayAgain`, counted from when the last
+   prayer of that kind opened, so a cold pit brings a prayer each evening and not every ten minutes.
+   `who(c, found)` is the one who prays, or null. `over(p, c, a)`, when a row has it, says the
+   prayer's own trouble is over; without it the prayer is over when the camp's trouble is.
+   `places(p, c)` are where the answer must fall, and `near` how close, or null for anywhere.
+   `answers` are the miracles that count. `ownHands: false` means that a trouble which ends with no
+   sign went away by itself, and nobody learns anything from it. Each reads `camp`, which the caller
+   sets. */
 const isEvening = () => { const s = tick % DAY; return s >= CLOCK.faith.evening || s < CLOCK.night.lifts; };
 const nextDawn = () => Math.floor(tick / DAY) * DAY + CLOCK.night.lifts + (tick % DAY >= CLOCK.night.lifts ? DAY : 0);
 /* A person who can pray: awake, believing above the floor, with no prayer open. */
@@ -142,9 +157,13 @@ const PRAYERS = {
   wolf: {
     trouble(){ return isNight() && campHumans().some(a => beastNear(a)); },
     who(){ return lowest(campHumans().filter(a => canPray(a) && beastNear(a)), a => near(a, beastNear(a))); },
+    /* The prayer is the person's: it ends when no wolf or fox is near the one who prayed, whoever
+       else in the camp is still afraid. */
+    over: (p, c, a) => !beastNear(a),
     where: (c, a) => [a.x, a.y, a.z],
     places: (p) => { const a = beingById(p.who); return a ? [p.where, [a.x, a.y, a.z]] : [p.where]; },
-    near: FAITH.wardRadius, answers: ['ward'],
+    /* A wolf that wanders off was not driven off by anyone. */
+    near: FAITH.wardRadius, answers: ['ward'], ownHands: false,
   },
   wildfire: {
     trouble(c){
@@ -165,7 +184,7 @@ const PRAYERS = {
 
 /* ---------- the tick ---------- */
 function startFaith(){
-  faith = { grace: 0, spent: 0, prayers: [], signs: [], tallies: [], troubles: {}, forgotten: false, nextPrayer: 1,
+  faith = { grace: FAITH.graceStart, spent: 0, prayers: [], signs: [], tallies: [], troubles: {}, forgotten: false, nextPrayer: 1,
     season: seasonOf(), since: freshTally() };
 }
 function freshTally(){ return { answered: 0, ownHands: 0, silent: 0, births: 0, deaths: 0, spent: 0, tick }; }
@@ -203,24 +222,29 @@ function giveBeliefs(){
 }
 const setBelief = (a, d) => { a.belief = clamp(a.belief + d, 0, FAITH.belief.top); };
 
+/* `faith.troubles` holds, by 'campId:kind', the tick the last prayer of that kind opened. */
 function openPrayers(){
   const prev = camp;
-  for (const c of camps){
-    camp = c;
-    for (const kind in PRAYERS){
-      const row = PRAYERS[kind], key = c.id + ':' + kind, found = row.trouble(c);
-      if (!found){ delete faith.troubles[key]; continue; }
-      const tr = faith.troubles[key] || (faith.troubles[key] = { since: tick, prayed: false });
-      if (tr.prayed) continue;
-      const a = row.who(c, found);
-      if (!a) continue;
-      tr.prayed = true;
-      const until = row.byDawn && isEvening() ? nextDawn() : tick + CLOCK.faith.deadline[kind];
-      faith.prayers.push({ id: faith.nextPrayer++, kind, who: a.id, camp: c.id, at: tick, until, where: row.where(c, a, found), end: null, endedAt: 0 });
-      log(faithSay(FAITH_TEXT.pray[kind], { name: a.name }), [a]);
+  try {
+    for (const c of camps){
+      camp = c;
+      for (const kind in PRAYERS){
+        const row = PRAYERS[kind], key = c.id + ':' + kind, last = faith.troubles[key];
+        if (last !== undefined && tick - last < CLOCK.faith.prayAgain) continue;
+        if (faith.prayers.some(p => !p.end && p.camp === c.id && p.kind === kind)) continue;
+        const found = row.trouble(c);
+        if (!found) continue;
+        const a = row.who(c, found);
+        if (!a) continue;
+        faith.troubles[key] = tick;
+        /* A fire prayer waits for dawn, and never less than its deadline, so one made just before
+           dawn is not over at once. */
+        const until = row.byDawn ? Math.max(nextDawn(), tick + CLOCK.faith.deadline[kind]) : tick + CLOCK.faith.deadline[kind];
+        faith.prayers.push({ id: faith.nextPrayer++, kind, who: a.id, camp: c.id, at: tick, until, where: row.where(c, a, found), end: null, endedAt: 0 });
+        log(faithSay(FAITH_TEXT.pray[kind], { name: a.name }), [a]);
+      }
     }
-  }
-  camp = prev;
+  } finally { camp = prev; }
 }
 /* A sign of the sky that answers this prayer: the right miracle, made after the prayer, near the trouble. */
 function skySign(p, c){
@@ -230,15 +254,22 @@ function skySign(p, c){
 }
 function resolvePrayers(){
   const prev = camp;
-  for (const p of faith.prayers){
-    if (p.end) continue;
-    const c = camps.find(k => k.id === p.camp), a = beingById(p.who);
-    camp = c;
-    if (!a || !a.alive) closePrayer(p, 'died', a);
-    else if (!PRAYERS[p.kind].trouble(c)) closePrayer(p, skySign(p, c) ? 'sky' : 'own', a);
-    else if (tick >= p.until) closePrayer(p, 'silent', a);
-  }
-  camp = prev;
+  try {
+    for (const p of faith.prayers){
+      if (p.end) continue;
+      const c = camps.find(k => k.id === p.camp), a = beingById(p.who), row = PRAYERS[p.kind];
+      /* A camp that is gone takes its prayers with it: they end with no line and move nobody. */
+      if (!c){ p.end = 'passed'; p.endedAt = tick; continue; }
+      camp = c;
+      if (!a || !a.alive){
+        closePrayer(p, 'died', a);
+        /* Someone else may pray about the same trouble at once. */
+        delete faith.troubles[c.id + ':' + p.kind];
+      }
+      else if (row.over ? row.over(p, c, a) : !row.trouble(c)) closePrayer(p, skySign(p, c) ? 'sky' : row.ownHands === false ? 'passed' : 'own', a);
+      else if (tick >= p.until) closePrayer(p, 'silent', a);
+    }
+  } finally { camp = prev; }
   const closed = faith.prayers.filter(p => p.end);
   if (closed.length > FAITH.keepClosed){ const drop = new Set(closed.slice(0, closed.length - FAITH.keepClosed)); faith.prayers = faith.prayers.filter(p => !drop.has(p)); }
 }
@@ -246,6 +277,10 @@ function resolvePrayers(){
 function closePrayer(p, end, a){
   p.end = end; p.endedAt = tick;
   const row = FAITH.outcome[end === 'died' ? 'silent' : end];
+  if (end === 'passed'){
+    log(faithSay(FAITH_TEXT.passed[p.kind], { name: a ? a.name : FAITH_TEXT.someone }), a ? [a] : [], 'info');
+    return;
+  }
   if (a && a.alive){
     setBelief(a, row.prayer);
     addThought(a, 'prayer', FAITH_TEXT.thought[end === 'died' ? 'silent' : end], row.mood, end === 'sky' ? CLOCK.thought.heard : end === 'own' ? CLOCK.thought.ownHands : CLOCK.thought.unheard);
@@ -257,8 +292,9 @@ function closePrayer(p, end, a){
   log(faithSay(text, { name }), a ? [a] : [], end === 'sky' ? 'good' : end === 'own' ? 'info' : 'bad');
 }
 /* The sky is forgotten when no living person believes above the floor. */
+const nobodyBelieves = () => !humans().some(a => a.belief > FAITH.belief.floor);
 function checkForgotten(){
-  const now = !humans().some(a => a.belief > FAITH.belief.floor);
+  const now = nobodyBelieves();
   if (now === faith.forgotten) return;
   faith.forgotten = now;
   if (now) log(FAITH_TEXT.forgotten, humans(), 'major'); else log(FAITH_TEXT.remembered, humans(), 'good');
@@ -298,7 +334,8 @@ function refused(act){
   if (!options.faith) return FAITH_TEXT.refuse.off;
   if (!faithOn()) return FAITH_TEXT.refuse.early;
   giveBeliefs();
-  if (faith.forgotten) return FAITH_TEXT.refuse.forgotten;
+  /* Asked now, and not read from the last period's flag: belief can fall or return between periods. */
+  if (nobodyBelieves()) return FAITH_TEXT.refuse.forgotten;
   if (faith.grace < FAITH.cost[act]) return faithSay(FAITH_TEXT.refuse.grace, { have: Math.floor(faith.grace), cost: FAITH.cost[act] });
   return null;
 }
@@ -307,7 +344,12 @@ function payMiracle(act, x, y, z, extra = {}){
   const cost = FAITH.cost[act];
   faith.grace -= cost; faith.spent += cost; faith.since.spent += cost;
   faith.signs.push({ act, x, y, z, tick, until: 0, ...extra });
-  for (const a of humans()) if (nearAt(a, x, y, z) <= FAITH.witnessRadius) setBelief(a, FAITH.belief.witness);
+  /* A person gains from seeing a miracle once in `CLOCK.faith.witnessGap`, so a sky that strikes the
+     same pit twice in an evening does not buy belief with it. */
+  for (const a of humans()){
+    if (nearAt(a, x, y, z) > FAITH.witnessRadius || (a.sawSign !== undefined && tick - a.sawSign < CLOCK.faith.witnessGap)) continue;
+    setBelief(a, FAITH.belief.witness); a.sawSign = tick;
+  }
   return cost;
 }
 const actSpot = e => ({ x: e.x, y: e.y, z: e.z || 0 });
@@ -338,6 +380,8 @@ function wardAct(e){
   const why = refused('ward'); if (why) return why;
   const { x, y, z } = actSpot(e);
   if (!hasTile(x, y, z)) return FAITH_TEXT.refuse.nowhere;
+  /* A Ward on ground with no wolf or fox near it guards nothing, and costs nothing. */
+  if (!beings.some(b => b.alive && SPECIES[b.species].warded && nearAt(b, x, y, z) <= FAITH.wardRadius)) return FAITH_TEXT.refuse.noWolves;
   /* The sign first: the flee reads it through threatsFor. */
   const cost = payMiracle('ward', x, y, z, { until: tick + CLOCK.faith.wardHold });
   let n = 0;

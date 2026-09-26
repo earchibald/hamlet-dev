@@ -294,10 +294,14 @@ const CLOCK = {
   faith: {
     every: mins(10),           // how often belief, grace, and prayers are looked at. A whole number of beats.
     grace: perHour(1),         // grace a tick from one person whose belief is 100. Belief 40 gives 0.4 of it.
-    fade: 2 / days(1),         // belief a tick that each person loses, down to the floor: 2 a day
-    /* How long a prayer waits for its answer, by kind. A fire prayer made in the evening waits until
-       dawn instead. */
+    fade: 1 / days(1),         // belief a tick that each person loses, down to the floor: 1 a day
+    /* How long a prayer waits for its answer, by kind. A fire prayer waits until the next dawn if
+       that is later. */
     deadline: { fire: hours(12), hunger: days(1), wolf: hours(1), wildfire: hours(6) },
+    /* A camp prays about one kind of trouble at most once in this long, counted from when the last
+       such prayer opened. A cold pit brings a prayer each evening, and an empty stash one each day. */
+    prayAgain: days(1),
+    witnessGap: days(1),       // a person gains belief from seeing a miracle at most once in this long
     evening: hours(17),        // from this hour to dawn is evening, when a cold pit makes someone pray
     rainLength: hours(4),      // the storm that Rain starts
     wardHold: days(1),         // how long a Ward keeps wolves and foxes off its ground
