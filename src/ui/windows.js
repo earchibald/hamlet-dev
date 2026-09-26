@@ -53,8 +53,8 @@ function wireWindows(){
   });
   box.addEventListener('pointermove', e => {
     if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-    if (drag.grip){ drag.w.w = Math.max(220, drag.wd + dx); drag.w.h = Math.max(120, drag.ht + dy); }
-    else { drag.w.x = Math.max(0, drag.x + dx); drag.w.y = Math.max(0, drag.y + dy); }
+    const r = drag.grip ? { x: drag.w.x, y: drag.w.y, w: drag.wd + dx, h: drag.ht + dy } : { x: drag.x + dx, y: drag.y + dy, w: drag.w.w, h: drag.w.h };
+    Object.assign(drag.w, winClamp(r, winArea(), drag.grip));
     renderWindows();
   });
   box.addEventListener('pointerup', () => { if (!drag) return; const w = drag.w; ui.rects[w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect'] = { x: w.x, y: w.y, w: w.w, h: w.h }; persist(); drag = null; });

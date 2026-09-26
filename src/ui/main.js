@@ -169,6 +169,7 @@ function initUI(){
     zoomSkipConsumesClick = false;
     e.stopPropagation(); e.preventDefault();
   }, true);
+  window.addEventListener('resize', fitWindows);
   document.addEventListener('keydown', e => {
     /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
        through pointercancel, with no paired click. That leaves the flag set after zoom is already

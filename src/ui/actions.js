@@ -117,6 +117,11 @@ function setView(v, s){
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* The size of the layer the windows sit in, which winClamp keeps every title bar inside. It is null
+   when the layer has no size, or no page at all (a test rig in Node), and then nothing is clamped. */
+function winArea(){ const box = typeof document !== 'undefined' && document.getElementById ? $('windows') : null; return box && box.clientWidth > 0 && box.clientHeight > 0 ? { w: box.clientWidth, h: box.clientHeight } : null; }
+/* On a page resize every open window is pulled back until its title bar shows. */
+function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows) Object.assign(w, winClamp(w, area)); renderWindows(); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
    The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
@@ -442,7 +447,7 @@ const ACTIONS = {
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }, winArea()); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
@@ -541,7 +546,7 @@ const ACTIONS = {
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
   popOut(){
-    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id, winArea()); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },

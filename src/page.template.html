@@ -167,7 +167,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
-.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+/* The title bar shares the class name .bar with the progress bars, whose rule sets a 7 px height and
+   hides the overflow. Without this reset the title bar was squashed and its title cut in half. */
+.win .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
 .win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The cut title gives way, so the dock hint and the close button keep their width. */
 .win .bar .title.cut + span{flex:none}

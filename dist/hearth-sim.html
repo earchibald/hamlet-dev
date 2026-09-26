@@ -167,7 +167,9 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
-.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+/* The title bar shares the class name .bar with the progress bars, whose rule sets a 7 px height and
+   hides the overflow. Without this reset the title bar was squashed and its title cut in half. */
+.win .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
 .win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The cut title gives way, so the dock hint and the close button keep their width. */
 .win .bar .title.cut + span{flex:none}
@@ -8210,12 +8212,29 @@ function winFind(kind, target){ return ui.windows.find(w => w.kind === kind && s
 /* Inspectors share one saved rect, so each new one steps 24 px down and across, into the first slot no open inspector holds.
    A drawer window keeps one rect per drawer id and opens where it was left. */
 const WIN_STEP = 24;
-function winOpen(kind, target){
+/* A window's title bar is its only handle. A bar pushed off the page cannot be dragged back, so every
+   window is kept where its whole bar shows: on open, on drag, and when the page is resized. `area` is
+   the window layer's size in px, from winArea() in windows.js. The window may hang off the bottom, but
+   never by its bar. From the grip the corner stays on the page, so the window can always be shrunk.
+   With no area (the tests that drive winOpen in Node) the rect is left as it is. */
+const WIN_MIN_W = 220, WIN_MIN_H = 120, WIN_BAR = 32;
+function winClamp(r, area, grip){
+  if (!area) return { ...r };
+  let { x, y, w, h } = r;
+  if (grip){ w = Math.max(WIN_MIN_W, Math.min(w, area.w - x)); h = Math.max(WIN_MIN_H, Math.min(h, area.h - y)); }
+  w = Math.max(WIN_MIN_W, Math.min(w, area.w)); h = Math.max(WIN_MIN_H, Math.min(h, area.h));
+  x = Math.max(0, Math.min(x, area.w - w)); y = Math.max(0, Math.min(y, area.h - WIN_BAR));
+  return { x, y, w, h };
+}
+function winOpen(kind, target, area){
   const have = winFind(kind, target); if (have) return have;
   const saved = ui.rects[kind === 'drawer' ? `drawer:${target}` : 'inspect'] || { x: 80, y: 80, w: 330, h: 420 };
-  const held = (n) => ui.windows.some(w => w.kind === 'inspect' && w.x === saved.x + WIN_STEP * n && w.y === saved.y + WIN_STEP * n);
-  let n = 0; if (kind === 'inspect') while (held(n)) n++;
-  const r = { x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h };
+  /* The step is taken before the clamp, and a slot is held when a window sits at its clamped place.
+     Near an edge several steps clamp to one place, so the search stops after WIN_MAX steps. */
+  const at = (n) => winClamp({ x: saved.x + WIN_STEP * n, y: saved.y + WIN_STEP * n, w: saved.w, h: saved.h }, area);
+  const held = (n) => { const p = at(n); return ui.windows.some(w => w.kind === 'inspect' && w.x === p.x && w.y === p.y); };
+  let n = 0; if (kind === 'inspect') while (n < WIN_MAX && held(n)) n++;
+  const r = at(n);
   const w = { id: ui.nextWin++, kind, target, ...r };
   ui.windows.push(w);
   const ins = ui.windows.filter(w => w.kind === 'inspect'); if (ins.length > WIN_MAX) winClose(ins[0].id);
@@ -9550,7 +9569,7 @@ function hideTip(){ tipTarget = null; tipAnchor = null; renderTip(); }
 const targetForCell = c => { const a = beings.find(a => a.alive && a.x === c.x && a.y === c.y && a.z === c.z) || beings.find(a => !a.alive && a.species === 'human' && a.x === c.x && a.y === c.y && a.z === c.z); return a ? { being: a.id, cell: [c.x, c.y, c.z] } : { tile: [c.x, c.y, c.z], cell: [c.x, c.y, c.z] }; };
 function pinCell(c, e){
   const t = targetForCell(c);
-  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile });
+  const w = winOpen('inspect', t.being != null ? { being: t.being } : { tile: t.tile }, winArea());
   setFocus(`window:${w.id}`); hideTip(); persist(); renderUI(true);
 }
 function tipForCell(c, e){
@@ -9645,8 +9664,8 @@ function wireWindows(){
   });
   box.addEventListener('pointermove', e => {
     if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-    if (drag.grip){ drag.w.w = Math.max(220, drag.wd + dx); drag.w.h = Math.max(120, drag.ht + dy); }
-    else { drag.w.x = Math.max(0, drag.x + dx); drag.w.y = Math.max(0, drag.y + dy); }
+    const r = drag.grip ? { x: drag.w.x, y: drag.w.y, w: drag.wd + dx, h: drag.ht + dy } : { x: drag.x + dx, y: drag.y + dy, w: drag.w.w, h: drag.w.h };
+    Object.assign(drag.w, winClamp(r, winArea(), drag.grip));
     renderWindows();
   });
   box.addEventListener('pointerup', () => { if (!drag) return; const w = drag.w; ui.rects[w.kind === 'drawer' ? `drawer:${w.target}` : 'inspect'] = { x: w.x, y: w.y, w: w.w, h: w.h }; persist(); drag = null; });
@@ -10029,6 +10048,11 @@ function setView(v, s){
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* The size of the layer the windows sit in, which winClamp keeps every title bar inside. It is null
+   when the layer has no size, or no page at all (a test rig in Node), and then nothing is clamped. */
+function winArea(){ const box = typeof document !== 'undefined' && document.getElementById ? $('windows') : null; return box && box.clientWidth > 0 && box.clientHeight > 0 ? { w: box.clientWidth, h: box.clientHeight } : null; }
+/* On a page resize every open window is pulled back until its title bar shows. */
+function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows) Object.assign(w, winClamp(w, area)); renderWindows(); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
    The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
@@ -10354,7 +10378,7 @@ const ACTIONS = {
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }, winArea()); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
@@ -10453,7 +10477,7 @@ const ACTIONS = {
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
   popOut(){
-    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id, winArea()); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
@@ -10657,6 +10681,7 @@ function initUI(){
     zoomSkipConsumesClick = false;
     e.stopPropagation(); e.preventDefault();
   }, true);
+  window.addEventListener('resize', fitWindows);
   document.addEventListener('keydown', e => {
     /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
        through pointercancel, with no paired click. That leaves the flag set after zoom is already
