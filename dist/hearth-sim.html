@@ -95,8 +95,12 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
 .mapbox{position:relative;overflow:hidden;background:var(--panel)}
-/* The map is pinned left, so it holds still when a drawer opens or shuts. */
-.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start}
+/* The map is centred in the room left of the drawer column, open or shut, so it holds still when a
+   drawer opens or shuts and a drawer does not cover it. The room is made by a spacer as wide as the
+   column (drawers 330 px, at 52 px from the edge, and a 10 px gap). The spacer gives up its width
+   first, so on a narrow page the map moves left before it is cut. */
+.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox .views::after{content:"";flex:0 1000 392px}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -123,6 +127,9 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
+/* With every drawer open, Goals shrank until its first goal's detail line was cut in half. This keeps
+   room for the filter row, a stage heading, and one goal whose detail runs to three lines. */
+.drawer[data-drawer="goals"]{min-height:190px}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}

@@ -75,3 +75,10 @@ const page = src('dist/hearth-sim.html');
 test('the window title bar resets the progress bar rule it shares a class with', () => {
   assert.match(page, /\.win \.bar\{height:auto;overflow:visible;/);
 });
+test('the map is centred beside the drawer column', () => {
+  assert.match(page, /\.mapbox \.views\{[^}]*justify-content:center\}/);
+  assert.match(page, /\.mapbox \.views::after\{content:"";flex:0 1000 392px\}/);
+});
+test('the Goals drawer keeps room for one whole goal', () => {
+  assert.match(page, /\.drawer\[data-drawer="goals"\]\{min-height:190px\}/);
+});
