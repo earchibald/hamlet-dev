@@ -229,7 +229,7 @@ test('a load at the same tick reads the loaded ground, as a fresh sim loaded fro
 test('a first fire from moss or firestones says the camp has a hearth; a relight does not', () => {
   for (const [how, setup, label, first, again] of [
     ['moss', (a, c) => { c.stash.moss = 1; }, 'light the pit with glowing moss', /tucks the glowing moss into the pit and blows\. The fire takes, and the camp has a hearth\./, /blows\. The fire takes\. No lightning, no sky\./],
-    ['firestones', (a, c) => { c.tools.firestones = 1; a.skills.craft = 10; a.traits.patience = 1; }, 'strike sparks', /coaxes a spark into flame\. The wood catches, and the camp has a hearth\./, /coaxes a spark into flame\. The fire is back\./],
+    ['firestones', (a, c) => { c.tools.firestones = 1; a.skills.craft = 10; a.traits.patience = 1; }, 'strike sparks', /coaxes a spark into flame\. The wood takes light, and the camp has a hearth\./, /coaxes a spark into flame\. The fire is back\./],
   ]){
     for (const everLit of [false, true]){
       const { api, a, c } = coldCamp(); c.everLit = everLit; setup(a, c);
