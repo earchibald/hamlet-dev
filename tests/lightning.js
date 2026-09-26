@@ -33,7 +33,10 @@ function strikeGapDays(api){
 }
 /* The mean wait, in world days, from a moment the pit is laid and cold to the first strike near the camp.
    This is the figure the player lives through, and the one design/notes.md gives. It is exact for the
-   weather model in updateWeather and the roll in tryLightning, not a sample:
+   weather model in updateWeather and the roll in tryLightning, not a sample, with two limits. It takes each
+   season alone, though a storm that ends in the next season draws that season's gap. It assumes each roll
+   finds a pine to strike; on three seeds, 1,000 forced rolls struck 999 times or more. A map with few
+   reachable pines would wait longer than this says:
      - storms start and end on a beat, so a storm lasts ceil(len / beat) beats and a gap ceil(gap / beat),
        for each value `rint` can draw;
      - during a storm, the camp's beat rolls `rollFor(rate.lightningOut, beat)` once;
