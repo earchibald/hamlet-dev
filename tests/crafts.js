@@ -300,3 +300,30 @@ test('when people sleep outside, the next hide goes to the hut, not the waterski
   assert.equal(api.hideReserved(), 0, 'nobody sleeps outside now');
   assert.ok(api.offersFor(a).some(o => o.label === 'sew the waterskin'), 'the waterskin offers at two hides once nobody sleeps outside');
 });
+
+/* A camp far from any water. The fill search once stopped after 3,000 tiles and gave up, so a camp 90
+   tiles from the river (seed moss-crag-87) had an empty waterskin for most of 16 days. A failed near
+   search must walk the whole world, as drinking does. */
+test('a camp beyond the near search still fills its waterskin', () => {
+  const { api, a, c } = readyCamp();
+  c.tools.waterskin = 1; c.stash.water = 0;
+  for (let y = 0; y < api.H; y++) for (let x = 0; x < api.W; x++){ const t = api.tileAt(x, y, 0); if (t.ground === 'water') t.ground = 'grass'; }
+  /* One pool just past everything the near search touches, with a ring of two tiles to spare. */
+  const near = api.reachable(a.x, a.y, a.z, 3000);
+  const clear = (x, y, z) => { if (z !== 0) return false; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){ const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < api.W && ny < api.H && near.has(api.idx3(nx, ny, 0))) return false; } return true; };
+  const far = api.bfs(a.x, a.y, a.z, clear, api.NZ * api.W * api.H, a);
+  assert.ok(far && far.length, 'no tile beyond the near search');
+  const [px, py] = far[far.length - 1]; const pool = api.tileAt(px, py, 0);
+  pool.ground = 'water'; pool.feature = null; pool.struct = null;
+  const wet = (x, y, z) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){ const t = api.tileAt(x + dx, y + dy, z); if (t && t.ground === 'water') return true; } return false; };
+  assert.equal(api.bfs(a.x, a.y, a.z, wet, 3000, a), null, 'the pool must lie beyond the 3,000-tile near search, or this test proves nothing');
+  /* doOffer's loop, watching that the waterskin is filled at the pool and not at the end of the first stretch. */
+  const o = api.offersFor(a).find(o => o.label === 'fill the waterskin');
+  assert.ok(o && api.startTask(a, o.task.kind, o.task.args), 'the fill would not start');
+  a.task.started = api.tick;
+  let filledAt = null;
+  for (let k = 0; k < api.ticks(600) && a.task; k++){ api.runTask(a); api.tick = api.tick + 1; if (!filledAt && a.carrying && a.carrying.kind === 'water') filledAt = [a.x, a.y]; }
+  assert.equal(a.task, null, 'the fill did not finish');
+  assert.ok(filledAt && wet(filledAt[0], filledAt[1], 0), `the waterskin was filled at ${filledAt}, not beside the pool at ${px},${py}`);
+  assert.equal(c.stash.water, 3, `water in the stash ${c.stash.water}`);
+});

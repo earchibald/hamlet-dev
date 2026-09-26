@@ -94,9 +94,13 @@ kbd{font:500 11px "JetBrains Mono",monospace;opacity:.65;margin-left:5px}
 .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .chip.info{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 /* The map box fills the rest. Everything else floats over it. */
-.mapbox{position:relative;overflow:hidden;background:var(--panel)}
-/* The map is pinned left, so it holds still when a drawer opens or shuts. */
-.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start}
+.mapbox{position:relative;overflow:hidden;background:var(--panel);--drawer-w:330px;--drawer-right:52px;--drawer-gap:10px}
+/* The map is centred in the room left of the drawer column, open or shut, so it holds still when a
+   drawer opens or shuts and a drawer does not cover it. The room is made by a spacer as wide as the
+   column. The spacer reads the same custom properties as #drawers, so the two cannot drift apart. It
+   gives up its width first, so on a narrow page the map moves left before it is cut. */
+.mapbox .views{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.mapbox .views::after{content:"";flex:0 1000 calc(var(--drawer-w) + var(--drawer-right) + var(--drawer-gap))}
 .map-wrap{max-width:100%;max-height:100%;overflow:auto}
 canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 120px);width:auto}
 .over{position:absolute;display:flex;gap:6px;align-items:center;z-index:2}
@@ -120,9 +124,14 @@ canvas{display:block;touch-action:none;cursor:crosshair;max-height:calc(100vh - 
 #drawerTabs{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;gap:6px}
 #drawerTabs .btn{writing-mode:vertical-rl;padding:9px 4px}
 #drawerTabs .btn kbd{margin-left:0;margin-inline-start:5px}
-#drawers{position:absolute;right:52px;top:10px;bottom:10px;width:330px;z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.drawer{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+#drawers{position:absolute;right:var(--drawer-right);top:10px;bottom:10px;width:var(--drawer-w);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.drawer{flex:1 1 0;min-height:70px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .drawer.fit{flex:0 1 auto;max-height:40%}
+/* Every drawer keeps 70 px, room for its header and its filter row, so on a short page with every
+   drawer open none of them shrinks away. With every drawer open, Goals shrank until its first goal's
+   detail line was cut in half. It keeps room for the filter row, a stage heading, and one goal whose
+   detail runs to three lines, but never more than 28% of the page height, so it cannot starve the rest. */
+.drawer[data-drawer="goals"]{min-height:min(190px,28vh)}
 .drawer.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
 .drawer h2{margin:0;padding:7px 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
 .drawer h2 .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:0;text-transform:none}
@@ -167,11 +176,15 @@ table.kv{width:100%;border-collapse:collapse;font-size:13px} table.kv td{padding
 #windows{position:absolute;inset:0;z-index:4;pointer-events:none}
 .win{position:absolute;display:flex;flex-direction:column;min-width:220px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.35);pointer-events:auto;overflow:hidden}
 .win.focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent),0 12px 36px rgba(0,0,0,.35)}
-.win .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
-.win .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The title bar shares the class name .bar with the progress bars, whose rule sets a 7 px height and
+   hides the overflow. Without this reset the title bar was squashed and its title cut in half. The
+   rules name the window's own child, .win > .bar: a need bar in an inspector's card is a .bar inside
+   the window too, and the old .win .bar rule took its height and hid its fill. */
+.win > .bar{height:auto;overflow:visible;border-radius:0;flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px 5px 10px;background:var(--bg);border-bottom:1px solid var(--line);cursor:move;font-weight:700;user-select:none}
+.win > .bar .title.cut{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The cut title gives way, so the dock hint and the close button keep their width. */
-.win .bar .title.cut + span{flex:none}
-.win .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
+.win > .bar .title.cut + span{flex:none}
+.win > .bar .k{font:500 11px "JetBrains Mono",monospace;color:var(--muted);font-weight:400}
 .win .body{overflow:auto;padding:6px 10px;flex:1;min-height:0}
 .win .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);opacity:.5;border-radius:0 0 6px 0}
 /* The hover card. */
@@ -200,6 +213,10 @@ dialog p{margin:6px 0;color:var(--muted);max-width:66ch}
 .legend b{font:700 14px "JetBrains Mono",monospace;margin-right:4px}
 table.keys{border-collapse:collapse;font-size:13px;width:100%} table.keys td{padding:2px 6px;border-bottom:1px solid var(--line)} table.keys td:first-child{font-family:"JetBrains Mono",monospace;white-space:nowrap;width:30%}
 dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
+/* The narrow-screen notice (review P3). Phones are not supported for now, so a narrow screen gets a
+   notice and not a layout. Its own block, so the page's other CSS can change without touching it. */
+#narrow{max-width:360px}
+#narrow p{max-width:none}
 @media (max-width:1400px){
   .strip{flex-wrap:wrap}
   .strip .world{flex:1 1 auto}
@@ -260,6 +277,13 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
   <div id="timeline" tabindex="0" aria-label="The timeline of the ages"></div>
 </div>
 <div id="tip" class="tip ins" role="tooltip" hidden></div>
+<!-- The narrow-screen notice (review P3). The script after the main one opens it on a phone. -->
+<dialog id="narrow" aria-labelledby="narrowTitle">
+  <h2 id="narrowTitle">This screen is narrow</h2>
+  <p>Hearth is made for a wider screen, such as a computer or a tablet.</p>
+  <p>On a phone, some text and buttons will overlap.</p>
+  <p><button class="btn" type="button" id="narrowGo">Go on anyway<kbd>Esc</kbd></button></p>
+</dialog>
 <dialog id="start">
   <h1>Hearth<span>@</span></h1>
   <p>One person, one valley, no tools. They will pick a spot, gather loose rocks and sticks, and lay a fire. You are the sky. Give them the spark, keep them honest, and watch who the smoke brings, what the winter takes, what walks in from the dark, and what lives in the oldest pines.</p>
@@ -322,6 +346,32 @@ dialog ul{margin:6px 0;padding-left:18px} dialog li{margin-bottom:4px}
 <script>
 __SIM__
 __UI__
+</script>
+<script>
+/* The narrow-screen notice (review P3). Phones are not supported for now. A screen narrower than 540 CSS
+   pixels gets a notice over the start dialog. 540 catches every phone held upright (360 to 440 wide) and
+   leaves alone a small tablet (600) and an iPad (768 and up), held upright or not. The width is read once,
+   at load. The notice is page shell, not view state, so it lives here and not in src/ui/. This script runs
+   after initUI has opened the start dialog, so the notice opens on top of it. While it is open, the frame
+   loop holds the ages, as it does for any open dialog.
+   While the notice is open, a capture listener on the document stops every key before the handler in
+   src/ui/main.js sees it. That handler still reads the focus as the start dialog, so Enter would make a
+   world behind the notice, and Alt+G would take a god. The listener does not prevent the default, so
+   Enter still clicks the focused button and Esc still cancels the notice. The cancel is prevented and the
+   notice closes itself: the prevented cancel is also what keeps WebKit from closing the start dialog on
+   the same Esc. Go on anyway hides the notice for the rest of the session. Storage may be blocked, so
+   every touch is wrapped, as in persist() in src/ui/state.js. */
+(function(){
+  const NARROW_QUERY = '(max-width: 539px)', NARROW_KEY = 'hearth.narrowSeen';
+  const d = document.getElementById('narrow');
+  if (!d || !window.matchMedia || !window.matchMedia(NARROW_QUERY).matches) return;
+  try { if (sessionStorage.getItem(NARROW_KEY)) return; } catch (e) { /* no storage: show it */ }
+  const go = () => { try { sessionStorage.setItem(NARROW_KEY, '1'); } catch (e) { /* no storage */ } d.close(); };
+  document.addEventListener('keydown', e => { if (d.open) e.stopPropagation(); }, true);
+  d.addEventListener('cancel', e => { e.preventDefault(); go(); });
+  document.getElementById('narrowGo').addEventListener('click', go);
+  d.showModal();
+})();
 </script>
 </body>
 </html>

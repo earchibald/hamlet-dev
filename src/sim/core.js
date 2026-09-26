@@ -159,9 +159,14 @@ const STAGES = [
   { id: 'sprites',    label: 'Neighbours' },
   { id: 'settlement', label: 'Settlement' },
 ];
+/* An age's number, counted from the Pulse. An age before the Pulse has no number. This is the one place
+   the count is made: the chronicle's stamp below, and the strip, the timeline, the act card, the foot and
+   the Hurry dialog in src/ui/derive.js, all read it. The timeline once printed the absolute age and said
+   "Age 1 to 11" while the strip above it said "Age 10". */
+const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
 /* Before the Pulse there is no "when", only "then". After it the ages count. */
 function stamp(){
-  if (era === 'gods') return pulseAge === null ? 'Before time' : `Age ${age - pulseAge + 1}`;
+  if (era === 'gods') return ageNumber(age) === null ? 'Before time' : `Age ${ageNumber(age)}`;
   return `Day ${dayOf()}, ${String(Math.floor(hourOf())).padStart(2, '0')}:00`;
 }
 /* A test seam, and the only way to see every line. `chronicle` keeps its last 300 and drops the
@@ -174,6 +179,11 @@ function stamp(){
    number, and it is in `NOT_SAVED`, so a loaded save cannot install one. A harness may observe more
    than the player. It must not make the world it observes a different world. */
 let chronicleSink = null, chronicleWritten = 0;
+
+/* A count and its noun: "1 day", "2 days". The one plural helper for the sim and the page, which
+   share one scope. It lives here so goal texts can use it; it moved from src/ui/derive.js. */
+/** @param {number} n @param {string} one @param {string} many */
+const nOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /* A chronicle line. `tag` is what kind of thing happened, for the namer's event table and
    for the epithets. `camp` is whose line it is. Both are data. Nothing reads the text. */

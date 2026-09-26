@@ -169,6 +169,7 @@ function initUI(){
     zoomSkipConsumesClick = false;
     e.stopPropagation(); e.preventDefault();
   }, true);
+  window.addEventListener('resize', fitWindows);
   document.addEventListener('keydown', e => {
     /* Clear the skip flag on every key, not only while a zoom runs. A skip press can end a zoom
        through pointercancel, with no paired click. That leaves the flag set after zoom is already
@@ -198,7 +199,7 @@ function initUI(){
   });
   setTool('inspect');
   newWorld(randomSeed());
-  if (!ui.savedSpeed) setSpeed(1); /* newWorld's restore() must read storage before any persist() can overwrite it */
+  if (!ui.savedSpeed) setSpeed(DAYS_SPEED); /* newWorld's restore() must read storage before any persist() can overwrite it */
   /* The autosave slot is read once. It answers after the dialog is up, and adds Continue to it then. */
   offerContinue();
   openStart();

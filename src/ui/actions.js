@@ -71,7 +71,7 @@ function pruneTrails(now){
     if (tr.length > 1 && now - tr[tr.length - 1][3] > TRAIL.ms) ui.trails[id] = [tr[tr.length - 1]];
   }
 }
-/* The strip's speed labels are only right for the days; relabel them here and in setPace, not in the frame
+/* The template's speed labels are only right for the days; showLadder relabels them, not the frame
    loop, since they change only when the era or the ladder changes, not every frame. */
 function relabelSpeeds(labels, key){
   document.querySelectorAll('#speeds .btn').forEach(b => {
@@ -93,8 +93,16 @@ function relabelSpeeds(labels, key){
 function onLadder(rungs, v, fn, name){
   if (!rungs.includes(v)) throw new TypeError(`${fn} was given ${v}, which is not on the ladder ${name} (${rungs.join(', ')})`);
 }
-function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; relabelSpeeds(SPEED_LABEL, 'speed'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === s)); persist(); }
-function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; relabelSpeeds(PACE_LABEL, 'pace'); document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.pace) === p)); }
+/* The buttons show the ladder of the era that runs, whichever setter was called. setSpeed is called in
+   the ages too: initUI sets the days' speed after newWorld has begun the ages, and it used to relabel the
+   buttons 1× to 256× and light the first one while the ages ran at single pace behind the start dialog. */
+function showLadder(){
+  const ages = inAges(), key = ages ? 'pace' : 'speed', now = ages ? pace : speed;
+  relabelSpeeds(ages ? PACE_LABEL : SPEED_LABEL, key);
+  document.querySelectorAll('#speeds .btn').forEach(b => b.classList.toggle('on', Number(b.dataset[key]) === now));
+}
+function setSpeed(s){ onLadder(SPEEDS, s, 'setSpeed', 'SPEEDS'); speed = s; showLadder(); persist(); }
+function setPace(p){ onLadder(PACES, p, 'setPace', 'PACES'); pace = p; showLadder(); }
 /* A beat the player stepped belongs to a paused world. Un-pausing ends it; the running clock takes the rest. */
 function setPaused(p){ paused = p; if (!p) ui.playing = false; $('pause').innerHTML = `${p ? 'Resume' : 'Pause'}<kbd>Space</kbd>`; $('pause').classList.toggle('on', p); }
 function setLevel(z){ lvl = clamp(z, ZMIN, ZMAX); hideTip(); hover = null; renderUI(true); }
@@ -117,6 +125,12 @@ function setView(v, s){
 function goto(sx, sy){ if (inAges()) return; if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) return; followId = null; cursor = cursorInSector(cursor, sx, sy); setView('loc', { sx, sy }); }
 /* Step to a neighbouring sector and keep the view. From the world map it opens the sector. */
 function move(dx, dy){ moveCursor([dx, dy, 'sector']); }
+/* The size of the layer the windows sit in, which winClamp keeps every title bar inside. It is null
+   when the layer has no size, or no page at all (a test rig in Node), and then nothing is clamped. */
+function winArea(){ const box = typeof document !== 'undefined' && document.getElementById ? $('windows') : null; return box && box.clientWidth > 0 && box.clientHeight > 0 ? { w: box.clientWidth, h: box.clientHeight } : null; }
+/* On a page resize every open window is pulled back until its title bar shows. Only the place moves:
+   a window keeps its size, so it is whole again when the page grows back. */
+function fitWindows(){ const area = winArea(); if (!area) return; for (const w of ui.windows){ const c = winClamp(w, area); w.x = c.x; w.y = c.y; } renderWindows(); }
 /* Put the cursor on a tile and make the view follow it: the sector view scrolls to its sector, the level follows.
    The camp fire view stays on the fire. A cursor that leaves it opens the sector view of the sector it is in. */
 function cursorTo(x, y, z){
@@ -238,7 +252,7 @@ function onLoad(){
   if (!wcv) return;
   wcv.width = W * WS * dpr; wcv.height = H * WS * dpr;
   ocv.width = W * WS; ocv.height = H * WS;
-  setSpeed(ui.savedSpeed || speed || 1); setPaused(false);
+  setSpeed(ui.savedSpeed || speed); setPaused(false);
   setView('loc', secOf(cursor.x, cursor.y));
 }
 
@@ -358,7 +372,7 @@ function onSettle(){
   followId = null; ui.row.people = 0; ui.row.goals = 0;
   /* The camps of the days are new, so the People drawer follows the chosen camp. */
   ui.peopleCamp = null;
-  setSpeed(ui.savedSpeed || speed || 1);
+  setSpeed(ui.savedSpeed || speed);
   /* A god's card opened in the ages would cover the valley at the moment it first shows. Drawer windows stay. */
   ui.windows = ui.windows.filter(w => w.kind !== 'inspect'); if (ui.focus.startsWith('window:') && !ui.windows.some(w => `window:${w.id}` === ui.focus)) ui.focus = 'map';
   /* An opened chip names one act of a creation that is over. The band is hidden from here, so nothing
@@ -436,13 +450,16 @@ const ACTIONS = {
   faster(){ ACTIONS.speedStep(Math.min(ladder().length - 1, ladder().indexOf(inAges() ? pace : speed) + 1)); },
   /* A place on the ladder, from zero. It does what that button does: the pace in the ages, the speed in the days. */
   speedStep(i){ ACTIONS.speed(ladder()[clamp(i, 0, ladder().length - 1)]); },
-  speed(s){ if (inAges()) setPace(s); else setSpeed(s); setPaused(false); },
+  /* A speed key, a speed button, and the palette all end here, so this is the one place a days speed
+     counts as the player's choice. savedSpeed follows it, or a load would go back to the speed read at
+     page load. The pace of the ages is not a days speed and sets no marker. */
+  speed(s){ if (inAges()) setPace(s); else { ui.speedChosen = true; ui.savedSpeed = s; setSpeed(s); } setPaused(false); },
   hurry(){ if (!inAges()){ say('The valley is already made.'); return; } openHurry(); },
   hurryGo(){ closeDialogs(); runAges(); renderUI(true); },
   overlay(){ if (inAges()){ say('The field is all there is. The borders show once the valley is made.'); return; } ui.overlay = !ui.overlay; if (ui.overlay && view !== 'world'){ followId = null; setView('world'); } renderUI(true); },
   tool(id){ setTool(id); },
   toolSticky(id){ setTool(id, true); },
-  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
+  inspect(id){ const a = beingById(id); if (!a) return; const w = winOpen('inspect', { being: id }, winArea()); ui.focus = `window:${w.id}`; if (!inAges()) cursorTo(a.x, a.y, a.z); renderUI(true); },
   /* A god has no tile in the ages, and following would drag the view back every frame. */
   follow(id){ if (inAges()){ say('A god has no place yet. There is nothing to follow.'); return; } const w = id == null && ui.focus.startsWith('window:') ? ui.windows.find(w => w.id === Number(ui.focus.slice(7))) : null; const target = id != null ? id : w && w.kind === 'inspect' && w.target.being; if (target == null) return; followId = followId === target ? null : target; renderUI(true); },
   view(){ cycleView(); },
@@ -541,7 +558,7 @@ const ACTIONS = {
   muteMenu(n){ const a = alerts()[n - 1]; if (a) openMute(a); },
   muteChoice(k){ muteChoice(k); },
   popOut(){
-    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id); ui.focus = `window:${w.id}`; }
+    if (ui.focus.startsWith('drawer:')){ const id = ui.focus.slice(7); const w = winOpen('drawer', id, winArea()); ui.focus = `window:${w.id}`; }
     else if (ui.focus.startsWith('window:')){ const w = ui.windows.find(w => w.id === Number(ui.focus.slice(7))); if (w && w.kind === 'drawer'){ winClose(w.id); ui.focus = `drawer:${w.target}`; if (!ui.open.includes(w.target)) ui.open.push(w.target); } }
     persist(); renderUI(true);
   },
