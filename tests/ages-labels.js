@@ -14,7 +14,7 @@ function loadUI(files, names){
   return Function(sim.source() + '\n' + ui.source(files) + '\n' + api)();
 }
 const FILES = ['state', 'icons', 'derive', 'keys', 'marks', 'map', 'timeline', 'strip', 'dialogs', 'actions'];
-const NAMES = ['ui', 'setSpeed', 'setPace', 'renderClock', 'drawTimeline', 'openHurry', 'ageName', 'ageSpanName', 'timelineModel', 'actCard', 'footChip'];
+const NAMES = ['ui', 'setSpeed', 'setPace', 'renderClock', 'drawTimeline', 'openHurry', 'ageName', 'ageSpanName', 'timelineModel', 'actCard', 'footChip', 'stamp'];
 
 /* A page just big enough for the code under test. Every element is made on first ask and kept, so a test
    reads back what the code wrote. The four speed buttons are read from the template itself, with their
@@ -58,8 +58,10 @@ test('while the ages run the speed buttons show the pace ladder, even after the 
   api.startCreation('r', {});
   assert.equal(api.era, 'gods');
   withPage(page => {
-    /* initUI's own order: newWorld ends with setPace(1), then initUI sets the days speed. */
-    api.setPace(1); api.setSpeed(1);
+    /* initUI's own order: newWorld ends with setPace(1), then initUI sets the days speed. After PR #129
+       that call is setSpeed(DAYS_SPEED), which is 8. It is 8 here and not 1 because the days' "1×" is
+       also single pace's label: with 1, the old code lit a button labelled "1×" and the lit check passed. */
+    api.setPace(1); api.setSpeed(8);
     assert.deepEqual(labels(page), ['¼×', '½×', '1×', '2×'], 'the ages show their own pace labels');
     assert.deepEqual(lit(page), ['1×'], 'the lit button is single pace, the third one');
     assert.equal(page.buttons[2].classList.contains('on'), true);
@@ -105,6 +107,9 @@ test('the strip and the timeline count the ages the same way', () => {
   assert.equal(strip, `Age ${n}`, 'the strip counts from the Pulse');
   assert.equal(head, `Before time to age ${n}`, 'the band starts before the Pulse and ends on the age the strip names');
   assert.equal(api.timelineModel().head, head, 'the band draws the model head');
+  assert.equal(api.stamp(), strip, "a chronicle line's when stamp names the age the strip names");
+  const told = api.chronicle.find(e => e.when !== 'Before time');
+  assert.ok(told && /^Age \d+$/.test(told.when), 'the chronicle holds a line stamped after the Pulse');
 });
 
 test('a band that lies wholly after the Pulse numbers both ends from it', () => {

@@ -20,11 +20,8 @@ const inAges = () => era === 'gods';
 /* Which ladder the speed buttons are on. The ages want a quarter and a half, because a creation is minutes
    of a game measured in hours; the days want the old four. H hurries the ages, so nothing above double. */
 function ladder(){ return inAges() ? PACES : SPEEDS; }
-/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse.
-   `ageNumber` is the one place that count is made. The strip, the timeline, the act card, the foot and
-   the Hurry dialog all read it, because the timeline once printed the absolute age and said "Age 1 to 11"
-   while the strip above it said "Age 10". An age before the Pulse has no number. */
-const ageNumber = n => pulseAge === null || n < pulseAge ? null : n - pulseAge + 1;
+/* An age as the chronicle names it. A mark holds the absolute age; the telling counts from the Pulse,
+   through `ageNumber` in src/sim/core.js, which the chronicle's stamp reads too. */
 const ageName = n => ageNumber(n) === null ? 'Before time' : `Age ${ageNumber(n)}`;
 /* A run of ages, from and to both absolute, named the way ageName names one. */
 function ageSpanName(from, to){
