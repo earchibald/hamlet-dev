@@ -102,6 +102,8 @@ Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed 
 
 ## 8. Camps and goals
 
+The tick counts in sections 8 to 11a are old ticks, 1,000 to a day, and the unit helpers in `src/sim/clock.js` convert them to world seconds.
+
 A camp is a list entry: site, pit, stash tile, stash counts, tools, structures, snares, favour with the fae, and a founding tick. Goals are per camp. A goal has a state (blocked, active, idle, done, locked) and offers work. Standing goals are marked "ongoing" and never finish. The player sets each goal to off, on, or high.
 
 The chain, in the order camps reach it:
@@ -225,14 +227,14 @@ A name is a record: the text, the tongue, the meaning, the tick it was given, on
 
 ## 13. Interface
 
-The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with three recorded exceptions: the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, and the cursor and hover set by the pointer handlers in `main.js`. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with six recorded exceptions. They are the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, the cursor and hover set by the pointer handlers in `main.js`, the beat clock driven by the frame loop in `main.js`, the gods' map cache in `map.js`, and the zoom's skip flag in `main.js`. CLAUDE.md names each field and the function that writes it. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
 
 - The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
 - Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Only a day-era line pulses. The creation writes a chronicle of major lines, all at tick 0 and all carrying an age, and they are the story of the world, not news from the camp, so they are never chips. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
 - The map fills the rest. Four views: sector at 26 px, nearby at 9 px, world at 3 px, and camp fire at 26 px. M cycles them in that order. The camp fire view has the sector view's shape. It centres on the chosen camp's pit, or on its site before the pit is built. It stops at the world's edges. With no camp to centre on, M skips it. A cursor that leaves it, or a sector step, opens the sector view. `locOrigin` in `derive.js` is the one origin that the drawing, the pointer, the cursor, and the tools read for both close views. The tools and the view buttons float top left. The foot shows the newest chronicle line when the chronicle drawer is shut. It leaves that line out when the act caption above it already shows it.
 - A moving creature leaves a short trail of fading dots in the sector, camp fire, and nearby views. A walker moves one square a tick, and 1× runs 60 ticks a second, so a creature moves a square every frame. The playtest asked for each creature to slide smoothly from one square to the next. That slide would have no frame to show, so on 2026-09-21 the user chose a trail instead. `noteTrails` in `actions.js` records each square after every step, and after the Step button. `trailDots` in `derive.js` sets the strength of each dot. `TRAIL` in `state.js` holds the numbers: a fade of 300 ms of wall time, eight dots, and 0.55 for the newest dot. `noteTrails` does not run on the world map, and that view draws no dots. So `setView` clears every trail when the view leaves the world map. A move of more than two squares, or of more than one level, starts a new trail. A load and the Hour button clear every trail, so neither leaves a streak in any view. Only the drawing changes.
 - Five drawers on the right edge: People (trouble first), Goals (by stage, done and idle folded, a blocked goal hidden until its prerequisite is done, A shows all), Chronicle (all or major), Camp (the stash, tools, favour, animals), Legends (the creation by age). Keys 1 to 5 toggle them. Legends is open in both eras and is never trimmed. Tab cycles focus, Esc returns it to the map, arrows move the row, numbers pick, Enter opens, Left and Right set a goal's priority.
-- The People drawer lists every person in the world, with two filters: camp and age. E steps the camp filter through the chosen camp, each other camp, and then everyone. Y steps the age filter through any, young, adult, and old. The age is the one `stage()` in `src/sim/species.js` gives. With no chosen camp, the drawer lists everyone, and E does nothing. In the ages the filter row is hidden.
+- The People drawer can list every person in the world. Two filters narrow the list: camp and age. By default the camp filter follows the chosen camp, so the drawer lists that camp's people. E steps the camp filter through the chosen camp, each other camp, and then everyone. Y steps the age filter through any, young, adult, and old. The age is the one `stage()` in `src/sim/species.js` gives. With no chosen camp, the drawer lists everyone, and E does nothing. In the ages the filter row is hidden.
 
   The view saves the age filter. It does not save the camp filter, because a camp id names a camp in one world only. A load and the settle set the camp filter back to the chosen camp.
 
@@ -297,11 +299,11 @@ The field on the world map, in the order it is drawn:
 | The ground | `previewField()` gives each tile a kind of ground. The map fills the tile in the world map's colour for that kind. A country with no pole is formless and draws in the `field-none` colour. |
 | A scar | Part of the ground. The preview paints what the scar leaves: ash for a burn, a line of hill with a stone crossing for a cut, water and dead pines for a drowning, and boulders for a break. |
 | A boundary | A line in the ink colour, at 0.25 alpha. A wet boundary draws no line, because the preview already paints its river. In the days, the `C` overlay draws every line at 0.85. |
-| A god | Its own icon, with its name, on its own anchor tile, `g.at`. A sleeping god is faded. When two icons would overlap, the second moves aside by the width of the two names plus a gap. |
+| A god | Its own icon, with its name, on its own anchor tile, `g.at`. A sleeping god is faded. Two icons within 22 px of each other on y keep `max(22, (w1 + w2) / 2) + 4` px apart on x, where w1 and w2 are the widths of the two names. The later icon moves right to make the gap. |
 
 **The preview of the ground.** `previewField()` in `src/ui/preview.js` models the ground that the gods' marks will become. So the gods' map looks like the valley before the valley exists. It runs settle's steps in settle's order: ground, rivers, lakes, scars, hills, and cave mouths. It draws no random number and writes no state. Settle draws from the people's stream, and a view that drew from that stream would change the valley. So the preview uses hashes of the seed and the tile in place of draws. It matches the settled valley by kind of ground and by the share of the map each kind covers, not tile by tile. It has no DOM, and `tests/preview.js` loads it in Node.
 
-One call cost 8 to 10 ms in Node at b3d7777, on a 280 by 120 map. So the view computes it once per act and keeps it in `fieldPreview`. `drawField` clears it when the field key in `src/ui/map.js` changes. The key counts gestures and discards, and it does not read the marks. So every act that writes a mark must also write a gesture. Otherwise the map shows stale ground.
+One call cost 8 to 10 ms in Node at b3d7777, on a 280 by 120 map. So the view computes it once per act and keeps it in `fieldPreview`. `drawField` clears it when the field key in `src/ui/map.js` changes. The key counts gestures and discards, and it does not read the marks. So every act that writes a mark must also write a gesture or a discard. Otherwise the map shows stale ground. `undoSettle` in `src/sim/settle.js` is the one writer that adds a discard.
 
 `tests/preview.js` checks this on seed gamma for the first acts of the creation. When the key does not change, a fresh preview must equal the kept one. The same file compares the preview with the settled valley on the six soak seeds. It also collects all the text the player reads, and fails if any of it says "country". The code and these notes say country. The player never reads that word.
 
@@ -325,17 +327,17 @@ the field as it was, fades the new one in over it, and draws each god's gesture 
 clock is `acc`, which the frame loop already keeps, so a tab that slept wakes and the drawing jumps with the
 state. `TWEEN` in `src/ui/state.js` holds the numbers. No duration entered `src/sim/`.
 
-The tiers key off the tween's own length, `AGE_MS / pace`, read at run time. No branch names a pace.
+The tiers key off the tween's own length, `BEAT_MS / pace`, read at run time. No branch names a pace. `beatTier` in `src/ui/derive.js` picks the tier. A beat the player steps always plays at the full tier.
 
-| Tween length | What runs | On today's ladder |
-|---|---|---|
-| 1000 ms or more | The intent cue, the walk, the figure, the caption, the cross-fade. | pace 1 |
-| 300 to 1000 ms | The same, without the intent cue. | pace 4 |
-| 100 to 300 ms | The walk and the cross-fade. | pace 16 |
-| Under 100 ms | Nothing. The field snaps, as it did before. | pace 64 |
+| Tween length | Tier | What runs | On today's ladder |
+|---|---|---|---|
+| 1000 ms or more | `full` | The intent cue, the walk, the figure, the caption, the cross-fade. | ¼ (4000 ms), ½ (2000 ms), 1 (1000 ms) |
+| Under 1000 ms | `figure` | The same, without the intent cue. | 2 (500 ms) |
+
+Two lower tiers, a walk-only one and a snap, stood below these. No pace on `PACES` could reach them, so they were removed. `tests/ui.js` fails if a pace buys less than `TWEEN.figure`, 300 ms. That file runs only with `SLOW=1`.
 
 A paused world, a world behind a dialog, a thrown-back valley, a new world, and a frame that ran two or more
-ages all snap. A hurry ends in the day era, so it snaps by itself.
+beats all snap. A hurry ends in the day era, so it snaps by itself.
 
 Four questions the design left open, and what the code answered.
 
@@ -369,14 +371,14 @@ The soak asserts, per seed:
 - The first camp has a site, a pit, and a fire that was lit.
 - The creation ended on its own, and the valley holds a life: it settled and did not fail, no backstop fired, the ages are within the limit, fewer valleys were thrown back than the cap allows, the gate is open, every god is asleep or dead, every hill carries a mark and a god behind it, every water cave carries a mark, every sector has a country, and the first day-era line was not stamped with an age. The soak also prints the creation's ages, discards, and roll of makings.
 - Someone is alive at the end.
-- The camps grow: at least 8 people alive at day 70, and at least one birth. Across all six seeds together, at least 180 people counted ever and 15 births, so a regression like the fishing bug that halved every seed still goes red. (The old per-seed floor of 20 people ever was too noisy: `humans` is a roughly 2x random variable across unrelated commits, with 20 inside its tail.)
-- The far countries are reached. Across all six seeds together, the caves searched, the finds brought home, the gnome repayments, and the burrow benches each stand above a floor set at about a third of the measured sum. One seed alone may send nobody that far, so the floor is on the six together.
+- The camps grow: at least 8 people alive at day 70 (6 on gamma), and at least one birth. This check runs only under `LONG=1`. Across all six seeds together, at least 180 people counted ever and 15 births, so a regression like the fishing bug that halved every seed still goes red. The sums run only under `LONG=1` with all six seeds. (The old per-seed floor of 20 people ever was too noisy: `humans` is a roughly 2x random variable across unrelated commits, with 20 inside its tail.)
+- The far countries are reached. Across all six seeds together, the caves searched, the finds brought home, the gnome repayments, and the burrow benches each stand above a floor set at about a third of the measured sum. One seed alone may send nobody that far, so the floor is on the six together. This check runs only under `LONG=1` with all six seeds.
 - Nobody dies of anything but old age. A death that is known and not yet traced goes in `KNOWN_DEATHS` in the test, as a todo, until it is fixed.
 - At most one person a seed dies in a den, and it is reported.
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it, and so must every den, water cave, and burrow exit still in use (a search from the first camp's stash), so a mid-game dig that seals a pocket is caught too, not only a person in one. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
 - The same seed tells the same story twice, and a seed, its options, and its log replay the same story, legends and all. A moved log tells a different one.
-- A seventh test, in the default run only: seed `x` is saved on day 1.5, loaded into a fresh sim, and told to day 3. The fingerprint over both halves together holds to `golden['x']`, the same line the six-seed test reads. It is section 18's oracle, run once more inside the soak's own worlds. The soak grew from about 96 s to about 118 s when this test was added.
+- A seventh test, in the default run only: seed `x` is saved on day 1.5, loaded into a fresh sim, and told to day 3. The fingerprint over both halves together holds to `golden['x']`, the same line the six-seed test reads. It is section 18's oracle, run once more inside the soak's own worlds. When this test was added on 2026-09-19, the soak still ran 70 days, and it grew from about 96 s to about 118 s.
 
 No test asserts on a clock reading. Several sessions work on this repo at once, so a test that watches the wall clock goes red when a neighbour is busy, and that teaches everyone to re-run a red gate until it turns green. `tests/ages.js` once held `ms < 3000` for one creation. It failed three times in one night on unrelated branches, and the same tree passed alone each time. It now counts the work instead: at most 60 ages, and fewer discards than `MAX_DISCARDS`, per seed, with the discards over all 24 seeds capped together. A discard repaints the whole world, so it is the unit a slow creation is paid for in. The seeds measure 14 to 31 ages and 0 to 4 discards, so each cap sits at about twice the worst. `tests/ages.js` and `tests/soak.js` both still print their milliseconds as a diagnostic, for a human to read.
 
@@ -450,7 +452,7 @@ What counts as time, in short form:
 
 A being runs its task once a stride, not once a tick, so a task's progress threshold and period count strides.
 
-`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each returns its argument unchanged. A value inside one is still in today's units: a count of ticks, a count of strides, a rate for each tick, a rate for each stride. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done. A chance that sits beside its period, such as `birth.chance` or `arrival.villageChance`, carries no marker; the retune changes it together with its period, and `rollFor` is the tool.
+`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each converts its argument to world units. A value inside one is in the old 1,000-a-day units, converted: a count of old ticks, a count of strides, a rate for each old tick, a rate for each stride. One old tick is 86.4 world seconds, and one stride is 172.8. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done. A chance that sits beside its period, such as `birth.chance` or `arrival.villageChance`, carries no marker; the retune changes it together with its period, and `rollFor` is the tool.
 
 The rows of `SPECIES`, `LIFE`, and `RECIPES` stay in their own tables. They are written with the same unit helpers, not moved into `CLOCK`.
 
@@ -462,7 +464,7 @@ A thought's key and the name of its `CLOCK.thought` entry are two things. Where 
 
 The lint cannot see everything. A literal passed through a named constant, a whole-number step such as `t.fire -= 2`, a division of `tick` by a literal, and a new data table with its own field names all pass it unread. A reviewer must catch those.
 
-Left for the retune (G4): `tests/lib/run.js` and `tests/door.js` each hard-code `DAY = 1000`; `src/ui/derive.js` holds pulse durations of 1500 ticks and `src/ui/map.js` refreshes its cache every 40 ticks, and the lint does not scan `src/ui/`; `tasks.js` near line 393 advances tree cutting by its own `1 + a.skills.woodcut * 0.3` and not by `workSpeed`, which plan G2 can fold in; `hours`, `mins`, and `secs` return fractions of a tick while `DAY` is 1000, so a caller must round; `CLOCK.thought.over` and `CLOCK.thought.wouldnothold` count ages of a god, not ticks.
+Left for the retune (G4): `src/ui/derive.js` holds pulse durations of 1500 ticks and `src/ui/map.js` refreshes its cache every 40 ticks, and the lint does not scan `src/ui/`; `tasks.js` near line 393 advances tree cutting by its own `1 + a.skills.woodcut * 0.3` and not by `workSpeed`, which plan G2 can fold in; `CLOCK.thought.over` and `CLOCK.thought.wouldnothold` count ages of a god, not ticks.
 
 The soak's six-seed fingerprint did not move through the whole plan. G1 is a pure refactor: every literal moved to `CLOCK` at its same value, in the same order of rolls.
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status: ready to start.** The user has ruled on all seven questions. See "The rulings". Two of the four late rulings name work this plan must not do: pack hunting, and child mortality. Both are recorded there and both are somebody else's. One question is deliberately left open: whether the soak keeps its floors. Task 4 measures it and takes a number to the user. No task removes a floor before that.
+**Status: paused.** Tasks 1 to 3 merged into dev at 72c1b96 on 2026-09-20. Later work is on branch tiers-g4, not in dev. The user paused the plan on 2026-09-20, after task 5. The user has ruled on all seven questions. See "The rulings". Two of the four late rulings name work this plan must not do: pack hunting, and child mortality. Both are recorded there and both are somebody else's. One question is deliberately left open: whether the soak keeps its floors. Task 4 measures it and takes a number to the user. No task removes a floor before that.
 
 **Goal:** Move the engine to real units, and keep the game playable at real units. A tick is one world second, a day is 86,400 ticks, a year is 365 days, a person lives about 70 years, and a walking person moves one tile a tick. The golden is blessed once, at the end, by the user.
 
