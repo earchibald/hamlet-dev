@@ -176,14 +176,19 @@ Object.assign(TASKS, {
       const kind = args.item;
       if (a.carrying && a.carrying.kind !== kind) return startTask(a, 'deliver');
       let found = null;
-      const p = bfs(a.x, a.y, a.z, (x, y, z) => { const it = itemAt(x, y, z); if (z >= 0 && it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; }, 2500, a);
+      const loose = (x, y, z) => { const it = itemAt(x, y, z); if (z >= 0 && it && it.kind === kind && !it.reservedBy){ found = it; return true; } return false; };
+      const p = bfs(a.x, a.y, a.z, loose, 2500, a);
       if (!p){
         if (a.carrying) return startTask(a, 'deliver');
-        const s = nearestSectorWith(a, looseCount(kind)); if (!s) return false;
-        const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
+        /* The near search failed. The counter says whether any lie within the reach, and the far
+           search finds the nearest of them by path. See SEARCH_REACH in world.js. */
+        if (!nearestSectorWith(a, looseCount(kind))) return false;
+        const q = searchReach(a, loose); if (!q) return false;
+        const it = found; it.reservedBy = a.id; args.id = it.id;
+        const s = sectorOfTile(it);
+        if (s === sectorOfTile(a)) return { label: `Looking for ${ITEMS[kind].plural}`, path: q };
         log(`${a.name} heads to the ${s.name.toLowerCase()} to look for ${ITEMS[kind].plural}.`, [a]);
-        setTask(a, 'walkTo', { at: [cx, cy, 0], within: 6 }, { label: `Walking to the ${s.name.toLowerCase()} for ${ITEMS[kind].plural}`, path: q });
-        return true;
+        return { label: `Walking to the ${s.name.toLowerCase()} for ${ITEMS[kind].plural}`, path: q };
       }
       const it = found; it.reservedBy = a.id; args.id = it.id;
       return { label: `Looking for ${ITEMS[kind].plural}`, path: p };
@@ -210,10 +215,16 @@ Object.assign(TASKS, {
       const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
       if (!p){
         if (a.carrying) return startTask(a, 'deliver');
-        const s = nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood)); if (!s) return false;
-        const [cx, cy] = secCenter(s); const q = pathToStop(a, cx, cy, 6); if (!q) return false;
-        setTask(a, 'walkTo', { at: [cx, cy, 0], within: 6 }, { label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q });
-        return true;
+        /* As in `gather`, the counter runs first, and then the far search runs over the same ground.
+           The counter counts a bush by its own tile. So the far search takes a bush only within the
+           reach. It skips a bush past the reach, even when the tile to stand on beside it is inside. */
+        if (!nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood))) return false;
+        const me = secOf(a.x, a.y); let bush = null;
+        const ripe = tl => hasFood(tl) && inReach(me, tl.x, tl.y);
+        const q = searchReach(a, (x, y, z) => !!(bush = nearFind(x, y, ripe, NEAR, z))); if (!q) return false;
+        const s = sectorOfTile(bush);
+        if (s === sectorOfTile(a)) return { label: 'Going to pick berries', path: q, progress: 0 };
+        return { label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, progress: 0 };
       }
       return { label: 'Going to pick berries', path: p, progress: 0 };
     },
