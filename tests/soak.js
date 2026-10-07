@@ -77,17 +77,22 @@ const KNOWN_DEATHS = {};
    still fails. */
 const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0, grown: 0 };
 
-/* The other end of the life table: a child born in the run who comes of age. Measured on the six
-   default seeds at 70 days, as children alive at the end and past 'young': r 2, x 1, alpha 3,
-   beta 6, gamma 3, delta 3, 18 together, out of 37 born. The claim now counts the coming-of-age
-   lines instead, and that count can only be the larger: it also holds a child who grew up and then
-   died. So the floor measured on the smaller count still holds. A per-seed floor of 1 rests on seed
-   x's single child, and
-   `born` is the same swinging variable the comment above describes, so the claim is floored across
-   the six seeds together, at about a third of the measured sum.
+/* The other end of the life table: a child born in the run who comes of age, counted by the lines
+   tagged 'grown'. Measured on branch review-h6-come-of-age at 317f62c. The six default seeds ran
+   70 days each, one process per seed.
 
-   The reason for summing is margin, not reachability. Beta alone made 6, so a single seed can carry
-   the whole summed floor. That is unlike `FAR_FLOOR` below, where a seed may genuinely never send
+     seed       r   x   alpha   beta   gamma   delta   together
+     grown     16  13      15     15      13      14         86
+     born      27  19      23     24      21      20        134
+
+   The floor is far below that sum. It was set at about a third of an older count, on an older dev.
+   That count was of children alive at the end and past 'young': 18 together out of 37 born, and
+   seed x had only 1. Whether to raise the floor is an open question on PR #139. `born` is the same
+   swinging variable the comment above describes, so the test sets one floor for the sum of the six
+   seeds, not one for each seed.
+
+   The reason for summing is margin, not reachability. Every seed alone made 13 or more, so a single
+   seed can carry the whole summed floor. That is unlike `FAR_FLOOR` below, where a seed may genuinely never send
    anyone to a cave in 70 days and the sum is the only way to make a claim at all. Here the sum only
    buys room for the swing in `born`. */
 const GROWN_FLOOR = 6;

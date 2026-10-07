@@ -84,6 +84,7 @@ test('a long catch-up across the turn writes the line once', () => {
   const from = child.seen;
   /* The tick moves and the child's body is left behind, which is what a being nobody looked at for
      half a world day is. `catchUp` then crosses the turn in many stretches. */
+  // Not setClock: it would move `seen` with the tick, and no catch-up would cross the turn.
   api.tick = turn + api.DAY / 4;
   assert.equal(grownLines(api).length, 0);
   api.catchUp(child);
@@ -135,4 +136,27 @@ test('a save made after the turn does not write the line again', () => {
   stepTo(b, b.tick + beats(b, 5));
   assert.equal(grownLines(b).length, 1, 'the line was written again after the load');
   assert.equal(b.beingById(child.id).grown, true, 'the save lost the mark');
+});
+
+test('a child who dies in the catch-up that crosses the turn writes no line', () => {
+  /* A dead child did not grow up, so the line must wait for the body to be alive at the end. The
+     child starves inside the same long catch-up that carries it past the turn. */
+  const { api, child, turn } = withChild();
+  setClock(api, turn - api.DAY / 4);
+  child.needs.food = 0; child.needs.water = 0; child.hp = 1;
+  // Not setClock, for the reason the long catch-up above gives.
+  api.tick = turn + api.DAY / 4;
+  api.catchUp(child);
+  assert.equal(child.alive, false, 'the child lived, so the case is not reached');
+  /* `diedAt` is the present tick, wherever in the catch-up the body gave out. `seen` is the end of the
+     stretch the body died in, so it says the death came before the turn. */
+  assert.ok(child.seen < turn, `the body gave out at ${child.seen}, after the turn at ${turn}`);
+  assert.equal(grownLines(api).length, 0);
+});
+
+test('the coming-of-age line names no night', () => {
+  /* Its kind is major, so a row in the event table would make it a night's name at the fire. */
+  const api = load();
+  assert.equal(api.EVENT_NAMES.grown, undefined);
+  assert.ok(Object.keys(api.EVENT_NAMES).includes('birth'), 'the event table is not the one this test reads');
 });
