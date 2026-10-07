@@ -1,6 +1,6 @@
 # Names: the land, the camps, the events, and the people
 
-Date: 2026-09-17. Branch: `ui-rethink`. Status: design, awaiting review.
+Date: 2026-09-17. Branch: `ui-rethink`. Status: merged into dev at 68b7061 on 2026-09-19. `design/notes.md` section 12a records the names as built.
 
 This spec adds a naming system to the simulation. It names the land, the camps, the events, and the people, and it keeps the history of every name. It adds no rule that moves a being or an item. Read `design/notes.md` first. The interface side is in `2026-09-17-ui-rethink-design.md`, section 8 of this spec is its input.
 
