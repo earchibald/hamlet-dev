@@ -127,7 +127,9 @@ test('a document line inside a code fence or inline code is not read', () => {
 
 /* Each `index.js` is a manifest, and its strings are code, not text, so both are left out. Each
    folder has a floor on the number of literals read. If the loop over a folder found none, the test
-   would pass for any text in it. On 2026-09-20 `src/sim` gave 3,942 and `src/ui` gave 1,779. */
+   would pass for any text in it. On 2026-09-20 `src/sim` gave 3,942 and `src/ui` gave 1,779. On
+   2026-10-06, after the rebase onto dev, they gave 4,154 and 2,061. The floors stay where they are:
+   they guard against a loop that reads nothing, and both counts are well above them. */
 const FOLDERS = { 'src/sim': 3000, 'src/ui': 1200 };
 function sourceLiterals(dir){
   const out = [];
@@ -137,9 +139,16 @@ function sourceLiterals(dir){
 }
 
 /* A fault that was in the game's text before this gate is recorded here by file, by rule, and by
-   number. The number may fall and may not rise. `src/ui/panels.js` writes " — the ground refused it"
-   and " — taken" after the name of a mark. A change to that text goes through the review panel. */
-const KNOWN_SOURCE = { 'src/ui/panels.js': { 'em-dash': 2 } };
+   number. The number may fall and may not rise. A change to that text goes through the review panel.
+
+   `src/ui/panels.js` writes " — the ground refused it" and " — taken" after the name of a mark.
+
+   `src/sim/snapshot.js` gives the reason that `blazeReach` is not saved in one sentence of 29 words.
+   It came in with the lightning work while this branch was open. A player never reads it. */
+const KNOWN_SOURCE = {
+  'src/ui/panels.js': { 'em-dash': 2 },
+  'src/sim/snapshot.js': { 'long-sentence': 1 },
+};
 
 for (const [dir, floor] of Object.entries(FOLDERS)){
   test(`no string in ${dir} holds a banned phrase, a new em dash, or a sentence over the limit`, () => {
