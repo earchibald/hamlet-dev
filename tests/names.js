@@ -587,7 +587,7 @@ test('the lines the event table reads carry their tags in a real run', () => {
   const { events } = runDays('r', 40);
   const tags = new Set(events.filter(e => e.tag).map(e => e.tag));
   assert.ok(tags.size >= 2, `only ${[...tags].join(', ')}`);
-  for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'oldCold', 'deer', 'fish', 'pot'].includes(e.tag), `${e.tag}: ${e.text}`);
+  for (const e of events) if (e.tag) assert.ok(['wolf', 'fire', 'frost', 'sprite', 'found', 'death', 'birth', 'old', 'oldCold', 'deer', 'fish', 'pot', 'grown'].includes(e.tag), `${e.tag}: ${e.text}`);
   const births = events.filter(e => e.text.includes(' is born to '));
   assert.ok(births.length > 0, 'nobody was born in forty days, so the birth tag is untested');
   for (const e of births) assert.equal(e.tag, 'birth', e.text);

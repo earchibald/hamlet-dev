@@ -73,6 +73,9 @@ interface Being {
   clothes?: boolean;
   /* When it last joined a camp (camps.js, names.js): a fresh founder or one born into it. */
   campSince?: number;
+  /* False on a child born in a camp until it comes of age, then true (camps.js, beings.js `comeOfAge`).
+     A founder has no flag at all, and so never comes of age in the chronicle. */
+  grown?: boolean;
   /* How many times it has taught a skill by the fire (beings.js), read by an epithet (names.js). */
   taught?: number;
   /* The epithet the camp calls it by, and the name-records of the ones it wore before
