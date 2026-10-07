@@ -1,6 +1,6 @@
 # The ages in motion: a god that moves, an act that shows, and a country that changes before the eye
 
-Design spec, 2026-09-18. It answers issue #11 of `earchibald/hamlet-dev`. It is a follow-up to mythos plan 4, watching the creation, and to section 6 of the mythos spec. Implementation follows in a plan. Nothing here is built yet.
+Design spec, 2026-09-18. It answers issue #11 of `earchibald/hamlet-dev`. It is a follow-up to mythos plan 4, watching the creation, and to section 6 of the mythos spec. Status: merged into dev at 5f0862f on 2026-09-18. `design/notes.md` section 13a, under "The ages in motion", records it as built.
 
 ## Summary
 

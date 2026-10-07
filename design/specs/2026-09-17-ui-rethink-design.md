@@ -1,6 +1,6 @@
 # The interface, rethought
 
-Date: 2026-09-17. Branch: `ui-rethink`. Status: design, awaiting review.
+Date: 2026-09-17. Branch: `ui-rethink`. Status: merged into dev at f9006c1 on 2026-09-18. `design/notes.md` section 13 records the interface as built.
 
 This spec replaces the page layout, the panels, and the controls. It does not change a rule of the simulation. Read `design/notes.md` section 13 for the interface as it is.
 
