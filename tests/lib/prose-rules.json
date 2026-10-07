@@ -1,0 +1,80 @@
+{
+  "sentenceWords": 25,
+  "phrases": [
+    {
+      "re": "load[- ]bearing",
+      "alt": "essential, required, or say what depends on it",
+      "example": "This check is load-bearing."
+    },
+    {
+      "re": "at the intersection of",
+      "alt": "say which two things are combined",
+      "example": "It sits at the intersection of art and code."
+    },
+    {
+      "re": "(have|has|got) the full picture",
+      "alt": "cut it, and state what is known",
+      "example": "Now I have the full picture."
+    },
+    {
+      "re": "I have what I need",
+      "alt": "cut it",
+      "example": "I have what I need to begin."
+    },
+    {
+      "re": "a real gap",
+      "alt": "say what is missing",
+      "example": "That is a real gap in the plan."
+    },
+    {
+      "re": "delv(e|es|ed|ing)",
+      "alt": "examine, read, or look at",
+      "example": "We delve into the log."
+    },
+    {
+      "re": "tapestry",
+      "alt": "name the real structure",
+      "example": "A rich tapestry of systems."
+    },
+    {
+      "re": "testament to",
+      "alt": "shows or proves",
+      "example": "It is a testament to the design."
+    },
+    {
+      "re": "let('s| us) break (this|that|it) down",
+      "alt": "cut it, and state the point",
+      "example": "Let's break this down."
+    },
+    {
+      "re": "it('s| is) important to (remember|note)",
+      "alt": "state the fact",
+      "example": "It is important to remember the flag."
+    },
+    {
+      "re": "navigat(e|es|ed|ing) the [a-z ]{0,20}landscape",
+      "alt": "compare the options",
+      "example": "We navigate the landscape of tools."
+    },
+    {
+      "re": "honest (accounting|summary|answer|assessment|take)",
+      "alt": "summary, or state the facts",
+      "example": "Here is my honest summary."
+    },
+    {
+      "re": "in the realm of",
+      "alt": "in",
+      "example": "In the realm of testing, it holds."
+    },
+    {
+      "re": "at its core",
+      "alt": "cut it",
+      "example": "At its core, the engine is a loop."
+    },
+    {
+      "re": "step[- ]change",
+      "alt": "a large improvement, with the number",
+      "example": "This is a step-change in speed."
+    }
+  ]
+}
