@@ -102,7 +102,7 @@ Plants: bushes are seedlings for 3 days, slow after 48, die after 60. They seed 
 
 ## 8. Camps and goals
 
-The tick counts in sections 8 to 11a are old ticks, 1,000 to a day, and the unit helpers in `src/sim/clock.js` convert them to world seconds.
+The tick counts in sections 8 to 11a are old ticks, at 1,000 ticks a day. The unit helpers in `src/sim/clock.js` convert them to world seconds.
 
 A camp is a list entry: site, pit, stash tile, stash counts, tools, structures, snares, favour with the fae, and a founding tick. Goals are per camp. A goal has a state (blocked, active, idle, done, locked) and offers work. Standing goals are marked "ongoing" and never finish. The player sets each goal to off, on, or high.
 
@@ -227,7 +227,16 @@ A name is a record: the text, the tongue, the meaning, the tick it was given, on
 
 ## 13. Interface
 
-The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with six recorded exceptions. They are the window drag handler in `windows.js`, the palette's own list state in `dialogs.js`, the cursor and hover set by the pointer handlers in `main.js`, the beat clock driven by the frame loop in `main.js`, the gods' map cache in `map.js`, and the zoom's skip flag in `main.js`. CLAUDE.md names each field and the function that writes it. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+The interface is `src/ui/`, plain scripts in one scope joined by `src/ui/index.js` after the sim. `derive.js` and `keys.js` touch no DOM and run in Node under `tests/ui.js`. View state changes in `actions.js`, where keys and clicks both end, with six recorded exceptions. CLAUDE.md names each field and the function that writes it. The design is `design/specs/2026-09-17-ui-rethink-design.md`.
+
+| Exception | File |
+|---|---|
+| The window drag handler | `windows.js` |
+| The palette's own list state | `dialogs.js` |
+| The cursor and hover, set by the pointer handlers | `main.js` |
+| The beat clock, driven by the frame loop | `main.js` |
+| The gods' map cache | `map.js` |
+| The zoom's skip flag | `main.js` |
 
 - The page fills the window. The strip on top has a world half (clock, season with days to the next, weather) and a camp half (the camp's name and tabs, gauges for hearth, food, water, and beds, and alert chips). Pause, step, hour, speeds, and help sit at the right.
 - Alerts read state each frame: fire, cold, food, water, threat, sprites, and event pulses from major chronicle lines and goals that open. Only a day-era line pulses. The creation writes a chronicle of major lines, all at tick 0 and all carrying an age, and they are the story of the world, not news from the camp, so they are never chips. Chips are numbered. Mutes are per type, per camp or everywhere, and persist.
@@ -327,14 +336,14 @@ the field as it was, fades the new one in over it, and draws each god's gesture 
 clock is `acc`, which the frame loop already keeps, so a tab that slept wakes and the drawing jumps with the
 state. `TWEEN` in `src/ui/state.js` holds the numbers. No duration entered `src/sim/`.
 
-The tiers key off the tween's own length, `BEAT_MS / pace`, read at run time. No branch names a pace. `beatTier` in `src/ui/derive.js` picks the tier. A beat the player steps always plays at the full tier.
+The tiers depend on the tween's own length, `BEAT_MS / pace`, read at run time. No branch names a pace. `beatTier` in `src/ui/derive.js` picks the tier. A beat the player steps always plays at the full tier.
 
 | Tween length | Tier | What runs | On today's ladder |
 |---|---|---|---|
 | 1000 ms or more | `full` | The intent cue, the walk, the figure, the caption, the cross-fade. | ¼ (4000 ms), ½ (2000 ms), 1 (1000 ms) |
 | Under 1000 ms | `figure` | The same, without the intent cue. | 2 (500 ms) |
 
-Two lower tiers, a walk-only one and a snap, stood below these. No pace on `PACES` could reach them, so they were removed. `tests/ui.js` fails if a pace buys less than `TWEEN.figure`, 300 ms. That file runs only with `SLOW=1`.
+Two lower tiers, a walk-only one and a snap, were once below these. No pace on `PACES` could reach them, so they were removed. `tests/ui.js` fails if a pace gives a beat shorter than `TWEEN.figure`, 300 ms. That file runs only with `SLOW=1`.
 
 A paused world, a world behind a dialog, a thrown-back valley, a new world, and a frame that ran two or more
 beats all snap. A hurry ends in the day era, so it snaps by itself.
@@ -378,7 +387,7 @@ The soak asserts, per seed:
 - Nobody is cut off from their camp. Once a day, one full-map search from each camp's stash; every living member must stand inside it, and so must every den, water cave, and burrow exit still in use (a search from the first camp's stash), so a mid-game dig that seals a pocket is caught too, not only a person in one. This is the check that caught the sealed pockets.
 - The run matches `tests/soak-golden.json`, a fingerprint of the chronicle, the beings, and the items. Any rule change moves it. Look at the printed counts, decide the move is what you meant, then bless it with `UPDATE_GOLDEN=1 node tests/soak.js`.
 - The same seed tells the same story twice, and a seed, its options, and its log replay the same story, legends and all. A moved log tells a different one.
-- A seventh test, in the default run only: seed `x` is saved on day 1.5, loaded into a fresh sim, and told to day 3. The fingerprint over both halves together holds to `golden['x']`, the same line the six-seed test reads. It is section 18's oracle, run once more inside the soak's own worlds. When this test was added on 2026-09-19, the soak still ran 70 days, and it grew from about 96 s to about 118 s.
+- A seventh test, in the default run only: seed `x` is saved on day 1.5, loaded into a fresh sim, and told to day 3. The fingerprint over both halves together holds to `golden['x']`, the same line the six-seed test reads. It is section 18's oracle, run once more inside the soak's own worlds. When this test was added on 2026-09-19, the soak still ran 70 days. The test raised the soak's run time from about 96 s to about 118 s.
 
 No test asserts on a clock reading. Several sessions work on this repo at once, so a test that watches the wall clock goes red when a neighbour is busy, and that teaches everyone to re-run a red gate until it turns green. `tests/ages.js` once held `ms < 3000` for one creation. It failed three times in one night on unrelated branches, and the same tree passed alone each time. It now counts the work instead: at most 60 ages, and fewer discards than `MAX_DISCARDS`, per seed, with the discards over all 24 seeds capped together. A discard repaints the whole world, so it is the unit a slow creation is paid for in. The seeds measure 14 to 31 ages and 0 to 4 discards, so each cap sits at about twice the worst. `tests/ages.js` and `tests/soak.js` both still print their milliseconds as a diagnostic, for a human to read.
 
@@ -452,7 +461,7 @@ What counts as time, in short form:
 
 A being runs its task once a stride, not once a tick, so a task's progress threshold and period count strides.
 
-`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. Each converts its argument to world units. A value inside one is in the old 1,000-a-day units, converted: a count of old ticks, a count of strides, a rate for each old tick, a rate for each stride. One old tick is 86.4 world seconds, and one stride is 172.8. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done. A chance that sits beside its period, such as `birth.chance` or `arrival.villageChance`, carries no marker; the retune changes it together with its period, and `rollFor` is the tool.
+`ticks`, `strides`, `tickRate`, and `strideRate` are legacy markers. A value inside one is in the old 1,000-a-day units: a count of old ticks, a count of strides, a rate for each old tick, or a rate for each stride. Each marker converts its value to world units. One old tick is 86.4 world seconds. One stride is 172.8 world seconds. Plan G4, the retune, replaces every marker with a world unit. When the source holds none of the four, the retune is done. A chance that sits beside its period, such as `birth.chance` or `arrival.villageChance`, carries no marker; the retune changes it together with its period, and `rollFor` is the tool.
 
 The rows of `SPECIES`, `LIFE`, and `RECIPES` stay in their own tables. They are written with the same unit helpers, not moved into `CLOCK`.
 
