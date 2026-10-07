@@ -56,11 +56,30 @@ function sectorCount(s, key, pred){
   resCache.set(ck, { t: tick, n }); return n;
 }
 const looseCount = kind => (s) => sectorCount(s, 'item-' + kind, (t, x, y) => { const it = itemAt(x, y); return it && it.kind === kind && !it.reservedBy; });
+/* How far a person looks for a loose thing: every sector within this many sectors of the person's
+   own, as dist() counts sectors. The counter below counts this far. Each far search looks this far
+   too. The two once covered different ground (issue #83). The near search stopped after 2,500 tiles,
+   about 30 tiles out. The counter looked four sectors out but skipped the person's own sector. So
+   the gather task sent a person to another sector while a free log lay 57 steps away. It also sent
+   away a person who stood in the sector with the logs. Now the counter counts the person's own
+   sector. When the near search fails, the far search looks over every sector the counter counts. */
+const SEARCH_REACH = 4;
+/* Whether the tile x, y lies within the reach of a person whose sector is `me`. */
+const inReach = (me, x, y) => dist(Math.floor(x / LW), Math.floor(y / LH), me.sx, me.sy) <= SEARCH_REACH;
+/* The nearest sector within the reach, the person's own first, where `counter` finds something. */
 function nearestSectorWith(a, counter){
   const me = secOf(a.x, a.y);
-  const list = sectors.filter(s => !(s.sx === me.sx && s.sy === me.sy)).sort((p, q) => dist(p.sx, p.sy, me.sx, me.sy) - dist(q.sx, q.sy, me.sx, me.sy));
-  for (const s of list){ if (dist(s.sx, s.sy, me.sx, me.sy) > 4) break; if (counter(s) > 0) return s; }
+  const list = sectors.slice().sort((p, q) => dist(p.sx, p.sy, me.sx, me.sy) - dist(q.sx, q.sy, me.sx, me.sy));
+  for (const s of list){ if (dist(s.sx, s.sy, me.sx, me.sy) > SEARCH_REACH) break; if (counter(s) > 0) return s; }
   return null;
+}
+/* The far search, for when the near search failed and the counter saw something. It looks at every
+   tile `goal` accepts within the reach, and at nothing past it. Its path may cross ground past the
+   reach on the way. It has no node limit, as with the search for far water. So whatever the counter
+   counts, this search finds, unless nobody can walk to it. */
+function searchReach(a, goal){
+  const me = secOf(a.x, a.y);
+  return bfs(a.x, a.y, a.z, (x, y, z) => inReach(me, x, y) && goal(x, y, z), NZ * W * H, a);
 }
 
 /* ---------- world generation ---------- */
