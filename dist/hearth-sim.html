@@ -1950,13 +1950,16 @@ function nearestSectorWith(a, counter){
   for (const s of list){ if (dist(s.sx, s.sy, me.sx, me.sy) > SEARCH_REACH) break; if (counter(s) > 0) return s; }
   return null;
 }
-/* The far search, for when the near search failed and the counter saw something. It looks at every
-   tile `goal` accepts within the reach, and at nothing past it. Its path may cross ground past the
-   reach on the way. It has no node limit, as with the search for far water. So whatever the counter
-   counts, this search finds, unless nobody can walk to it. */
+/* The far search runs when the near search fails and the counter counts something. It never steps
+   onto a tile past the reach. It stops at the reach's edge even when nobody can walk to anything
+   inside it. It has no other node limit. It accepts only tiles on the surface, because the counter
+   counts only the surface. So it finds whatever the counter counts, if a person can walk to it
+   without leaving the reach. It misses a thing that only a path outside the reach leads to. The
+   offer then fails, the same as for a thing nobody can reach. The reach has no margin, because a
+   margin would be a second reach. */
 function searchReach(a, goal){
   const me = secOf(a.x, a.y);
-  return bfs(a.x, a.y, a.z, (x, y, z) => inReach(me, x, y) && goal(x, y, z), NZ * W * H, a);
+  return bfs(a.x, a.y, a.z, (x, y, z) => z === 0 && goal(x, y, z), NZ * W * H, a, (x, y) => inReach(me, x, y));
 }
 
 /* ---------- world generation ---------- */
@@ -2680,7 +2683,9 @@ let reachSeen, reachGen = 0;
 /* The search buffers cover every level of the world. startWorld sizes them once the options are set. */
 function allocSearch(){ bfsPrev = new Int32Array(NZ * W * H); bfsSeen = new Uint32Array(NZ * W * H); bfsGen = 0; reachSeen = new Uint32Array(NZ * W * H); reachGen = 0; }
 const unpack = i => { const z = ((i / (W * H)) | 0) + ZMIN, r = i - (z - ZMIN) * W * H, x = r % W; return [x, (r - x) / W, z]; };
-function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
+/* `inside`, when given, bounds the search. The search neither tests nor steps onto a tile it refuses. Only
+   the far search passes it. Every other caller leaves it out and searches exactly as before. */
+function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null, inside = null){
   if (goal(sx, sy, sz)) return [];
   const lo = who ? SPECIES[who.species].zmin : ZMIN, hi = who ? SPECIES[who.species].zmax : ZMAX;
   const start = idx3(sx, sy, sz);
@@ -2692,6 +2697,7 @@ function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
     for (let k = 0; k < st.length; k += 3){
       const nx = st[k], ny = st[k + 1], nz = st[k + 2];
       if (nz < lo || nz > hi) continue;
+      if (inside && !inside(nx, ny, nz)) continue;
       const ni = idx3(nx, ny, nz);
       if (seen[ni] === gen) continue;
       seen[ni] = gen; prev[ni] = c;
@@ -3319,12 +3325,13 @@ Object.assign(TASKS, {
       const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
       if (!p){
         if (a.carrying) return startTask(a, 'deliver');
-        /* As for loose things in `gather`: the counter, then the far search over the same ground. A
-           bush counts by its own tile, so the place to stand beside it may lie just past the reach. */
+        /* As in `gather`, the counter runs first, and then the far search runs over the same ground.
+           The counter counts a bush by its own tile. So the far search takes a bush only within the
+           reach. It skips a bush past the reach, even when the tile to stand on beside it is inside. */
         if (!nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood))) return false;
         const me = secOf(a.x, a.y); let bush = null;
         const ripe = tl => hasFood(tl) && inReach(me, tl.x, tl.y);
-        const q = bfs(a.x, a.y, a.z, (x, y, z) => !!(bush = nearFind(x, y, ripe, NEAR, z)), NZ * W * H, a); if (!q) return false;
+        const q = searchReach(a, (x, y, z) => !!(bush = nearFind(x, y, ripe, NEAR, z))); if (!q) return false;
         const s = sectorOfTile(bush);
         if (s === sectorOfTile(a)) return { label: 'Going to pick berries', path: q, progress: 0 };
         return { label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, progress: 0 };

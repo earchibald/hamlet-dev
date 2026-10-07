@@ -73,13 +73,16 @@ function nearestSectorWith(a, counter){
   for (const s of list){ if (dist(s.sx, s.sy, me.sx, me.sy) > SEARCH_REACH) break; if (counter(s) > 0) return s; }
   return null;
 }
-/* The far search, for when the near search failed and the counter saw something. It looks at every
-   tile `goal` accepts within the reach, and at nothing past it. Its path may cross ground past the
-   reach on the way. It has no node limit, as with the search for far water. So whatever the counter
-   counts, this search finds, unless nobody can walk to it. */
+/* The far search runs when the near search fails and the counter counts something. It never steps
+   onto a tile past the reach. It stops at the reach's edge even when nobody can walk to anything
+   inside it. It has no other node limit. It accepts only tiles on the surface, because the counter
+   counts only the surface. So it finds whatever the counter counts, if a person can walk to it
+   without leaving the reach. It misses a thing that only a path outside the reach leads to. The
+   offer then fails, the same as for a thing nobody can reach. The reach has no margin, because a
+   margin would be a second reach. */
 function searchReach(a, goal){
   const me = secOf(a.x, a.y);
-  return bfs(a.x, a.y, a.z, (x, y, z) => inReach(me, x, y) && goal(x, y, z), NZ * W * H, a);
+  return bfs(a.x, a.y, a.z, (x, y, z) => z === 0 && goal(x, y, z), NZ * W * H, a, (x, y) => inReach(me, x, y));
 }
 
 /* ---------- world generation ---------- */

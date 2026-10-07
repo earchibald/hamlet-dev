@@ -6,7 +6,9 @@ let reachSeen, reachGen = 0;
 /* The search buffers cover every level of the world. startWorld sizes them once the options are set. */
 function allocSearch(){ bfsPrev = new Int32Array(NZ * W * H); bfsSeen = new Uint32Array(NZ * W * H); bfsGen = 0; reachSeen = new Uint32Array(NZ * W * H); reachGen = 0; }
 const unpack = i => { const z = ((i / (W * H)) | 0) + ZMIN, r = i - (z - ZMIN) * W * H, x = r % W; return [x, (r - x) / W, z]; };
-function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
+/* `inside`, when given, bounds the search. The search neither tests nor steps onto a tile it refuses. Only
+   the far search passes it. Every other caller leaves it out and searches exactly as before. */
+function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null, inside = null){
   if (goal(sx, sy, sz)) return [];
   const lo = who ? SPECIES[who.species].zmin : ZMIN, hi = who ? SPECIES[who.species].zmax : ZMAX;
   const start = idx3(sx, sy, sz);
@@ -18,6 +20,7 @@ function bfs(sx, sy, sz, goal, maxNodes = 2500, who = null){
     for (let k = 0; k < st.length; k += 3){
       const nx = st[k], ny = st[k + 1], nz = st[k + 2];
       if (nz < lo || nz > hi) continue;
+      if (inside && !inside(nx, ny, nz)) continue;
       const ni = idx3(nx, ny, nz);
       if (seen[ni] === gen) continue;
       seen[ni] = gen; prev[ni] = c;

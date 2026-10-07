@@ -215,12 +215,13 @@ Object.assign(TASKS, {
       const p = bfs(a.x, a.y, a.z, (x, y, z) => !!nearFind(x, y, hasFood, NEAR, z), 2500, a);
       if (!p){
         if (a.carrying) return startTask(a, 'deliver');
-        /* As for loose things in `gather`: the counter, then the far search over the same ground. A
-           bush counts by its own tile, so the place to stand beside it may lie just past the reach. */
+        /* As in `gather`, the counter runs first, and then the far search runs over the same ground.
+           The counter counts a bush by its own tile. So the far search takes a bush only within the
+           reach. It skips a bush past the reach, even when the tile to stand on beside it is inside. */
         if (!nearestSectorWith(a, s => sectorCount(s, 'berries', hasFood))) return false;
         const me = secOf(a.x, a.y); let bush = null;
         const ripe = tl => hasFood(tl) && inReach(me, tl.x, tl.y);
-        const q = bfs(a.x, a.y, a.z, (x, y, z) => !!(bush = nearFind(x, y, ripe, NEAR, z)), NZ * W * H, a); if (!q) return false;
+        const q = searchReach(a, (x, y, z) => !!(bush = nearFind(x, y, ripe, NEAR, z))); if (!q) return false;
         const s = sectorOfTile(bush);
         if (s === sectorOfTile(a)) return { label: 'Going to pick berries', path: q, progress: 0 };
         return { label: `Walking to the ${s.name.toLowerCase()} for berries`, path: q, progress: 0 };

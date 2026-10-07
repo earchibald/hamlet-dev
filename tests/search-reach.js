@@ -55,7 +55,7 @@ test('a person standing in the sector that holds the only log finds it', () => {
   put(a, 112, 40);                        // the top left corner of sector 4,2
   const log = api.addItem('log', 139, 59); // its bottom right corner, 46 steps off
   const ok = api.startTask(a, 'gather', { item: 'log' });
-  assert.ok(ok, `the gather would not start: the counter did not see the log in the person's own sector (task: ${doing(api, a)})`);
+  assert.ok(ok, `the gather would not start (task: ${doing(api, a)}). Either the counter did not count the log in the person's own sector, or the far search did not reach it.`);
   assert.equal(a.task.kind, 'gather', `the person was given ${doing(api, a)}`);
   assert.equal(a.task.args.id, log.id);
   assert.ok(!api.chronicle.some(e => e.text.includes('to look for logs')), 'a line says the person went somewhere else for logs');
@@ -77,7 +77,7 @@ test('a person standing in the sector that holds the only ripe bush finds it', (
   put(a, 112, 40);
   const b = api.tileAt(139, 59); b.feature = 'bush'; b.berries = 3;
   const ok = api.startTask(a, 'pickBerries');
-  assert.ok(ok, `picking would not start: the counter did not see the bush in the person's own sector (task: ${doing(api, a)})`);
+  assert.ok(ok, `picking would not start (task: ${doing(api, a)}). Either the counter did not count the bush in the person's own sector, or the far search did not reach it.`);
   assert.equal(a.task.kind, 'pickBerries', `the person was given ${doing(api, a)}`);
   const end = a.task.path[a.task.path.length - 1];
   assert.ok(Math.abs(end[0] - 139) + Math.abs(end[1] - 59) <= 1, `the path ends at ${end}, not beside the bush`);
@@ -103,6 +103,38 @@ test('the far search sees no farther than the counter', () => {
   assert.ok(s.sx + past < api.W / api.LW, 'the world is too narrow for a sector past the reach');
   const beyond = api.addItem('log', (s.sx + past) * api.LW + 1, 50);
   const ok = api.startTask(a, 'gather', { item: 'log' });
-  assert.ok(!ok || a.task.args.id !== beyond.id, `the far search took the log at ${beyond.x},${beyond.y}, ${past} sectors off, which the counter does not see`);
+  assert.ok(!ok || a.task.args.id !== beyond.id, `the far search took the log at ${beyond.x},${beyond.y}, ${past} sectors off, which the counter does not count`);
   assert.equal(shut.reservedBy, null);
+});
+
+test('the far search takes no bush farther than the counter counts', () => {
+  const { api, a } = plain();
+  put(a, 126, 50);
+  /* A ripe bush inside the reach that nobody can stand beside: the counter counts it, so the far search runs. */
+  const shut = api.tileAt(183, 50); shut.feature = 'bush'; shut.berries = 3;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) api.tileAt(183 + dx, 50 + dy).ground = 'rock';
+  /* A ripe bush on the first column past the reach. The tile to stand on beside it lies inside the reach. */
+  const s = api.secOf(a.x, a.y), past = api.SEARCH_REACH + 1;
+  assert.ok(s.sx + past < api.W / api.LW, 'the world is too narrow for a sector past the reach');
+  const bx = (s.sx + past) * api.LW, beyond = api.tileAt(bx, 50); beyond.feature = 'bush'; beyond.berries = 3;
+  assert.ok(api.secOf(bx - 1, 50).sx === s.sx + api.SEARCH_REACH, 'the place to stand beside the far bush is not inside the reach');
+  const ok = api.startTask(a, 'pickBerries');
+  const end = ok && a.task && a.task.path.length ? a.task.path[a.task.path.length - 1] : null;
+  assert.ok(!end || Math.abs(end[0] - bx) + Math.abs(end[1] - 50) > 1, `the far search went to the bush at ${bx},50, ${past} sectors off, which the counter does not count`);
+});
+
+test('the far search takes nothing off the surface, because the counter counts only the surface', () => {
+  const { api, a } = plain();
+  put(a, 126, 50);
+  /* A surface log in reach that nobody can walk to, so the counter counts one and the far search runs. */
+  const shut = api.addItem('log', 183, 50);
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) api.tileAt(183 + dx, 50 + dy).ground = 'rock';
+  /* A log one level up, 44 steps off, that a person can walk to by a slope. The near search cannot see it. */
+  api.tileAt(169, 50).slope = true;
+  api.placeTile(170, 50, 1, 'grass');
+  const up = api.addItem('log', 170, 50, 1);
+  assert.equal(api.bfs(a.x, a.y, 0, (x, y, z) => x === up.x && y === up.y && z === 1, 2500, a), null, 'the near search reached the raised log');
+  assert.ok(api.bfs(a.x, a.y, 0, (x, y, z) => x === up.x && y === up.y && z === 1, 1e6, a), 'nobody can walk to the raised log, so this case tests nothing');
+  const ok = api.startTask(a, 'gather', { item: 'log' });
+  assert.ok(!ok || a.task.args.id !== up.id, 'the far search took a log one level up, which the counter does not count');
 });
