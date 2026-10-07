@@ -16,20 +16,36 @@ const RULES = JSON.parse(fs.readFileSync(path.join(__dirname, 'prose-rules.json'
 /* Blank a span and keep its length, so that the text after it stays in the same column. */
 const blank = s => s.replace(/[^\n]/g, ' ');
 
+/* A dash between clauses has three forms. An em dash counts anywhere. An en dash counts only with a
+   space or the end of the text on each side, and so do two hyphens. A range of numbers, such as 3–5,
+   is not a dash between clauses. An HTML entity for a dash is read as the dash. */
+const DASH = /—|(?<!\S)–(?!\S)|(?<!\S)--(?!\S)/g;
+const entities = t => t.replace(/&(?:mdash|#8212|#x2014);/gi, '—').replace(/&(?:ndash|#8211|#x2013);/gi, '–');
+const hasDash = t => new RegExp(DASH.source).test(entities(t));
+
 const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'in', 'of', 'do', 'else', 'void', 'delete', 'throw', 'new', 'yield', 'await']);
 function literals(src){
   const out = [];
   let i = 0, line = 1;
   /* A string closes after the strings inside it, so each one is kept with its offset and the list is
-     put in source order at the end. A string of placeholders alone, such as XX, holds no word. */
+     put in source order at the end. A string of placeholders alone, such as XX, holds no word.
+     A string with no word is still kept if it holds a dash, such as the joiner in .join(' — '),
+     because a dash needs no word beside it. */
   const emit = (at, from, raw) => {
     const text = raw.replace(/\s+/g, ' ').trim();
-    if (/[A-Za-z]{2}/.test(text.replace(/X/g, ''))) out.push({ from, line: at, text });
+    if (/[A-Za-z]{2}/.test(text.replace(/X/g, '')) || hasDash(text)) out.push({ from, line: at, text });
   };
-  const escaped = () => { // `i` is on the backslash. Returns the character the escape stands for.
-    const c = src[i + 1]; i += 2;
+  /* `i` is the index of the backslash. Returns the character the escape stands for, so that '\u2014' is read
+     as an em dash and '\u00b7' as a middle dot, and not as the word u2014 or u00b7. */
+  const escaped = () => {
+    const c = src[i + 1];
+    const hex = (from, to, next) => { const n = parseInt(src.slice(from, to), 16); i = next; return Number.isNaN(n) ? '' : String.fromCodePoint(n); };
+    if (c === 'u' && src[i + 2] === '{'){ const close = src.indexOf('}', i + 3); return hex(i + 3, close, close + 1); }
+    if (c === 'u') return hex(i + 2, i + 6, i + 6);
+    if (c === 'x') return hex(i + 2, i + 4, i + 4);
+    i += 2;
     if (c === '\n'){ line++; return ''; }
-    return c === 'n' || c === 't' || c === 'r' ? ' ' : c;
+    return 'ntrbfv'.includes(c) ? ' ' : c;
   };
   function quoted(q){ // `i` is after the opening quote
     const at = line, from = i; let s = '';
@@ -108,13 +124,12 @@ function docLines(md){
 function check(raw, { sentences = false } = {}){
   const out = [];
   /* A curly apostrophe and a hard hyphen are the same words to a reader, so they are made plain. */
-  const text = raw.replace(/[‘’]/g, "'").replace(/[‐‑]/g, '-');
+  const text = entities(raw).replace(/[‘’]/g, "'").replace(/[‐‑]/g, '-');
   for (const p of RULES.phrases){
     const m = text.match(new RegExp('\\b(?:' + p.re + ')\\b', 'i'));
     if (m) out.push({ rule: 'phrase', match: m[0].toLowerCase(), note: `"${m[0]}": use ${p.alt}` });
   }
-  /* An em dash, an en dash with a space on each side, or two hyphens with a space on each side. */
-  for (const m of text.matchAll(/—|\s–\s|\s--\s/g)) out.push({ rule: 'em-dash', match: m[0].trim(), note: 'use a full stop or a comma' });
+  for (const m of text.matchAll(DASH)) out.push({ rule: 'em-dash', match: m[0].trim(), note: 'use a full stop or a comma' });
   /* In HTML a tag ends a sentence, or the words of two paragraphs would count as one sentence. */
   if (sentences) for (const s of text.replace(/<[^>]*>/g, '. ').split(/(?<=[.?!])\s+/)){
     const n = s.trim().split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w)).length;

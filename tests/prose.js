@@ -88,6 +88,37 @@ test('a code fence that never closes is an error, because it would hide the rest
   assert.throws(() => docLines('One.\n```js\nThree is load-bearing.\n'), /fence/);
 });
 
+/* The four cases below are inputs that the second extractor got wrong. The task review of the
+   rebase found them. For each one, it put a fault into the source, and the gate still passed. */
+test('an escape is read as the character it stands for, so an escaped em dash is a dash', () => {
+  assert.deepEqual(texts("const a = 'The fire ran \\u2014 nobody slept.';"), ['The fire ran — nobody slept.']);
+  assert.deepEqual(texts("const a = `The fire ran \\u{2014} nobody slept.`;"), ['The fire ran — nobody slept.']);
+  assert.deepEqual(texts("const a = 'The fire ran \\xb7 nobody slept.';"), ['The fire ran · nobody slept.']);
+  assert.deepEqual(rulesOf(check(texts("const a = 'The fire ran \\u2014 nobody slept.';")[0])), ['em-dash']);
+});
+
+test('an escaped middle dot is not counted as a word of a sentence', () => {
+  const words = Array.from({ length: RULES.sentenceWords }, () => 'fire');
+  const src = `const a = '${words.slice(0, 12).join(' ')} \\u00b7 ${words.slice(12).join(' ')}.';`;
+  assert.equal(texts(src).length, 1);
+  assert.deepEqual(rulesOf(check(texts(src)[0], { sentences: true })), [], 'the 25 words are at the limit, and the dot is not a word');
+});
+
+test('a joiner with no word in it is still read, because a dash needs no word beside it', () => {
+  assert.deepEqual(texts("const a = parts.join(' — ');"), ['—']);
+  assert.deepEqual(rulesOf(check(texts("const a = parts.join(' — ');")[0])), ['em-dash']);
+  assert.deepEqual(rulesOf(check(texts("const a = parts.join(' \\u2014 ');")[0])), ['em-dash']);
+  assert.deepEqual(rulesOf(check(texts("const a = parts.join(' – ');")[0])), ['em-dash']);
+  assert.deepEqual(texts("const a = parts.join(' · '); const b = parts.join(' - ');"), []);
+});
+
+test('an HTML entity for a dash is a dash', () => {
+  for (const e of ['&mdash;', '&#8212;', '&#x2014;', '&ndash;', '&#8211;', '&#x2013;'])
+    assert.deepEqual(rulesOf(check(`The fire ran ${e} nobody slept.`)), ['em-dash'], e);
+  assert.deepEqual(rulesOf(check('Days 3&ndash;5 were cold.')), [], 'a range is not a dash between clauses');
+  assert.deepEqual(texts("const h = '<b>' + '&mdash;' + '</b>';"), ['&mdash;']);
+});
+
 test('a literal with no word in it is not read', () => {
   assert.deepEqual(texts("const k = 'a b c d'; const sel = '#x > .y + .z ~ .w'; const n = '12 / 7';"), []);
 });
@@ -140,6 +171,10 @@ function sourceLiterals(dir){
 
 /* A fault that was in the game's text before this gate is recorded here by file, by rule, and by
    number. The number may fall and may not rise. A change to that text goes through the review panel.
+
+   The record counts by file and by rule, and not by line. So if one known fault is fixed and a new
+   fault of the same rule enters the same file, the count stays the same and the test passes. Lower
+   the number when you fix a known fault, and the new fault then shows.
 
    `src/ui/panels.js` writes " — the ground refused it" and " — taken" after the name of a mark.
 
