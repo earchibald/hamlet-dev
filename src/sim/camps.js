@@ -350,7 +350,7 @@ function updateCamps(){
       for (const p of hs) for (const q of hs) if (p.id < q.id && (p.opinions[q.id] || 0) >= 35 && (q.opinions[p.id] || 0) >= 35 && (!pair || (p.opinions[q.id] + q.opinions[p.id]) > pair.v)) pair = { p, q, v: p.opinions[q.id] + q.opinions[p.id] };
       if (pair){
         const [hx, hy] = camp.shelter, c = makeBeing('human', hx, hy, takeName(), (pair.p.hue + pair.q.hue) / 2 % 360);
-        c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
+        c.born = tick; c.camp = camp; c.parents = [pair.p.id, pair.q.id]; c.grown = false; c.skills = Object.fromEntries(Object.keys(c.skills).map(k => [k, 0]));
         for (const t in c.traits) c.traits[t] = clamp(Math.round(((pair.p.traits[t] + pair.q.traits[t]) / 2 + (rng() - 0.5) * 0.3) * 100) / 100, 0, 1);
         beings.push(c); pair.p.lastChild = pair.q.lastChild = tick;
         lineageFor(c, { roof: true, village: !!camp.village,

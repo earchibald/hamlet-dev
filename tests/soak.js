@@ -77,14 +77,22 @@ const KNOWN_DEATHS = {};
    still fails. */
 const sums = { humans: 0, born: 0, searched: 0, finds: 0, repaid: 0, benches: 0, grown: 0 };
 
-/* The other end of the life table: a child born in the run who is alive at the end and past
-   'young'. Measured on the six default seeds at 70 days: r 2, x 1, alpha 3, beta 6, gamma 3,
-   delta 3, 18 together, out of 37 born. A per-seed floor of 1 rests on seed x's single child, and
-   `born` is the same swinging variable the comment above describes, so the claim is floored across
-   the six seeds together, at about a third of the measured sum.
+/* The other end of the life table: a child born in the run who comes of age, counted by the lines
+   tagged 'grown'. Measured on branch review-h6-come-of-age at 317f62c. The six default seeds ran
+   70 days each, one process per seed.
 
-   The reason for summing is margin, not reachability. Beta alone made 6, so a single seed can carry
-   the whole summed floor. That is unlike `FAR_FLOOR` below, where a seed may genuinely never send
+     seed       r   x   alpha   beta   gamma   delta   together
+     grown     16  13      15     15      13      14         86
+     born      27  19      23     24      21      20        134
+
+   The floor is far below that sum. It was set at about a third of an older count, on an older dev.
+   That count was of children alive at the end and past 'young': 18 together out of 37 born, and
+   seed x had only 1. Whether to raise the floor is an open question on PR #139. `born` is the same
+   swinging variable the comment above describes, so the test sets one floor for the sum of the six
+   seeds, not one for each seed.
+
+   The reason for summing is margin, not reachability. Every seed alone made 13 or more, so a single
+   seed can carry the whole summed floor. That is unlike `FAR_FLOOR` below, where a seed may genuinely never send
    anyone to a cave in 70 days and the sum is the only way to make a claim at all. Here the sum only
    buys room for the swing in `born`. */
 const GROWN_FLOOR = 6;
@@ -125,20 +133,19 @@ for (const seed of SEEDS){
        for a being taken off the board another way. Three paths do that today: the snared rabbit
        (beings.js:369), the deer in the pitfall (beings.js:377) and an unmade god (gods.js:467).
        All three are non-human, so no number here is touched. A human killed down a path like
-       those would answer NaN to every comparison below. It drops out of `grown` and `pastSpan`
+       those would answer NaN to every comparison below. It drops out of `pastSpan`
        in silence. It does not leave quietly, though: `oldestHuman` spreads the NaN through
        `Math.max`, and the diagnostic below prints `NaN` days. So a fourth such path needs
        `diedAt` with it. */
     const LH = api.LIFE.human;
     const lastAge = b => ((b.alive ? api.tick : b.diedAt) - b.born) / api.DAY;
     const bornHere = api.beings.filter(b => b.species === 'human' && b.parents);
-    /* `grown` asks `stage()`, the function every rule in the sim consults, rather than recomputing
-       the age against `LIFE.human.adult`. An assertion on the arithmetic would hold while `stage()`
-       was frozen at 'young', which is one of the mechanisms the claim below names. `stage()` reads
-       the live tick, so it is asked only of a being still alive: for a dead child it would answer
-       for the age that child would have been, and a run that killed every child would still count
-       them as grown. */
-    const grown = bornHere.filter(b => b.alive && api.stage(b) !== 'young');
+    /* `grown` counts the line a child writes when it comes of age (src/sim/beings.js, `comeOfAge`),
+       by its tag and not by its text. It was read off the beings at the end, with `stage()`, because
+       the turn wrote nothing (issue #104). The event is the honest thing to count: a frozen `stage()`
+       writes no line, and neither does a child who died young. Only a human child born in a camp
+       carries the mark the line reads, so no founder and no animal feeds this count. */
+    const grown = events.filter(e => e.tag === 'grown');
     const pastSpan = api.beings.filter(b => b.species === 'human' && lastAge(b) > LH.life);
     const oldestHuman = Math.max(0, ...api.beings.filter(b => b.species === 'human').map(lastAge));
     /* Human old-age deaths, counted by tag and not by text. `counts.oldAge` in tests/lib/run.js is
@@ -173,7 +180,7 @@ for (const seed of SEEDS){
        killed by something else lifts this number and not the tag count, and that death is the
        sibling claim's business, not this one's. */
     const humanOldDead = api.beings.filter(b => b.species === 'human' && !b.alive && lastAge(b) > LH.life).length;
-    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them alive and grown up; ${pastSpan.length} passed the span, ${humanOldAge} people died of old age (${counts.oldAge} lines of old age all told, gnomes too, if any); oldest ${oldestHuman.toFixed(1)} days`);
+    t.diagnostic(`${seed}: life table (adult ${LH.adult}, old ${LH.old}, span ${LH.life} days): ${bornHere.length} born here, ${grown.length} of them came of age; ${pastSpan.length} passed the span, ${humanOldAge} people died of old age (${counts.oldAge} lines of old age all told, gnomes too, if any); oldest ${oldestHuman.toFixed(1)} days`);
 
     await t.test('the first camp has a site, a pit, and a fire that was lit', () => {
       const c = api.camps[0];
@@ -380,18 +387,17 @@ test('the six camps together grow', { skip: SUM_SKIP }, t => {
 /* The young end of the life table. `born >= 1` is already floored per seed, but a birth is only the
    start of the passage: nothing said a child ever grew up, so the whole young-to-adult transition
    was unnamed, and a change that killed every child, or froze `stage()` at 'young', would leave the
-   soak green (issue #94). `stage()` writes no chronicle line when it turns, so the claim is read off
-   the beings at the end instead of counted from the events, and it asks `stage()` itself rather
-   than recomputing the age: an age comparison would hold while `stage()` was frozen, which is one
-   of the two mechanisms named here. Summed across the six seeds, for the reason GROWN_FLOOR
-   gives.
+   soak green (issue #94). A child who comes of age writes a chronicle line (issue #104), and the
+   claim counts those lines. A frozen `stage()` writes none, and neither does a child who died young,
+   so both mechanisms named here turn it red. Summed across the six seeds, for the reason
+   GROWN_FLOOR gives.
 
    SUSPENDED under `SUM_SKIP`, like the two floors above, and for the same two reasons: nobody is
    born in three world days, and `GROWN_FLOOR` is a sum across the six seeds measured over seventy of
    dev's days. The floor is not lowered to fit the short run. */
 test('a child born in the run grows up', { skip: SUM_SKIP }, t => {
-  t.diagnostic(`children born in the run who are alive and past 'young' across ${SEEDS.join(', ')}: ${sums.grown} of ${sums.born} born`);
-  assert.ok(sums.grown >= GROWN_FLOOR, `${sums.grown} of ${sums.born} children are alive at the end and past 'young' by stage() (want >= ${GROWN_FLOOR}). A birth that never grows up leaves every rule that reads a being's stage untested on its far side.`);
+  t.diagnostic(`children born in the run who came of age across ${SEEDS.join(', ')}: ${sums.grown} of ${sums.born} born`);
+  assert.ok(sums.grown >= GROWN_FLOOR, `${sums.grown} of ${sums.born} children came of age in the chronicle (want >= ${GROWN_FLOOR}). A birth that never grows up leaves every rule that reads a being's stage untested on its far side.`);
 });
 
 /* SUSPENDED for the same two reasons: nobody walks to a far country in three days, and these are
