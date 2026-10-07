@@ -143,8 +143,9 @@ function sourceLiterals(dir){
 
    `src/ui/panels.js` writes " — the ground refused it" and " — taken" after the name of a mark.
 
-   `src/sim/snapshot.js` gives the reason that `blazeReach` is not saved in one sentence of 29 words.
-   It came in with the lightning work while this branch was open. A player never reads it. */
+   `src/sim/snapshot.js` gives the reason that `blazeReach` is not saved. That reason is one sentence
+   of 29 words. It came in with the lightning work while this branch was open. A player never reads
+   it. */
 const KNOWN_SOURCE = {
   'src/ui/panels.js': { 'em-dash': 2 },
   'src/sim/snapshot.js': { 'long-sentence': 1 },
